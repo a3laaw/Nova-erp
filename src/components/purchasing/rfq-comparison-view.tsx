@@ -3,8 +3,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem } from '@/lib/types';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -15,9 +15,22 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, cn } from '@/lib/utils';
-import { Award, AlertCircle, AlertTriangle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
+import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus } from 'lucide-react';
+import { Button } from '../ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
@@ -25,9 +38,16 @@ interface RfqComparisonViewProps {
 
 export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
+  const router = useRouter();
+  const { user: currentUser } = useAuth();
+
   const [registeredVendors, setRegisteredVendors] = useState<Vendor[]>([]);
   const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  
+  const [isAwarding, setIsAwarding] = useState(false);
+  const [vendorToAward, setVendorToAward] = useState<any | null>(null);
 
   useEffect(() => {
     if (!firestore || !rfq.id) {
@@ -74,7 +94,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
       return { data: [], vendors: [], totals: {} };
     }
 
-    // Combine registered and prospective vendors
     const allAvailableVendors = [
         ...registeredVendors,
         ...(rfq.prospectiveVendors || [])
@@ -110,6 +129,95 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
     return { data, vendors: participatingVendors, totals: tempTotals };
   }, [loadingData, rfq, supplierQuotations, registeredVendors]);
+
+  const handleAwardClick = (vendor: any) => {
+      setVendorToAward(vendor);
+  };
+
+  const handleConfirmAward = async () => {
+    if (!firestore || !vendorToAward || !currentUser) return;
+    setIsAwarding(true);
+
+    try {
+        let finalVendorId = vendorToAward.id;
+        const isProspective = String(finalVendorId).startsWith('prospective-');
+
+        await runTransaction(firestore, async (transaction) => {
+            // 1. إذا كان المورد محتملاً، نحوله لمورد رسمي أولاً لضمان سلامة الربط المحاسبي
+            if (isProspective) {
+                const newVendorRef = doc(collection(firestore, 'vendors'));
+                finalVendorId = newVendorRef.id;
+                transaction.set(newVendorRef, {
+                    name: vendorToAward.name,
+                    contactPerson: 'تم التحويل من طلب تسعير',
+                    createdAt: serverTimestamp(),
+                });
+            }
+
+            // 2. توليد رقم أمر الشراء
+            const currentYear = new Date().getFullYear();
+            const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+            const counterDoc = await transaction.get(counterRef);
+            let nextNumber = 1;
+            if (counterDoc.exists()) {
+                const counts = counterDoc.data()?.counts || {};
+                nextNumber = (counts[currentYear] || 0) + 1;
+            }
+            const poNumber = `PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+
+            // 3. تجهيز بيانات الأصناف بناءً على عرض السعر المختار
+            const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
+            if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
+
+            const poItems = rfq.items.map(rfqItem => {
+                const quoteItem = quote.items.find(qi => qi.rfqItemId === rfqItem.id);
+                const unitPrice = quoteItem?.unitPrice || 0;
+                return {
+                    internalItemId: rfqItem.internalItemId,
+                    itemName: rfqItem.itemName,
+                    quantity: rfqItem.quantity,
+                    unitPrice: unitPrice,
+                    total: unitPrice * rfqItem.quantity
+                };
+            });
+
+            const totalAmount = poItems.reduce((sum, item) => sum + item.total, 0);
+
+            // 4. إنشاء أمر الشراء
+            const newPoRef = doc(collection(firestore, 'purchaseOrders'));
+            const poData = {
+                poNumber,
+                orderDate: serverTimestamp(),
+                vendorId: finalVendorId,
+                vendorName: vendorToAward.name,
+                projectId: rfq.projectId || null,
+                items: poItems,
+                totalAmount,
+                status: 'draft',
+                rfqId: rfq.id,
+                supplierQuotationId: quote.id,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser.id
+            };
+
+            transaction.set(newPoRef, cleanFirestoreData(poData));
+            transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            
+            // 5. تحديث حالة الـ RFQ (اختياري)
+            const rfqRef = doc(firestore, 'rfqs', rfq.id!);
+            transaction.update(rfqRef, { status: 'closed' });
+        });
+
+        toast({ title: 'تمت الترسية بنجاح', description: 'تم إنشاء مسودة أمر شراء وتحديث المخزون المحاسبي.' });
+        router.push('/dashboard/purchasing/purchase-orders');
+
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'فشل الترسية', description: error.message });
+    } finally {
+        setIsAwarding(false);
+        setVendorToAward(null);
+    }
+  };
 
   if (loadingData)
     return (
@@ -199,22 +307,70 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             })}
           </TableBody>
           <TableFooter className="bg-muted/30">
-            <TableRow className="h-20 border-t-4 border-primary/20">
+            <TableRow className="h-24 border-t-4 border-primary/20">
               <TableCell colSpan={2} className="text-right px-8 font-black text-lg">
-                إجمالي قيمة التوريد الكاملة:
+                إجمالي العرض / الترسية:
               </TableCell>
               {comparisonData.vendors.map((vendor) => (
                 <TableCell
                   key={vendor.id}
-                  className="text-center font-mono text-xl font-black text-primary border-r bg-primary/5"
+                  className="text-center border-r bg-primary/5 px-2"
                 >
-                  {formatCurrency(comparisonData.totals[vendor.id!])}
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="font-mono text-xl font-black text-primary">
+                        {formatCurrency(comparisonData.totals[vendor.id!])}
+                    </span>
+                    <Button 
+                        size="sm" 
+                        variant="default"
+                        className="h-8 rounded-lg text-[10px] font-bold gap-1 px-3 bg-green-600 hover:bg-green-700 no-print"
+                        onClick={() => handleAwardClick(vendor)}
+                        disabled={isAwarding}
+                    >
+                        <ShoppingCart className="h-3 w-3" />
+                        ترسية وإنشاء أمر شراء
+                    </Button>
+                  </div>
                 </TableCell>
               ))}
             </TableRow>
           </TableFooter>
         </Table>
       </div>
+
+      <AlertDialog open={!!vendorToAward} onOpenChange={() => setVendorToAward(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+                <Award className="text-green-600" />
+                تأكيد الترسية والتحويل
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من اختيار عرض سعر المورد <span className="font-bold text-foreground">"{vendorToAward?.name}"</span>؟
+              <br/><br/>
+              {String(vendorToAward?.id).startsWith('prospective-') ? (
+                  <div className="p-3 bg-blue-50 text-blue-800 rounded-xl border border-blue-100 text-xs flex items-start gap-2">
+                      <UserPlus className="h-4 w-4 mt-0.5 shrink-0" />
+                      <p>هذا المورد محتمل وغير مسجل في النظام. سيقوم النظام بتسجيله تلقائياً كمورد رسمي لإتمام العملية.</p>
+                  </div>
+              ) : (
+                  "سيقوم النظام بإنشاء مسودة أمر شراء (Draft PO) ببيانات هذا العرض فوراً."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isAwarding}>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAward}
+              disabled={isAwarding}
+              className="bg-green-600 hover:bg-green-700 font-bold"
+            >
+              {isAwarding ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <ShoppingCart className="h-4 w-4 ml-2"/>}
+              تأكيد وإنشاء الأمر
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
