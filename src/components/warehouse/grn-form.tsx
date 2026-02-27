@@ -136,8 +136,9 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
     const handleRegisterVendor = async () => {
         if (!selectedPo || !firestore) return;
-        if (!vendorData.phone) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'رقم الهاتف مطلوب لمنع تكرار الموردين.' });
+        
+        if (!vendorData.phone.trim()) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'رقم الهاتف مطلوب إجبارياً لتثبيت المورد ومنع التكرار.' });
             return;
         }
 
@@ -173,13 +174,11 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
         setIsSaving(true);
         try {
-            // جلب الحسابات قبل بدء العملية لضمان الترتيب الصحيح
             const accountsRef = collection(firestore, 'chartOfAccounts');
             const coaSnap = await getDocs(query(accountsRef));
             const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
 
             await runTransaction(firestore, async (transaction) => {
-                // 1. القراءات أولاً (READS FIRST)
                 const currentYear = new Date().getFullYear();
                 const grnCounterRef = doc(firestore, 'counters', 'grns');
                 const coaVendorCounterRef = doc(firestore, 'counters', 'coa_vendors');
@@ -189,34 +188,27 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     transaction.get(coaVendorCounterRef)
                 ]);
 
-                // 2. معالجة المنطق (LOGIC)
                 let inventoryAcc = allAccounts.find(a => a.code === '1104');
                 let vendorsParentAcc = allAccounts.find(a => a.code === '2101');
                 let vendorAcc = allAccounts.find(a => a.name === selectedPo.vendorName && a.parentCode === '2101');
 
-                // حساب الأكواد الجديدة إذا لزم الأمر
                 const nextGrnNumber = ((grnCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const grnNumber = `GRN-${currentYear}-${String(nextGrnNumber).padStart(4, '0')}`;
                 
                 let nextVendorNum = coaVendorCounterDoc.data()?.lastNumber || 0;
 
-                // 3. عمليات الكتابة (WRITES LAST)
-                
-                // إنشاء حساب المخزون إذا نقص
                 if (!inventoryAcc) {
                     const newInvRef = doc(accountsRef);
                     inventoryAcc = { id: newInvRef.id, code: '1104', name: 'المخزون', type: 'asset', level: 2, parentCode: '11', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' };
                     transaction.set(newInvRef, inventoryAcc);
                 }
 
-                // إنشاء حساب الموردين الأب إذا نقص
                 if (!vendorsParentAcc) {
                     const newVenPRef = doc(accountsRef);
                     vendorsParentAcc = { id: newVenPRef.id, code: '2101', name: 'الموردون', type: 'liability', level: 2, parentCode: '21', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' };
                     transaction.set(newVenPRef, vendorsParentAcc);
                 }
 
-                // إنشاء حساب المورد الشخصي إذا نقص
                 if (!vendorAcc) {
                     nextVendorNum++;
                     const vendorCode = `2101${String(nextVendorNum).padStart(3, '0')}`;
@@ -314,7 +306,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     <AlertTriangle className="h-5 w-5" />
                     <AlertTitle className="font-black text-lg">المورد غير مسجل في النظام!</AlertTitle>
                     <AlertDescription className="space-y-4">
-                        <p>لا يمكن إتمام عملية الاستلام وإصدار قيد مالي لمورد "محتمل". يجب عليك أولاً إكمال بيانات المورد وتحويله لمورد رسمي لمنع تكرار الحسابات المحاسبية.</p>
+                        <p>لا يمكن إتمام عملية الاستلام وإصدار قيد مالي لمورد "محتمل". يجب عليك أولاً إكمال بيانات المورد (خاصة رقم الهاتف) وتحويله لمورد رسمي لمنع تكرار الحسابات المحاسبية.</p>
                         <Button type="button" onClick={() => setIsRegistrationDialogOpen(true)} className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl gap-2">
                             <UserPlus className="h-4 w-4" /> إكمال بيانات المورد الآن
                         </Button>
@@ -399,7 +391,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 <div className="space-y-4 py-4">
                     <div className="grid gap-2">
                         <Label>رقم الجوال / الهاتف <span className="text-destructive">*</span></Label>
-                        <Input value={vendorData.phone} onChange={e => setVendorData(p => ({...p, phone: e.target.value}))} placeholder="أدخل رقم التواصل الرئيسي..." dir="ltr" />
+                        <Input value={vendorData.phone} onChange={e => setVendorData(p => ({...p, phone: e.target.value}))} placeholder="أدخل رقم التواصل الرئيسي..." dir="ltr" required />
                     </div>
                     <div className="grid gap-2">
                         <Label>جهة الاتصال</Label>
@@ -412,7 +404,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 </div>
                 <DialogFooter className="gap-2">
                     <Button variant="ghost" onClick={() => setIsRegistrationDialogOpen(false)}>تراجع</Button>
-                    <Button onClick={handleRegisterVendor} disabled={isSaving || !vendorData.phone} className="rounded-xl font-bold px-8">
+                    <Button onClick={handleRegisterVendor} disabled={isSaving || !vendorData.phone.trim()} className="rounded-xl font-bold px-8">
                         {isSaving ? <Loader2 className="animate-spin h-4 w-4 ml-2"/> : <UserPlus className="h-4 w-4 ml-2" />}
                         تثبيت المورد والمتابعة
                     </Button>

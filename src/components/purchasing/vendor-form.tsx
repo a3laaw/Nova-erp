@@ -52,17 +52,25 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !formData.name) {
+        if (!firestore) return;
+        
+        if (!formData.name.trim()) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'اسم المورد مطلوب.' });
             return;
         }
+
+        if (!formData.phone.trim()) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'رقم الهاتف مطلوب بشكل إلزامي لضمان عدم تكرار الموردين.' });
+            return;
+        }
+
         setIsSaving(true);
         try {
             if (isEditing) {
                 await updateDoc(doc(firestore, 'vendors', vendor!.id!), cleanFirestoreData(formData));
                 toast({ title: 'نجاح', description: 'تم تحديث بيانات المورد.' });
             } else {
-                await addDoc(collection(firestore, 'vendors'), cleanFirestoreData(formData));
+                await addDoc(collection(firestore, 'vendors'), cleanFirestoreData({ ...formData, createdAt: serverTimestamp() }));
                 toast({ title: 'نجاح', description: 'تمت إضافة المورد بنجاح.' });
             }
             onClose();
@@ -91,8 +99,8 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="phone">الهاتف</Label>
-                                <Input id="phone" value={formData.phone} onChange={handleChange} dir="ltr" />
+                                <Label htmlFor="phone">رقم الهاتف / الجوال <span className="text-destructive">*</span></Label>
+                                <Input id="phone" value={formData.phone} onChange={handleChange} dir="ltr" required />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="email">البريد الإلكتروني</Label>
@@ -108,7 +116,7 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                         <Button type="submit" disabled={isSaving}>
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                            حفظ
+                            حفظ البيانات
                         </Button>
                     </DialogFooter>
                 </form>
