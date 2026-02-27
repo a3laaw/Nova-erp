@@ -12,11 +12,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch, where, getDocs, updateDoc } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search } from 'lucide-react';
+import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search, Undo2, Loader2 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -29,6 +29,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { searchPurchaseOrders } from '@/lib/cache/fuse-search';
 import { DateInput } from '../ui/date-input';
 import Link from 'next/link';
+import { useAuth } from '@/context/auth-context';
 
 
 const statusColors: Record<string, string> = {
@@ -49,11 +50,13 @@ const statusTranslations: Record<string, string> = {
 
 export function PurchaseOrdersList() {
   const { firestore } = useFirebase();
+  const { user: currentUser } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   
   const [itemToDelete, setItemToDelete] = useState<PurchaseOrder | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -83,6 +86,47 @@ export function PurchaseOrdersList() {
     if (!date) return '-';
     return format(date, 'dd/MM/yyyy');
   };
+
+  const handleUndoApproval = async (po: PurchaseOrder) => {
+    if (!firestore || !currentUser || isProcessing) return;
+    
+    // التحقق من الصلاحيات
+    if (currentUser.role !== 'Admin' && currentUser.role !== 'Accountant') {
+        toast({ variant: 'destructive', title: 'غير مسموح', description: 'ليس لديك صلاحية التعديل على أوامر الشراء.' });
+        return;
+    }
+
+    setIsProcessing(true);
+    try {
+        // 1. التحقق مما إذا كان هناك أي إذن استلام مرتبط
+        const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', po.id), where('status', '!=', 'cancelled'));
+        const grnsSnap = await getDocs(grnsQuery);
+        
+        if (!grnsSnap.empty) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'لا يمكن التراجع', 
+                description: 'تم البدء باستلام بضاعة لهذا الأمر بالفعل. يجب إلغاء أذونات الاستلام أولاً.' 
+            });
+            return;
+        }
+
+        // 2. تحديث الحالة
+        const poRef = doc(firestore, 'purchaseOrders', po.id!);
+        await updateDoc(poRef, { 
+            status: 'draft',
+            approvedBy: null,
+            approvedAt: null
+        });
+        
+        toast({ title: 'تم التراجع', description: 'تمت إعادة أمر الشراء لحالة المسودة بنجاح.' });
+    } catch (error) {
+        console.error("Undo approval failed:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الاعتماد.' });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
   
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
@@ -97,7 +141,7 @@ export function PurchaseOrdersList() {
         if (itemToDelete.rfqId) {
             const rfqRef = doc(firestore, 'rfqs', itemToDelete.rfqId);
             batch.update(rfqRef, {
-                status: 'sent', // إعادة الحالة إلى مرسل للمفاضلة مرة أخرى
+                status: 'sent', 
                 awardedVendorId: null,
                 awardedPoId: null
             });
@@ -203,13 +247,22 @@ export function PurchaseOrdersList() {
                             <TableCell>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isProcessing}>
+                                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
+                                        </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" dir="rtl">
                                         <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                                         <DropdownMenuItem onClick={() => router.push(`/dashboard/purchasing/purchase-orders/${po.id}`)}>
                                             <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                         </DropdownMenuItem>
+                                        
+                                        {po.status === 'approved' && (
+                                            <DropdownMenuItem onClick={() => handleUndoApproval(po)} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
+                                                <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الاعتماد (إعادة لمسودة)
+                                            </DropdownMenuItem>
+                                        )}
+
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem onClick={() => setItemToDelete(po)} className="text-destructive focus:text-destructive">
                                             <Trash2 className="ml-2 h-4 w-4" /> حذف
