@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
 import {
   Table,
@@ -151,7 +151,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
             if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
 
-            const rfqRef = doc(firestore, 'rfqs', rfq.id!);
+            const rfqRefDoc = doc(firestore, 'rfqs', rfq.id!);
             
             let finalVendorId = vendorToAward.id;
 
@@ -207,7 +207,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             transaction.set(newPoRef, cleanFirestoreData(poData));
             transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             
-            transaction.update(rfqRef, { 
+            transaction.update(rfqRefDoc, { 
                 status: 'closed',
                 awardedVendorId: finalVendorId,
                 awardedPoId: newPoRef.id
@@ -230,11 +230,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     setIsUndoing(true);
     try {
         const poRef = doc(firestore, 'purchaseOrders', rfq.awardedPoId);
-        const rfqRef = doc(firestore, 'rfqs', rfq.id);
+        const rfqRefDoc = doc(firestore, 'rfqs', rfq.id);
 
         await runTransaction(firestore, async (transaction) => {
-            transaction.delete(poRef);
-            transaction.update(rfqRef, {
+            const poSnap = await transaction.get(poRef);
+            if (poSnap.exists()) {
+                transaction.delete(poRef);
+            }
+            transaction.update(rfqRefDoc, {
                 status: 'sent',
                 awardedVendorId: null,
                 awardedPoId: null
