@@ -120,7 +120,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     setSelectedAwards(newAwards);
   };
 
-  // تنفيذ عملية الترسية النهائية وإنشاء أوامر الشراء
   const handleConfirmSplitAward = async () => {
     if (!firestore || !currentUser || !rfq.id) return;
     
@@ -201,23 +200,61 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="overflow-x-auto print:overflow-visible">
-        <Table className="w-full border-collapse print:table-fixed print:border-none" style={{ tableLayout: 'fixed' }}>
+      {/* استايل خاص للطباعة لإجبار البيانات على الظهور */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          .comparison-table-container {
+            overflow: visible !important;
+            display: block !important;
+          }
+          table {
+            table-layout: auto !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+          }
+          th, td {
+            position: static !important;
+            background-color: transparent !important;
+            border: 1px solid #ddd !important;
+            overflow: visible !important;
+            z-index: auto !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+          }
+          .award-label {
+            display: block !important;
+            font-size: 8px !important;
+            font-weight: bold !important;
+            color: #000 !important;
+            margin-top: 2px !important;
+          }
+          .selected-cell-print {
+            background-color: #f0f0f0 !important;
+            border: 2px solid #000 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}} />
+
+      <div className="overflow-x-auto comparison-table-container">
+        <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col className="w-[220px]" />
             <col className="w-[70px]" />
             {allVendors.map(v => <col key={v.id} className="min-w-[180px]" />)}
           </colgroup>
-          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-muted/10">
+          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
             <TableRow className="min-h-24 border-b-2">
-              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-transparent print:border-b-2">بيان الصنف المطلوب</TableHead>
-              <TableHead className="text-center font-bold text-xs print:border-b-2">الكمية</TableHead>
+              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground">بيان الصنف المطلوب</TableHead>
+              <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
               {allVendors.map(vendor => {
                 const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                 const isCredit = quote?.paymentTerms?.toLowerCase().includes('credit') || quote?.paymentTerms?.includes('آجل') || quote?.paymentTerms?.includes('حساب');
                 
                 return (
-                  <TableHead key={vendor.id} className="p-2 border-r align-top print:border-b-2 print:static">
+                  <TableHead key={vendor.id} className="p-2 border-r align-top">
                     <div className="flex flex-col h-full gap-2 min-h-[100px]">
                       <div className="text-center px-1">
                         <p className="font-black text-primary text-sm whitespace-normal leading-tight break-words">
@@ -231,7 +268,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                             disabled={!!rfq.awardedVendorId}
                         >ترسية الكل هنا</Button>
                       </div>
-                      <div className="flex justify-center gap-1 mt-auto">
+                      <div className="flex justify-center gap-1 mt-auto no-print">
                         <Badge variant="outline" className={cn("text-[9px] px-1 h-5 gap-1", isCredit ? "bg-green-50 text-green-700 border-green-200" : "bg-orange-50 text-orange-700")}>
                             {isCredit ? <CreditCard className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                             {isCredit ? 'آجل' : 'نقدي'}
@@ -249,7 +286,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           <TableBody>
             {tableData.map(({ item, quotes, minPrice }) => (
               <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b">
-                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l print:static print:bg-transparent">{item.itemName}</TableCell>
+                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
                 <TableCell className="text-center font-mono font-bold bg-muted/5">{item.quantity}</TableCell>
                 {allVendors.map(vendor => {
                   const quote = quotes.find(q => q.vendorId === vendor.id);
@@ -261,8 +298,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     <TableCell
                       key={vendor.id}
                       className={cn(
-                        "text-center cursor-pointer transition-all border-r p-0 print:border print:static",
-                        isSelected ? "bg-primary/10 border-primary/40 print:bg-blue-50 print:border-2 print:border-primary" : isBest ? "bg-green-500/5 print:bg-green-50" : "",
+                        "text-center cursor-pointer transition-all border-r p-0",
+                        isSelected ? "bg-primary/10 border-primary/40 selected-cell-print" : isBest ? "bg-green-500/5" : "",
                         isLocked && "cursor-default"
                       )}
                       onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
@@ -276,16 +313,16 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                             {isSelected && <CheckCircle2 className="h-4 w-4 fill-primary/20 no-print" />}
                             {formatCurrency(quote.price)}
                           </div>
-                          {/* تمييز في الطباعة */}
+                          {/* تمييز صريح في الطباعة */}
                           {isSelected && (
-                            <div className="hidden print:block absolute -top-1 right-1 text-[7px] font-black text-primary uppercase border border-primary px-1 rounded-sm bg-white">
-                              [ مختـــار ]
+                            <div className="hidden award-label">
+                              [ تم الاختيار ]
                             </div>
                           )}
-                          {isBest && !isSelected && (
-                            <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter print:bg-white print:border print:px-1">
-                              أفضل سعر
-                            </div>
+                          {!isSelected && isBest && (
+                             <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter no-print">
+                                أفضل سعر
+                             </div>
                           )}
                         </div>
                       ) : (
