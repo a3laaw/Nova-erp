@@ -1,14 +1,24 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import type { PurchaseOrder, Vendor } from '@/lib/types';
+import type { PurchaseOrder } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Printer, ArrowRight, ShoppingCart, Calendar, User, Target, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { 
+    Printer, 
+    ArrowRight, 
+    ShoppingCart, 
+    Calendar, 
+    User, 
+    Target, 
+    CheckCircle, 
+    XCircle, 
+    Loader2,
+    Info
+} from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -18,6 +28,7 @@ import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -71,7 +82,7 @@ export default function PurchaseOrderDetailPage() {
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل اعتماد الطلب.' });
         } finally {
-            setIsUpdating(true);
+            setIsUpdating(false);
         }
     };
 
@@ -269,7 +280,7 @@ export default function PurchaseOrderDetailPage() {
                         </div>
                     </div>
                 </div>
-            </Card>
+            </div>
         </div>
     );
 }
