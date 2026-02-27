@@ -255,11 +255,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             page-break-after: auto;
           }
 
-          table { width: 100% !important; table-layout: auto !important; border-collapse: collapse !important; border: 1px solid #000 !important; }
+          table { width: auto !important; min-width: 100% !important; table-layout: auto !important; border-collapse: collapse !important; border: 1px solid #000 !important; }
           th, td { border: 1px solid #000 !important; padding: 6px !important; color: #000 !important; font-size: 8.5pt !important; }
           .font-black { font-weight: 900 !important; }
           
-          /* تمييز الترسية في الطباعة */
+          /* تحسين ديناميكية عمود البيان في الطباعة */
+          .desc-col-print { width: 1% !important; white-space: nowrap !important; }
+          .qty-col-print { width: 1% !important; white-space: nowrap !important; text-align: center !important; }
+          
           .awarded-cell-print { background-color: #f0f0f0 !important; border: 2px solid #000 !important; position: relative; }
           .awarded-label-print { display: block !important; font-size: 7pt !important; font-weight: bold; margin-top: 2px; }
         }
@@ -271,8 +274,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground">بيان الصنف المطلوب</TableHead>
-                <TableHead className="text-center font-bold px-4">الكمية</TableHead>
+                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto">بيان الصنف المطلوب</TableHead>
+                <TableHead className="text-center font-bold px-4 w-auto whitespace-nowrap">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                   const itemsTotal = rfq.items.reduce((sum, item) => {
@@ -313,7 +316,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               {tableData.map(({ item, quotes, minPrice }) => (
                 <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b last:border-0">
                   <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l whitespace-nowrap">{item.itemName}</TableCell>
-                  <TableCell className="text-center font-mono font-bold bg-muted/5 px-4">{item.quantity}</TableCell>
+                  <TableCell className="text-center font-mono font-bold bg-muted/5 px-4 whitespace-nowrap">{item.quantity}</TableCell>
                   {allVendors.map(vendor => {
                     const quote = quotes.find(q => q.vendorId === vendor.id);
                     const isBest = quote?.price === minPrice && minPrice !== Infinity;
@@ -391,8 +394,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <table>
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="text-right font-black w-1/3">بيان الصنف المطلوب</th>
-                  <th className="text-center w-12">الكمية</th>
+                  <th className="text-right font-black desc-col-print">بيان الصنف المطلوب</th>
+                  <th className="text-center qty-col-print">الكمية</th>
                   {chunk.map(vendor => {
                     const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                     const itemsTotal = rfq.items.reduce((sum, item) => {
@@ -419,7 +422,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               <tbody>
                 {tableData.map(({ item, quotes, minPrice }) => (
                   <tr key={item.id}>
-                    <td className="font-bold text-right">{item.itemName}</td>
+                    <td className="font-bold text-right whitespace-nowrap">{item.itemName}</td>
                     <td className="text-center font-mono">{item.quantity}</td>
                     {chunk.map(vendor => {
                       const quote = quotes.find(q => q.vendorId === vendor.id);
