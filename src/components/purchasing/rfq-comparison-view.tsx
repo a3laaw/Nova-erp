@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
-import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2 } from 'lucide-react';
+import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2, Ban } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -132,12 +132,41 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     return { data: tableRows, vendors: participatingVendors, totals: tempTotals };
   }, [loadingData, rfq, supplierQuotations, registeredVendors]);
 
+  // منطق الفلترة: تحديد الأصناف المستبعدة لأن سعرها صفر أو غير موجودة
+  const awardedItemsInfo = useMemo(() => {
+    if (!vendorToAward) return { toAward: [], excluded: [] };
+    
+    const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
+    if (!quote) return { toAward: [], excluded: [] };
+
+    const toAward: any[] = [];
+    const excluded: any[] = [];
+
+    rfq.items.forEach(item => {
+        const quoteItem = quote.items.find(qi => qi.rfqItemId === item.id);
+        if (quoteItem && quoteItem.unitPrice > 0) {
+            toAward.push({ ...item, unitPrice: quoteItem.unitPrice });
+        } else {
+            excluded.push(item);
+        }
+    });
+
+    return { toAward, excluded };
+  }, [vendorToAward, rfq.items, supplierQuotations]);
+
   const handleAwardClick = (vendor: any) => {
       setVendorToAward(vendor);
   };
 
   const handleConfirmAward = async () => {
     if (!firestore || !vendorToAward || !currentUser || !rfq.id) return;
+    
+    const { toAward } = awardedItemsInfo;
+    if (toAward.length === 0) {
+        toast({ variant: 'destructive', title: 'لا يمكن الترسية', description: 'المورد لم يقم بتسعير أي من الأصناف المطلوبة بسعر أكبر من صفر.' });
+        return;
+    }
+
     setIsAwarding(true);
 
     try {
@@ -154,7 +183,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             const rfqRefDoc = doc(firestore, 'rfqs', rfq.id!);
             let finalVendorId = vendorToAward.id;
 
-            // إذا كان المورد محتملاً، نحوله لمورد رسمي
             if (isProspective) {
                 const newVendorRef = doc(collection(firestore, 'vendors'));
                 finalVendorId = newVendorRef.id;
@@ -165,11 +193,9 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     createdAt: serverTimestamp(),
                 });
 
-                // تحديث عرض السعر ليرتبط بـ ID المورد الرسمي الجديد
                 const quoteRef = doc(firestore, 'supplierQuotations', quote.id!);
                 transaction.update(quoteRef, { vendorId: finalVendorId });
 
-                // تحديث طلب التسعير لنقل المورد من "محتملاً" إلى "مسجلاً" لضمان ظهور البيانات
                 transaction.update(rfqRefDoc, {
                     prospectiveVendors: arrayRemove({ id: vendorToAward.id, name: vendorToAward.name }),
                     vendorIds: arrayUnion(finalVendorId)
@@ -183,17 +209,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             }
             const poNumber = `PO-${currentYear}-${String(nextPoNumber).padStart(4, '0')}`;
 
-            const poItems = rfq.items.map(item => {
-                const quoteItem = quote.items.find(qi => qi.rfqItemId === item.id);
-                const unitPrice = quoteItem?.unitPrice || 0;
-                return {
-                    internalItemId: item.internalItemId,
-                    itemName: item.itemName,
-                    quantity: item.quantity,
-                    unitPrice: unitPrice,
-                    total: unitPrice * item.quantity
-                };
-            });
+            // استخدام القائمة المفلترة فقط
+            const poItems = toAward.map(item => ({
+                internalItemId: item.internalItemId,
+                itemName: item.itemName,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                total: item.unitPrice * item.quantity
+            }));
 
             const totalAmount = poItems.reduce((sum, item) => sum + item.total, 0);
 
@@ -223,7 +246,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             });
         });
 
-        toast({ title: 'اكتملت عملية الترسية', description: `تم إنشاء مسودة أمر شراء بنجاح.` });
+        toast({ title: 'اكتملت عملية الترسية', description: `تم إنشاء مسودة أمر شراء للأصناف المسعرة فقط.` });
         setVendorToAward(null);
     } catch (error: any) {
         console.error("Awarding failed:", error);
@@ -333,7 +356,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                           isWinner ? 'bg-primary/5 text-primary' : isBestPrice ? 'bg-green-500/10 text-green-700' : 'text-foreground/70'
                         )}
                       >
-                        {quote?.unitPrice === Infinity ? (
+                        {quote?.unitPrice === Infinity || quote?.unitPrice === 0 ? (
                           <span className="text-muted-foreground/30 italic text-xs">- غير مسعر -</span>
                         ) : (
                           <div className="flex flex-col items-center gap-0.5">
@@ -412,28 +435,41 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
       <AlertDialog open={!!vendorToAward} onOpenChange={() => setVendorToAward(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-xl font-black">
-                <Award className="text-green-600 h-6 w-6" />
-                تأكيد الترسية والتحويل
+            <AlertDialogTitle className="flex items-center gap-2 text-xl font-black text-primary">
+                <Award className="h-6 w-6" />
+                تأكيد الترسية والتحويل لأمر شراء
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-base space-y-4">
-              <p>هل أنت متأكد من اختيار عرض سعر المورد <span className="font-bold text-foreground">"{vendorToAward?.name}"</span>؟</p>
+            <AlertDialogDescription className="text-base space-y-4 pt-4">
+              <p>أنت على وشك اختيار المورد <span className="font-bold text-foreground">"{vendorToAward?.name}"</span> لتوريد البضاعة.</p>
               
+              {awardedItemsInfo.excluded.length > 0 && (
+                  <div className="p-4 bg-orange-50 text-orange-800 rounded-2xl border border-orange-100 space-y-2">
+                      <div className="flex items-center gap-2 font-bold">
+                          <Ban className="h-4 w-4" />
+                          أصناف سيتم استبعادها:
+                      </div>
+                      <p className="text-xs">المورد لم يقم بتسعير الأصناف التالية (أو سعرها 0)، ولن تظهر في أمر الشراء:</p>
+                      <ul className="list-disc list-inside text-xs pr-2">
+                          {awardedItemsInfo.excluded.map(item => <li key={item.id}>{item.itemName}</li>)}
+                      </ul>
+                  </div>
+              )}
+
               {vendorToAward && String(vendorToAward.id).startsWith('prospective-') && (
                   <div className="p-4 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-sm flex items-start gap-3">
                       <UserPlus className="h-5 w-5 mt-0.5 shrink-0 text-blue-600" />
-                      <p>هذا المورد محتمل وغير مسجل في النظام. سيقوم النظام بتسجيله تلقائياً كمورد رسمي لإتمام العملية المحاسبية بشكل سليم.</p>
+                      <p>هذا المورد سيتم تسجيله تلقائياً كمورد رسمي في النظام.</p>
                   </div>
               )}
-              <p className="text-sm text-muted-foreground italic">سيتم إنشاء مسودة أمر شراء (Draft PO) ببيانات هذا العرض فوراً.</p>
+              <p className="text-sm text-muted-foreground italic">سيتم إنشاء مسودة أمر شراء (Draft PO) فوراً.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel disabled={isAwarding} className="rounded-xl px-6">إلغاء</AlertDialogCancel>
+            <AlertDialogCancel disabled={isAwarding} className="rounded-xl">إلغاء</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmAward}
               disabled={isAwarding}
-              className="bg-green-600 hover:bg-green-700 font-bold rounded-xl px-8"
+              className="bg-primary hover:bg-primary/90 font-bold rounded-xl px-8"
             >
               {isAwarding ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <ShoppingCart className="h-4 w-4 ml-2"/>}
               تأكيد وإنشاء الأمر
