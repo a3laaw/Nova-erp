@@ -4,7 +4,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, where, updateDoc, getDocs, arrayUnion, orderBy } from 'firebase/firestore';
+import { doc, collection, query, where, updateDoc, arrayUnion, orderBy } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,6 @@ import { SupplierQuotationCard } from '@/components/purchasing/supplier-quotatio
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
@@ -52,62 +51,29 @@ export default function RfqDetailsPage() {
     const [prospectiveName, setProspectiveName] = useState('');
     const [isAddingVendor, setIsAddingVendor] = useState(false);
 
-    const [vendors, setVendors] = useState<any[]>([]);
-    const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
-    const [dataLoading, setDataLoading] = useState(true);
-
+    // 1. اشتراك لحظي في وثيقة طلب التسعير
     const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef ? rfqRef.path : null);
 
-    const { data: allSystemVendors } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
+    // 2. اشتراك لحظي في جميع الموردين للمطابقة
+    const { data: allSystemVendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
 
-    useEffect(() => {
-        if (!firestore || !rfq) {
-            setDataLoading(false);
-            return;
-        }
+    // 3. اشتراك لحظي في عروض الأسعار المرتبطة بهذا الطلب
+    const quotesQuery = useMemo(() => {
+        if (!firestore || !id) return [];
+        return [where('rfqId', '==', id)];
+    }, [firestore, id]);
+    const { data: supplierQuotations, loading: quotesLoading } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations', quotesQuery);
 
-        const fetchData = async () => {
-            setDataLoading(true);
-            try {
-                const registeredVendorIds = rfq.vendorIds || [];
-                let fetchedRegisteredVendors: any[] = [];
-
-                if (registeredVendorIds.length > 0) {
-                    const chunks = [];
-                    for (let i = 0; i < registeredVendorIds.length; i += 30) {
-                        chunks.push(registeredVendorIds.slice(i, i + 30));
-                    }
-
-                    const vendorPromises = chunks.map(chunk => 
-                        getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
-                    );
-                    const vendorSnapshots = await Promise.all(vendorPromises);
-                    fetchedRegisteredVendors = vendorSnapshots.flatMap(snap => 
-                        snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
-                    );
-                }
-
-                // Combine with prospective vendors from RFQ doc
-                const combinedVendors = [
-                    ...fetchedRegisteredVendors,
-                    ...(rfq.prospectiveVendors || [])
-                ];
-                
-                setVendors(combinedVendors);
-
-                const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', id)));
-                setSupplierQuotations(quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation)));
-
-            } catch (err) {
-                console.error("Error fetching RFQ related data:", err);
-            } finally {
-                setDataLoading(false);
-            }
-        };
-
-        fetchData();
-    }, [firestore, rfq, id]);
+    // 4. دمج الموردين (المسجلين والمحتملين) بشكل تفاعلي
+    const displayVendors = useMemo(() => {
+        if (!rfq || !allSystemVendors) return [];
+        
+        const registered = allSystemVendors.filter(v => rfq.vendorIds?.includes(v.id!));
+        const prospective = rfq.prospectiveVendors || [];
+        
+        return [...registered, ...prospective];
+    }, [rfq, allSystemVendors]);
     
     const handleChangeStatus = async (newStatus: RequestForQuotation['status']) => {
         if (!rfqRef) return;
@@ -158,7 +124,7 @@ export default function RfqDetailsPage() {
             .map(v => ({ value: v.id!, label: v.name }));
     }, [allSystemVendors, rfq?.vendorIds]);
 
-    const loading = rfqLoading || dataLoading;
+    const loading = rfqLoading || vendorsLoading;
 
     if (loading) {
         return (
@@ -249,7 +215,7 @@ export default function RfqDetailsPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {vendors.map(vendor => {
+                {displayVendors.map(vendor => {
                     const existingQuote = supplierQuotations.find(q => q.vendorId === vendor.id);
                     return (
                         <SupplierQuotationCard 
@@ -260,7 +226,7 @@ export default function RfqDetailsPage() {
                         />
                     )
                 })}
-                {vendors.length === 0 && (
+                {!loading && displayVendors.length === 0 && (
                     <div className="col-span-full h-48 flex flex-col items-center justify-center border-2 border-dashed rounded-[2rem] bg-muted/5 opacity-40">
                         <Search className="h-12 w-12 mb-2" />
                         <p className="font-bold">لا يوجد موردون حالياً، أضف مورد لبدء التسعير.</p>
