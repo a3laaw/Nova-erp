@@ -124,20 +124,43 @@ export function RfqsList() {
     setIsDeleting(true);
     try {
       const rfqId = itemToDelete.id!;
+      
+      // 1. جلب عروض الأسعار المرتبطة
       const quotesRef = collection(firestore, 'supplierQuotations');
       const quotesQuery = query(quotesRef, where('rfqId', '==', rfqId));
       const quotesSnap = await getDocs(quotesQuery);
 
+      // 2. جلب أوامر الشراء المرتبطة (إن وجدت)
+      const poRef = collection(firestore, 'purchaseOrders');
+      const poQuery = query(poRef, where('rfqId', '==', rfqId));
+      const poSnap = await getDocs(poQuery);
+
       const batch = writeBatch(firestore);
+      
+      // حذف الطلب الرئيسي
       batch.delete(doc(firestore, 'rfqs', rfqId));
+      
+      // حذف العروض المرتبطة
       quotesSnap.docs.forEach((quoteDoc) => {
         batch.delete(quoteDoc.ref);
       });
+
+      // حذف أوامر الشراء (فقط إذا كانت مسودة) أو فصل الارتباط
+      poSnap.docs.forEach((poDoc) => {
+          const poData = poDoc.data();
+          if (poData.status === 'draft') {
+              batch.delete(poDoc.ref);
+          } else {
+              // إذا كان الأمر معتمداً أو مستلماً، لا نحذفه بل نمسح رابط طلب التسعير منه فقط
+              batch.update(poDoc.ref, { rfqId: null, supplierQuotationId: null });
+          }
+      });
+
       await batch.commit();
 
       toast({
         title: 'نجاح',
-        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر مرتبط.`,
+        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر ${poSnap.size > 0 ? 'وأوامر الشراء المرتبطة' : ''}.`,
       });
     } catch (error) {
       console.error('Failed to delete RFQ:', error);
@@ -258,7 +281,6 @@ export function RfqsList() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => setItemToDelete(rfq)}
-                          disabled={rfq.status === 'closed'}
                           className="text-destructive focus:text-destructive focus:bg-destructive/10"
                         >
                           <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
@@ -284,7 +306,10 @@ export function RfqsList() {
               <span className="font-bold text-foreground">
                 &quot;{itemToDelete?.rfqNumber}&quot;
               </span>{' '}
-              وكافة عروض الأسعار المرتبطة به نهائياً.
+              وكافة عروض الأسعار المرتبطة به نهائياً. 
+              {itemToDelete?.status === 'closed' && (
+                  <p className="mt-2 text-amber-600 font-bold">تنبيه: سيتم أيضاً حذف مسودة أمر الشراء المرتبطة بهذا الطلب.</p>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

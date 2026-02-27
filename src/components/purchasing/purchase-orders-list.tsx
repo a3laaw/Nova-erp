@@ -12,7 +12,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -88,9 +88,30 @@ export function PurchaseOrdersList() {
     if (!itemToDelete || !firestore) return;
     setIsDeleting(true);
     try {
-        await deleteDoc(doc(firestore, 'purchaseOrders', itemToDelete.id!));
-        toast({ title: 'نجاح', description: 'تم حذف أمر الشراء بنجاح.' });
+        const batch = writeBatch(firestore);
+        
+        // 1. حذف أمر الشراء
+        batch.delete(doc(firestore, 'purchaseOrders', itemToDelete.id!));
+
+        // 2. إذا كان مرتبطاً بطلب تسعير، نعيد فتح الطلب
+        if (itemToDelete.rfqId) {
+            const rfqRef = doc(firestore, 'rfqs', itemToDelete.rfqId);
+            batch.update(rfqRef, {
+                status: 'sent', // إعادة الحالة إلى مرسل للمفاضلة مرة أخرى
+                awardedVendorId: null,
+                awardedPoId: null
+            });
+        }
+
+        await batch.commit();
+        toast({ 
+            title: 'نجاح', 
+            description: itemToDelete.rfqId 
+                ? 'تم حذف أمر الشراء وإعادة فتح طلب التسعير المرتبط للمفاضلة.' 
+                : 'تم حذف أمر الشراء بنجاح.' 
+        });
     } catch (error) {
+        console.error('Error deleting purchase order:', error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف أمر الشراء.' });
     } finally {
         setIsDeleting(false);
@@ -155,7 +176,7 @@ export function PurchaseOrdersList() {
                 <TableHead>رقم الطلب</TableHead>
                 <TableHead>المورد</TableHead>
                 <TableHead>تاريخ الطلب</TableHead>
-                <TableHead className="text-left">الإجمالي</TableHead>
+                <TableHead className="text-left">إجمالي</TableHead>
                 <TableHead>الحالة</TableHead>
                 <TableHead>الإجراءات</TableHead>
               </TableRow>
@@ -207,7 +228,11 @@ export function PurchaseOrdersList() {
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم حذف أمر الشراء رقم "{itemToDelete?.poNumber}" بشكل دائم.</AlertDialogDescription>
+                    <AlertDialogDescription>
+                        {itemToDelete?.rfqId 
+                            ? `سيتم حذف أمر الشراء رقم "${itemToDelete?.poNumber}" وإعادة فتح طلب التسعير المرتبط به للمفاضلة مرة أخرى.`
+                            : `سيتم حذف أمر الشراء رقم "${itemToDelete?.poNumber}" بشكل دائم.`}
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
