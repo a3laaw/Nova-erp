@@ -152,7 +152,6 @@ export function SupplierQuotationForm({
         className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none bg-background"
         dir="rtl"
       >
-        {/* رأس ثابت */}
         <DialogHeader className="p-6 bg-muted/20 border-b flex-shrink-0">
           <div className="flex justify-between items-start">
             <div>
@@ -166,7 +165,6 @@ export function SupplierQuotationForm({
           </div>
         </DialogHeader>
 
-        {/* منطقة المحتوى القابلة للتمرير (ScrollArea) */}
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
@@ -255,7 +253,6 @@ export function SupplierQuotationForm({
           </div>
         </ScrollArea>
 
-        {/* تذييل ثابت يحتوي على أزرار الحفظ */}
         <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
           <Button
             variant="ghost"
@@ -272,7 +269,7 @@ export function SupplierQuotationForm({
             className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[240px]"
           >
             {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
-            {isSaving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}
+            {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ عرض السعر'}
           </Button>
         </DialogFooter>
       </DialogContent>
