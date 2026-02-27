@@ -47,7 +47,6 @@ interface QuoteItem {
   unitPrice: number | string;
 }
 
-// الكلمات الدلالية الموسعة للبحث الذكي في ملفات Excel
 const PRICE_KEYWORDS = ['سعر', 'السعر', 'وحده', 'الوحدة', 'قيمة', 'القيمة', 'اجمالي', 'الإجمالي', 'price', 'unit price', 'rate', 'unit', 'cost', 'amt', 'amount', 'total'];
 const ITEM_KEYWORDS = ['بند', 'البند', 'بيان', 'البيان', 'اسم', 'الاسم', 'صنف', 'الصنف', 'وصف', 'الوصف', 'item', 'description', 'name', 'service', 'product'];
 const CODE_KEYWORDS = ['كود', 'الكود', 'رمز', 'الرمز', 'رقم', 'الرقم', 'مسلسل', 'م', 'code', 'sku', 'part number', 'id', 'ref', 'reference', 'no'];
@@ -73,7 +72,6 @@ export function SupplierQuotationForm({
   const [isImporting, setIsImporting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // جلب كافة الأصناف لمطابقة الـ SKU إذا وجد
   const { data: allItems = [] } = useSubscription<Item>(firestore, 'items');
 
   useEffect(() => {
@@ -118,8 +116,8 @@ export function SupplierQuotationForm({
   const cleanText = (text: string) => {
     if (!text) return '';
     return text.toString().trim().toLowerCase()
-      .replace(/[0-9]/g, '') // إزالة الأرقام
-      .replace(/^(توريد|تركيب|م|رقم|بند|صنف)\s+/g, '') // إزالة الكلمات الزائدة من البداية
+      .replace(/[0-9]/g, '')
+      .replace(/^(توريد|تركيب|م|رقم|بند|صنف)\s+/g, '')
       .trim();
   };
 
@@ -142,14 +140,11 @@ export function SupplierQuotationForm({
         let colIdx = { code: -1, name: -1, price: -1 };
         let headerRowIdx = -1;
 
-        // البحث الذكي عن الهيدر
         for (let i = 0; i < Math.min(data.length, 20); i++) {
           const row = data[i]?.map(c => String(c || '').toLowerCase().trim()) || [];
-          
           if (colIdx.name === -1) colIdx.name = row.findIndex(c => ITEM_KEYWORDS.some(k => c.includes(k)));
           if (colIdx.price === -1) colIdx.price = row.findIndex(c => PRICE_KEYWORDS.some(k => c.includes(k)));
           if (colIdx.code === -1) colIdx.code = row.findIndex(c => CODE_KEYWORDS.some(k => c.includes(k)));
-
           if (colIdx.name !== -1 && colIdx.price !== -1) {
             headerRowIdx = i;
             break;
@@ -159,7 +154,6 @@ export function SupplierQuotationForm({
         let codeMatchCount = 0;
         let nameMatchCount = 0;
         const newItems = [...items];
-
         const systemItemMap = new Map();
         rfq.items.forEach(ri => {
             const fullItem = allItems.find(i => i.id === ri.internalItemId);
@@ -170,17 +164,13 @@ export function SupplierQuotationForm({
         for (let i = startIdx; i < data.length; i++) {
           const row = data[i];
           if (!row || row.length === 0) continue;
-
           let excelCode = colIdx.code !== -1 ? String(row[colIdx.code] || '').trim().toLowerCase() : '';
           let excelName = colIdx.name !== -1 ? String(row[colIdx.name] || '').trim() : '';
           let excelPrice = -1;
-
           if (colIdx.price !== -1) {
               excelPrice = parseFloat(String(row[colIdx.price] || '0').replace(/[^0-9.]/g, ''));
           }
-
           if (isNaN(excelPrice) || excelPrice <= 0) continue;
-
           let matchedIdx = -1;
           if (excelCode) {
               matchedIdx = newItems.findIndex(ni => {
@@ -193,7 +183,6 @@ export function SupplierQuotationForm({
                   continue;
               }
           }
-
           const cleanedExcelName = cleanText(excelName);
           if (cleanedExcelName) {
               matchedIdx = newItems.findIndex(ni => {
@@ -206,7 +195,6 @@ export function SupplierQuotationForm({
               }
           }
         }
-
         setItems(newItems);
         toast({ title: 'اكتمل الاستيراد الذكي', description: `تمت مطابقة (${codeMatchCount}) أصناف بالكود، و (${nameMatchCount}) أصناف بالاسم.` });
       } catch (error: any) {
