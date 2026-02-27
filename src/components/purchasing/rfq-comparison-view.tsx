@@ -2,8 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -11,26 +11,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
-import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2, Ban, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Award, ShoppingCart, Loader2, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Label } from '../ui/label';
 
 interface RfqComparisonViewProps {
@@ -48,7 +37,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [loadingData, setLoadingData] = useState(true);
   
   const [isAwarding, setIsAwarding] = useState(false);
-  const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); // itemId -> vendorId
+  const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
   useEffect(() => {
     if (!firestore || !rfq.id) {
@@ -212,10 +201,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           <colgroup>
             <col className="w-[220px]" />
             <col className="w-[70px]" />
-            {allVendors.map(v => <col key={v.id} className="w-[180px]" />)}
+            {allVendors.map(v => <col key={v.id} className="min-w-[180px]" />)}
           </colgroup>
           <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-white">
-            <TableRow className="h-24 border-b-2">
+            <TableRow className="min-h-24 border-b-2">
               <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-white">بيان الصنف المطلوب</TableHead>
               <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
               {allVendors.map(vendor => {
@@ -223,10 +212,12 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 const isCredit = quote?.paymentTerms?.toLowerCase().includes('credit') || quote?.paymentTerms?.includes('آجل') || quote?.paymentTerms?.includes('حساب');
                 
                 return (
-                  <TableHead key={vendor.id} className="p-2 border-r">
-                    <div className="flex flex-col h-full gap-2">
-                      <div className="text-center">
-                        <p className="font-black text-primary truncate text-sm">{vendor.name}</p>
+                  <TableHead key={vendor.id} className="p-2 border-r align-top">
+                    <div className="flex flex-col h-full gap-2 min-h-[100px]">
+                      <div className="text-center px-1">
+                        <p className="font-black text-primary text-sm whitespace-normal leading-tight break-words">
+                            {vendor.name}
+                        </p>
                         <Button 
                             variant="ghost" 
                             size="sm" 
