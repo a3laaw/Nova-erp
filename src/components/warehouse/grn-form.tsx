@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -10,9 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator } from 'lucide-react';
+import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
 import type { PurchaseOrder, Account, Warehouse, Item, GoodsReceiptNote } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
