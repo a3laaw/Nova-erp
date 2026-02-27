@@ -21,7 +21,7 @@ import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '../ui/textarea';
 
 const lineSchema = z.object({
@@ -53,7 +53,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const [isSaving, setIsSaving] = useState(false);
     const [loadingPoStatus, setLoadingPoStatus] = useState(false);
     
-    // حالات المورد المحتمل
     const [isProspectiveVendor, setIsProspectiveVendor] = useState(false);
     const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
     const [vendorData, setVendorData] = useState({ phone: '', address: '', contactPerson: '' });
@@ -137,18 +136,34 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const handleRegisterVendor = async () => {
         if (!selectedPo || !firestore) return;
         
-        if (!vendorData.phone.trim()) {
+        const phoneTrimmed = vendorData.phone.trim();
+        if (!phoneTrimmed) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'رقم الهاتف مطلوب إجبارياً لتثبيت المورد ومنع التكرار.' });
             return;
         }
 
         setIsSaving(true);
         try {
+            // --- منع تكرار الهاتف عند التسجيل السريع ---
+            const vendorsRef = collection(firestore, 'vendors');
+            const phoneQuery = query(vendorsRef, where('phone', '==', phoneTrimmed));
+            const phoneSnap = await getDocs(phoneQuery);
+            
+            if (!phoneSnap.empty) {
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'رقم مكرر', 
+                    description: 'رقم الهاتف هذا مسجل بالفعل لمورد آخر في النظام. يرجى استخدامه أو تعديل البيانات.' 
+                });
+                setIsSaving(false);
+                return;
+            }
+
             await runTransaction(firestore, async (transaction) => {
                 const newVendorRef = doc(collection(firestore, 'vendors'));
                 const newVendorData = {
                     name: selectedPo.vendorName,
-                    phone: vendorData.phone,
+                    phone: phoneTrimmed,
                     address: vendorData.address,
                     contactPerson: vendorData.contactPerson,
                     createdAt: serverTimestamp(),

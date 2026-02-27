@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { Loader2, Save } from 'lucide-react';
 import type { Vendor } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
@@ -59,8 +59,8 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
             return;
         }
 
-        // التحقق من رقم الهاتف كحقل إجباري
-        if (!formData.phone.trim()) {
+        const phoneTrimmed = formData.phone.trim();
+        if (!phoneTrimmed) {
             toast({ 
                 variant: 'destructive', 
                 title: 'بيانات ناقصة', 
@@ -71,6 +71,22 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
 
         setIsSaving(true);
         try {
+            // --- منع تكرار رقم الهاتف ---
+            const vendorsRef = collection(firestore, 'vendors');
+            const phoneQuery = query(vendorsRef, where('phone', '==', phoneTrimmed));
+            const phoneSnap = await getDocs(phoneQuery);
+            
+            const isDuplicate = phoneSnap.docs.some(d => d.id !== vendor?.id);
+            if (isDuplicate) {
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'رقم هاتف مكرر', 
+                    description: 'رقم الهاتف هذا مسجل بالفعل لمورد آخر في النظام. يرجى التأكد من البيانات.' 
+                });
+                setIsSaving(false);
+                return;
+            }
+
             if (isEditing) {
                 await updateDoc(doc(firestore, 'vendors', vendor!.id!), cleanFirestoreData(formData));
                 toast({ title: 'نجاح', description: 'تم تحديث بيانات المورد.' });
