@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Award, Loader2, CheckCircle2, Undo2, AlertCircle, Calculator, FileText, Printer, Separator } from 'lucide-react';
+import { Award, Loader2, CheckCircle2, Undo2, AlertCircle, Calculator, FileText, Printer } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '../ui/scroll-area';
+import { Separator } from '../ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '../layout/logo';
 import { format } from 'date-fns';
@@ -304,12 +305,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <p className="text-xs font-bold font-mono">RFQ REF: {rfq.rfqNumber}</p>
             <p className="text-[10px] text-muted-foreground">تاريخ التحليل: {rfqDate ? format(rfqDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</p>
           </div>
-        </div>
-
-        <div className="flex justify-end mb-4 no-print">
-            <Button onClick={handlePrint} variant="outline" className="gap-2 rounded-xl font-bold border-2">
-                <Printer className="h-4 w-4"/> طباعة التحليل
-            </Button>
         </div>
 
         <div className="comparison-table-container border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card print:border-none print:shadow-none">
