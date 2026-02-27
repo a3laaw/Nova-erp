@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Search, Loader2, MoreHorizontal, Eye, Trash2 } from 'lucide-react';
 import { Input } from '../ui/input';
+import { Button } from '../ui/button';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -90,7 +91,7 @@ export function GrnList() {
                         <TableHead>رقم الإذن (GRN)</TableHead>
                         <TableHead>المورد</TableHead>
                         <TableHead>التاريخ</TableHead>
-                        <TableHead>عدد الأصناف</TableHead>
+                        <TableHead>{'عدد الأصناف'}</TableHead>
                         <TableHead className="text-left">إجمالي القيمة</TableHead>
                         <TableHead className="w-[80px]"><span className="sr-only">الإجراءات</span></TableHead>
                     </TableRow>
@@ -122,6 +123,7 @@ export function GrnList() {
                                             <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" dir="rtl">
+                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                                             <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/grns/${grn.id}`)}>
                                                 <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                             </DropdownMenuItem>
