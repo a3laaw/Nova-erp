@@ -7,12 +7,37 @@ export async function analyzeSupplierQuote(input: {
   const apiKey = process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || '';
   if (!apiKey) throw new Error('مفتاح API غير موجود في ملف .env');
 
-  const parts = input.quoteFileDataUri.split(';base64,');
-  if (parts.length !== 2) throw new Error('تنسيق الملف غير صالح.');
-  const mimeType = parts[0].split(':')[1];
-  const base64Data = parts[1];
+  var listUrl = 'https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey;
+  var listResponse = await fetch(listUrl);
+  
+  if (!listResponse.ok) {
+    throw new Error('مفتاح API غير صالح. الرجاء إنشاء مفتاح جديد من https://aistudio.google.com/apikey');
+  }
 
-  const prompt = 'أنت خبير مشتريات ومحاسب تكاليف دقيق جداً. قم بتحليل مستند عرض السعر المرفق واستخراج أسعار الوحدات (Unit Price) للأصناف المطلوبة التالية.\n\nالأصناف المطلوبة (RFQ Items):\n' + input.rfqItems.map(function(item) { return '- المعرف الفريد: "' + item.id + '", اسم الصنف: "' + item.name + '"'; }).join('\n') + '\n\nالمطلوب منك:\n1. ابحث في المستند عن كل صنف يطابق أو يشابه في المعنى الأصناف المذكورة أعلاه.\n2. استخرج سعر الوحدة (Unit Price) المجرد (رقم فقط).\n3. إذا كان السعر بعملة أخرى حوله للدينار الكويتي إن أمكن أو ضعه كما هو.\n4. أجب بتنسيق JSON فقط ولا تضف أي نص شرح خارج الـ JSON.\n\nالتنسيق المطلوب (JSON):\n{\n  "items": [\n    { "rfqItemId": "المعرف الفريد المذكور أعلاه", "unitPrice": 123.45 }\n  ],\n  "summary": "ملخص لما وجدته بالعربية"\n}';
+  var listData = await listResponse.json();
+  var allModels = listData.models || [];
+  
+  var visionModels = allModels.filter(function(m: any) {
+    var name = (m.name || '').toLowerCase();
+    var methods = m.supportedGenerationMethods || [];
+    var supportsGenerate = methods.indexOf('generateContent') >= 0;
+    var isGemini = name.indexOf('gemini') >= 0;
+    var isNotEmbedding = name.indexOf('embedding') < 0;
+    var isNotAqa = name.indexOf('aqa') < 0;
+    return supportsGenerate && isGemini && isNotEmbedding && isNotAqa;
+  });
+
+  if (visionModels.length === 0) {
+    var modelNames = allModels.map(function(m: any) { return m.name; }).join('\n');
+    throw new Error('لا توجد موديلات Gemini متاحة لمفتاحك.\n\nالموديلات الموجودة:\n' + modelNames);
+  }
+
+  var parts = input.quoteFileDataUri.split(';base64,');
+  if (parts.length !== 2) throw new Error('تنسيق الملف غير صالح.');
+  var mimeType = parts[0].split(':')[1];
+  var base64Data = parts[1];
+
+  var prompt = 'أنت خبير مشتريات ومحاسب تكاليف دقيق جداً. قم بتحليل مستند عرض السعر المرفق واستخراج أسعار الوحدات (Unit Price) للأصناف المطلوبة التالية.\n\nالأصناف المطلوبة (RFQ Items):\n' + input.rfqItems.map(function(item) { return '- المعرف الفريد: "' + item.id + '", اسم الصنف: "' + item.name + '"'; }).join('\n') + '\n\nالمطلوب منك:\n1. ابحث في المستند عن كل صنف يطابق أو يشابه في المعنى الأصناف المذكورة أعلاه.\n2. استخرج سعر الوحدة (Unit Price) المجرد (رقم فقط).\n3. أجب بتنسيق JSON فقط ولا تضف أي نص شرح خارج الـ JSON.\n\nالتنسيق المطلوب (JSON):\n{\n  "items": [\n    { "rfqItemId": "المعرف الفريد المذكور أعلاه", "unitPrice": 123.45 }\n  ],\n  "summary": "ملخص لما وجدته بالعربية"\n}';
 
   var requestBody = {
     contents: [{
@@ -30,26 +55,24 @@ export async function analyzeSupplierQuote(input: {
     ]
   };
 
-  var urls = [
-    { name: 'gemini-2.5-flash-preview-05-20 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=' + apiKey },
-    { name: 'gemini-2.0-flash-001 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' + apiKey },
-    { name: 'gemini-2.0-flash-001 v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent?key=' + apiKey },
-    { name: 'gemini-2.0-flash-lite-001 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-001:generateContent?key=' + apiKey },
-    { name: 'gemini-2.0-flash-lite-001 v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite-001:generateContent?key=' + apiKey },
-    { name: 'gemini-1.5-flash-002 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=' + apiKey },
-    { name: 'gemini-1.5-flash-002 v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-002:generateContent?key=' + apiKey }
-  ];
-
   var allErrors: string[] = [];
+  allErrors.push('الموديلات المتاحة لمفتاحك (' + visionModels.length + '):');
+  visionModels.forEach(function(m: any) { allErrors.push('  - ' + m.name); });
+  allErrors.push('---');
 
-  for (var i = 0; i < urls.length; i++) {
-    var entry = urls[i];
+  for (var i = 0; i < visionModels.length; i++) {
+    var modelName = visionModels[i].name;
+    
     try {
       if (i > 0) {
         await new Promise(function(resolve) { setTimeout(resolve, 3000); });
       }
 
-      var response = await fetch(entry.url, {
+      var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + apiKey;
+
+      allErrors.push('محاولة ' + (i + 1) + ': ' + modelName + '...');
+
+      var response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -63,7 +86,7 @@ export async function analyzeSupplierQuote(input: {
         } catch(e2) {
           errorText = response.statusText;
         }
-        allErrors.push(entry.name + ' => HTTP ' + response.status + ': ' + errorText);
+        allErrors.push('  فشل HTTP ' + response.status + ': ' + errorText.substring(0, 200));
         if (response.status === 429) {
           await new Promise(function(resolve) { setTimeout(resolve, 5000); });
         }
@@ -73,7 +96,7 @@ export async function analyzeSupplierQuote(input: {
       var data = await response.json();
 
       if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0] || !data.candidates[0].content.parts[0].text) {
-        allErrors.push(entry.name + ' => رد فارغ: ' + JSON.stringify(data).substring(0, 300));
+        allErrors.push('  رد فارغ: ' + JSON.stringify(data).substring(0, 200));
         continue;
       }
 
@@ -82,7 +105,7 @@ export async function analyzeSupplierQuote(input: {
 
       var jsonMatch = cleaned.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        allErrors.push(entry.name + ' => الرد ليس JSON: ' + cleaned.substring(0, 300));
+        allErrors.push('  الرد ليس JSON: ' + cleaned.substring(0, 200));
         continue;
       }
 
@@ -93,16 +116,16 @@ export async function analyzeSupplierQuote(input: {
         try {
           return JSON.parse(fixed);
         } catch(e4) {
-          allErrors.push(entry.name + ' => JSON غير صالح: ' + jsonMatch[0].substring(0, 300));
+          allErrors.push('  JSON غير صالح');
           continue;
         }
       }
 
     } catch (error: any) {
-      allErrors.push(entry.name + ' => خطأ: ' + (error.message || 'غير معروف'));
+      allErrors.push('  خطأ: ' + (error.message || 'غير معروف'));
       continue;
     }
   }
 
-  throw new Error('فشل التحليل مع جميع الموديلات.\n\nتفاصيل الأخطاء:\n' + allErrors.join('\n'));
+  throw new Error('فشل التحليل.\n\n' + allErrors.join('\n'));
 }
