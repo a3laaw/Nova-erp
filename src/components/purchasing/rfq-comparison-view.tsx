@@ -229,8 +229,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   if (loading) return <div className="p-8"><Skeleton className="h-[500px] w-full rounded-2xl" /></div>;
 
   return (
-    <div className="space-y-6 print-landscape">
-      {/* ─── ستايلات الطباعة المتقدمة ─── */}
+    <div className="space-y-6">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           html, body { background: white !important; height: auto !important; overflow: visible !important; }
@@ -250,25 +249,23 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             margin-bottom: 20px;
           }
 
-          .print-page-container:last-child {
-            break-after: auto;
-            page-break-after: auto;
-          }
-
-          table { width: auto !important; min-width: 100% !important; table-layout: auto !important; border-collapse: collapse !important; border: 1px solid #000 !important; }
-          th, td { border: 1px solid #000 !important; padding: 6px !important; color: #000 !important; font-size: 8.5pt !important; }
-          .font-black { font-weight: 900 !important; }
+          table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #000 !important; }
+          th, td { border: 1px solid #ddd !important; padding: 8px !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           
-          /* تحسين ديناميكية عمود البيان في الطباعة */
-          .desc-col-print { width: 1% !important; white-space: nowrap !important; }
+          .desc-col-print { width: 1% !important; white-space: normal !important; min-width: 200px !important; }
           .qty-col-print { width: 1% !important; white-space: nowrap !important; text-align: center !important; }
           
-          .awarded-cell-print { background-color: #f0f0f0 !important; border: 2px solid #000 !important; position: relative; }
-          .awarded-label-print { display: block !important; font-size: 7pt !important; font-weight: bold; margin-top: 2px; }
+          .text-green-print { color: #16a34a !important; font-weight: bold !important; }
+          .text-red-print { color: #dc2626 !important; font-weight: bold !important; }
+          .text-blue-print { color: #2563eb !important; font-weight: bold !important; }
+          .bg-muted-print { background-color: #f8fafc !important; }
+          
+          .awarded-cell-print { border: 3px solid #eab308 !important; background-color: #fefce8 !important; }
+          .awarded-badge-print { display: inline-block !important; font-size: 7pt !important; background: #eab308 !important; color: #000 !important; padding: 2px 4px !important; border-radius: 4px !important; margin-bottom: 4px !important; }
         }
       `}} />
 
-      {/* ─── وضع الشاشة (Screen Mode) ─── */}
+      {/* ─── وضع الشاشة ─── */}
       <div className="no-print space-y-6">
         <div className="border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card">
           <Table className="w-full border-collapse table-auto">
@@ -337,7 +334,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           </Table>
         </div>
 
-        {/* أزرار الإجراءات */}
         <div className="space-y-6">
             {rfq.status !== 'cancelled' && !isLocked ? (
                 <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg">
@@ -371,11 +367,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </div>
       </div>
 
-      {/* ─── وضع الطباعة المجزأ (Print Mode - Horizontal Pagination) ─── */}
+      {/* ─── وضع الطباعة المجزأ مع الألوان ─── */}
       <div id="printable-multi-page-area" className="hidden print:block">
         {vendorChunks.map((chunk, chunkIndex) => (
           <div key={chunkIndex} className="print-page-container">
-            {/* الترويسة الرسمية (تتكرر في كل صفحة) */}
             <div className="flex justify-between items-start mb-6 border-b-4 border-primary/20 pb-4">
               <div className="flex items-center gap-4">
                 <Logo className="h-12 w-12 !p-1" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
@@ -390,10 +385,9 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               </div>
             </div>
 
-            {/* الجدول المجزأ */}
             <table>
               <thead>
-                <tr className="bg-gray-50">
+                <tr className="bg-muted-print">
                   <th className="text-right font-black desc-col-print">بيان الصنف المطلوب</th>
                   <th className="text-center qty-col-print">الكمية</th>
                   {chunk.map(vendor => {
@@ -407,11 +401,13 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     return (
                       <th key={vendor.id} className="text-center">
                         <div className="space-y-1">
-                          <p className="font-black text-primary border-b pb-1">{vendor.name}</p>
-                          <div className="text-[7pt] font-normal">
-                            <div>الخصم: {formatCurrency(quote?.discountAmount || 0)}</div>
-                            <div>التوصيل: {formatCurrency(quote?.deliveryFees || 0)}</div>
-                            <div className="font-black pt-1">الصافي: {formatCurrency(netTotal)}</div>
+                          <p className="font-black text-blue-print border-b pb-1">{vendor.name}</p>
+                          <div className="text-[7pt] font-normal space-y-0.5 text-right pr-2">
+                            <div><span className="opacity-60">التوريد:</span> <b>{quote?.deliveryTimeDays || '-'} يوم</b></div>
+                            <div className="text-blue-print"><span className="opacity-60">الدفع:</span> <b>{quote?.paymentTerms || 'نقدي'}</b></div>
+                            <div className="text-green-print"><span className="opacity-60">الخصم:</span> <b>{formatCurrency(quote?.discountAmount || 0)}</b></div>
+                            <div className="text-red-print"><span className="opacity-60">التوصيل:</span> <b>{formatCurrency(quote?.deliveryFees || 0)}</b></div>
+                            <div className="font-black text-blue-print pt-1 border-t">الصافي: {formatCurrency(netTotal)}</div>
                           </div>
                         </div>
                       </th>
@@ -422,7 +418,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               <tbody>
                 {tableData.map(({ item, quotes, minPrice }) => (
                   <tr key={item.id}>
-                    <td className="font-bold text-right whitespace-nowrap">{item.itemName}</td>
+                    <td className="font-bold text-right">{item.itemName}</td>
                     <td className="text-center font-mono">{item.quantity}</td>
                     {chunk.map(vendor => {
                       const quote = quotes.find(q => q.vendorId === vendor.id);
@@ -430,8 +426,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                       const isSelected = selectedAwards[item.id] === vendor.id;
                       return (
                         <td key={vendor.id} className={cn("text-center font-mono font-black", isSelected && "awarded-cell-print")}>
-                          {quote?.price ? formatCurrency(quote.price) : "-"}
-                          {isSelected && <div className="hidden awarded-label-print">[ تمت الترسية ]</div>}
+                          {isSelected && <div className="awarded-badge-print">تمت الترسية</div>}
+                          <div className={cn(isBest && !isSelected && "text-green-print")}>
+                            {quote?.price ? formatCurrency(quote.price) : "-"}
+                          </div>
                         </td>
                       );
                     })}
@@ -440,7 +438,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               </tbody>
             </table>
 
-            {/* تذييل الاعتماد (يظهر في كل صفحة لضمان الرسمية) */}
             <div className="grid grid-cols-3 gap-8 mt-12 text-center text-[8pt] border-t pt-4">
                 <div><p className="font-black">إعداد المشتريات</p><div className="mt-8 border-t border-dashed pt-1">التوقيع</div></div>
                 <div><p className="font-black">المراجعة المالية</p><div className="mt-8 border-t border-dashed pt-1">الختم والاعتماد</div></div>
