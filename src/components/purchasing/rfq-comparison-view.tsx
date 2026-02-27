@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, Item } from '@/lib/types';
 import {
   Table,
@@ -15,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Award, ShoppingCart, Loader2, Clock, CreditCard, CheckCircle2 } from 'lucide-react';
+import { Award, ShoppingCart, Loader2, Clock, CreditCard, CheckCircle2, Undo2, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -36,17 +35,19 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [registeredVendors, setRegisteredVendors] = useState<Vendor[]>([]);
   const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
   const [loadingData, setLoadingData] = useState(true);
-  
   const [isAwarding, setIsAwarding] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
   
-  // Initialize selectedAwards from rfq.awardedItems if it exists
+  // حفظ خريطة الترسية (بند -> مورد)
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
   useEffect(() => {
     if (rfq.awardedItems) {
         setSelectedAwards(rfq.awardedItems);
+    } else {
+        setSelectedAwards({});
     }
-  }, [rfq.awardedItems]);
+  }, [rfq.awardedItems, rfq.id]);
 
   useEffect(() => {
     if (!firestore || !rfq.id) {
@@ -105,8 +106,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     });
   }, [rfq.items, allVendors, supplierQuotations]);
 
+  const isClosed = rfq.status === 'closed' || rfq.status === 'cancelled';
+
   const handleCellClick = (itemId: string, vendorId: string, price: number) => {
-    if (price <= 0 || rfq.status === 'closed' || rfq.status === 'cancelled') return;
+    if (price <= 0 || isClosed) return;
     setSelectedAwards(prev => ({
       ...prev,
       [itemId]: prev[itemId] === vendorId ? '' : vendorId
@@ -114,7 +117,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   };
 
   const handleAwardToVendor = (vendorId: string) => {
-    if (rfq.status === 'closed' || rfq.status === 'cancelled') return;
+    if (isClosed) return;
     const newAwards = { ...selectedAwards };
     tableData.forEach(row => {
       const quote = row.quotes.find(q => q.vendorId === vendorId);
@@ -123,13 +126,27 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
       }
     });
     setSelectedAwards(newAwards);
+    toast({ title: 'ترسية الكل', description: 'تم اختيار جميع بنود هذا المورد بنجاح.' });
+  };
+
+  const handleReopenRfq = async () => {
+    if (!firestore || isReopening) return;
+    setIsReopening(true);
+    try {
+        await updateDoc(doc(firestore, 'rfqs', rfq.id!), { status: 'sent' });
+        toast({ title: 'تم فتح الطلب', description: 'يمكنك الآن تعديل الترسية مرة أخرى.' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إعادة فتح الطلب.' });
+    } finally {
+        setIsReopening(false);
+    }
   };
 
   const handleConfirmSplitAward = async () => {
     if (!firestore || !currentUser || !rfq.id) return;
     
-    const itemIds = Object.keys(selectedAwards).filter(id => !!selectedAwards[id]);
-    if (itemIds.length === 0) {
+    const awardedEntries = Object.entries(selectedAwards).filter(([_, vId]) => !!vId);
+    if (awardedEntries.length === 0) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى اختيار مورد واحد على الأقل لترسية بند واحد.' });
         return;
     }
@@ -142,7 +159,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             const poCounterDoc = await transaction.get(poCounterRef);
             let nextPoSeq = (poCounterDoc.data()?.counts?.[currentYear] || 0) + 1;
 
-            const vendorsToProcess = [...new Set(Object.values(selectedAwards).filter(Boolean))];
+            const vendorsToProcess = [...new Set(awardedEntries.map(([_, vId]) => vId))];
             const newPoIds: string[] = [];
 
             for (const vId of vendorsToProcess) {
@@ -186,7 +203,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
             transaction.set(poCounterRef, { counts: { [currentYear]: nextPoSeq - 1 } }, { merge: true });
             
-            // CRITICAL: Store awardedItems mapping in RFQ document for future review
             transaction.update(doc(firestore, 'rfqs', rfq.id!), {
                 status: 'closed',
                 awardedVendorId: vendorsToProcess.length === 1 ? vendorsToProcess[0] : 'multiple',
@@ -220,7 +236,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         }
       `}} />
 
-      <div className="overflow-x-auto comparison-table-container">
+      <div className="overflow-x-auto comparison-table-container border-2 rounded-[2rem] shadow-sm bg-card">
         <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col className="w-[220px]" />
@@ -245,10 +261,15 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-6 text-[10px] text-muted-foreground hover:text-primary mt-1 no-print"
+                            className={cn(
+                                "h-6 text-[10px] mt-1 no-print rounded-full",
+                                isClosed ? "opacity-0 cursor-default" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            )}
                             onClick={() => handleAwardToVendor(vendor.id!)}
-                            disabled={rfq.status === 'closed' || rfq.status === 'cancelled'}
-                        >ترسية الكل هنا</Button>
+                            disabled={isClosed}
+                        >
+                            ترسية الكل هنا
+                        </Button>
                       </div>
                       <div className="flex justify-center gap-1 mt-auto">
                         <Badge variant="outline" className={cn("text-[9px] px-1 h-5 gap-1", isCredit ? "bg-green-50 text-green-700 border-green-200" : "bg-orange-50 text-orange-700")}>
@@ -265,14 +286,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               })}
             </TableRow>
           </TableHeader>
-          {/* Print-only Header */}
-          <thead className="hidden print:table-header-group">
-            <tr className="bg-gray-100 font-bold border-b">
-                <td className="p-2">بيان الصنف المطلوب</td>
-                <td className="p-2 text-center">الكمية</td>
-                {allVendors.map(v => <td key={v.id} className="p-2 text-center">{v.name}</td>)}
-            </tr>
-          </thead>
+          
           <TableBody>
             {tableData.map(({ item, quotes, minPrice }) => (
               <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b">
@@ -282,15 +296,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                   const quote = quotes.find(q => q.vendorId === vendor.id);
                   const isBest = quote?.price === minPrice && minPrice !== Infinity;
                   const isSelected = selectedAwards[item.id] === vendor.id;
-                  const isClosed = rfq.status === 'closed' || rfq.status === 'cancelled';
 
                   return (
                     <TableCell
                       key={vendor.id}
                       className={cn(
-                        "text-center cursor-pointer transition-all border-r p-0",
-                        isSelected ? "bg-blue-50/50 border-2 border-primary ring-inset selected-cell-print" : isBest ? "bg-green-500/5" : "",
-                        isClosed && "cursor-default"
+                        "text-center transition-all border-r p-0",
+                        !isClosed && "cursor-pointer",
+                        isSelected ? "bg-blue-50/50 border-2 border-primary ring-inset selected-cell-print" : isBest ? "bg-green-500/5" : ""
                       )}
                       onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
                     >
@@ -305,7 +318,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                           </div>
                           
                           {isSelected && (
-                            <div className="hidden award-label">
+                            <div className="hidden award-label text-[8px] font-black uppercase text-primary mt-1">
                               [ تم الاختيار ]
                             </div>
                           )}
@@ -327,7 +340,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </Table>
       </div>
 
-      {rfq.status !== 'closed' && rfq.status !== 'cancelled' && (
+      {!isClosed ? (
         <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg mx-4 no-print">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Award className="h-8 w-8" /></div>
@@ -345,12 +358,31 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 اعتماد وتحويل لأوامر شراء
             </Button>
         </div>
-      )}
-      
-      {rfq.status === 'closed' && (
-          <div className="mx-4 p-4 bg-muted/20 border-2 border-dashed rounded-2xl flex items-center justify-center gap-2 text-muted-foreground no-print">
-              <CheckCircle2 className="h-5 w-5" />
-              <p className="font-bold">تمت الترسية وإغلاق الطلب. يمكنك مراجعة الموردين الفائزين المظللين بالأزرق أعلاه.</p>
+      ) : (
+          <div className="mx-4 space-y-4 no-print">
+              <div className="p-6 bg-green-50 border-2 border-dashed border-green-200 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-8 w-8 text-green-600" />
+                      <div>
+                          <p className="font-black text-green-800">تمت الترسية وإغلاق الطلب بنجاح.</p>
+                          <p className="text-xs text-green-700">يمكنك مراجعة الموردين الفائزين المظللين بالأزرق أعلاه أو طباعة التحليل.</p>
+                      </div>
+                  </div>
+                  <Button onClick={handleReopenRfq} disabled={isReopening} variant="outline" className="rounded-xl border-orange-200 text-orange-700 hover:bg-orange-50 font-bold gap-2">
+                      {isReopening ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4" />}
+                      إعادة فتح للترسية (تعديل)
+                  </Button>
+              </div>
+              
+              {Object.keys(selectedAwards).length === 0 && (
+                  <Alert variant="destructive" className="rounded-2xl">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>تنبيه: الترسية فارغة</AlertTitle>
+                      <AlertDescription>
+                          تم إغلاق هذا الطلب دون اختيار أي بنود فائزة من مصفوفة المقارنة. يرجى الضغط على "إعادة فتح للترسية" أعلاه للقيام بالاختيار.
+                      </AlertDescription>
+                  </Alert>
+              )}
           </div>
       )}
     </div>
