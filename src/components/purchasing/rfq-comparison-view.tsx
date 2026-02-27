@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -89,7 +88,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     ...(rfq.prospectiveVendors || [])
   ], [registeredVendors, rfq.prospectiveVendors]);
 
-  // منطق اختيار السعر الأفضل
   const tableData = useMemo(() => {
     return rfq.items.map(item => {
       const quotesPerVendor = allVendors.map(vendor => {
@@ -209,16 +207,16 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto print:overflow-visible">
         <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col className="w-[220px]" />
             <col className="w-[70px]" />
             {allVendors.map(v => <col key={v.id} className="w-[180px]" />)}
           </colgroup>
-          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
+          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-white">
             <TableRow className="h-24 border-b-2">
-              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground">بيان الصنف المطلوب</TableHead>
+              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-white">بيان الصنف المطلوب</TableHead>
               <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
               {allVendors.map(vendor => {
                 const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
@@ -232,7 +230,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-6 text-[10px] text-muted-foreground hover:text-primary mt-1"
+                            className="h-6 text-[10px] text-muted-foreground hover:text-primary mt-1 no-print"
                             onClick={() => handleAwardToVendor(vendor.id!)}
                             disabled={!!rfq.awardedVendorId}
                         >ترسية الكل هنا</Button>
@@ -255,7 +253,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           <TableBody>
             {tableData.map(({ item, quotes, minPrice }) => (
               <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b">
-                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
+                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l print:static print:bg-white">{item.itemName}</TableCell>
                 <TableCell className="text-center font-mono font-bold bg-muted/5">{item.quantity}</TableCell>
                 {allVendors.map(vendor => {
                   const quote = quotes.find(q => q.vendorId === vendor.id);
@@ -276,7 +274,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                       {quote?.price ? (
                         <div className="flex flex-col items-center justify-center h-14 relative">
                           <div className={cn("flex items-center gap-1 font-mono font-black", isSelected ? "text-primary text-lg" : isBest ? "text-green-700" : "text-foreground/60")}>
-                            {isSelected && <CheckCircle2 className="h-4 w-4 fill-primary/20" />}
+                            {isSelected && <CheckCircle2 className="h-4 w-4 fill-primary/20 no-print" />}
                             {formatCurrency(quote.price)}
                           </div>
                           {isBest && !isSelected && <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter">أفضل سعر</div>}
@@ -294,7 +292,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
       </div>
 
       {!rfq.awardedVendorId && (
-        <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg mx-4">
+        <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg mx-4 no-print">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Award className="h-8 w-8" /></div>
                 <div>
