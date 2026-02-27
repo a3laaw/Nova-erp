@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2, AlertTriangle, Info } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
 import type { PurchaseOrder, Account, Warehouse, Item, GoodsReceiptNote } from '@/lib/types';
