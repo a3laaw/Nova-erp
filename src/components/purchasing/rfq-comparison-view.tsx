@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
 import {
   Table,
@@ -12,6 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
@@ -30,6 +30,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Label } from '../ui/label';
 
 interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
