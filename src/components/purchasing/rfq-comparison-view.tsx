@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, where, runTransaction, doc, serverTimestamp, orderBy } from 'firebase/firestore';
+import type { RequestForQuotation, Vendor, SupplierQuotation, CompanyActivityType } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
@@ -41,13 +41,34 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const { user: currentUser } = useAuth();
   const { branding } = useBranding();
 
-  const [registeredVendors, setRegisteredVendors] = useState<Vendor[]>([]);
-  const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
   const [isAwarding, setIsAwarding] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
-  
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
+
+  // --- 1. Real-time Subscriptions (CRITICAL: Fix for empty data on print) ---
+  
+  // Subscribe to all vendors to get names
+  const { data: allVendorsList, loading: vendorsLoading } = useSubscription<Vendor>(
+    firestore, 
+    'vendors', 
+    useMemo(() => [orderBy('name')], [])
+  );
+
+  // Subscribe to quotations for this RFQ
+  const quotesQuery = useMemo(() => [where('rfqId', '==', rfq.id)], [rfq.id]);
+  const { data: supplierQuotations, loading: quotesLoading } = useSubscription<SupplierQuotation>(
+    firestore, 
+    'supplierQuotations', 
+    quotesQuery
+  );
+
+  // Filter only vendors that are part of this RFQ (Registered or Prospective)
+  const allVendors = useMemo(() => {
+    if (!allVendorsList) return [];
+    const registered = allVendorsList.filter(v => rfq.vendorIds?.includes(v.id!));
+    const prospective = rfq.prospectiveVendors || [];
+    return [...registered, ...prospective];
+  }, [allVendorsList, rfq.vendorIds, rfq.prospectiveVendors]);
 
   const isLocked = useMemo(() => {
     return rfq.status === 'cancelled' || (rfq.awardedPoIds && rfq.awardedPoIds.length > 0);
@@ -60,48 +81,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         setSelectedAwards({});
     }
   }, [rfq.awardedItems, rfq.id]);
-
-  useEffect(() => {
-    if (!firestore || !rfq.id) {
-      setLoadingData(false);
-      return;
-    }
-
-    const fetchData = async () => {
-      setLoadingData(true);
-      try {
-        const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', rfq.id)));
-        const fetchedQuotes = quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation));
-        setSupplierQuotations(fetchedQuotes);
-
-        const vendorIds = rfq.vendorIds || [];
-        if (vendorIds.length > 0) {
-            const fetchedVendors: Vendor[] = [];
-            const vendorBatches = [];
-            for (let i = 0; i < vendorIds.length; i += 30) {
-                vendorBatches.push(vendorIds.slice(i, i + 30));
-            }
-            
-            for (const batch of vendorBatches) {
-                const snap = await getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', batch)));
-                snap.forEach(d => fetchedVendors.push({ id: d.id, ...d.data() } as Vendor));
-            }
-            setRegisteredVendors(fetchedVendors);
-        }
-      } catch (err) {
-        console.error("Error fetching comparison data:", err);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    fetchData();
-  }, [firestore, rfq.id, rfq.vendorIds]);
-
-  const allVendors = useMemo(() => [
-    ...registeredVendors,
-    ...(rfq.prospectiveVendors || [])
-  ], [registeredVendors, rfq.prospectiveVendors]);
 
   const tableData = useMemo(() => {
     return rfq.items.map(item => {
@@ -123,7 +102,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   }, [rfq.items, allVendors, supplierQuotations]);
 
   const handleCellClick = (itemId: string, vendorId: string, price: number) => {
-    if (price <= 0 || isLocked || rfq.status !== 'closed') return;
+    if (price <= 0 || isLocked || rfq.status === 'cancelled') return;
     setSelectedAwards(prev => ({
       ...prev,
       [itemId]: prev[itemId] === vendorId ? '' : vendorId
@@ -131,7 +110,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   };
 
   const handleAwardToVendor = (vendorId: string) => {
-    if (isLocked || rfq.status !== 'closed') return;
+    if (isLocked || rfq.status === 'cancelled') return;
     const newAwards = { ...selectedAwards };
     tableData.forEach(row => {
       const quote = row.quotes.find(q => q.vendorId === vendorId);
@@ -238,56 +217,88 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   const rfqDate = toFirestoreDate(rfq.date);
 
+  const loading = vendorsLoading || quotesLoading;
+
+  if (loading) return <div className="p-8"><Skeleton className="h-[500px] w-full rounded-2xl" /></div>;
+
   return (
     <div className="space-y-6 print-landscape">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          body * { visibility: hidden; }
-          #printable-comparison-area, #printable-comparison-area * { visibility: visible; }
+          /* Full Page Reset for Clean Export */
+          html, body { 
+            height: auto !important; 
+            overflow: visible !important; 
+            background: white !important;
+          }
+          
+          /* Force Color & Background Printing */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          /* Hide UI Chrome */
+          .no-print, header, footer, nav, aside, button {
+            display: none !important;
+          }
+
+          /* Direct Container Targeting */
           #printable-comparison-area {
+            display: block !important;
+            visibility: visible !important;
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
-            background: white !important;
+            z-index: 9999;
           }
-          .sticky { position: static !important; }
-          th, td { position: static !important; background: transparent !important; }
-          .comparison-table-container { 
-            overflow: visible !important; 
-            width: 100% !important; 
+
+          /* Table Layout Fixes */
+          .comparison-table-container {
+            overflow: visible !important;
+            width: 100% !important;
             max-width: none !important;
             border: none !important;
           }
-          table { 
-            width: 100% !important; 
-            table-layout: auto !important; 
-            border-collapse: collapse !important; 
+
+          table {
+            width: 100% !important;
+            table-layout: auto !important;
+            border-collapse: collapse !important;
           }
-          th, td { 
-            border: 1px solid #000 !important; 
-            font-size: 8pt !important; 
-            padding: 6px !important; 
+
+          th, td {
+            border: 1px solid #000 !important;
+            color: #000 !important;
+            font-size: 9pt !important;
+            padding: 8px !important;
+            background: transparent !important;
+            visibility: visible !important;
           }
+
+          /* Highlight Selection in Print */
           .awarded-cell-print {
             background-color: #f3f4f6 !important;
             border: 3px solid #000 !important;
             font-weight: 900 !important;
           }
+
           .awarded-label-print {
             display: block !important;
-            font-size: 7pt !important;
-            color: #000 !important;
-            margin-top: 2px;
+            font-size: 8pt !important;
             font-weight: bold;
+            color: #000 !important;
+            margin-top: 4px;
           }
-          .no-print, button { display: none !important; }
+          
+          .sticky { position: static !important; }
         }
       `}} />
 
-      <div id="printable-comparison-area" className="space-y-6 bg-card rounded-2xl border-none p-4 md:p-6 print:p-0">
+      <div id="printable-comparison-area" className="space-y-6 bg-card rounded-2xl p-4 md:p-6 print:p-0">
         
         {/* Report Header */}
         <div className="flex justify-between items-start mb-8 border-b-4 border-primary/20 pb-6">
@@ -331,7 +342,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                               size="sm" 
                               className={cn("h-6 text-[10px] mt-1 no-print rounded-full", isLocked ? "opacity-0" : "text-muted-foreground hover:text-primary hover:bg-primary/10")}
                               onClick={() => handleAwardToVendor(vendor.id!)}
-                              disabled={isLocked || rfq.status !== 'closed'}
+                              disabled={isLocked || rfq.status === 'cancelled'}
                           >
                               ترسية الكل هنا
                           </Button>
@@ -366,7 +377,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         key={vendor.id}
                         className={cn(
                           "text-center transition-all border-r p-0 min-w-[120px]",
-                          !isLocked && rfq.status === 'closed' && "cursor-pointer",
+                          !isLocked && rfq.status !== 'cancelled' && "cursor-pointer",
                           isSelected ? "bg-primary/10 border-2 border-primary ring-inset awarded-cell-print" : isBest ? "bg-green-500/5" : ""
                         )}
                         onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
@@ -380,7 +391,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                               {isSelected && <CheckCircle2 className="h-3 w-3 no-print" />}
                               {formatCurrency(quote.price)}
                             </div>
-                            {isSelected && <div className="hidden awarded-label-print font-black text-[7pt] text-center w-full">[ تمت الترسية ]</div>}
+                            {isSelected && <div className="hidden awarded-label-print font-black text-center w-full">[ تم الاختيار ]</div>}
                           </div>
                         ) : (
                           <span className="text-[10px] text-muted-foreground/20 italic">-</span>
@@ -412,7 +423,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
       </div>
 
       <div className="no-print space-y-6">
-        {rfq.status === 'closed' && !isLocked ? (
+        {rfq.status !== 'cancelled' && !isLocked ? (
             <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-primary/10 rounded-2xl text-primary h-14 w-14 flex items-center justify-center"><Calculator className="h-8 w-8" /></div>
@@ -446,7 +457,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             </div>
         )}
         
-        {!isLocked && rfq.status === 'closed' && Object.keys(selectedAwards).length === 0 && (
+        {!isLocked && Object.keys(selectedAwards).length === 0 && (
             <Alert variant="destructive" className="rounded-2xl">
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>تنبيه: الترسية فارغة</AlertTitle>
