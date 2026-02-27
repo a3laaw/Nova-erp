@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -51,7 +50,8 @@ interface QuoteItem {
 
 const PRICE_KEYWORDS = ['سعر', 'السعر', 'وحده', 'الوحدة', 'قيمة', 'القيمة', 'اجمالي', 'الإجمالي', 'price', 'unit price', 'rate', 'unit', 'cost', 'amt', 'amount', 'total'];
 const ITEM_KEYWORDS = ['بند', 'البند', 'بيان', 'البيان', 'اسم', 'الاسم', 'صنف', 'الصنف', 'وصف', 'الوصف', 'item', 'description', 'name', 'service', 'product'];
-const CODE_KEYWORDS = ['كود', 'الكود', 'رمز', 'الرمز', 'رقم', 'الرقم', 'مسلسل', 'م', 'code', 'sku', 'part number', 'id', 'ref', 'reference', 'no'];
+const DISCOUNT_KEYWORDS = ['خصم', 'الخصم', 'تخفيض', 'discount', 'disc', 'less', 'off'];
+const DELIVERY_KEYWORDS = ['توصيل', 'التوصيل', 'شحن', 'نقل', 'delivery', 'shipping', 'freight', 'transport'];
 
 export function SupplierQuotationForm({
   isOpen,
@@ -75,8 +75,6 @@ export function SupplierQuotationForm({
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  const { data: allItems = [] } = useSubscription<Item>(firestore, 'items');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -137,14 +135,32 @@ export function SupplierQuotationForm({
 
         if (data.length < 1) throw new Error('الملف فارغ.');
 
-        let colIdx = { code: -1, name: -1, price: -1 };
+        let colIdx = { name: -1, price: -1 };
         let headerRowIdx = -1;
+        let detectedDiscount = 0;
+        let detectedDelivery = 0;
 
-        for (let i = 0; i < Math.min(data.length, 20); i++) {
+        // مسح الملف للبحث عن الإجماليات والخصوم في أي خلية
+        data.forEach(row => {
+            row.forEach((cell, idx) => {
+                const text = String(cell || '').toLowerCase();
+                const nextCellVal = parseFloat(String(row[idx + 1] || '0').replace(/[^0-9.]/g, ''));
+                
+                if (DISCOUNT_KEYWORDS.some(k => text.includes(k)) && nextCellVal > 0) {
+                    detectedDiscount = nextCellVal;
+                }
+                if (DELIVERY_KEYWORDS.some(k => text.includes(k)) && nextCellVal > 0) {
+                    detectedDelivery = nextCellVal;
+                }
+            });
+        });
+
+        // البحث عن أعمدة الجدول
+        for (let i = 0; i < Math.min(data.length, 30); i++) {
           const row = data[i]?.map(c => String(c || '').toLowerCase().trim()) || [];
           if (colIdx.name === -1) colIdx.name = row.findIndex(c => ITEM_KEYWORDS.some(k => c.includes(k)));
           if (colIdx.price === -1) colIdx.price = row.findIndex(c => PRICE_KEYWORDS.some(k => c.includes(k)));
-          if (colIdx.code === -1) colIdx.code = row.findIndex(c => CODE_KEYWORDS.some(k => c.includes(k)));
+          
           if (colIdx.name !== -1 && colIdx.price !== -1) {
             headerRowIdx = i;
             break;
@@ -157,7 +173,7 @@ export function SupplierQuotationForm({
         
         for (let i = startIdx; i < data.length; i++) {
           const row = data[i];
-          if (!row || row.length === 0) continue;
+          if (!row) continue;
           let excelName = colIdx.name !== -1 ? String(row[colIdx.name] || '').trim().toLowerCase() : '';
           let excelPrice = colIdx.price !== -1 ? parseFloat(String(row[colIdx.price] || '0').replace(/[^0-9.]/g, '')) : 0;
           
@@ -169,8 +185,15 @@ export function SupplierQuotationForm({
               }
           }
         }
+
         setItems(newItems);
-        toast({ title: 'اكتمل الاستيراد', description: `تمت مطابقة (${matchCount}) أصناف بنجاح.` });
+        if (detectedDiscount > 0) setDiscountAmount(String(detectedDiscount));
+        if (detectedDelivery > 0) setDeliveryFees(String(detectedDelivery));
+
+        toast({ 
+            title: 'اكتمل الاستيراد من Excel', 
+            description: `تمت مطابقة (${matchCount}) أصناف${detectedDiscount > 0 ? ' واستخراج الخصم' : ''}${detectedDelivery > 0 ? ' ورسوم التوصيل' : ''}.` 
+        });
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'فشل الاستيراد', description: error.message });
       } finally {
@@ -194,14 +217,27 @@ export function SupplierQuotationForm({
                 const rfqItems = rfq.items.map(i => ({ id: i.id!, name: i.itemName }));
                 const result = await analyzeSupplierQuote({ quoteFileDataUri: dataUri, rfqItems });
 
-                if (result && result.items) {
-                    const newItems = [...items];
-                    result.items.forEach((aiItem: any) => {
-                        const idx = newItems.findIndex(ni => ni.rfqItemId === aiItem.rfqItemId);
-                        if (idx !== -1 && aiItem.unitPrice) newItems[idx].unitPrice = aiItem.unitPrice;
+                if (result) {
+                    // تحديث أسعار البنود
+                    if (result.items) {
+                        const newItems = [...items];
+                        result.items.forEach((aiItem: any) => {
+                            const idx = newItems.findIndex(ni => ni.rfqItemId === aiItem.rfqItemId);
+                            if (idx !== -1 && aiItem.unitPrice) newItems[idx].unitPrice = aiItem.unitPrice;
+                        });
+                        setItems(newItems);
+                    }
+
+                    // تحديث الحقول المالية الإجمالية
+                    if (result.discountAmount) setDiscountAmount(String(result.discountAmount));
+                    if (result.deliveryFees) setDeliveryFees(String(result.deliveryFees));
+                    if (result.deliveryTimeDays) setDeliveryTime(String(result.deliveryTimeDays));
+                    if (result.paymentTerms) setPaymentTerms(result.paymentTerms);
+
+                    toast({ 
+                        title: 'اكتمل التحليل الذكي', 
+                        description: result.summary || `تم استخراج كافة البيانات المالية والأسعار بنجاح.` 
                     });
-                    setItems(newItems);
-                    toast({ title: 'اكتمل التحليل بالذكاء الاصطناعي', description: result.summary || `تم استخراج الأسعار بنجاح.` });
                 }
             } catch (err: any) {
                 toast({ variant: 'destructive', title: 'خطأ في التحليل', description: err.message });
@@ -277,7 +313,7 @@ export function SupplierQuotationForm({
 
               <Button variant="default" className="gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white h-11 rounded-xl" onClick={() => aiFileInputRef.current?.click()} disabled={isImporting || isAnalyzing}>
                 {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
-                تحليل ذكي
+                تحليل ذكي (شامل)
               </Button>
             </div>
           </div>

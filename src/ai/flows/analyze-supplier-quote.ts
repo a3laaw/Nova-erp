@@ -37,7 +37,30 @@ export async function analyzeSupplierQuote(input: {
   var mimeType = parts[0].split(':')[1];
   var base64Data = parts[1];
 
-  var prompt = 'أنت خبير مشتريات ومحاسب تكاليف دقيق جداً. قم بتحليل مستند عرض السعر المرفق واستخراج أسعار الوحدات (Unit Price) للأصناف المطلوبة التالية.\n\nالأصناف المطلوبة (RFQ Items):\n' + input.rfqItems.map(function(item) { return '- المعرف الفريد: "' + item.id + '", اسم الصنف: "' + item.name + '"'; }).join('\n') + '\n\nالمطلوب منك:\n1. ابحث في المستند عن كل صنف يطابق أو يشابه في المعنى الأصناف المذكورة أعلاه.\n2. استخرج سعر الوحدة (Unit Price) المجرد (رقم فقط).\n3. أجب بتنسيق JSON فقط ولا تضف أي نص شرح خارج الـ JSON.\n\nالتنسيق المطلوب (JSON):\n{\n  "items": [\n    { "rfqItemId": "المعرف الفريد المذكور أعلاه", "unitPrice": 123.45 }\n  ],\n  "summary": "ملخص لما وجدته بالعربية"\n}';
+  var prompt = `أنت خبير مشتريات ومحاسب تكاليف دقيق جداً. قم بتحليل مستند عرض السعر المرفق واستخراج البيانات التالية بدقة متناهية.
+
+الأصناف المطلوبة (RFQ Items):
+${input.rfqItems.map(function(item) { return `- المعرف الفريد: "${item.id}", اسم الصنف: "${item.name}"`; }).join('\n')}
+
+المطلوب منك استخراج JSON بالصيغة التالية فقط:
+{
+  "items": [
+    { "rfqItemId": "المعرف الفريد المذكور أعلاه", "unitPrice": 123.45 }
+  ],
+  "discountAmount": 0.0, 
+  "deliveryFees": 0.0,
+  "deliveryTimeDays": 0,
+  "paymentTerms": "شرح طريقة الدفع المذكورة (مثلاً: 50% نقدي و50% آجل)",
+  "summary": "ملخص لما وجدته بالعربية"
+}
+
+ملاحظات هامة للتحليل:
+1. ابحث عن أي "خصم إجمالي" (Total Discount) في أسفل الفاتورة وضعه في discountAmount.
+2. ابحث عن "رسوم توصيل" (Delivery/Shipping) وضعه في deliveryFees.
+3. ابحث عن مدة التوريد بالأيام.
+4. افهم شروط الدفع جيداً (نقدي، آجل، أو مختلط) واكتبها في paymentTerms.
+5. استخرج سعر الوحدة (Unit Price) المجرد لكل صنف مطابق.
+6. أجب بتنسيق JSON فقط ولا تضف أي نص شرح خارج الـ JSON.`;
 
   var requestBody = {
     contents: [{
@@ -55,22 +78,15 @@ export async function analyzeSupplierQuote(input: {
     ]
   };
 
-  var allErrors: string[] = [];
-  allErrors.push('الموديلات المتاحة لمفتاحك (' + visionModels.length + '):');
-  visionModels.forEach(function(m: any) { allErrors.push('  - ' + m.name); });
-  allErrors.push('---');
-
   for (var i = 0; i < visionModels.length; i++) {
     var modelName = visionModels[i].name;
     
     try {
       if (i > 0) {
-        await new Promise(function(resolve) { setTimeout(resolve, 3000); });
+        await new Promise(function(resolve) { setTimeout(resolve, 2000); });
       }
 
       var url = 'https://generativelanguage.googleapis.com/v1beta/' + modelName + ':generateContent?key=' + apiKey;
-
-      allErrors.push('محاولة ' + (i + 1) + ': ' + modelName + '...');
 
       var response = await fetch(url, {
         method: 'POST',
@@ -78,54 +94,23 @@ export async function analyzeSupplierQuote(input: {
         body: JSON.stringify(requestBody)
       });
 
-      if (!response.ok) {
-        var errorText = '';
-        try {
-          var errJson = await response.json();
-          errorText = errJson.error ? errJson.error.message : JSON.stringify(errJson);
-        } catch(e2) {
-          errorText = response.statusText;
-        }
-        allErrors.push('  فشل HTTP ' + response.status + ': ' + errorText.substring(0, 200));
-        if (response.status === 429) {
-          await new Promise(function(resolve) { setTimeout(resolve, 5000); });
-        }
-        continue;
-      }
+      if (!response.ok) continue;
 
       var data = await response.json();
-
-      if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0] || !data.candidates[0].content.parts[0].text) {
-        allErrors.push('  رد فارغ: ' + JSON.stringify(data).substring(0, 200));
-        continue;
-      }
+      if (!data?.candidates?.[0]?.content?.parts?.[0]?.text) continue;
 
       var text = data.candidates[0].content.parts[0].text;
       var cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
 
       var jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        allErrors.push('  الرد ليس JSON: ' + cleaned.substring(0, 200));
-        continue;
-      }
+      if (!jsonMatch) continue;
 
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch(e3) {
-        var fixed = jsonMatch[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
-        try {
-          return JSON.parse(fixed);
-        } catch(e4) {
-          allErrors.push('  JSON غير صالح');
-          continue;
-        }
-      }
+      return JSON.parse(jsonMatch[0]);
 
     } catch (error: any) {
-      allErrors.push('  خطأ: ' + (error.message || 'غير معروف'));
       continue;
     }
   }
 
-  throw new Error('فشل التحليل.\n\n' + allErrors.join('\n'));
+  throw new Error('فشل التحليل الذكي للمستند. يرجى التأكد من وضوح الصورة أو جودة ملف الـ PDF.');
 }
