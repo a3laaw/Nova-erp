@@ -1,8 +1,7 @@
 'use server';
 
 /**
- * @fileOverview ميزة التحليل الذكي معطلة حالياً لضمان استقرار النظام.
- * تم الاحتفاظ بالملف فارغاً لتجنب أخطاء الاستيراد.
+ * @fileOverview ميزة التحليل الذكي معطلة حالياً بناءً على طلب المستخدم لضمان استقرار النظام.
  */
 
 export async function analyzeSupplierQuote(input: any) {

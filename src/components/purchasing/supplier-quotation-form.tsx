@@ -12,7 +12,6 @@ import { Loader2, Save, Table as TableIcon } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
-import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cleanFirestoreData } from '@/lib/utils';
 
@@ -84,15 +83,17 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none" dir="rtl">
-        <DialogHeader className="p-6 bg-muted/20 border-b">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none bg-background" dir="rtl">
+        <DialogHeader className="p-6 bg-muted/20 border-b flex-shrink-0">
           <div>
             <DialogTitle className="text-2xl font-black text-foreground">إدخال عرض السعر: {vendor.name}</DialogTitle>
             <DialogDescription className="text-sm font-medium">طلب تسعير رقم: {rfq.rfqNumber}</DialogDescription>
           </div>
         </DialogHeader>
-        <ScrollArea className="flex-1 px-6">
-          <div className="py-6 space-y-8">
+        
+        {/* Content Area with absolute scroll fix */}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مرجع المورد</Label>
@@ -111,12 +112,13 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                 <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="rounded-xl h-10 border-2" />
               </div>
             </div>
-            <div className="space-y-4">
+
+            <div className="space-y-4 pb-4">
               <div className="flex items-center gap-2 px-2">
                 <TableIcon className="h-5 w-5 text-primary" />
                 <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
               </div>
-              <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
+              <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-card">
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow className="h-14 border-b-2">
@@ -129,7 +131,14 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
                       <TableRow key={item.rfqItemId} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
                         <TableCell className="px-8 font-bold text-foreground/80">{item.itemName}</TableCell>
                         <TableCell className="px-6">
-                          <Input type="number" step="0.001" value={item.unitPrice} onChange={(e) => handleItemPriceChange(item.rfqItemId, e.target.value)} className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30" placeholder="0.000" />
+                          <Input 
+                            type="number" 
+                            step="0.001" 
+                            value={item.unitPrice} 
+                            onChange={(e) => handleItemPriceChange(item.rfqItemId, e.target.value)} 
+                            className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30" 
+                            placeholder="0.000" 
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -138,13 +147,16 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
               </div>
             </div>
           </div>
-        </ScrollArea>
-        <DialogFooter className="p-6 border-t bg-muted/10">
-          <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
-          <Button onClick={handleSubmit} disabled={isSaving || items.every((i) => !i.unitPrice)} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[240px]">
-            {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
-            {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ عرض السعر'}
-          </Button>
+        </div>
+
+        <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
+          <div className="flex justify-end gap-4 w-full">
+            <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
+            <Button onClick={handleSubmit} disabled={isSaving || items.every((i) => !i.unitPrice)} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[240px]">
+              {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
+              {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ عرض السعر'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
