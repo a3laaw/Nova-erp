@@ -16,6 +16,7 @@ import { ar } from 'date-fns/locale';
 import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 const statusColors: Record<string, string> = {
     draft: 'bg-yellow-100 text-yellow-800',
