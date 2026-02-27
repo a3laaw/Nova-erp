@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -23,6 +22,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Separator } from '../ui/separator';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
@@ -92,7 +93,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     ...(rfq.prospectiveVendors || [])
   ], [registeredVendors, rfq.prospectiveVendors]);
 
-  // منطق تصغير الجدول آلياً للطباعة بناءً على عدد الموردين
   const printScaleClass = useMemo(() => {
     if (allVendors.length > 8) return "print-scale-xs";
     if (allVendors.length > 5) return "print-scale-sm";
@@ -245,7 +245,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           .award-label { display: block !important; font-size: 8px !important; font-weight: 900 !important; color: #000 !important; margin-top: 2px !important; }
           .no-print { display: none !important; }
           .sticky { position: static !important; transform: none !important; }
-          /* Dynamic Scaling for large tables */
           .print-scale-xs td, .print-scale-xs th { font-size: 8px !important; }
           .print-scale-sm td, .print-scale-sm th { font-size: 10px !important; }
         }
