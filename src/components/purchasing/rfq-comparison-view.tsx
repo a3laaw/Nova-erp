@@ -23,7 +23,7 @@ import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '../ui/scroll-area';
-import { Separator } from '../ui/separator';
+import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '../layout/logo';
 import { format } from 'date-fns';
@@ -77,7 +77,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         const vendorIds = rfq.vendorIds || [];
         if (vendorIds.length > 0) {
             const fetchedVendors: Vendor[] = [];
-            for (let i = 0; i < vendorIds.length; i += 30) {
+            for (let i = 0; i < vendorIds.slice(0, 30).length; i += 30) {
               const chunk = vendorIds.slice(i, i + 30);
               const snap = await getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)));
               snap.forEach(d => fetchedVendors.push({ id: d.id, ...d.data() } as Vendor));
@@ -232,12 +232,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  if (loadingData) return <div className="p-8"><Skeleton className="h-96 w-full rounded-2xl" /></div>;
-
   const rfqDate = toFirestoreDate(rfq.date);
 
   return (
@@ -343,7 +337,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                           <div className="flex justify-between text-[9px]"><span className="text-muted-foreground">الدفع:</span> <span className="font-bold text-blue-600 truncate max-w-[80px]">{quote?.paymentTerms || 'نقدي'}</span></div>
                           <div className="flex justify-between text-[9px] text-green-600"><span className="font-medium">الخصم:</span> <span className="font-bold">{formatCurrency(quote?.discountAmount || 0)}</span></div>
                           <div className="flex justify-between text-[9px] text-red-600"><span className="font-medium">التوصيل:</span> <span className="font-bold">{formatCurrency(quote?.deliveryFees || 0)}</span></div>
-                          <Separator className="my-1 opacity-50"/>
+                          <Separator className="my-1"/>
                           <div className="flex justify-between text-[10px] font-black text-primary"><span>الصافي:</span> <span>{formatCurrency(netTotal)}</span></div>
                         </div>
                       </div>
