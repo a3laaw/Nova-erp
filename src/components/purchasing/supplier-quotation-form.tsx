@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -17,7 +16,7 @@ import { Label } from '../ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Table as TableIcon, FileSpreadsheet, Info, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, Table as TableIcon, FileSpreadsheet, Info, CheckCircle2, Sparkles, Image as ImageIcon } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation, Item } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -31,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cleanFirestoreData } from '@/lib/utils';
+import { analyzeSupplierQuote } from '@/ai/flows/analyze-supplier-quote';
 import * as XLSX from 'xlsx';
 
 interface SupplierQuotationFormProps {
@@ -62,6 +62,7 @@ export function SupplierQuotationForm({
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
 
   const [reference, setReference] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -70,6 +71,7 @@ export function SupplierQuotationForm({
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // جلب كافة الأصناف لمطابقة الـ SKU إذا وجد
   const { data: allItems = [] } = useSubscription<Item>(firestore, 'items');
@@ -217,6 +219,54 @@ export function SupplierQuotationForm({
     reader.readAsBinaryString(file);
   };
 
+  const handleAiAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzing(true);
+    try {
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const dataUri = evt.target?.result as string;
+                const rfqItems = rfq.items.map(i => ({ id: i.id!, name: i.itemName }));
+                
+                const result = await analyzeSupplierQuote({
+                    quoteFileDataUri: dataUri,
+                    rfqItems
+                });
+
+                if (result && result.items) {
+                    const newItems = [...items];
+                    let matchCount = 0;
+                    result.items.forEach((aiItem: any) => {
+                        const idx = newItems.findIndex(ni => ni.rfqItemId === aiItem.rfqItemId);
+                        if (idx !== -1 && aiItem.unitPrice) {
+                            newItems[idx].unitPrice = aiItem.unitPrice;
+                            matchCount++;
+                        }
+                    });
+                    setItems(newItems);
+                    toast({ 
+                        title: 'اكتمل التحليل بالذكاء الاصطناعي', 
+                        description: result.summary || `تم استخراج أسعار (${matchCount}) أصناف بنجاح من المستند.` 
+                    });
+                }
+            } catch (innerError: any) {
+                toast({ variant: 'destructive', title: 'خطأ في معالجة الملف', description: innerError.message });
+            } finally {
+                setIsAnalyzing(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'خطأ في التحليل', description: error.message });
+        setIsAnalyzing(false);
+    } finally {
+        if (e.target) e.target.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !date) return;
@@ -268,14 +318,26 @@ export function SupplierQuotationForm({
             </div>
             <div className="flex gap-2">
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={handleExcelImport} />
+              <input type="file" ref={aiFileInputRef} className="hidden" accept="image/*, .pdf" onChange={handleAiAnalysis} />
+              
               <Button
                 variant="outline"
                 className="gap-2 border-primary/50 text-primary hover:bg-primary/5 h-11 rounded-xl shadow-sm font-bold"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isImporting}
+                disabled={isImporting || isAnalyzing}
               >
                 {isImporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSpreadsheet className="h-5 w-5" />}
-                استيراد ذكي من Excel
+                استيراد من Excel
+              </Button>
+
+              <Button
+                variant="default"
+                className="gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white h-11 rounded-xl shadow-md font-bold border-none"
+                onClick={() => aiFileInputRef.current?.click()}
+                disabled={isImporting || isAnalyzing}
+              >
+                {isAnalyzing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Sparkles className="h-5 w-5" />}
+                تحليل ذكي (صورة/PDF)
               </Button>
             </div>
           </div>
@@ -306,12 +368,14 @@ export function SupplierQuotationForm({
               <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-2">
                   <TableIcon className="h-5 w-5 text-primary" />
-                  <Label className="text-xl font-black text-foreground">قائمة الأسعار</Label>
+                  <Label className="text-xl font-black text-foreground">قائمة الأسعار المستخرجة</Label>
                 </div>
-                <div className="text-[10px] text-muted-foreground font-bold italic flex items-center gap-1 bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
-                  <CheckCircle2 className="h-3 w-3 text-primary" />
-                  أدخل الأسعار يدوياً أو استخدم زر الاستيراد الذكي.
-                </div>
+                {isAnalyzing && (
+                    <div className="flex items-center gap-2 text-primary font-bold animate-pulse">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        جاري تحليل المستند بالذكاء الاصطناعي...
+                    </div>
+                )}
               </div>
               <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
                 <Table>
@@ -345,10 +409,10 @@ export function SupplierQuotationForm({
         </ScrollArea>
 
         <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
-          <Button variant="ghost" type="button" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
+          <Button variant="ghost" type="button" onClick={onClose} disabled={isSaving || isAnalyzing} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSaving || items.every((i) => !i.unitPrice)}
+            disabled={isSaving || isAnalyzing || items.every((i) => !i.unitPrice)}
             className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[240px]"
           >
             {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
