@@ -13,12 +13,8 @@ export async function analyzeSupplierQuote(input: {
   try {
     const response = await ai.generate({
       model: 'googleai/gemini-1.5-flash',
-      config: {
-        responseMimeType: 'application/json',
-      },
-      system: `أنت محاسب ومهندس خبير ومحلل بيانات. القاعدة الذهبية: ابحث عن القيم (المورد، الأصناف، الأسعار) مهما كانت المسميات (مثلا 'البيان' بدل 'الصنف'). استخرج البيانات وطابقها مع معرفات RFQ المقدمة.`,
       prompt: [
-        { text: "حلل صورة الجدول المستخرج. استخرج: البند، الكمية، السعر. المخرجات JSON فقط بهذا التنسيق:" },
+        { text: "أنت محاسب ومهندس خبير ومحلل بيانات. قم بقراءة صورة جدول عروض الأسعار المرفقة. حلل الجدول وحوله لـ JSON فقط بالتنسيق التالي:" },
         { text: `{ "vendorName": "...", "date": "YYYY-MM-DD", "totalAmount": 0, "extractedPrices": [ { "rfqItemId": "id", "unitPrice": 0 } ] }` },
         { 
           media: { 
@@ -26,7 +22,10 @@ export async function analyzeSupplierQuote(input: {
             contentType: 'image/jpeg' 
           } 
         }
-      ]
+      ],
+      config: {
+        responseMimeType: 'application/json',
+      },
     });
 
     const output = response.text;
