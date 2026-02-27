@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -55,6 +56,15 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'item-cost': 'تحليل التكلفة والبيع',
     'stagnant-items': 'الأصناف الراكدة',
     'best-sellers': 'الأكثر طلباً',
+    'vendor-statements': 'كشوفات الموردين',
+    'client-statements': 'كشوفات العملاء',
+    'purchase-orders': 'أوامر الشراء',
+    'rfqs': 'طلبات التسعير',
+    'vendors': 'الموردون',
+    'grns': 'أذونات الاستلام',
+    'material-issue': 'صرف المواد',
+    'transfers': 'التحويلات',
+    'warehouses': 'المستودعات',
   },
   en: {
     dashboard: 'Dashboard',
@@ -104,6 +114,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'item-cost': 'Cost & Sales Analysis',
     'stagnant-items': 'Stagnant Items',
     'best-sellers': 'Most Requested',
+    'vendor-statements': 'Vendor Statements',
+    'client-statements': 'Client Statements',
   },
 };
 
@@ -116,10 +128,15 @@ const getDynamicSegmentLabel = (parentSegment: string | undefined, lang: 'ar' | 
             case 'appointments': return 'تفاصيل الموعد';
             case 'journal-entries': return 'تفاصيل القيد';
             case 'cash-receipts': return 'تفاصيل السند';
+            case 'vendors': return 'ملف المورد';
+            case 'purchase-orders': return 'تفاصيل الأمر';
+            case 'rfqs': return 'تفاصيل الطلب';
+            case 'grns': return 'إذن استلام';
+            case 'material-issue': return 'إذن صرف';
+            case 'adjustments': return 'إذن تسوية';
             default: return 'تفاصيل';
         }
     }
-    // Fallback for English or other languages
     switch (parentSegment) {
         case 'clients': return 'Client Details';
         case 'employees': return 'Employee Profile';
@@ -127,6 +144,7 @@ const getDynamicSegmentLabel = (parentSegment: string | undefined, lang: 'ar' | 
         case 'appointments': return 'Appointment Details';
         case 'journal-entries': return 'Entry Details';
         case 'cash-receipts': return 'Receipt Details';
+        case 'vendors': return 'Vendor Profile';
         default: return 'Details';
     }
 }
