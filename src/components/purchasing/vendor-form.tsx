@@ -59,8 +59,13 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
             return;
         }
 
+        // التحقق من رقم الهاتف كحقل إجباري
         if (!formData.phone.trim()) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'رقم الهاتف مطلوب بشكل إلزامي لضمان عدم تكرار الموردين.' });
+            toast({ 
+                variant: 'destructive', 
+                title: 'بيانات ناقصة', 
+                description: 'رقم الهاتف/الجوال مطلوب بشكل إلزامي لضمان عدم تكرار الموردين في النظام.' 
+            });
             return;
         }
 
@@ -87,6 +92,7 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>{isEditing ? 'تعديل بيانات المورد' : 'إضافة مورد جديد'}</DialogTitle>
+                        <DialogDescription>يرجى إدخال البيانات الأساسية للمورد، الحقول المميزة بـ (*) إجبارية.</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 grid gap-4">
                         <div className="grid gap-2">
@@ -100,7 +106,14 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="phone">رقم الهاتف / الجوال <span className="text-destructive">*</span></Label>
-                                <Input id="phone" value={formData.phone} onChange={handleChange} dir="ltr" required />
+                                <Input 
+                                    id="phone" 
+                                    value={formData.phone} 
+                                    onChange={handleChange} 
+                                    dir="ltr" 
+                                    required 
+                                    placeholder="ادخل رقم التواصل..."
+                                />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="email">البريد الإلكتروني</Label>
@@ -109,7 +122,7 @@ export function VendorForm({ isOpen, onClose, vendor }: VendorFormProps) {
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="address">العنوان</Label>
-                            <Textarea id="address" value={formData.address} onChange={handleChange} />
+                            <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
                         </div>
                     </div>
                     <DialogFooter>
