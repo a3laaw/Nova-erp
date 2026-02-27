@@ -229,7 +229,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* ─── ستايلات الطباعة المتقدمة بالألوان والتقسيم ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           html, body { background: white !important; height: auto !important; overflow: visible !important; }
@@ -263,13 +262,11 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             print-color-adjust: exact !important; 
           }
           
-          /* تثبيت الألوان في الطباعة */
           .text-green-print { color: #16a34a !important; font-weight: bold !important; }
           .text-red-print { color: #dc2626 !important; font-weight: bold !important; }
           .text-blue-print { color: #2563eb !important; font-weight: bold !important; }
           .bg-muted-print { background-color: #f8fafc !important; }
           
-          /* عمود البيان الديناميكي الحقيقي */
           .desc-col-print { 
             width: 1% !important; 
             white-space: normal !important; 
@@ -282,7 +279,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             text-align: center !important; 
           }
           
-          /* تمييز الترسية المطبوع */
           .awarded-cell-print { 
             border: 3px solid #eab308 !important; 
             background-color: #fefce8 !important; 
@@ -300,13 +296,13 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         }
       `}} />
 
-      {/* ─── وضع العرض في الشاشة (جدول عريض واحد) ─── */}
+      {/* وضع العرض في الشاشة */}
       <div className="no-print space-y-6">
         <div className="border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card">
           <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto min-w-[200px]">بيان الصنف المطلوب</TableHead>
+                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto">بيان الصنف المطلوب</TableHead>
                 <TableHead className="text-center font-bold px-4 w-auto whitespace-nowrap">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
@@ -402,11 +398,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </div>
       </div>
 
-      {/* ─── وضع الطباعة المجزأ (3 موردين لكل صفحة) ─── */}
+      {/* وضع الطباعة المجزأ */}
       <div id="printable-multi-page-area" className="hidden print:block">
         {vendorChunks.map((chunk, chunkIndex) => (
           <div key={chunkIndex} className="print-page-container">
-            {/* رأس الصفحة الرسمي */}
             <div className="flex justify-between items-start mb-6 border-b-4 border-primary/20 pb-4">
               <div className="flex items-center gap-4">
                 <Logo className="h-14 w-14 !p-1 bg-white border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
@@ -476,7 +471,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               </tbody>
             </table>
 
-            {/* تذييل الصفحة للتوقيعات */}
             <div className="grid grid-cols-3 gap-12 mt-16 text-center text-[9pt] border-t-2 pt-6">
                 <div><p className="font-black mb-10">إعداد / قسم المشتريات</p><div className="border-t border-dashed pt-1">التوقيع والتاريخ</div></div>
                 <div><p className="font-black mb-10">مراجعة / الإدارة المالية</p><div className="border-t border-dashed pt-1">الختم والاعتماد</div></div>
