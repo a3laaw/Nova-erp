@@ -655,6 +655,7 @@ export type RequestForQuotation = {
   awardedVendorId?: string;
   awardedPoId?: string;
   awardedPoIds?: string[]; // NEW: For multiple awards
+  awardedItems?: Record<string, string>; // NEW: Stores item-to-vendor mapping
 };
 
 export type SupplierQuotation = {

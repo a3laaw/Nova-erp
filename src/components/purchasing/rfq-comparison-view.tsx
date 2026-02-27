@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -37,9 +38,16 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [loadingData, setLoadingData] = useState(true);
   
   const [isAwarding, setIsAwarding] = useState(false);
+  
+  // Initialize selectedAwards from rfq.awardedItems if it exists
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
-  // جلب البيانات الأساسية (الموردين وعروضهم)
+  useEffect(() => {
+    if (rfq.awardedItems) {
+        setSelectedAwards(rfq.awardedItems);
+    }
+  }, [rfq.awardedItems]);
+
   useEffect(() => {
     if (!firestore || !rfq.id) {
       setLoadingData(false);
@@ -78,7 +86,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     ...(rfq.prospectiveVendors || [])
   ], [registeredVendors, rfq.prospectiveVendors]);
 
-  // تجهيز مصفوفة البيانات
   const tableData = useMemo(() => {
     return rfq.items.map(item => {
       const quotesPerVendor = allVendors.map(vendor => {
@@ -98,18 +105,16 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     });
   }, [rfq.items, allVendors, supplierQuotations]);
 
-  // التعامل مع النقر للترسية الحية
   const handleCellClick = (itemId: string, vendorId: string, price: number) => {
-    if (price <= 0 || !!rfq.awardedVendorId) return;
+    if (price <= 0 || rfq.status === 'closed' || rfq.status === 'cancelled') return;
     setSelectedAwards(prev => ({
       ...prev,
       [itemId]: prev[itemId] === vendorId ? '' : vendorId
     }));
   };
 
-  // ترسية كل بنود المورد بنقرة واحدة
   const handleAwardToVendor = (vendorId: string) => {
-    if (!!rfq.awardedVendorId) return;
+    if (rfq.status === 'closed' || rfq.status === 'cancelled') return;
     const newAwards = { ...selectedAwards };
     tableData.forEach(row => {
       const quote = row.quotes.find(q => q.vendorId === vendorId);
@@ -180,14 +185,17 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             }
 
             transaction.set(poCounterRef, { counts: { [currentYear]: nextPoSeq - 1 } }, { merge: true });
+            
+            // CRITICAL: Store awardedItems mapping in RFQ document for future review
             transaction.update(doc(firestore, 'rfqs', rfq.id!), {
                 status: 'closed',
                 awardedVendorId: vendorsToProcess.length === 1 ? vendorsToProcess[0] : 'multiple',
-                awardedPoIds: newPoIds
+                awardedPoIds: newPoIds,
+                awardedItems: selectedAwards 
             });
         });
 
-        toast({ title: 'نجاح الترسية', description: 'تم إنشاء أوامر الشراء للموردين المختارين.' });
+        toast({ title: 'نجاح الترسية', description: 'تم إنشاء أوامر الشراء للموردين المختارين وحفظ الترسية في السجل.' });
         router.push('/dashboard/purchasing/purchase-orders');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل الترسية', description: e.message });
@@ -200,41 +208,15 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* استايل خاص للطباعة لإجبار البيانات على الظهور */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          .comparison-table-container {
-            overflow: visible !important;
-            display: block !important;
-          }
-          table {
-            table-layout: auto !important;
-            width: 100% !important;
-            border-collapse: collapse !important;
-          }
-          th, td {
-            position: static !important;
-            background-color: transparent !important;
-            border: 1px solid #ddd !important;
-            overflow: visible !important;
-            z-index: auto !important;
-            opacity: 1 !important;
-            visibility: visible !important;
-          }
-          .award-label {
-            display: block !important;
-            font-size: 8px !important;
-            font-weight: bold !important;
-            color: #000 !important;
-            margin-top: 2px !important;
-          }
-          .selected-cell-print {
-            background-color: #f0f0f0 !important;
-            border: 2px solid #000 !important;
-          }
-          .no-print {
-            display: none !important;
-          }
+          .comparison-table-container { overflow: visible !important; display: block !important; }
+          table { table-layout: auto !important; width: 100% !important; border-collapse: collapse !important; }
+          th, td { position: static !important; background-color: transparent !important; border: 1px solid #ddd !important; padding: 8px !important; }
+          .selected-cell-print { background-color: #f8fafc !important; border: 3px solid #000 !important; }
+          .award-label { display: block !important; font-size: 9px !important; font-weight: 900 !important; color: #000 !important; margin-top: 4px !important; }
+          .no-print { display: none !important; }
+          .sticky { position: static !important; }
         }
       `}} />
 
@@ -245,8 +227,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <col className="w-[70px]" />
             {allVendors.map(v => <col key={v.id} className="min-w-[180px]" />)}
           </colgroup>
-          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
-            <TableRow className="min-h-24 border-b-2">
+          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 no-print">
+            <TableRow className="h-24 border-b-2">
               <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground">بيان الصنف المطلوب</TableHead>
               <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
               {allVendors.map(vendor => {
@@ -255,7 +237,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 
                 return (
                   <TableHead key={vendor.id} className="p-2 border-r align-top">
-                    <div className="flex flex-col h-full gap-2 min-h-[100px]">
+                    <div className="flex flex-col h-full gap-2">
                       <div className="text-center px-1">
                         <p className="font-black text-primary text-sm whitespace-normal leading-tight break-words">
                             {vendor.name}
@@ -265,10 +247,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                             size="sm" 
                             className="h-6 text-[10px] text-muted-foreground hover:text-primary mt-1 no-print"
                             onClick={() => handleAwardToVendor(vendor.id!)}
-                            disabled={!!rfq.awardedVendorId}
+                            disabled={rfq.status === 'closed' || rfq.status === 'cancelled'}
                         >ترسية الكل هنا</Button>
                       </div>
-                      <div className="flex justify-center gap-1 mt-auto no-print">
+                      <div className="flex justify-center gap-1 mt-auto">
                         <Badge variant="outline" className={cn("text-[9px] px-1 h-5 gap-1", isCredit ? "bg-green-50 text-green-700 border-green-200" : "bg-orange-50 text-orange-700")}>
                             {isCredit ? <CreditCard className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                             {isCredit ? 'آجل' : 'نقدي'}
@@ -283,24 +265,32 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               })}
             </TableRow>
           </TableHeader>
+          {/* Print-only Header */}
+          <thead className="hidden print:table-header-group">
+            <tr className="bg-gray-100 font-bold border-b">
+                <td className="p-2">بيان الصنف المطلوب</td>
+                <td className="p-2 text-center">الكمية</td>
+                {allVendors.map(v => <td key={v.id} className="p-2 text-center">{v.name}</td>)}
+            </tr>
+          </thead>
           <TableBody>
             {tableData.map(({ item, quotes, minPrice }) => (
               <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b">
-                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
+                <TableCell className="font-bold px-4 md:sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
                 <TableCell className="text-center font-mono font-bold bg-muted/5">{item.quantity}</TableCell>
                 {allVendors.map(vendor => {
                   const quote = quotes.find(q => q.vendorId === vendor.id);
                   const isBest = quote?.price === minPrice && minPrice !== Infinity;
                   const isSelected = selectedAwards[item.id] === vendor.id;
-                  const isLocked = !!rfq.awardedVendorId;
+                  const isClosed = rfq.status === 'closed' || rfq.status === 'cancelled';
 
                   return (
                     <TableCell
                       key={vendor.id}
                       className={cn(
                         "text-center cursor-pointer transition-all border-r p-0",
-                        isSelected ? "bg-primary/10 border-primary/40 selected-cell-print" : isBest ? "bg-green-500/5" : "",
-                        isLocked && "cursor-default"
+                        isSelected ? "bg-blue-50/50 border-2 border-primary ring-inset selected-cell-print" : isBest ? "bg-green-500/5" : "",
+                        isClosed && "cursor-default"
                       )}
                       onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
                     >
@@ -308,18 +298,18 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         <div className="flex flex-col items-center justify-center h-14 relative overflow-visible">
                           <div className={cn(
                             "flex items-center gap-1 font-mono font-black", 
-                            isSelected ? "text-primary text-lg" : isBest ? "text-green-700" : "text-foreground/60"
+                            isSelected ? "text-primary text-lg scale-110" : isBest ? "text-green-700" : "text-foreground/60"
                           )}>
                             {isSelected && <CheckCircle2 className="h-4 w-4 fill-primary/20 no-print" />}
                             {formatCurrency(quote.price)}
                           </div>
-                          {/* تمييز صريح في الطباعة */}
+                          
                           {isSelected && (
                             <div className="hidden award-label">
                               [ تم الاختيار ]
                             </div>
                           )}
-                          {!isSelected && isBest && (
+                          {!isSelected && isBest && !isClosed && (
                              <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter no-print">
                                 أفضل سعر
                              </div>
@@ -337,13 +327,13 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </Table>
       </div>
 
-      {!rfq.awardedVendorId && (
+      {rfq.status !== 'closed' && rfq.status !== 'cancelled' && (
         <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg mx-4 no-print">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Award className="h-8 w-8" /></div>
                 <div>
                     <h4 className="font-black text-lg text-primary">اعتماد الترسية المختارة</h4>
-                    <p className="text-xs text-muted-foreground">تم اختيار موردين لـ {Object.values(selectedAwards).filter(Boolean).length} من أصل {rfq.items.length} بنود.</p>
+                    <p className="text-xs text-muted-foreground">سيتم إنشاء أوامر شراء منفصلة لكل مورد تم اختياره في الجدول أعلاه.</p>
                 </div>
             </div>
             <Button 
@@ -355,6 +345,13 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 اعتماد وتحويل لأوامر شراء
             </Button>
         </div>
+      )}
+      
+      {rfq.status === 'closed' && (
+          <div className="mx-4 p-4 bg-muted/20 border-2 border-dashed rounded-2xl flex items-center justify-center gap-2 text-muted-foreground no-print">
+              <CheckCircle2 className="h-5 w-5" />
+              <p className="font-bold">تمت الترسية وإغلاق الطلب. يمكنك مراجعة الموردين الفائزين المظللين بالأزرق أعلاه.</p>
+          </div>
       )}
     </div>
   );
