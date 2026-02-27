@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
 import {
   Table,
@@ -12,7 +12,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
@@ -135,27 +134,44 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   };
 
   const handleConfirmAward = async () => {
-    if (!firestore || !vendorToAward || !currentUser) return;
+    if (!firestore || !vendorToAward || !currentUser || !rfq.id) return;
     setIsAwarding(true);
 
     try {
-        let finalVendorId = vendorToAward.id;
-        const isProspective = String(finalVendorId).startsWith('prospective-');
-
+        const isProspective = String(vendorToAward.id).startsWith('prospective-');
+        
         await runTransaction(firestore, async (transaction) => {
+            // --- 1. ALL READS FIRST ---
+            const currentYear = new Date().getFullYear();
+            const counterRef = doc(firestore, 'counters', 'purchaseOrders');
+            const counterDoc = await transaction.get(counterRef);
+            
+            const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
+            if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
+
+            const rfqRef = doc(firestore, 'rfqs', rfq.id!);
+            const rfqSnap = await transaction.get(rfqRef);
+            if (!rfqSnap.exists()) throw new Error("لم يتم العثور على طلب التسعير.");
+
+            // --- 2. ALL WRITES NEXT ---
+            let finalVendorId = vendorToAward.id;
+
+            // If prospective, register them as a official vendor
             if (isProspective) {
                 const newVendorRef = doc(collection(firestore, 'vendors'));
                 finalVendorId = newVendorRef.id;
                 transaction.set(newVendorRef, {
                     name: vendorToAward.name,
-                    contactPerson: 'تم التحويل من طلب تسعير',
+                    contactPerson: 'تم التحويل من طلب تسعير (مورد محتمل سابقاً)',
                     createdAt: serverTimestamp(),
                 });
+
+                // Update the original quotation to link to the official vendor ID
+                const quoteRef = doc(firestore, 'supplierQuotations', quote.id!);
+                transaction.update(quoteRef, { vendorId: finalVendorId });
             }
 
-            const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-            const counterDoc = await transaction.get(counterRef);
+            // Calculate PO Number
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -163,9 +179,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             }
             const poNumber = `PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
-            const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
-            if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
-
+            // Map RFQ items to PO items
             const poItems = rfq.items.map(item => {
                 const quoteItem = quote.items.find(qi => qi.rfqItemId === item.id);
                 const unitPrice = quoteItem?.unitPrice || 0;
@@ -180,6 +194,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
             const totalAmount = poItems.reduce((sum, item) => sum + item.total, 0);
 
+            // Create PO
             const newPoRef = doc(collection(firestore, 'purchaseOrders'));
             const poData = {
                 poNumber,
@@ -199,14 +214,15 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             transaction.set(newPoRef, cleanFirestoreData(poData));
             transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             
-            const rfqRef = doc(firestore, 'rfqs', rfq.id!);
+            // Close the RFQ
             transaction.update(rfqRef, { status: 'closed' });
         });
 
-        toast({ title: 'تمت الترسية بنجاح', description: 'تم إنشاء مسودة أمر شراء وتحديث المخزون المحاسبي.' });
+        toast({ title: 'اكتملت عملية الترسية', description: `تم تسجيل ${isProspective ? 'المورد و' : ''}إنشاء مسودة أمر شراء بنجاح.` });
         router.push('/dashboard/purchasing/purchase-orders');
 
     } catch (error: any) {
+        console.error("Awarding failed:", error);
         toast({ variant: 'destructive', title: 'فشل الترسية', description: error.message });
     } finally {
         setIsAwarding(false);
@@ -250,7 +266,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               {comparisonData.vendors.map((vendor) => (
                 <TableHead key={vendor.id} className="text-center px-4 font-black text-primary border-r">
                   <div className="flex flex-col items-center">
-                    <span className="truncate w-full">{vendor.name}</span>
+                    <span className="truncate w-full text-center">{vendor.name}</span>
                     <span className="text-[10px] text-muted-foreground font-normal">عرض المورد</span>
                   </div>
                 </TableHead>
@@ -322,7 +338,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         onClick={() => handleAwardClick(vendor)}
                         disabled={isAwarding}
                     >
-                        <ShoppingCart className="h-3 w-3" />
+                        {isAwarding && vendorToAward?.id === vendor.id ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShoppingCart className="h-3 w-3" />}
                         ترسية وإنشاء أمر شراء
                     </Button>
                   </div>
@@ -340,17 +356,16 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 <Award className="text-green-600 h-6 w-6" />
                 تأكيد الترسية والتحويل
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              هل أنت متأكد من اختيار عرض سعر المورد <span className="font-bold text-foreground">"{vendorToAward?.name}"</span>؟
-              <br/><br/>
-              {vendorToAward && String(vendorToAward.id).startsWith('prospective-') ? (
+            <AlertDialogDescription className="text-base space-y-4">
+              <p>هل أنت متأكد من اختيار عرض سعر المورد <span className="font-bold text-foreground">"{vendorToAward?.name}"</span>؟</p>
+              
+              {vendorToAward && String(vendorToAward.id).startsWith('prospective-') && (
                   <div className="p-4 bg-blue-50 text-blue-800 rounded-2xl border border-blue-100 text-sm flex items-start gap-3">
                       <UserPlus className="h-5 w-5 mt-0.5 shrink-0 text-blue-600" />
                       <p>هذا المورد محتمل وغير مسجل في النظام. سيقوم النظام بتسجيله تلقائياً كمورد رسمي لإتمام العملية المحاسبية بشكل سليم.</p>
                   </div>
-              ) : (
-                  "سيقوم النظام بإنشاء مسودة أمر شراء (Draft PO) ببيانات هذا العرض فوراً لمراجعتها واعتمادها."
               )}
+              <p className="text-sm text-muted-foreground italic">سيتم إنشاء مسودة أمر شراء (Draft PO) ببيانات هذا العرض فوراً.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">
