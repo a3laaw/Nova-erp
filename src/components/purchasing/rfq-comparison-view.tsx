@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -18,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
 import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2 } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
@@ -232,7 +232,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         const poRef = doc(firestore, 'purchaseOrders', rfq.awardedPoId);
         const rfqRef = doc(firestore, 'rfqs', rfq.id);
 
-        // We use a transaction to ensure atomic deletion and status update
         await runTransaction(firestore, async (transaction) => {
             transaction.delete(poRef);
             transaction.update(rfqRef, {
@@ -381,7 +380,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         <Button 
                             size="sm" 
                             variant="default"
-                            className="h-8 rounded-lg text-[10px] font-bold gap-1 px-3 bg-green-600 hover:bg-green-700 no-print"
+                            className="h-8 rounded-xl text-[10px] font-bold gap-1 px-3 bg-green-600 hover:bg-green-700 no-print"
                             onClick={() => handleAwardClick(vendor)}
                             disabled={isAwarding}
                         >
