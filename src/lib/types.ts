@@ -652,6 +652,8 @@ export type RequestForQuotation = {
   prospectiveVendors?: { id: string; name: string }[];
   items: RfqItem[];
   createdAt: any;
+  awardedVendorId?: string;
+  awardedPoId?: string;
 };
 
 export type SupplierQuotation = {
@@ -678,6 +680,7 @@ export type PurchaseOrder = {
     projectId?: string; // NEW: Link to construction project
     warehouseId?: string; // NEW: Target site warehouse
     supplierQuotationId?: string;
+    rfqId?: string;
     items: {
       internalItemId?: string;
       itemName: string;

@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
 import {
   Table,
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
-import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus } from 'lucide-react';
+import { Award, AlertCircle, ShoppingCart, Loader2, UserPlus, Undo2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -47,6 +48,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [loadingData, setLoadingData] = useState(true);
   
   const [isAwarding, setIsAwarding] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [vendorToAward, setVendorToAward] = useState<any | null>(null);
 
   useEffect(() => {
@@ -142,7 +144,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         const isProspective = String(vendorToAward.id).startsWith('prospective-');
         
         await runTransaction(firestore, async (transaction) => {
-            // --- 1. ALL READS FIRST ---
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'purchaseOrders');
             const counterDoc = await transaction.get(counterRef);
@@ -151,13 +152,9 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
 
             const rfqRef = doc(firestore, 'rfqs', rfq.id!);
-            const rfqSnap = await transaction.get(rfqRef);
-            if (!rfqSnap.exists()) throw new Error("لم يتم العثور على طلب التسعير.");
-
-            // --- 2. ALL WRITES NEXT ---
+            
             let finalVendorId = vendorToAward.id;
 
-            // If prospective, register them as a official vendor
             if (isProspective) {
                 const newVendorRef = doc(collection(firestore, 'vendors'));
                 finalVendorId = newVendorRef.id;
@@ -166,13 +163,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     contactPerson: 'تم التحويل من طلب تسعير (مورد محتمل سابقاً)',
                     createdAt: serverTimestamp(),
                 });
-
-                // Update the original quotation to link to the official vendor ID
                 const quoteRef = doc(firestore, 'supplierQuotations', quote.id!);
                 transaction.update(quoteRef, { vendorId: finalVendorId });
             }
 
-            // Calculate PO Number
             let nextNumber = 1;
             if (counterDoc.exists()) {
                 const counts = counterDoc.data()?.counts || {};
@@ -180,7 +174,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             }
             const poNumber = `PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
-            // Map RFQ items to PO items
             const poItems = rfq.items.map(item => {
                 const quoteItem = quote.items.find(qi => qi.rfqItemId === item.id);
                 const unitPrice = quoteItem?.unitPrice || 0;
@@ -195,7 +188,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
             const totalAmount = poItems.reduce((sum, item) => sum + item.total, 0);
 
-            // Create PO
             const newPoRef = doc(collection(firestore, 'purchaseOrders'));
             const poData = {
                 poNumber,
@@ -215,19 +207,47 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             transaction.set(newPoRef, cleanFirestoreData(poData));
             transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             
-            // Close the RFQ
-            transaction.update(rfqRef, { status: 'closed' });
+            transaction.update(rfqRef, { 
+                status: 'closed',
+                awardedVendorId: finalVendorId,
+                awardedPoId: newPoRef.id
+            });
         });
 
-        toast({ title: 'اكتملت عملية الترسية', description: `تم تسجيل ${isProspective ? 'المورد و' : ''}إنشاء مسودة أمر شراء بنجاح.` });
-        router.push('/dashboard/purchasing/purchase-orders');
-
+        toast({ title: 'اكتملت عملية الترسية', description: `تم إنشاء مسودة أمر شراء بنجاح.` });
+        setVendorToAward(null);
     } catch (error: any) {
         console.error("Awarding failed:", error);
         toast({ variant: 'destructive', title: 'فشل الترسية', description: error.message });
     } finally {
         setIsAwarding(false);
-        setVendorToAward(null);
+    }
+  };
+
+  const handleUndoAward = async () => {
+    if (!firestore || !rfq.id || !rfq.awardedPoId) return;
+    
+    setIsUndoing(true);
+    try {
+        const poRef = doc(firestore, 'purchaseOrders', rfq.awardedPoId);
+        const rfqRef = doc(firestore, 'rfqs', rfq.id);
+
+        // We use a transaction to ensure atomic deletion and status update
+        await runTransaction(firestore, async (transaction) => {
+            transaction.delete(poRef);
+            transaction.update(rfqRef, {
+                status: 'sent',
+                awardedVendorId: null,
+                awardedPoId: null
+            });
+        });
+
+        toast({ title: 'تم التراجع', description: 'تم حذف أمر الشراء وإعادة فتح طلب التسعير للمقارنة.' });
+    } catch (error: any) {
+        console.error("Undo failed:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الترسية.' });
+    } finally {
+        setIsUndoing(false);
     }
   };
 
@@ -246,6 +266,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
       </div>
     );
   }
+
+  const isAlreadyAwarded = !!rfq.awardedVendorId;
 
   return (
     <div className="space-y-4">
@@ -290,12 +312,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                   {comparisonData.vendors.map((vendor) => {
                     const quote = quotes.find((q) => q.vendorId === vendor.id);
                     const isBestPrice = quote?.unitPrice === minPrice && minPrice !== Infinity;
+                    const isWinner = rfq.awardedVendorId === vendor.id;
+
                     return (
                       <TableCell
                         key={vendor.id}
                         className={cn(
                           'text-center font-mono font-bold border-r px-4',
-                          isBestPrice ? 'bg-green-500/10 text-green-700' : 'text-foreground/70'
+                          isWinner ? 'bg-primary/5 text-primary' : isBestPrice ? 'bg-green-500/10 text-green-700' : 'text-foreground/70'
                         )}
                       >
                         {quote?.unitPrice === Infinity ? (
@@ -303,7 +327,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         ) : (
                           <div className="flex flex-col items-center gap-0.5">
                             <div className="flex items-center justify-center gap-1.5">
-                              {isBestPrice && <Award className="h-4 w-4 text-green-600 fill-green-600/20" />}
+                              {(isWinner || isBestPrice) && <Award className={cn("h-4 w-4", isWinner ? "text-primary fill-primary/20" : "text-green-600 fill-green-600/20")} />}
                               <span>{formatCurrency(quote!.unitPrice)}</span>
                             </div>
                             <span className="text-[9px] text-muted-foreground font-normal">
@@ -323,28 +347,52 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               <TableCell colSpan={2} className="text-right px-8 font-black text-lg">
                 إجمالي العرض / الترسية:
               </TableCell>
-              {comparisonData.vendors.map((vendor) => (
-                <TableCell
-                  key={vendor.id}
-                  className="text-center border-r bg-primary/5 px-2"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="font-mono text-xl font-black text-primary">
-                        {formatCurrency(comparisonData.totals[vendor.id!] || 0)}
-                    </span>
-                    <Button 
-                        size="sm" 
-                        variant="default"
-                        className="h-8 rounded-lg text-[10px] font-bold gap-1 px-3 bg-green-600 hover:bg-green-700 no-print"
-                        onClick={() => handleAwardClick(vendor)}
-                        disabled={isAwarding}
-                    >
-                        {isAwarding && vendorToAward?.id === vendor.id ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShoppingCart className="h-3 w-3" />}
-                        ترسية وإنشاء أمر شراء
-                    </Button>
-                  </div>
-                </TableCell>
-              ))}
+              {comparisonData.vendors.map((vendor) => {
+                const isWinner = rfq.awardedVendorId === vendor.id;
+                
+                return (
+                  <TableCell
+                    key={vendor.id}
+                    className={cn("text-center border-r px-2", isWinner ? "bg-primary/10" : "bg-primary/5")}
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <span className={cn("font-mono text-xl font-black", isWinner ? "text-primary" : "text-foreground/60")}>
+                          {formatCurrency(comparisonData.totals[vendor.id!] || 0)}
+                      </span>
+                      
+                      {isAlreadyAwarded ? (
+                          isWinner ? (
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                className="h-8 rounded-lg text-[10px] font-bold gap-1 px-3 shadow-md no-print"
+                                onClick={handleUndoAward}
+                                disabled={isUndoing}
+                              >
+                                {isUndoing ? <Loader2 className="h-3 w-3 animate-spin"/> : <Undo2 className="h-3 w-3" />}
+                                تراجع عن الترسية
+                              </Button>
+                          ) : (
+                              <div className="h-8 flex items-center justify-center">
+                                  <Badge variant="secondary" className="text-[9px] opacity-50">تمت الترسية لمورد آخر</Badge>
+                              </div>
+                          )
+                      ) : (
+                        <Button 
+                            size="sm" 
+                            variant="default"
+                            className="h-8 rounded-lg text-[10px] font-bold gap-1 px-3 bg-green-600 hover:bg-green-700 no-print"
+                            onClick={() => handleAwardClick(vendor)}
+                            disabled={isAwarding}
+                        >
+                            {isAwarding && vendorToAward?.id === vendor.id ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShoppingCart className="h-3 w-3" />}
+                            ترسية وإنشاء أمر شراء
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                );
+              })}
             </TableRow>
           </TableFooter>
         </Table>
