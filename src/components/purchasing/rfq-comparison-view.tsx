@@ -77,10 +77,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         const vendorIds = rfq.vendorIds || [];
         if (vendorIds.length > 0) {
             const fetchedVendors: Vendor[] = [];
-            for (let i = 0; i < vendorIds.slice(0, 30).length; i += 30) {
-              const chunk = vendorIds.slice(i, i + 30);
-              const snap = await getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)));
-              snap.forEach(d => fetchedVendors.push({ id: d.id, ...d.data() } as Vendor));
+            const vendorBatches = [];
+            for (let i = 0; i < vendorIds.length; i += 30) {
+                vendorBatches.push(vendorIds.slice(i, i + 30));
+            }
+            
+            for (const batch of vendorBatches) {
+                const snap = await getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', batch)));
+                snap.forEach(d => fetchedVendors.push({ id: d.id, ...d.data() } as Vendor));
             }
             setRegisteredVendors(fetchedVendors);
         }
@@ -235,7 +239,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const rfqDate = toFirestoreDate(rfq.date);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-landscape">
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           body * { visibility: hidden; }

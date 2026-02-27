@@ -7,13 +7,13 @@
 
 @layer base {
   :root {
-    --background: 220 14.3% 97.5%; /* gray-100/blue-gray-100 equivalent */
+    --background: 220 14.3% 97.5%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%; /* #1e40af */
+    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -31,8 +31,8 @@
     --sidebar-foreground: 215 25% 27%;
     --sidebar-primary: 221.2 83.2% 53.3%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 95% 93%; /* لون أزرق فاتح جداً عند التمرير لمنع التداخل مع الأبيض */
-    --sidebar-accent-foreground: 221.2 83.2% 53.3%; /* لون أزرق داكن للنص والأيقونات عند التمرير */
+    --sidebar-accent: 214 95% 93%;
+    --sidebar-accent-foreground: 221.2 83.2% 53.3%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 221.2 83.2% 53.3%;
   }
@@ -79,7 +79,7 @@
 }
 
 @layer utilities {
-    /* Hide number input spinners */
+    /* إخفاء أسهم حقول الأرقام */
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button {
       -webkit-appearance: none;
@@ -89,43 +89,50 @@
       -moz-appearance: textfield;
     }
 
+    /* ─── القواعد الذهبية للطباعة ─── */
     @media print {
         html, body {
             background: white !important;
             color: black !important;
             -webkit-print-color-adjust: exact;
             color-adjust: exact;
+            height: auto !important;
+            overflow: visible !important;
         }
-        .no-print {
+
+        /* إخفاء كل شيء غير ضروري للوثيقة */
+        .no-print, [role="navigation"], header, button, .sidebar, .sidebar-trigger {
             display: none !important;
         }
+
         .printable-wrapper {
             box-shadow: none !important;
             border: none !important;
             background: transparent !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
-        .printable-container {
-            display: table;
-            width: 100%;
-            border-collapse: collapse;
+
+        /* التحكم في الاتجاه الرأسي (Portrait) */
+        .print-portrait {
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
         }
-        .print-header {
-            display: table-header-group;
+
+        /* التحكم في الاتجاه الأفقي (Landscape) */
+        .print-landscape {
+            @page {
+                size: A4 landscape;
+                margin: 10mm;
+            }
         }
-        .print-content {
-            display: table-row-group;
-        }
-        .print-footer {
-            display: table-footer-group;
-        }
-        .print-watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            opacity: 0.08;
-            z-index: -1;
-            pointer-events: none;
+
+        /* لضمان كسر الصفحة بشكل صحيح */
+        .page-break {
+            page-break-before: always;
         }
     }
 }
@@ -142,11 +149,6 @@
         --rdp-outline-selected: 3px solid hsl(var(--primary));
         --rdp-selected-color: hsl(var(--primary-foreground));
     }
-}
-
-@page {
-    size: A4;
-    margin: 0;
 }
 
 /* Fix for dropdown/popover click issues */
