@@ -235,7 +235,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   if (loadingData) return <div className="p-8"><Skeleton className="h-96 w-full rounded-2xl" /></div>;
 
   return (
-    <div className={cn("space-y-6", printScaleClass)}>
+    <div className={cn("space-y-6 max-w-full", printScaleClass)}>
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           .comparison-table-container { overflow: visible !important; display: block !important; }
@@ -250,7 +250,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         }
       `}} />
 
-      <div className="overflow-x-auto comparison-table-container border-2 rounded-[2rem] shadow-sm bg-card">
+      <div className="overflow-x-auto w-full comparison-table-container border-2 rounded-[2rem] shadow-sm bg-card">
         <Table className="w-full border-collapse" style={{ tableLayout: 'auto' }}>
           <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 no-print">
             <TableRow className="border-b-2">
