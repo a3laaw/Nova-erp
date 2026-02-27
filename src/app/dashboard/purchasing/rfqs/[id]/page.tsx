@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -8,7 +9,7 @@ import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2 } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2, UserSearch } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -21,6 +22,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 
 const statusColors: Record<string, string> = {
     draft: 'bg-yellow-100 text-yellow-800',
@@ -46,9 +49,10 @@ export default function RfqDetailsPage() {
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
     const [newVendorId, setNewVendorId] = useState('');
+    const [prospectiveName, setProspectiveName] = useState('');
     const [isAddingVendor, setIsAddingVendor] = useState(false);
 
-    const [vendors, setVendors] = useState<Vendor[]>([]);
+    const [vendors, setVendors] = useState<any[]>([]);
     const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
     const [dataLoading, setDataLoading] = useState(true);
 
@@ -58,7 +62,7 @@ export default function RfqDetailsPage() {
     const { data: allSystemVendors } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
 
     useEffect(() => {
-        if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) {
+        if (!firestore || !rfq) {
             setDataLoading(false);
             return;
         }
@@ -66,20 +70,31 @@ export default function RfqDetailsPage() {
         const fetchData = async () => {
             setDataLoading(true);
             try {
-                const vendorIds = rfq.vendorIds;
-                const chunks = [];
-                for (let i = 0; i < vendorIds.length; i += 30) {
-                    chunks.push(vendorIds.slice(i, i + 30));
+                const registeredVendorIds = rfq.vendorIds || [];
+                let fetchedRegisteredVendors: any[] = [];
+
+                if (registeredVendorIds.length > 0) {
+                    const chunks = [];
+                    for (let i = 0; i < registeredVendorIds.length; i += 30) {
+                        chunks.push(registeredVendorIds.slice(i, i + 30));
+                    }
+
+                    const vendorPromises = chunks.map(chunk => 
+                        getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
+                    );
+                    const vendorSnapshots = await Promise.all(vendorPromises);
+                    fetchedRegisteredVendors = vendorSnapshots.flatMap(snap => 
+                        snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
+                    );
                 }
 
-                const vendorPromises = chunks.map(chunk => 
-                    getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
-                );
-                const vendorSnapshots = await Promise.all(vendorPromises);
-                const fetchedVendors = vendorSnapshots.flatMap(snap => 
-                    snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
-                );
-                setVendors(fetchedVendors);
+                // Combine with prospective vendors from RFQ doc
+                const combinedVendors = [
+                    ...fetchedRegisteredVendors,
+                    ...(rfq.prospectiveVendors || [])
+                ];
+                
+                setVendors(combinedVendors);
 
                 const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', id)));
                 setSupplierQuotations(quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation)));
@@ -92,7 +107,7 @@ export default function RfqDetailsPage() {
         };
 
         fetchData();
-    }, [firestore, rfq?.vendorIds, id]);
+    }, [firestore, rfq, id]);
     
     const handleChangeStatus = async (newStatus: RequestForQuotation['status']) => {
         if (!rfqRef) return;
@@ -107,16 +122,28 @@ export default function RfqDetailsPage() {
         }
     };
 
-    const handleAddVendor = async () => {
-        if (!rfqRef || !newVendorId) return;
+    const handleAddVendor = async (type: 'registered' | 'prospective') => {
+        if (!rfqRef) return;
+        
         setIsAddingVendor(true);
         try {
-            await updateDoc(rfqRef, {
-                vendorIds: arrayUnion(newVendorId)
-            });
+            if (type === 'registered') {
+                if (!newVendorId) return;
+                await updateDoc(rfqRef, {
+                    vendorIds: arrayUnion(newVendorId)
+                });
+            } else {
+                if (!prospectiveName.trim()) return;
+                const tempId = `prospective-${Math.random().toString(36).substring(2, 9)}`;
+                await updateDoc(rfqRef, {
+                    prospectiveVendors: arrayUnion({ id: tempId, name: prospectiveName.trim() })
+                });
+            }
+            
             toast({ title: 'تمت الإضافة', description: 'تمت إضافة المورد للطلب بنجاح.' });
             setIsAddVendorOpen(false);
             setNewVendorId('');
+            setProspectiveName('');
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إضافة المورد.' });
         } finally {
@@ -243,27 +270,54 @@ export default function RfqDetailsPage() {
 
             {/* Add Vendor Dialog */}
             <Dialog open={isAddVendorOpen} onOpenChange={setIsAddVendorOpen}>
-                <DialogContent dir="rtl" className="rounded-2xl">
+                <DialogContent dir="rtl" className="rounded-2xl max-w-lg">
                     <DialogHeader>
                         <DialogTitle>إضافة مورد لطلب التسعير</DialogTitle>
-                        <DialogDescription>يمكنك إضافة مورد جديد لهذا الطلب حتى بعد إرساله لاستقبال عرضه ومقارنته مع البقية.</DialogDescription>
+                        <DialogDescription>يمكنك اختيار مورد مسجل من النظام أو إدخال مورد محتمل جديد لهذا الطلب فقط.</DialogDescription>
                     </DialogHeader>
-                    <div className="py-6">
-                        <Label className="mb-2 block font-bold">اختر المورد من القائمة:</Label>
-                        <InlineSearchList 
-                            value={newVendorId}
-                            onSelect={setNewVendorId}
-                            options={vendorOptions}
-                            placeholder="ابحث باسم المورد..."
-                            className="h-12 rounded-xl"
-                        />
-                    </div>
-                    <DialogFooter>
+                    
+                    <Tabs defaultValue="registered" className="py-4">
+                        <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                            <TabsTrigger value="registered">مورد مسجل</TabsTrigger>
+                            <TabsTrigger value="prospective">مورد محتمل</TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="registered" className="space-y-4 pt-4">
+                            <div className="grid gap-2">
+                                <Label className="font-bold">اختر المورد من القائمة:</Label>
+                                <InlineSearchList 
+                                    value={newVendorId}
+                                    onSelect={setNewVendorId}
+                                    options={vendorOptions}
+                                    placeholder="ابحث باسم المورد..."
+                                    className="h-12 rounded-xl"
+                                />
+                            </div>
+                            <Button onClick={() => handleAddVendor('registered')} disabled={!newVendorId || isAddingVendor} className="w-full h-12 rounded-xl font-bold">
+                                {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <PlusCircle className="h-4 w-4 ml-2"/>}
+                                إضافة المورد المختار
+                            </Button>
+                        </TabsContent>
+                        
+                        <TabsContent value="prospective" className="space-y-4 pt-4">
+                            <div className="grid gap-2">
+                                <Label className="font-bold">اسم المورد المحتمل:</Label>
+                                <Input 
+                                    value={prospectiveName} 
+                                    onChange={(e) => setProspectiveName(e.target.value)} 
+                                    placeholder="ادخل اسم الشركة أو المورد..." 
+                                    className="h-12 rounded-xl border-2"
+                                />
+                            </div>
+                            <Button onClick={() => handleAddVendor('prospective')} disabled={!prospectiveName.trim() || isAddingVendor} className="w-full h-12 rounded-xl font-bold bg-orange-600 hover:bg-orange-700">
+                                {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <UserSearch className="h-4 w-4 ml-2"/>}
+                                إضافة كمورد محتمل
+                            </Button>
+                        </TabsContent>
+                    </Tabs>
+                    
+                    <DialogFooter className="mt-4">
                         <Button variant="ghost" onClick={() => setIsAddVendorOpen(false)} disabled={isAddingVendor}>إلغاء</Button>
-                        <Button onClick={handleAddVendor} disabled={!newVendorId || isAddingVendor} className="rounded-xl px-8">
-                            {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <PlusCircle className="h-4 w-4 ml-2"/>}
-                            تأكيد الإضافة للطلب
-                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

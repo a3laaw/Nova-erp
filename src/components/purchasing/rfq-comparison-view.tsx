@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -22,24 +23,14 @@ interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
 }
 
-interface ComparisonData {
-  rfqItem: RfqItem;
-  quotes: {
-    vendorId: string;
-    vendorName: string;
-    unitPrice: number;
-  }[];
-}
-
 export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const { firestore } = useFirebase();
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [registeredVendors, setRegisteredVendors] = useState<Vendor[]>([]);
   const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  // إصلاح #3: تقسيم جلب الموردين لتجنب قيود IN Query
   useEffect(() => {
-    if (!firestore || !rfq.id || !rfq.vendorIds || rfq.vendorIds.length === 0) {
+    if (!firestore || !rfq.id) {
       setLoadingData(false);
       return;
     }
@@ -47,26 +38,26 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        // جلب العروض أولاً
         const quotesSnap = await getDocs(query(collection(firestore, 'supplierQuotations'), where('rfqId', '==', rfq.id)));
         const fetchedQuotes = quotesSnap.docs.map(d => ({ id: d.id, ...d.data() } as SupplierQuotation));
         setSupplierQuotations(fetchedQuotes);
 
-        // جلب الموردين في مجموعات
-        const vendorIds = rfq.vendorIds;
-        const chunks = [];
-        for (let i = 0; i < vendorIds.length; i += 30) {
-          chunks.push(vendorIds.slice(i, i + 30));
-        }
+        const vendorIds = rfq.vendorIds || [];
+        if (vendorIds.length > 0) {
+            const chunks = [];
+            for (let i = 0; i < vendorIds.length; i += 30) {
+              chunks.push(vendorIds.slice(i, i + 30));
+            }
 
-        const vendorPromises = chunks.map(chunk => 
-          getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
-        );
-        const vendorSnapshots = await Promise.all(vendorPromises);
-        const fetchedVendors = vendorSnapshots.flatMap(snap => 
-          snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
-        );
-        setVendors(fetchedVendors);
+            const vendorPromises = chunks.map(chunk => 
+              getDocs(query(collection(firestore, 'vendors'), where('__name__', 'in', chunk)))
+            );
+            const vendorSnapshots = await Promise.all(vendorPromises);
+            const fetchedVendors = vendorSnapshots.flatMap(snap => 
+              snap.docs.map(d => ({ id: d.id, ...d.data() } as Vendor))
+            );
+            setRegisteredVendors(fetchedVendors);
+        }
 
       } catch (err) {
         console.error("Error fetching comparison data:", err);
@@ -79,11 +70,17 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   }, [firestore, rfq.id, rfq.vendorIds]);
 
   const comparisonData = useMemo(() => {
-    if (loadingData || !rfq || !supplierQuotations || !vendors) {
+    if (loadingData || !rfq) {
       return { data: [], vendors: [], totals: {} };
     }
 
-    const participatingVendors = vendors.filter((v) =>
+    // Combine registered and prospective vendors
+    const allAvailableVendors = [
+        ...registeredVendors,
+        ...(rfq.prospectiveVendors || [])
+    ];
+
+    const participatingVendors = allAvailableVendors.filter((v) =>
       supplierQuotations.some((q) => q.vendorId === v.id)
     );
 
@@ -112,7 +109,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     });
 
     return { data, vendors: participatingVendors, totals: tempTotals };
-  }, [loadingData, rfq, supplierQuotations, vendors]);
+  }, [loadingData, rfq, supplierQuotations, registeredVendors]);
 
   if (loadingData)
     return (
@@ -132,14 +129,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-4">
-      {rfq.vendorIds?.length > 30 && (
-        <Alert className="mx-6 mt-4 bg-amber-50 border-amber-200 text-amber-800">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>تنبيه</AlertTitle>
-          <AlertDescription>لقد تم جلب بيانات الموردين في مجموعات لضمان دقة التحليل.</AlertDescription>
-        </Alert>
-      )}
-      
       <div className="overflow-x-auto print:overflow-visible">
         <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
           <colgroup>

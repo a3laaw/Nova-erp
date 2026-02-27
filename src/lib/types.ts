@@ -649,6 +649,7 @@ export type RequestForQuotation = {
   date: any;
   status: 'draft' | 'sent' | 'closed' | 'cancelled';
   vendorIds: string[];
+  prospectiveVendors?: { id: string; name: string }[];
   items: RfqItem[];
   createdAt: any;
 };
@@ -772,7 +773,7 @@ export type Boq = {
   projectId?: string; // Link back to construction project
   totalValue: number;
   itemCount: number;
-  createdAt?: any;
+  createdAt: any;
 };
   
 export type BoqReferenceItem = {
