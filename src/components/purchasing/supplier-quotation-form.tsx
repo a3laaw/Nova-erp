@@ -259,7 +259,7 @@ export function SupplierQuotationForm({
           <Button 
             onClick={handleSubmit} 
             disabled={isSaving || items.every(i => !i.unitPrice)}
-            className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[200px]"
+            className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[240px]"
           >
             {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
             {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ عرض السعر'}
