@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where, deleteField } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -88,31 +88,38 @@ export default function PurchaseOrderDetailPage() {
     };
 
     const handleUndoApproval = async () => {
-        if (!poRef || !currentUser || !po) return;
+        if (!poRef || !currentUser || !po || !firestore) return;
         
         setIsUpdating(true);
         try {
-            // التحقق مما إذا كان هناك أي إذن استلام مرتبط
-            const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', po.id), where('status', '!=', 'cancelled'));
+            // Simplified query to check for any linked GRNs
+            const grnsQuery = query(
+                collection(firestore, 'grns'), 
+                where('purchaseOrderId', '==', po.id)
+            );
             const grnsSnap = await getDocs(grnsQuery);
             
-            if (!grnsSnap.empty) {
+            // Filter non-cancelled GRNs in memory to avoid needing a composite index
+            const activeGrns = grnsSnap.docs.filter(d => d.data().status !== 'cancelled');
+            
+            if (activeGrns.length > 0) {
                 toast({ 
                     variant: 'destructive', 
                     title: 'لا يمكن التراجع', 
-                    description: 'تم البدء باستلام بضاعة لهذا الأمر بالفعل. يجب إلغاء أذونات الاستلام أولاً.' 
+                    description: 'تم البدء باستلام بضاعة لهذا الأمر بالفعل. يجب حذف أذونات الاستلام أولاً.' 
                 });
                 return;
             }
 
             await updateDoc(poRef, { 
                 status: 'draft',
-                approvedBy: null,
-                approvedAt: null
+                approvedBy: deleteField(),
+                approvedAt: deleteField()
             });
             
             toast({ title: 'تم التراجع', description: 'تمت إعادة أمر الشراء لحالة المسودة بنجاح.' });
         } catch (error) {
+            console.error("Undo approval failed:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الاعتماد.' });
         } finally {
             setIsUpdating(false);

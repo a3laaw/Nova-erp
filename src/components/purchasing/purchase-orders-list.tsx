@@ -10,9 +10,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirebase } from '@/firebase';
-import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc, writeBatch, where, getDocs, updateDoc } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch, where, getDocs, updateDoc, deleteField } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
@@ -90,7 +89,6 @@ export function PurchaseOrdersList() {
   const handleUndoApproval = async (po: PurchaseOrder) => {
     if (!firestore || !currentUser || isProcessing) return;
     
-    // التحقق من الصلاحيات
     if (currentUser.role !== 'Admin' && currentUser.role !== 'Accountant') {
         toast({ variant: 'destructive', title: 'غير مسموح', description: 'ليس لديك صلاحية التعديل على أوامر الشراء.' });
         return;
@@ -98,25 +96,27 @@ export function PurchaseOrdersList() {
 
     setIsProcessing(true);
     try {
-        // 1. التحقق مما إذا كان هناك أي إذن استلام مرتبط
-        const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', po.id), where('status', '!=', 'cancelled'));
+        // Simplified query to check for any linked GRNs
+        const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', po.id));
         const grnsSnap = await getDocs(grnsQuery);
         
-        if (!grnsSnap.empty) {
+        // Filter in memory to avoid index requirements
+        const activeGrns = grnsSnap.docs.filter(d => d.data().status !== 'cancelled');
+        
+        if (activeGrns.length > 0) {
             toast({ 
                 variant: 'destructive', 
                 title: 'لا يمكن التراجع', 
-                description: 'تم البدء باستلام بضاعة لهذا الأمر بالفعل. يجب إلغاء أذونات الاستلام أولاً.' 
+                description: 'تم البدء باستلام بضاعة لهذا الأمر بالفعل. يجب حذف أذونات الاستلام أولاً.' 
             });
             return;
         }
 
-        // 2. تحديث الحالة
         const poRef = doc(firestore, 'purchaseOrders', po.id!);
         await updateDoc(poRef, { 
             status: 'draft',
-            approvedBy: null,
-            approvedAt: null
+            approvedBy: deleteField(),
+            approvedAt: deleteField()
         });
         
         toast({ title: 'تم التراجع', description: 'تمت إعادة أمر الشراء لحالة المسودة بنجاح.' });
@@ -134,10 +134,8 @@ export function PurchaseOrdersList() {
     try {
         const batch = writeBatch(firestore);
         
-        // 1. حذف أمر الشراء
         batch.delete(doc(firestore, 'purchaseOrders', itemToDelete.id!));
 
-        // 2. إذا كان مرتبطاً بطلب تسعير، نعيد فتح الطلب
         if (itemToDelete.rfqId) {
             const rfqRef = doc(firestore, 'rfqs', itemToDelete.rfqId);
             batch.update(rfqRef, {
