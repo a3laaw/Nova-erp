@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview محرك تحليل صور عروض الأسعار المطور.
- * تم تحسينه لحل خطأ plugin is not a function عبر تحديد contentType وتطهير JSON.
+ * تم تحسينه لحل خطأ plugin is not a function عبر استخدام Google AI المحدث.
  */
 
 import { ai } from '../genkit';
@@ -37,6 +37,6 @@ export async function analyzeSupplierQuote(input: {
 
   } catch (e: any) {
     console.error("AI Flow Error:", e);
-    throw new Error("حدث خطأ في معالجة الصورة، يرجى التأكد من وضوح الصورة والمحاولة مرة أخرى.");
+    throw new Error("حدث خطأ في معالجة الصورة، يرجى التأكد من وضوح الصورة وتحديث المكتبات.");
   }
 }

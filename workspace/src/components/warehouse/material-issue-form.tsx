@@ -91,7 +91,17 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 setDepartments(deptSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
                 
                 const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
-                setProjects(projSnap.docs.map(d => ({...d.data(), id: d.id, clientName: clientMap.get(d.data().clientId)} as ClientTransaction & { clientName: string })));
+                
+                const fetchedProjects = projSnap.docs.map(d => {
+                    const data = d.data();
+                    return {
+                        ...data,
+                        id: d.id,
+                        clientName: clientMap.get(data.clientId)
+                    } as ClientTransaction & { clientName: string };
+                });
+                
+                setProjects(fetchedProjects.filter(p => p.clientName));
             } catch(e) {
                 console.error("Error fetching reference data:", e);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });

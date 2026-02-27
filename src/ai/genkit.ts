@@ -1,7 +1,11 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 
-// الحل الأضمن: تعريف الموديل والبلجن بشكل منفصل
+/**
+ * تهيئة محرك Genkit 1.x باستخدام بلجن Google AI المستقر.
+ */
 export const ai = genkit({
-  plugins: [googleAI()], 
+  plugins: [
+    googleAI(),
+  ],
 });
