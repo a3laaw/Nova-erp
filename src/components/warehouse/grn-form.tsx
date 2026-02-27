@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -74,7 +75,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
     const selectedPo = useMemo(() => pos.find(p => p.id === selectedPoId), [pos, selectedPoId]);
 
-    // تحقق من نوع المورد عند اختيار أمر الشراء
     useEffect(() => {
         if (selectedPo) {
             const isRegistered = registeredVendors.some(v => v.id === selectedPo.vendorId);
@@ -134,7 +134,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
     const totalValue = useMemo(() => (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantityReceived) || 0) * (item.unitPrice || 0), 0), [watchedItems]);
 
-    // دمج المورد المحتمل في النظام وتحويله لمورد رسمي
     const handleRegisterVendor = async () => {
         if (!selectedPo || !firestore) return;
         if (!vendorData.phone) {
@@ -145,7 +144,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
         setIsSaving(true);
         try {
             await runTransaction(firestore, async (transaction) => {
-                // 1. إنشاء المورد الرسمي
                 const newVendorRef = doc(collection(firestore, 'vendors'));
                 const newVendorData = {
                     name: selectedPo.vendorName,
@@ -156,7 +154,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 };
                 transaction.set(newVendorRef, newVendorData);
 
-                // 2. تحديث أمر الشراء ليرتبط بالمورد الجديد
                 const poRef = doc(firestore, 'purchaseOrders', selectedPoId);
                 transaction.update(poRef, { vendorId: newVendorRef.id });
             });
@@ -176,49 +173,58 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
         setIsSaving(true);
         try {
-            await runTransaction(firestore, async (transaction) => {
-                const accountsRef = collection(firestore, 'chartOfAccounts');
-                const coaSnap = await getDocs(query(accountsRef));
-                const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
+            // جلب الحسابات قبل بدء العملية لضمان الترتيب الصحيح
+            const accountsRef = collection(firestore, 'chartOfAccounts');
+            const coaSnap = await getDocs(query(accountsRef));
+            const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
 
-                // 1. تأمين الحسابات الرئيسية (ترميم تلقائي للشجرة)
+            await runTransaction(firestore, async (transaction) => {
+                // 1. القراءات أولاً (READS FIRST)
+                const currentYear = new Date().getFullYear();
+                const grnCounterRef = doc(firestore, 'counters', 'grns');
+                const coaVendorCounterRef = doc(firestore, 'counters', 'coa_vendors');
+                
+                const [grnCounterDoc, coaVendorCounterDoc] = await Promise.all([
+                    transaction.get(grnCounterRef),
+                    transaction.get(coaVendorCounterRef)
+                ]);
+
+                // 2. معالجة المنطق (LOGIC)
                 let inventoryAcc = allAccounts.find(a => a.code === '1104');
+                let vendorsParentAcc = allAccounts.find(a => a.code === '2101');
+                let vendorAcc = allAccounts.find(a => a.name === selectedPo.vendorName && a.parentCode === '2101');
+
+                // حساب الأكواد الجديدة إذا لزم الأمر
+                const nextGrnNumber = ((grnCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                const grnNumber = `GRN-${currentYear}-${String(nextGrnNumber).padStart(4, '0')}`;
+                
+                let nextVendorNum = coaVendorCounterDoc.data()?.lastNumber || 0;
+
+                // 3. عمليات الكتابة (WRITES LAST)
+                
+                // إنشاء حساب المخزون إذا نقص
                 if (!inventoryAcc) {
                     const newInvRef = doc(accountsRef);
-                    inventoryAcc = { code: '1104', name: 'المخزون', type: 'asset', level: 2, parentCode: '11', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' };
+                    inventoryAcc = { id: newInvRef.id, code: '1104', name: 'المخزون', type: 'asset', level: 2, parentCode: '11', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' };
                     transaction.set(newInvRef, inventoryAcc);
-                    inventoryAcc.id = newInvRef.id;
                 }
 
-                let vendorsParentAcc = allAccounts.find(a => a.code === '2101');
+                // إنشاء حساب الموردين الأب إذا نقص
                 if (!vendorsParentAcc) {
                     const newVenPRef = doc(accountsRef);
-                    vendorsParentAcc = { code: '2101', name: 'الموردون', type: 'liability', level: 2, parentCode: '21', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' };
+                    vendorsParentAcc = { id: newVenPRef.id, code: '2101', name: 'الموردون', type: 'liability', level: 2, parentCode: '21', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' };
                     transaction.set(newVenPRef, vendorsParentAcc);
-                    vendorsParentAcc.id = newVenPRef.id;
                 }
 
-                // 2. البحث أو إنشاء حساب فرعي للمورد
-                let vendorAcc = allAccounts.find(a => a.name === selectedPo.vendorName && a.parentCode === '2101');
+                // إنشاء حساب المورد الشخصي إذا نقص
                 if (!vendorAcc) {
-                    const nextCounterRef = doc(firestore, 'counters', 'coa_vendors');
-                    const counterDoc = await transaction.get(nextCounterRef);
-                    const nextNum = (counterDoc.data()?.lastNumber || 0) + 1;
-                    const vendorCode = `2101${String(nextNum).padStart(3, '0')}`;
-                    
+                    nextVendorNum++;
+                    const vendorCode = `2101${String(nextVendorNum).padStart(3, '0')}`;
                     const newVenAccRef = doc(accountsRef);
-                    vendorAcc = { code: vendorCode, name: selectedPo.vendorName, type: 'liability', level: 3, parentCode: '2101', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' };
+                    vendorAcc = { id: newVenAccRef.id, code: vendorCode, name: selectedPo.vendorName, type: 'liability', level: 3, parentCode: '2101', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' };
                     transaction.set(newVenAccRef, vendorAcc);
-                    vendorAcc.id = newVenAccRef.id;
-                    transaction.set(nextCounterRef, { lastNumber: nextNum }, { merge: true });
+                    transaction.set(coaVendorCounterRef, { lastNumber: nextVendorNum }, { merge: true });
                 }
-
-                // 3. حفظ إذن الاستلام وتوليد القيد
-                const currentYear = new Date().getFullYear();
-                const counterRef = doc(firestore, 'counters', 'grns');
-                const counterDoc = await transaction.get(counterRef);
-                const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                const grnNumber = `GRN-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
                 const newGrnRef = doc(collection(firestore, 'grns'));
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
@@ -241,7 +247,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     createdAt: serverTimestamp(), createdBy: currentUser.id,
                 }));
 
-                transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+                transaction.set(grnCounterRef, { counts: { [currentYear]: nextGrnNumber } }, { merge: true });
                 
                 const isFullyReceived = data.itemsReceived.every(i => (i.quantityReceived + i.quantityPreviouslyReceived) >= (i.quantityOrdered - 0.0001));
                 transaction.update(doc(firestore, 'purchaseOrders', data.purchaseOrderId), { status: isFullyReceived ? 'received' : 'partially_received' });
@@ -250,7 +256,8 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية آلياً.' });
             router.push('/dashboard/warehouse/grns');
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل حفظ إذن الاستلام.' });
+            console.error("GRN Transaction Error:", error);
+            toast({ variant: 'destructive', title: 'خطأ تقني', description: error.message || 'فشل حفظ إذن الاستلام.' });
         } finally {
             setIsSaving(false);
         }
@@ -317,6 +324,14 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
             {fields.length > 0 && !isProspectiveVendor && (
                 <div className="space-y-4">
+                    <Alert variant="default" className="bg-blue-50 border-blue-200">
+                        <Info className="h-4 w-4 text-blue-600" />
+                        <AlertTitle className="text-blue-800 font-bold">تعليمات الاستلام الجزئي</AlertTitle>
+                        <AlertDescription className="text-blue-700 text-xs">
+                            يمكنك تعديل "الكمية الحالية" إذا لم يتم توريد كامل البند. سيقوم النظام بحفظ الباقي للاستلام لاحقاً.
+                        </AlertDescription>
+                    </Alert>
+
                     <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
                         <Table>
                             <TableHeader className="bg-muted/50">
@@ -331,7 +346,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                             <TableBody>
                                 {fields.map((field, index) => {
                                     const item = watchedItems?.[index];
-                                    const remaining = (item?.quantityOrdered || 0) - (item?.quantityPreviouslyReceived || 0);
                                     const lineTotal = (item?.quantityReceived || 0) * (item?.unitPrice || 0);
                                     return (
                                         <TableRow key={field.id} className="h-20 border-b last:border-0 hover:bg-muted/5">
