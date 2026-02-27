@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -46,7 +47,7 @@ interface QuoteItem {
   unitPrice: number | string;
 }
 
-// 1. الكلمات الدلالية الموسعة
+// الكلمات الدلالية الموسعة للبحث الذكي في ملفات Excel
 const PRICE_KEYWORDS = ['سعر', 'السعر', 'وحده', 'الوحدة', 'قيمة', 'القيمة', 'اجمالي', 'الإجمالي', 'price', 'unit price', 'rate', 'unit', 'cost', 'amt', 'amount', 'total'];
 const ITEM_KEYWORDS = ['بند', 'البند', 'بيان', 'البيان', 'اسم', 'الاسم', 'صنف', 'الصنف', 'وصف', 'الوصف', 'item', 'description', 'name', 'service', 'product'];
 const CODE_KEYWORDS = ['كود', 'الكود', 'رمز', 'الرمز', 'رقم', 'الرقم', 'مسلسل', 'م', 'code', 'sku', 'part number', 'id', 'ref', 'reference', 'no'];
@@ -139,7 +140,7 @@ export function SupplierQuotationForm({
         let colIdx = { code: -1, name: -1, price: -1 };
         let headerRowIdx = -1;
 
-        // البحث الذكي عن الهيدر وتجاهل الصفوف الفارغة في البداية
+        // البحث الذكي عن الهيدر
         for (let i = 0; i < Math.min(data.length, 20); i++) {
           const row = data[i]?.map(c => String(c || '').toLowerCase().trim()) || [];
           
@@ -147,7 +148,6 @@ export function SupplierQuotationForm({
           if (colIdx.price === -1) colIdx.price = row.findIndex(c => PRICE_KEYWORDS.some(k => c.includes(k)));
           if (colIdx.code === -1) colIdx.code = row.findIndex(c => CODE_KEYWORDS.some(k => c.includes(k)));
 
-          // إذا وجدنا على الأقل اسم وسعر، نعتمد هذا الصف كبداية
           if (colIdx.name !== -1 && colIdx.price !== -1) {
             headerRowIdx = i;
             break;
@@ -158,14 +158,12 @@ export function SupplierQuotationForm({
         let nameMatchCount = 0;
         const newItems = [...items];
 
-        // خريطة الأصناف في النظام للبحث السريع بالكود
         const systemItemMap = new Map();
         rfq.items.forEach(ri => {
             const fullItem = allItems.find(i => i.id === ri.internalItemId);
             systemItemMap.set(ri.id, { ...ri, sku: fullItem?.sku?.toLowerCase() });
         });
 
-        // معالجة البيانات
         const startIdx = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
         for (let i = startIdx; i < data.length; i++) {
           const row = data[i];
@@ -175,18 +173,12 @@ export function SupplierQuotationForm({
           let excelName = colIdx.name !== -1 ? String(row[colIdx.name] || '').trim() : '';
           let excelPrice = -1;
 
-          // محاولة استخراج السعر
           if (colIdx.price !== -1) {
               excelPrice = parseFloat(String(row[colIdx.price] || '0').replace(/[^0-9.]/g, ''));
-          } else if (headerRowIdx === -1) {
-              // استراتيجية الاستنتاج: إذا لم يوجد هيدر، ابحث عن رقم في الصف
-              const foundPrice = row.find(c => typeof c === 'number' || (!isNaN(parseFloat(c)) && String(c).includes('.')));
-              if (foundPrice) excelPrice = parseFloat(String(foundPrice));
           }
 
           if (isNaN(excelPrice) || excelPrice <= 0) continue;
 
-          // 1. الأولوية للكود
           let matchedIdx = -1;
           if (excelCode) {
               matchedIdx = newItems.findIndex(ni => {
@@ -196,20 +188,16 @@ export function SupplierQuotationForm({
               if (matchedIdx !== -1) {
                   newItems[matchedIdx].unitPrice = excelPrice;
                   codeMatchCount++;
-                  continue; // تم بنجاح، انتقل للصف التالي
+                  continue;
               }
           }
 
-          // 2. المطابقة بالاسم (مرنة)
           const cleanedExcelName = cleanText(excelName);
           if (cleanedExcelName) {
               matchedIdx = newItems.findIndex(ni => {
                   const cleanedSystemName = cleanText(ni.itemName);
-                  return cleanedSystemName === cleanedExcelName || 
-                         cleanedSystemName.includes(cleanedExcelName) || 
-                         cleanedExcelName.includes(cleanedSystemName);
+                  return cleanedSystemName === cleanedExcelName || cleanedSystemName.includes(cleanedExcelName) || cleanedExcelName.includes(cleanedSystemName);
               });
-              
               if (matchedIdx !== -1) {
                   newItems[matchedIdx].unitPrice = excelPrice;
                   nameMatchCount++;
@@ -218,11 +206,7 @@ export function SupplierQuotationForm({
         }
 
         setItems(newItems);
-        toast({
-          title: 'اكتمل الاستيراد الذكي',
-          description: `تم العثور على (${codeMatchCount}) أصناف بالكود، و (${nameMatchCount}) أصناف بالاسم.`,
-        });
-
+        toast({ title: 'اكتمل الاستيراد الذكي', description: `تمت مطابقة (${codeMatchCount}) أصناف بالكود، و (${nameMatchCount}) أصناف بالاسم.` });
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'فشل الاستيراد', description: error.message });
       } finally {
@@ -230,7 +214,6 @@ export function SupplierQuotationForm({
         if (e.target) e.target.value = '';
       }
     };
-
     reader.readAsBinaryString(file);
   };
 
@@ -281,7 +264,7 @@ export function SupplierQuotationForm({
           <div className="flex justify-between items-center w-full">
             <div>
               <DialogTitle className="text-2xl font-black text-foreground">عرض السعر: {vendor.name}</DialogTitle>
-              <DialogDescription className="text-sm font-medium">طلب تسعير رقم: {rfq.rfqNumber}</DialogDescription>
+              <DialogDescription className="text-sm font-medium">إدخال الأسعار لطلب التسعير: {rfq.rfqNumber}</DialogDescription>
             </div>
             <div className="flex gap-2">
               <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={handleExcelImport} />
@@ -327,7 +310,7 @@ export function SupplierQuotationForm({
                 </div>
                 <div className="text-[10px] text-muted-foreground font-bold italic flex items-center gap-1 bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
                   <CheckCircle2 className="h-3 w-3 text-primary" />
-                  النظام يدعم المطابقة التلقائية بالكود أو بالاسم.
+                  أدخل الأسعار يدوياً أو استخدم زر الاستيراد الذكي.
                 </div>
               </div>
               <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">

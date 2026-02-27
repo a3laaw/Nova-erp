@@ -1,13 +1,14 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useFirebase, useDocument } from '@/firebase';
-import { doc, collection, query, where, updateDoc, getDocs } from 'firebase/firestore';
+import { useFirebase, useDocument, useSubscription } from '@/firebase';
+import { doc, collection, query, where, updateDoc, getDocs, arrayUnion, orderBy } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertTriangle } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertTriangle, UserPlus, Loader2, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -17,6 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<string, string> = {
     draft: 'bg-yellow-100 text-yellow-800',
@@ -36,17 +40,24 @@ export default function RfqDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
+    
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [isAddVendorOpen, setIsAddVendorOpen] = useState(false);
+    const [newVendorId, setNewVendorId] = useState('');
+    const [isAddingVendor, setIsAddingVendor] = useState(false);
 
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [supplierQuotations, setSupplierQuotations] = useState<SupplierQuotation[]>([]);
     const [dataLoading, setDataLoading] = useState(true);
 
-    const rfqRef = useMemo(() => firestore && id ? doc(firestore, 'rfqs', id) : null, [firestore, id]);
+    const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
 
-    // إصلاح #3: جلب الموردين في مجموعات لتجنب حد الـ 30 في Firestore IN Query
+    // Fetch all system vendors for the "Add Vendor" feature
+    const { data: allSystemVendors } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
+
     useEffect(() => {
         if (!firestore || !rfq?.vendorIds || rfq.vendorIds.length === 0) {
             setDataLoading(false);
@@ -89,12 +100,37 @@ export default function RfqDetailsPage() {
         setIsUpdatingStatus(true);
         try {
             await updateDoc(rfqRef, { status: newStatus });
+            toast({ title: 'تحديث الحالة', description: `تم تغيير حالة الطلب إلى ${statusTranslations[newStatus]}.` });
         } catch (e) {
             console.error("Failed to update status", e);
         } finally {
             setIsUpdatingStatus(false);
         }
     };
+
+    const handleAddVendor = async () => {
+        if (!rfqRef || !newVendorId) return;
+        setIsAddingVendor(true);
+        try {
+            await updateDoc(rfqRef, {
+                vendorIds: arrayUnion(newVendorId)
+            });
+            toast({ title: 'تمت الإضافة', description: 'تمت إضافة المورد للطلب بنجاح.' });
+            setIsAddVendorOpen(false);
+            setNewVendorId('');
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إضافة المورد.' });
+        } finally {
+            setIsAddingVendor(false);
+        }
+    };
+
+    const vendorOptions = useMemo(() => {
+        const existingIds = new Set(rfq?.vendorIds || []);
+        return (allSystemVendors || [])
+            .filter(v => !existingIds.has(v.id!))
+            .map(v => ({ value: v.id!, label: v.name }));
+    }, [allSystemVendors, rfq?.vendorIds]);
 
     const loading = rfqLoading || dataLoading;
 
@@ -113,27 +149,10 @@ export default function RfqDetailsPage() {
     
     if (!rfq) return <div className="text-center py-20 text-muted-foreground">لم يتم العثور على طلب التسعير.</div>;
 
-    // إصلاح #4: حماية التاريخ
-    const safeDate = (() => {
-        try {
-            return toFirestoreDate(rfq.date);
-        } catch {
-            return null;
-        }
-    })();
+    const safeDate = toFirestoreDate(rfq.date);
 
     return (
         <div className="space-y-6" dir="rtl">
-             {rfq.vendorIds?.length > 30 && (
-                <Alert className="bg-amber-50 border-amber-200 text-amber-800">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>قائمة موردين كبيرة</AlertTitle>
-                    <AlertDescription>
-                        يحتوي هذا الطلب على {rfq.vendorIds.length} مورداً. تم تقسيم جلب البيانات لضمان الاستقرار.
-                    </AlertDescription>
-                </Alert>
-             )}
-
              <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
                 <CardHeader>
                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -151,44 +170,51 @@ export default function RfqDetailsPage() {
                         </div>
                          <div className="flex gap-2">
                             {rfq.status === 'draft' && (
-                                <Button onClick={() => handleChangeStatus('sent')} disabled={isUpdatingStatus} className="gap-2">
+                                <Button onClick={() => handleChangeStatus('sent')} disabled={isUpdatingStatus} className="gap-2 rounded-xl font-bold">
                                     <Send className="h-4 w-4" /> إرسال الطلب
                                 </Button>
                             )}
                             {rfq.status === 'sent' && (
-                                <Button onClick={() => handleChangeStatus('closed')} disabled={isUpdatingStatus} className="bg-green-600 hover:bg-green-700 gap-2">
-                                    <XCircle className="h-4 w-4" /> إغلاق الطلب والمقارنة
+                                <Button onClick={() => handleChangeStatus('closed')} disabled={isUpdatingStatus} className="bg-green-600 hover:bg-green-700 gap-2 rounded-xl font-bold shadow-lg shadow-green-200">
+                                    <XCircle className="h-4 w-4" /> إغلاق وبدء المقارنة
                                 </Button>
                             )}
                             {rfq.status === 'closed' && (
-                                <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2">
+                                <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2 rounded-xl font-bold">
                                     <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
-                                        <BarChart className="h-4 w-4" /> عرض مصفوفة المقارنة
+                                        <BarChart className="h-4 w-4" /> مصفوفة المقارنة
                                     </Link>
                                 </Button>
                             )}
-                            <Button variant="ghost" onClick={() => router.back()} className="gap-2"><ArrowRight className="h-4 w-4"/> العودة</Button>
+                            <Button variant="ghost" onClick={() => router.back()} className="gap-2 rounded-xl"><ArrowRight className="h-4 w-4"/> العودة</Button>
                          </div>
                     </div>
                 </CardHeader>
                  <CardContent>
-                    <div className="p-4 bg-white/50 dark:bg-muted/20 rounded-xl border">
-                        <h3 className="text-sm font-bold text-muted-foreground mb-3">الأصناف المطلوبة:</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {rfq.items.map(item => (
-                                <div key={item.id} className="flex justify-between items-center p-3 bg-card border rounded-lg shadow-sm">
-                                    <span className="font-bold text-sm">{item.itemName}</span>
-                                    <Badge variant="secondary" className="font-mono">{item.quantity}</Badge>
-                                </div>
-                            ))}
+                    <div className="p-4 bg-white/50 dark:bg-muted/20 rounded-xl border flex flex-col md:flex-row justify-between gap-4">
+                        <div className="flex-grow">
+                            <h3 className="text-sm font-bold text-muted-foreground mb-3">الأصناف المطلوبة للتحليل:</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {rfq.items.map(item => (
+                                    <Badge key={item.id} variant="secondary" className="px-3 py-1 text-xs font-bold bg-background border shadow-sm">
+                                        {item.itemName} ({item.quantity})
+                                    </Badge>
+                                ))}
+                            </div>
                         </div>
+                        {rfq.status !== 'closed' && (
+                            <Button variant="outline" className="rounded-xl border-dashed border-primary/50 text-primary hover:bg-primary/5 gap-2 h-auto py-3" onClick={() => setIsAddVendorOpen(true)}>
+                                <UserPlus className="h-5 w-5" />
+                                إضافة مورد إضافي للطلب
+                            </Button>
+                        )}
                     </div>
                 </CardContent>
             </Card>
 
             <div className="flex items-center gap-3 mb-2">
                 <GanttChartSquare className="text-primary h-6 w-6" />
-                <h3 className="text-xl font-black">عروض أسعار الموردين ({vendors.length})</h3>
+                <h3 className="text-xl font-black">عروض أسعار الموردين المستلمة</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -203,7 +229,40 @@ export default function RfqDetailsPage() {
                         />
                     )
                 })}
+                {vendors.length === 0 && (
+                    <div className="col-span-full h-48 flex flex-col items-center justify-center border-2 border-dashed rounded-[2rem] bg-muted/5 opacity-40">
+                        <Search className="h-12 w-12 mb-2" />
+                        <p className="font-bold">لا يوجد موردون حالياً، أضف مورد لبدء التسعير.</p>
+                    </div>
+                )}
             </div>
+
+            {/* Add Vendor Dialog */}
+            <Dialog open={isAddVendorOpen} onOpenChange={setIsAddVendorOpen}>
+                <DialogContent dir="rtl" className="rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle>إضافة مورد لطلب التسعير</DialogTitle>
+                        <DialogDescription>يمكنك إضافة مورد جديد لهذا الطلب حتى بعد إرساله لاستقبال عرضه ومقارنته مع البقية.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-6">
+                        <Label className="mb-2 block font-bold">اختر المورد من القائمة:</Label>
+                        <InlineSearchList 
+                            value={newVendorId}
+                            onSelect={setNewVendorId}
+                            options={vendorOptions}
+                            placeholder="ابحث باسم المورد..."
+                            className="h-12 rounded-xl"
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsAddVendorOpen(false)} disabled={isAddingVendor}>إلغاء</Button>
+                        <Button onClick={handleAddVendor} disabled={!newVendorId || isAddingVendor} className="rounded-xl px-8">
+                            {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <PlusCircle className="h-4 w-4 ml-2"/>}
+                            تأكيد الإضافة للطلب
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
