@@ -666,6 +666,9 @@ export type SupplierQuotation = {
     date: any;
     deliveryTimeDays?: number;
     paymentTerms?: string;
+    discountAmount?: number; // NEW
+    deliveryFees?: number; // NEW
+    paymentMethodDetail?: string; // NEW (e.g. 50/50 mix)
     items: {
         rfqItemId: string;
         unitPrice: number;
