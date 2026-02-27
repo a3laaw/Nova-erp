@@ -8,10 +8,11 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Table as TableIcon } from 'lucide-react';
+import { Loader2, Save, Table as TableIcon, History } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
+import { ScrollArea } from '../ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cleanFirestoreData } from '@/lib/utils';
 
@@ -32,6 +33,8 @@ interface QuoteItem {
 export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQuote = null }: SupplierQuotationFormProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  
+  // Form State
   const [reference, setReference] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [deliveryTime, setDeliveryTime] = useState('');
@@ -48,7 +51,11 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
       setPaymentTerms(existingQuote.paymentTerms || '');
       const initialItems = rfq.items.map((rfqItem) => {
         const existingItem = existingQuote.items.find((qi) => qi.rfqItemId === rfqItem.id);
-        return { rfqItemId: rfqItem.id!, itemName: rfqItem.itemName, unitPrice: existingItem?.unitPrice ?? '' };
+        return { 
+          rfqItemId: rfqItem.id!, 
+          itemName: rfqItem.itemName, 
+          unitPrice: existingItem?.unitPrice ?? '' 
+        };
       });
       setItems(initialItems);
     } else {
@@ -69,21 +76,44 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
     if (!firestore || !date) return;
     setIsSaving(true);
     try {
-      const processedItems = items.filter((item) => item.unitPrice !== '' && !isNaN(Number(item.unitPrice))).map((item) => ({ rfqItemId: item.rfqItemId, unitPrice: Number(item.unitPrice) }));
+      const processedItems = items
+        .filter((item) => item.unitPrice !== '' && !isNaN(Number(item.unitPrice)))
+        .map((item) => ({ 
+          rfqItemId: item.rfqItemId, 
+          unitPrice: Number(item.unitPrice) 
+        }));
+
       if (processedItems.length === 0) throw new Error('الرجاء إدخال سعر صنف واحد على الأقل.');
-      const dataToSave = { rfqId: rfq.id!, vendorId: vendor.id!, quotationReference: reference, date: date, deliveryTimeDays: Number(deliveryTime) || null, paymentTerms: paymentTerms, items: processedItems };
-      if (existingQuote) { await updateDoc(doc(firestore, 'supplierQuotations', existingQuote.id!), cleanFirestoreData(dataToSave)); }
-      else { await addDoc(collection(firestore, 'supplierQuotations'), cleanFirestoreData(dataToSave)); }
+
+      const dataToSave = { 
+        rfqId: rfq.id!, 
+        vendorId: vendor.id!, 
+        quotationReference: reference, 
+        date: date, 
+        deliveryTimeDays: Number(deliveryTime) || null, 
+        paymentTerms: paymentTerms, 
+        items: processedItems 
+      };
+
+      if (existingQuote) { 
+        await updateDoc(doc(firestore, 'supplierQuotations', existingQuote.id!), cleanFirestoreData(dataToSave)); 
+      } else { 
+        await addDoc(collection(firestore, 'supplierQuotations'), cleanFirestoreData(dataToSave)); 
+      }
+      
       onClose();
       toast({ title: 'نجاح', description: 'تم حفظ عرض السعر بنجاح.' });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message });
-    } finally { setIsSaving(false); }
+    } finally { 
+      setIsSaving(false); 
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none bg-background" dir="rtl">
+        {/* Fixed Header */}
         <DialogHeader className="p-6 bg-muted/20 border-b flex-shrink-0">
           <div>
             <DialogTitle className="text-2xl font-black text-foreground">إدخال عرض السعر: {vendor.name}</DialogTitle>
@@ -91,12 +121,13 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
           </div>
         </DialogHeader>
         
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-8">
+        {/* Scrollable Content Area */}
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مرجع المورد</Label>
-                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="رقم عرض المورد..." className="rounded-xl h-10 border-2" />
+                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="رقم عرض المورد..." className="rounded-xl h-10 border-2 bg-background" />
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">تاريخ العرض</Label>
@@ -104,15 +135,15 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">مدة التوريد (أيام)</Label>
-                <Input type="number" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="0" className="rounded-xl h-10 border-2" />
+                <Input type="number" value={deliveryTime} onChange={(e) => setDeliveryTime(e.target.value)} placeholder="0" className="rounded-xl h-10 border-2 bg-background" />
               </div>
               <div className="grid gap-2">
                 <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">شروط الدفع</Label>
-                <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="rounded-xl h-10 border-2" />
+                <Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="مثال: نقداً..." className="rounded-xl h-10 border-2 bg-background" />
               </div>
             </div>
 
-            <div className="space-y-4 pb-4">
+            <div className="space-y-4">
               <div className="flex items-center gap-2 px-2">
                 <TableIcon className="h-5 w-5 text-primary" />
                 <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
@@ -146,18 +177,19 @@ export function SupplierQuotationForm({ isOpen, onClose, rfq, vendor, existingQu
               </div>
             </div>
           </div>
-        </div>
+        </ScrollArea>
 
+        {/* Fixed Footer */}
         <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
           <div className="flex justify-end gap-4 w-full">
-            <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl">إلغاء</Button>
+            <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold h-12 px-8 rounded-xl hover:bg-background">إلغاء</Button>
             <Button onClick={handleSubmit} disabled={isSaving || items.every((i) => !i.unitPrice)} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[240px]">
               {isSaving ? <Loader2 className="animate-spin h-5 w-5 ml-3" /> : <Save className="h-5 w-5 ml-3" />}
-              {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ عرض السعر'}
+              {isSaving ? 'جاري الحفظ...' : 'حفظ عرض السعر'}
             </Button>
           </div>
         </DialogFooter>
-      </DialogContent>
+      </form>
     </Dialog>
   );
 }
