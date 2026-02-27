@@ -203,9 +203,9 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <col className="w-[70px]" />
             {allVendors.map(v => <col key={v.id} className="min-w-[180px]" />)}
           </colgroup>
-          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-white">
+          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-muted/20">
             <TableRow className="min-h-24 border-b-2">
-              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-white">بيان الصنف المطلوب</TableHead>
+              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-transparent">بيان الصنف المطلوب</TableHead>
               <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
               {allVendors.map(vendor => {
                 const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
@@ -244,7 +244,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           <TableBody>
             {tableData.map(({ item, quotes, minPrice }) => (
               <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b">
-                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l print:static print:bg-white">{item.itemName}</TableCell>
+                <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l print:static print:bg-transparent">{item.itemName}</TableCell>
                 <TableCell className="text-center font-mono font-bold bg-muted/5">{item.quantity}</TableCell>
                 {allVendors.map(vendor => {
                   const quote = quotes.find(q => q.vendorId === vendor.id);
