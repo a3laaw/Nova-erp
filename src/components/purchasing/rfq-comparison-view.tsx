@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation, Item } from '@/lib/types';
+import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
@@ -41,6 +41,11 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   
   // حفظ خريطة الترسية (بند -> مورد)
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
+
+  // تجميد الجدول فقط إذا تم إصدار أوامر شراء بالفعل أو إذا ألغي الطلب
+  const isLocked = useMemo(() => {
+    return rfq.status === 'cancelled' || (rfq.awardedPoIds && rfq.awardedPoIds.length > 0);
+  }, [rfq.status, rfq.awardedPoIds]);
 
   useEffect(() => {
     if (rfq.awardedItems) {
@@ -107,10 +112,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     });
   }, [rfq.items, allVendors, supplierQuotations]);
 
-  const isClosed = rfq.status === 'closed' || rfq.status === 'cancelled';
-
   const handleCellClick = (itemId: string, vendorId: string, price: number) => {
-    if (price <= 0 || isClosed) return;
+    if (price <= 0 || isLocked) return;
     setSelectedAwards(prev => ({
       ...prev,
       [itemId]: prev[itemId] === vendorId ? '' : vendorId
@@ -118,7 +121,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   };
 
   const handleAwardToVendor = (vendorId: string) => {
-    if (isClosed) return;
+    if (isLocked) return;
     const newAwards = { ...selectedAwards };
     tableData.forEach(row => {
       const quote = row.quotes.find(q => q.vendorId === vendorId);
@@ -134,7 +137,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     if (!firestore || isReopening) return;
     setIsReopening(true);
     try {
-        await updateDoc(doc(firestore, 'rfqs', rfq.id!), { status: 'sent' });
+        await updateDoc(doc(firestore, 'rfqs', rfq.id!), { 
+            status: 'sent',
+            awardedPoIds: [] // السماح بإعادة الترسية
+        });
         toast({ title: 'تم فتح الطلب', description: 'يمكنك الآن تعديل الترسية مرة أخرى.' });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إعادة فتح الطلب.' });
@@ -229,11 +235,12 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         @media print {
           .comparison-table-container { overflow: visible !important; display: block !important; }
           table { table-layout: auto !important; width: 100% !important; border-collapse: collapse !important; }
-          th, td { position: static !important; background-color: transparent !important; border: 1px solid #ddd !important; padding: 8px !important; }
-          .selected-cell-print { background-color: #f8fafc !important; border: 3px solid #000 !important; }
+          th, td { position: static !important; background-color: transparent !important; border: 1px solid #ddd !important; padding: 8px !important; overflow: visible !important; }
+          .selected-cell-print { background-color: #f1f5f9 !important; border: 3px solid #000 !important; }
           .award-label { display: block !important; font-size: 9px !important; font-weight: 900 !important; color: #000 !important; margin-top: 4px !important; }
           .no-print { display: none !important; }
-          .sticky { position: static !important; }
+          .sticky { position: static !important; transform: none !important; }
+          [data-radix-popper-content-wrapper] { display: none !important; }
         }
       `}} />
 
@@ -264,10 +271,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                             size="sm" 
                             className={cn(
                                 "h-6 text-[10px] mt-1 no-print rounded-full",
-                                isClosed ? "opacity-0 cursor-default" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                                isLocked ? "opacity-0 cursor-default" : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                             )}
                             onClick={() => handleAwardToVendor(vendor.id!)}
-                            disabled={isClosed}
+                            disabled={isLocked}
                         >
                             ترسية الكل هنا
                         </Button>
@@ -303,7 +310,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                       key={vendor.id}
                       className={cn(
                         "text-center transition-all border-r p-0",
-                        !isClosed && "cursor-pointer",
+                        !isLocked && "cursor-pointer",
                         isSelected ? "bg-blue-50/50 border-2 border-primary ring-inset selected-cell-print" : isBest ? "bg-green-500/5" : ""
                       )}
                       onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
@@ -323,7 +330,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                               [ تم الاختيار ]
                             </div>
                           )}
-                          {!isSelected && isBest && !isClosed && (
+                          {!isSelected && isBest && !isLocked && (
                              <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter no-print">
                                 أفضل سعر
                              </div>
@@ -341,7 +348,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </Table>
       </div>
 
-      {!isClosed ? (
+      {!isLocked ? (
         <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg mx-4 no-print">
             <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Award className="h-8 w-8" /></div>

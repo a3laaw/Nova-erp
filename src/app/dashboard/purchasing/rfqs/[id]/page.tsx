@@ -33,7 +33,7 @@ const statusColors: Record<string, string> = {
 const statusTranslations: Record<string, string> = {
     draft: 'مسودة',
     sent: 'مرسل للموردين',
-    closed: 'مغلق (تحت المقارنة)',
+    closed: 'مغلق (مرحلة الترسية)',
     cancelled: 'ملغي',
 };
 
@@ -81,8 +81,8 @@ export default function RfqDetailsPage() {
         if (newStatus === 'closed' && supplierQuotations.length === 0) {
             toast({
                 variant: 'destructive',
-                title: 'لا يمكن الإغلاق',
-                description: 'يجب إضافة عرض سعر واحد على الأقل من الموردين قبل بدء عملية المقارنة والترسية.'
+                title: 'لا يمكن البدء بالمقارنة',
+                description: 'يجب إضافة عرض سعر واحد على الأقل من الموردين قبل إغلاق باب التقديم والبدء في الترسية.'
             });
             return;
         }
@@ -192,11 +192,11 @@ export default function RfqDetailsPage() {
                             {rfq.status === 'closed' && (
                                 <>
                                     <Button onClick={() => handleChangeStatus('sent')} disabled={isUpdatingStatus} variant="outline" className="gap-2 rounded-xl font-bold border-orange-200 text-orange-700 hover:bg-orange-50">
-                                        <Undo2 className="h-4 w-4" /> إعادة فتح
+                                        <Undo2 className="h-4 w-4" /> إعادة فتح لاستلام العروض
                                     </Button>
                                     <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2 rounded-xl font-bold">
                                         <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
-                                            <BarChart className="h-4 w-4" /> مصفوفة المقارنة
+                                            <BarChart className="h-4 w-4" /> مصفوفة المقارنة والترسية
                                         </Link>
                                     </Button>
                                 </>
