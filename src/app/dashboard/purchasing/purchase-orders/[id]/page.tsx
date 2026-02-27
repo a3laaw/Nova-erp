@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -27,7 +27,7 @@ import { ar } from 'date-fns/locale';
 import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
@@ -108,13 +108,19 @@ export default function PurchaseOrderDetailPage() {
         );
     }
 
-    if (!po) return <div className="text-center p-20">لم يتم العثور على أمر الشراء.</div>;
+    if (!po) {
+        return (
+            <div className="text-center p-20" dir="rtl">
+                <p className="text-muted-foreground text-lg">لم يتم العثور على أمر الشراء المطلوب.</p>
+                <Button variant="link" onClick={() => router.back()}>العودة للخلف</Button>
+            </div>
+        );
+    }
 
     const orderDate = toFirestoreDate(po.orderDate);
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto p-4 sm:p-6" dir="rtl">
-            {/* Header Actions */}
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 no-print bg-background/80 backdrop-blur-sm sticky top-0 z-10 py-4 border-b">
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2">
                     <ArrowRight className="h-4 w-4"/> العودة للقائمة
@@ -138,15 +144,14 @@ export default function PurchaseOrderDetailPage() {
                 </div>
             </div>
 
-            <Card className="print:border-none shadow-xl rounded-3xl overflow-hidden bg-white dark:bg-card">
+            <Card className="print:border-none shadow-lg rounded-3xl overflow-hidden bg-white dark:bg-card">
                 <div id="printable-area" className="p-8 sm:p-12 print:p-0">
-                    {/* Official Document Header */}
                     <div className="flex justify-between items-start mb-12 border-b-4 border-primary/20 pb-8">
                         <div className="flex items-center gap-6">
                             <Logo className="h-20 w-20 !p-3 shadow-inner border bg-background" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                             <div>
                                 <h1 className="text-2xl font-black tracking-tight">{branding?.company_name || 'شركة المقاولات'}</h1>
-                                <p className="text-sm text-muted-foreground max-w-sm mt-1 leading-relaxed">{branding?.address}</p>
+                                <p className="text-sm text-muted-foreground max-sm mt-1 leading-relaxed">{branding?.address}</p>
                                 <p className="text-xs text-muted-foreground mt-1">هاتف: {branding?.phone} | البريد: {branding?.email}</p>
                             </div>
                         </div>
@@ -162,7 +167,6 @@ export default function PurchaseOrderDetailPage() {
                         </div>
                     </div>
 
-                    {/* Transaction Details */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12 p-8 bg-muted/30 rounded-3xl border">
                         <div className="space-y-6">
                             <div className="flex items-start gap-4">
@@ -210,13 +214,12 @@ export default function PurchaseOrderDetailPage() {
                         </div>
                     </div>
 
-                    {/* PO Items Table */}
                     <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm mb-10">
                         <Table>
                             <TableHeader className="bg-muted/80">
                                 <TableRow className="h-14 border-b-2">
                                     <TableHead className="w-16 text-center font-bold text-xs uppercase px-1">م</TableHead>
-                                    <TableHead className="px-6 font-bold text-foreground">بيان المـواد / الأصنـاف</TableHead>
+                                    <TableHead className="px-6 font-bold text-foreground text-right">بيان المـواد / الأصنـاف</TableHead>
                                     <TableHead className="w-24 text-center font-bold text-foreground">الكمية</TableHead>
                                     <TableHead className="w-32 text-center font-bold text-foreground">سعر الوحدة</TableHead>
                                     <TableHead className="w-40 text-left font-bold text-foreground px-8">الإجمالي</TableHead>
@@ -226,7 +229,7 @@ export default function PurchaseOrderDetailPage() {
                                 {po.items.map((item, idx) => (
                                     <TableRow key={idx} className="h-16 border-b last:border-0 hover:bg-transparent">
                                         <TableCell className="text-center font-mono text-xs font-bold text-muted-foreground bg-muted/10 border-l">{idx + 1}</TableCell>
-                                        <TableCell className="px-6 font-bold text-lg">{item.itemName}</TableCell>
+                                        <TableCell className="px-6 font-bold text-lg text-right">{item.itemName}</TableCell>
                                         <TableCell className="text-center font-mono font-black text-xl">{item.quantity}</TableCell>
                                         <TableCell className="text-center font-mono font-bold text-primary">{formatCurrency(item.unitPrice)}</TableCell>
                                         <TableCell className="text-left font-mono font-black text-xl px-8 bg-primary/[0.02] border-r">
@@ -246,7 +249,6 @@ export default function PurchaseOrderDetailPage() {
                         </Table>
                     </div>
 
-                    {/* Notes & Footer */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-8">
                         <div className="space-y-3">
                             <Label className="font-black text-sm text-muted-foreground flex items-center gap-2">
@@ -264,7 +266,6 @@ export default function PurchaseOrderDetailPage() {
                         </div>
                     </div>
 
-                    {/* Official Signatures Section */}
                     <div className="grid grid-cols-3 gap-12 mt-24 text-center text-sm border-t-2 pt-12">
                         <div className="space-y-16">
                             <p className="font-black border-b-2 border-foreground pb-2">قسم المشتريات</p>
@@ -280,7 +281,7 @@ export default function PurchaseOrderDetailPage() {
                         </div>
                     </div>
                 </div>
-            </div>
+            </Card>
         </div>
     );
 }
