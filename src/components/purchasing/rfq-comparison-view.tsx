@@ -14,15 +14,13 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Award, Loader2, CheckCircle2, Undo2, AlertCircle, Calculator, Printer, ArrowRight } from 'lucide-react';
+import { Award, Loader2, CheckCircle2, Undo2, Calculator, Printer, ArrowRight, Star } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '../layout/logo';
@@ -34,7 +32,7 @@ interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
 }
 
-// ثوابت التحكم في الطباعة
+// ثوابت التحكم في الطباعة العرضية
 const VENDORS_PER_PAGE = 3; 
 
 export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
@@ -48,7 +46,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [isReopening, setIsReopening] = useState(false);
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
-  // --- 1. الاشتراكات اللحظية ---
+  // --- 1. جلب البيانات اللحظية ---
   const { data: allVendorsList, loading: vendorsLoading } = useSubscription<Vendor>(
     firestore, 
     'vendors', 
@@ -62,6 +60,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     quotesQuery
   );
 
+  // دمج الموردين المسجلين والمحتملين
   const allVendors = useMemo(() => {
     if (!allVendorsList) return [];
     const registered = allVendorsList.filter(v => rfq.vendorIds?.includes(v.id!));
@@ -69,7 +68,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     return [...registered, ...prospective];
   }, [allVendorsList, rfq.vendorIds, rfq.prospectiveVendors]);
 
-  // تقسيم الموردين إلى مجموعات للطباعة
+  // تقسيم الموردين لمجموعات للطباعة العرضية
   const vendorChunks = useMemo(() => {
     const chunks = [];
     for (let i = 0; i < allVendors.length; i += VENDORS_PER_PAGE) {
@@ -230,6 +229,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* ─── ستايلات الطباعة المتقدمة بالألوان والتقسيم ─── */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           html, body { background: white !important; height: auto !important; overflow: visible !important; }
@@ -246,32 +246,67 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             page-break-after: always;
             width: 100% !important;
             padding: 0 !important;
-            margin-bottom: 20px;
+            margin-bottom: 40px;
           }
 
-          table { width: 100% !important; border-collapse: collapse !important; border: 1px solid #000 !important; }
-          th, td { border: 1px solid #ddd !important; padding: 8px !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          table { 
+            width: 100% !important; 
+            border-collapse: collapse !important; 
+            border: 1px solid #000 !important; 
+            table-layout: auto !important;
+          }
           
-          .desc-col-print { width: 1% !important; white-space: normal !important; min-width: 200px !important; }
-          .qty-col-print { width: 1% !important; white-space: nowrap !important; text-align: center !important; }
+          th, td { 
+            border: 1px solid #ddd !important; 
+            padding: 8px !important; 
+            -webkit-print-color-adjust: exact !important; 
+            print-color-adjust: exact !important; 
+          }
           
+          /* تثبيت الألوان في الطباعة */
           .text-green-print { color: #16a34a !important; font-weight: bold !important; }
           .text-red-print { color: #dc2626 !important; font-weight: bold !important; }
           .text-blue-print { color: #2563eb !important; font-weight: bold !important; }
           .bg-muted-print { background-color: #f8fafc !important; }
           
-          .awarded-cell-print { border: 3px solid #eab308 !important; background-color: #fefce8 !important; }
-          .awarded-badge-print { display: inline-block !important; font-size: 7pt !important; background: #eab308 !important; color: #000 !important; padding: 2px 4px !important; border-radius: 4px !important; margin-bottom: 4px !important; }
+          /* عمود البيان الديناميكي الحقيقي */
+          .desc-col-print { 
+            width: 1% !important; 
+            white-space: normal !important; 
+            min-width: 250px !important; 
+            text-align: right !important;
+          }
+          .qty-col-print { 
+            width: 1% !important; 
+            white-space: nowrap !important; 
+            text-align: center !important; 
+          }
+          
+          /* تمييز الترسية المطبوع */
+          .awarded-cell-print { 
+            border: 3px solid #eab308 !important; 
+            background-color: #fefce8 !important; 
+          }
+          .awarded-badge-print { 
+            display: inline-block !important; 
+            font-size: 7pt !important; 
+            background: #eab308 !important; 
+            color: #000 !important; 
+            padding: 2px 6px !important; 
+            border-radius: 4px !important; 
+            margin-bottom: 4px !important; 
+            font-weight: bold !important;
+          }
         }
       `}} />
 
-      {/* ─── وضع الشاشة ─── */}
+      {/* ─── وضع العرض في الشاشة (جدول عريض واحد) ─── */}
       <div className="no-print space-y-6">
         <div className="border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card">
           <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto">بيان الصنف المطلوب</TableHead>
+                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto min-w-[200px]">بيان الصنف المطلوب</TableHead>
                 <TableHead className="text-center font-bold px-4 w-auto whitespace-nowrap">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
@@ -312,14 +347,14 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <TableBody>
               {tableData.map(({ item, quotes, minPrice }) => (
                 <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b last:border-0">
-                  <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l whitespace-nowrap">{item.itemName}</TableCell>
+                  <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
                   <TableCell className="text-center font-mono font-bold bg-muted/5 px-4 whitespace-nowrap">{item.quantity}</TableCell>
                   {allVendors.map(vendor => {
                     const quote = quotes.find(q => q.vendorId === vendor.id);
                     const isBest = quote?.price === minPrice && minPrice !== Infinity;
                     const isSelected = selectedAwards[item.id] === vendor.id;
                     return (
-                      <TableCell key={vendor.id} className={cn("text-center border-r p-0 min-w-[120px]", !isLocked && rfq.status !== 'cancelled' && "cursor-pointer", isSelected && "bg-primary/10 border-2 border-primary")} onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}>
+                      <TableCell key={vendor.id} className={cn("text-center border-r p-0 min-w-[120px]", !isLocked && rfq.status !== 'cancelled' && "cursor-pointer", isSelected && "bg-primary/10 border-2 border-primary shadow-inner")} onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}>
                         {quote?.price ? (
                           <div className={cn("font-mono font-black", isSelected ? "text-primary scale-110" : isBest ? "text-green-700" : "text-foreground/60")}>
                             {formatCurrency(quote.price)}
@@ -367,29 +402,31 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </div>
       </div>
 
-      {/* ─── وضع الطباعة المجزأ مع الألوان ─── */}
+      {/* ─── وضع الطباعة المجزأ (3 موردين لكل صفحة) ─── */}
       <div id="printable-multi-page-area" className="hidden print:block">
         {vendorChunks.map((chunk, chunkIndex) => (
           <div key={chunkIndex} className="print-page-container">
+            {/* رأس الصفحة الرسمي */}
             <div className="flex justify-between items-start mb-6 border-b-4 border-primary/20 pb-4">
               <div className="flex items-center gap-4">
-                <Logo className="h-12 w-12 !p-1" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                <Logo className="h-14 w-14 !p-1 bg-white border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                 <div>
-                  <h1 className="text-lg font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                  <p className="text-[8px] text-muted-foreground">{branding?.address}</p>
+                  <h1 className="text-xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
+                  <p className="text-[9px] text-muted-foreground">{branding?.address}</p>
                 </div>
               </div>
               <div className="text-left space-y-1">
-                <h2 className="text-xl font-black text-primary">تحليل مقارنة الأسعار (صفحة {chunkIndex + 1})</h2>
-                <p className="text-[10px] font-bold font-mono">RFQ: {rfq.rfqNumber} | التاريخ: {rfqDate ? format(rfqDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</p>
+                <h2 className="text-2xl font-black text-primary">مصفوفة مقارنة عروض الأسعار</h2>
+                <p className="text-[10px] font-bold font-mono">الطلب: {rfq.rfqNumber} | صفحة {chunkIndex + 1} من {vendorChunks.length}</p>
+                <p className="text-[9px] text-muted-foreground">تاريخ التحليل: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ar })}</p>
               </div>
             </div>
 
             <table>
               <thead>
                 <tr className="bg-muted-print">
-                  <th className="text-right font-black desc-col-print">بيان الصنف المطلوب</th>
-                  <th className="text-center qty-col-print">الكمية</th>
+                  <th className="desc-col-print">بيان الصنف المطلوب</th>
+                  <th className="qty-col-print">الكمية</th>
                   {chunk.map(vendor => {
                     const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                     const itemsTotal = rfq.items.reduce((sum, item) => {
@@ -399,15 +436,16 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     const netTotal = itemsTotal - (quote?.discountAmount || 0) + (quote?.deliveryFees || 0);
 
                     return (
-                      <th key={vendor.id} className="text-center">
-                        <div className="space-y-1">
-                          <p className="font-black text-blue-print border-b pb-1">{vendor.name}</p>
-                          <div className="text-[7pt] font-normal space-y-0.5 text-right pr-2">
+                      <th key={vendor.id} className="text-center align-top">
+                        <div className="space-y-1 min-w-[150px]">
+                          <p className="font-black text-blue-print border-b-2 pb-1 mb-2 text-sm">{vendor.name}</p>
+                          <div className="text-[8pt] font-normal space-y-1 text-right px-2">
                             <div><span className="opacity-60">التوريد:</span> <b>{quote?.deliveryTimeDays || '-'} يوم</b></div>
                             <div className="text-blue-print"><span className="opacity-60">الدفع:</span> <b>{quote?.paymentTerms || 'نقدي'}</b></div>
                             <div className="text-green-print"><span className="opacity-60">الخصم:</span> <b>{formatCurrency(quote?.discountAmount || 0)}</b></div>
                             <div className="text-red-print"><span className="opacity-60">التوصيل:</span> <b>{formatCurrency(quote?.deliveryFees || 0)}</b></div>
-                            <div className="font-black text-blue-print pt-1 border-t">الصافي: {formatCurrency(netTotal)}</div>
+                            <Separator className="my-1 border-gray-300"/>
+                            <div className="font-black text-blue-print text-sm pt-1">الصافي: {formatCurrency(netTotal)}</div>
                           </div>
                         </div>
                       </th>
@@ -418,15 +456,15 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               <tbody>
                 {tableData.map(({ item, quotes, minPrice }) => (
                   <tr key={item.id}>
-                    <td className="font-bold text-right">{item.itemName}</td>
-                    <td className="text-center font-mono">{item.quantity}</td>
+                    <td className="font-bold text-right text-sm">{item.itemName}</td>
+                    <td className="text-center font-mono font-bold">{item.quantity}</td>
                     {chunk.map(vendor => {
                       const quote = quotes.find(q => q.vendorId === vendor.id);
                       const isBest = quote?.price === minPrice && minPrice !== Infinity;
                       const isSelected = selectedAwards[item.id] === vendor.id;
                       return (
-                        <td key={vendor.id} className={cn("text-center font-mono font-black", isSelected && "awarded-cell-print")}>
-                          {isSelected && <div className="awarded-badge-print">تمت الترسية</div>}
+                        <td key={vendor.id} className={cn("text-center font-mono font-black text-base", isSelected && "awarded-cell-print")}>
+                          {isSelected && <div className="awarded-badge-print">[ تم الاختيار ]</div>}
                           <div className={cn(isBest && !isSelected && "text-green-print")}>
                             {quote?.price ? formatCurrency(quote.price) : "-"}
                           </div>
@@ -438,10 +476,11 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
               </tbody>
             </table>
 
-            <div className="grid grid-cols-3 gap-8 mt-12 text-center text-[8pt] border-t pt-4">
-                <div><p className="font-black">إعداد المشتريات</p><div className="mt-8 border-t border-dashed pt-1">التوقيع</div></div>
-                <div><p className="font-black">المراجعة المالية</p><div className="mt-8 border-t border-dashed pt-1">الختم والاعتماد</div></div>
-                <div><p className="font-black">مدير العمليات</p><div className="mt-8 border-t border-dashed pt-1">التوقيع النهائي</div></div>
+            {/* تذييل الصفحة للتوقيعات */}
+            <div className="grid grid-cols-3 gap-12 mt-16 text-center text-[9pt] border-t-2 pt-6">
+                <div><p className="font-black mb-10">إعداد / قسم المشتريات</p><div className="border-t border-dashed pt-1">التوقيع والتاريخ</div></div>
+                <div><p className="font-black mb-10">مراجعة / الإدارة المالية</p><div className="border-t border-dashed pt-1">الختم والاعتماد</div></div>
+                <div><p className="font-black mb-10">اعتماد / مدير العمليات</p><div className="border-t border-dashed pt-1">الموافقة النهائية</div></div>
             </div>
           </div>
         ))}
