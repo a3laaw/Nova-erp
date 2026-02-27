@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,11 @@ import { Label } from '../ui/label';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { doc, addDoc, updateDoc, collection } from 'firebase/firestore';
-import { Loader2, Save, Table as TableIcon, X } from 'lucide-react';
+import { Loader2, Save, Table as TableIcon, FileSpreadsheet, Download, Info } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
+import { ScrollArea } from '../ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cleanFirestoreData } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 interface SupplierQuotationFormProps {
   isOpen: boolean;
@@ -44,6 +46,10 @@ interface QuoteItem {
   unitPrice: number | string;
 }
 
+// الكلمات المفتاحية للبحث الذكي عن الأعمدة
+const PRICE_KEYWORDS = ['سعر', 'سعر الوحدة', 'Price', 'Unit Price', 'Rate', 'مبلغ', 'Cost'];
+const ITEM_KEYWORDS = ['اسم', 'صنف', 'بيان', 'Item', 'Description', 'Name', 'Name of Item'];
+
 export function SupplierQuotationForm({
   isOpen,
   onClose,
@@ -53,6 +59,7 @@ export function SupplierQuotationForm({
 }: SupplierQuotationFormProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [reference, setReference] = useState('');
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -60,6 +67,7 @@ export function SupplierQuotationForm({
   const [paymentTerms, setPaymentTerms] = useState('');
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -98,6 +106,98 @@ export function SupplierQuotationForm({
     setItems((prev) =>
       prev.map((item) => (item.rfqItemId === rfqItemId ? { ...item, unitPrice: price } : item))
     );
+  };
+
+  const handleExcelImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        // تحويل إلى مصفوفة من المصفوفات للبحث عن الهيدر بسهولة
+        const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+        if (data.length < 2) throw new Error('الملف فارغ أو غير صالح.');
+
+        let itemColIndex = -1;
+        let priceColIndex = -1;
+        let headerRowIndex = -1;
+
+        // البحث الذكي عن الهيدر في أول 10 صفوف
+        for (let i = 0; i < Math.min(data.length, 10); i++) {
+          const row = data[i];
+          if (!row) continue;
+
+          itemColIndex = row.findIndex(cell => 
+            ITEM_KEYWORDS.some(kw => String(cell || '').toLowerCase().includes(kw.toLowerCase()))
+          );
+          priceColIndex = row.findIndex(cell => 
+            PRICE_KEYWORDS.some(kw => String(cell || '').toLowerCase().includes(kw.toLowerCase()))
+          );
+
+          if (itemColIndex !== -1 && priceColIndex !== -1) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        if (headerRowIndex === -1) {
+          throw new Error('لم يتم التعرف على أعمدة "الصنف" و "السعر". تأكد من وجود عناوين واضحة للأعمدة.');
+        }
+
+        let matchCount = 0;
+        const newItems = [...items];
+
+        // معالجة الصفوف بعد الهيدر
+        for (let i = headerRowIndex + 1; i < data.length; i++) {
+          const row = data[i];
+          if (!row) continue;
+
+          const excelItemName = String(row[itemColIndex] || '').trim().toLowerCase();
+          const excelPrice = parseFloat(String(row[priceColIndex] || '0').replace(/[^0-9.]/g, ''));
+
+          if (excelItemName && !isNaN(excelPrice) && excelPrice > 0) {
+            // محاولة المطابقة مع بنود الـ RFQ
+            const matchedIndex = newItems.findIndex(item => 
+              item.itemName.trim().toLowerCase() === excelItemName ||
+              excelItemName.includes(item.itemName.trim().toLowerCase()) ||
+              item.itemName.trim().toLowerCase().includes(excelItemName)
+            );
+
+            if (matchedIndex !== -1) {
+              newItems[matchedIndex].unitPrice = excelPrice;
+              matchCount++;
+            }
+          }
+        }
+
+        setItems(newItems);
+        toast({
+          title: 'اكتمل الاستيراد',
+          description: `تم مطابقة واستيراد ${matchCount} أسعار من ملف Excel بنجاح.`,
+        });
+
+      } catch (error: any) {
+        toast({
+          variant: 'destructive',
+          title: 'فشل الاستيراد',
+          description: error.message || 'حدث خطأ أثناء معالجة الملف.',
+        });
+      } finally {
+        setIsImporting(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+
+    reader.readAsBinaryString(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,11 +248,11 @@ export function SupplierQuotationForm({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none bg-background"
+        className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none bg-background"
         dir="rtl"
       >
         <DialogHeader className="p-6 bg-muted/20 border-b flex-shrink-0">
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-center w-full">
             <div>
               <DialogTitle className="text-2xl font-black text-foreground">
                 إدخال عرض السعر: {vendor.name}
@@ -161,95 +261,112 @@ export function SupplierQuotationForm({
                 طلب تسعير رقم: {rfq.rfqNumber}
               </DialogDescription>
             </div>
+            <div className="flex gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleExcelImport}
+              />
+              <Button
+                variant="outline"
+                className="gap-2 border-green-600/50 text-green-700 hover:bg-green-50 h-11 rounded-xl shadow-sm font-bold"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+              >
+                {isImporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileSpreadsheet className="h-5 w-5" />}
+                استيراد الأسعار من Excel
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
-        {/* Scrollable Container - This fixes the hidden items issue */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 min-h-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
-            <div className="grid gap-2">
-              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                مرجع المورد
-              </Label>
-              <Input
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="رقم عرض المورد..."
-                className="rounded-xl h-10 border-2"
-              />
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
+              <div className="grid gap-2">
+                <Label className="font-bold text-xs pr-2 text-muted-foreground">مرجع المورد</Label>
+                <Input
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="رقم عرض المورد..."
+                  className="rounded-xl h-10 border-2"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-xs pr-2 text-muted-foreground">تاريخ العرض</Label>
+                <DateInput value={date} onChange={setDate} className="h-10 rounded-xl" />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-xs pr-2 text-muted-foreground">مدة التوريد (أيام)</Label>
+                <Input
+                  type="number"
+                  value={deliveryTime}
+                  onChange={(e) => setDeliveryTime(e.target.value)}
+                  placeholder="0"
+                  className="h-10 rounded-xl border-2"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label className="font-bold text-xs pr-2 text-muted-foreground">شروط الدفع</Label>
+                <Input
+                  value={paymentTerms}
+                  onChange={(e) => setPaymentTerms(e.target.value)}
+                  placeholder="مثال: نقداً..."
+                  className="h-10 rounded-xl border-2"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                تاريخ العرض
-              </Label>
-              <DateInput value={date} onChange={setDate} className="h-10 rounded-xl" />
-            </div>
-            <div className="grid gap-2">
-              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                مدة التوريد (أيام)
-              </Label>
-              <Input
-                type="number"
-                value={deliveryTime}
-                onChange={(e) => setDeliveryTime(e.target.value)}
-                placeholder="0"
-                className="h-10 rounded-xl border-2"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                شروط الدفع
-              </Label>
-              <Input
-                value={paymentTerms}
-                onChange={(e) => setPaymentTerms(e.target.value)}
-                placeholder="مثال: نقداً..."
-                className="h-10 rounded-xl border-2"
-              />
-            </div>
-          </div>
 
-          <div className="space-y-4 pb-4">
-            <div className="flex items-center gap-2 px-2">
-              <TableIcon className="h-5 w-5 text-primary" />
-              <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
-            </div>
-            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow className="h-14 border-b-2">
-                    <TableHead className="px-8 font-black text-base">اسم الصنف المطلوب</TableHead>
-                    <TableHead className="w-56 text-center font-black text-base px-6">
-                      سعر الوحدة (د.ك)
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow
-                      key={item.rfqItemId}
-                      className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group"
-                    >
-                      <TableCell className="px-8 font-bold text-foreground/80">
-                        {item.itemName}
-                      </TableCell>
-                      <TableCell className="px-6">
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={item.unitPrice}
-                          onChange={(e) => handleItemPriceChange(item.rfqItemId, e.target.value)}
-                          className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30"
-                          placeholder="0.000"
-                        />
-                      </TableCell>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-2">
+                  <TableIcon className="h-5 w-5 text-primary" />
+                  <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
+                </div>
+                <div className="text-[10px] text-muted-foreground font-bold italic flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  يمكنك تعبئة الأسعار يدوياً أو استخدام زر استيراد Excel بالأعلى.
+                </div>
+              </div>
+              <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="h-14 border-b-2">
+                      <TableHead className="px-8 font-black text-base">اسم الصنف المطلوب</TableHead>
+                      <TableHead className="w-56 text-center font-black text-base px-6">
+                        سعر الوحدة (د.ك)
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => (
+                      <TableRow
+                        key={item.rfqItemId}
+                        className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group"
+                      >
+                        <TableCell className="px-8 font-bold text-foreground/80">
+                          {item.itemName}
+                        </TableCell>
+                        <TableCell className="px-6">
+                          <Input
+                            type="number"
+                            step="0.001"
+                            value={item.unitPrice}
+                            onChange={(e) => handleItemPriceChange(item.rfqItemId, e.target.value)}
+                            className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30"
+                            placeholder="0.000"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           </div>
-        </div>
+        </ScrollArea>
 
         <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
           <Button
