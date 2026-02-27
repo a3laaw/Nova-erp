@@ -1,41 +1,33 @@
 'use server';
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 /**
- * @fileOverview خبير النظام الذكي باستخدام Google AI.
+ * @fileOverview خبير النظام الذكي باستخدام مكتبة Google الرسمية المباشرة.
  */
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-import { findNavigationTool } from '@/ai/tools/find-navigation';
 
-const SystemExpertInputSchema = z.object({
-  question: z.string().describe("سؤال المستخدم حول النظام أو البيانات."),
-  history: z.array(z.object({
-    role: z.enum(['user', 'model']),
-    content: z.string(),
-  })).optional().describe('سجل المحادثة السابقة.'),
-});
-export type SystemExpertInput = z.infer<typeof SystemExpertInputSchema>;
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || "");
 
-const SystemExpertOutputSchema = z.object({
-  answer: z.string().describe("إجابة الذكاء الاصطناعي."),
-});
-export type SystemExpertOutput = z.infer<typeof SystemExpertOutputSchema>;
-
-export async function askSystemExpert(input: SystemExpertInput): Promise<SystemExpertOutput> {
-    const { question, history } = input;
-    const llmHistory = history?.map(msg => ({
-      role: msg.role,
-      content: [{ text: msg.content }],
-    })) || [];
-    
-    const response = await ai.generate({
-      model: 'googleai/gemini-1.5-flash',
-      history: llmHistory,
-      system: `أنت المساعد الذكي لنظام Nova ERP. مهمتك هي مساعدة المستخدم في استخدام النظام والإجابة على استفساراته حول البيانات.
-      - إذا سأل المستخدم عن مديونية عميل، استخدم الأدوات المتاحة.
-      - كن مهذباً ومختصراً في إجاباتك باللغة العربية.`,
-      prompt: question,
-      tools: [findNavigationTool]
+export async function askSystemExpert(input: { question: string, history?: any[] }) {
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: "أنت المساعد الذكي لنظام Nova ERP. مهمتك هي مساعدة المستخدم في استخدام النظام والإجابة على استفساراته حول البيانات. كن مهذباً ومختصراً في إجاباتك باللغة العربية."
     });
+
+    const chat = model.startChat({
+      history: input.history?.map(h => ({
+        role: h.role === 'user' ? 'user' : 'model',
+        parts: [{ text: h.content }],
+      })) || [],
+    });
+
+    const result = await chat.sendMessage(input.question);
+    const response = await result.response;
     
-    return { answer: response.text };
+    return { answer: response.text() };
+  } catch (error) {
+    console.error("System Expert Error:", error);
+    return { answer: "عذراً، واجهت مشكلة في معالجة سؤالك. يرجى المحاولة مرة أخرى لاحقاً." };
+  }
 }

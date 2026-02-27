@@ -1,38 +1,41 @@
 'use server';
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 /**
- * @fileOverview المساعد المحاسبي الذكي باستخدام Google AI.
+ * @fileOverview المساعد المحاسبي الذكي باستخدام مكتبة Google الرسمية.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENAI_API_KEY || "");
 
-const AccountingAssistantInputSchema = z.object({
-  command: z.string().describe('الأمر النصي من المستخدم'),
-  currentDate: z.string().describe('التاريخ الحالي بصيغة YYYY-MM-DD')
-});
+export async function runAccountingAssistant(input: { command: string, currentDate: string }) {
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
-const AccountingAssistantOutputSchema = z.object({
-  command: z.string().describe("اسم العملية البرمجية"),
-  payload: z.any().describe("البيانات المنظمة للعملية"),
-  explanation: z.string().describe("شرح بالعربية لما سيتم تنفيذه"),
-  warnings: z.array(z.string()).describe("تحذيرات أو افتراضات")
-});
-
-export type AccountingAssistantInput = z.infer<typeof AccountingAssistantInputSchema>;
-export type AccountingAssistantOutput = z.infer<typeof AccountingAssistantOutputSchema>;
-
-export async function runAccountingAssistant(input: AccountingAssistantInput): Promise<AccountingAssistantOutput> {
-  const { output } = await ai.generate({
-    model: 'googleai/gemini-1.5-flash',
-    system: `أنت مساعد محاسبي خبير في نظام ERP. 
+    const prompt = `أنت مساعد محاسبي خبير في نظام ERP. 
     مهمتك تحويل طلبات المستخدم إلى JSON منظم.
     الأوامر المدعومة: create_journal_entry, create_receipt_voucher, create_payment_voucher.
-    التزم دائماً بالقيد المزدوج (Debit = Credit).`,
-    prompt: `التاريخ اليوم: ${input.currentDate}. نفذ الأمر التالي: ${input.command}`,
-    output: { format: 'json', schema: AccountingAssistantOutputSchema }
-  });
+    التزم دائماً بالقيد المزدوج (Debit = Credit).
+    
+    التاريخ اليوم: ${input.currentDate}. 
+    نفذ الأمر التالي: ${input.command}
+    
+    التنسيق المطلوب:
+    {
+      "command": "string",
+      "payload": any,
+      "explanation": "string (بالعربية)",
+      "warnings": string[]
+    }`;
 
-  if (!output) throw new Error('تعذر معالجة الطلب من قبل الذكاء الاصطناعي');
-  return output;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return JSON.parse(response.text());
+  } catch (error) {
+    console.error("Accounting Assistant Error:", error);
+    throw new Error("تعذر معالجة الطلب المحاسبي حالياً.");
+  }
 }
