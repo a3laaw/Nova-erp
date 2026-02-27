@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, serverTimestamp, arrayUnion, arrayRemove } from 'firebase/firestore';
 import type { RequestForQuotation, Vendor, SupplierQuotation, RfqItem, PurchaseOrder } from '@/lib/types';
 import {
   Table,
@@ -145,34 +145,43 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'purchaseOrders');
-            const counterDoc = await transaction.get(counterRef);
+            const poCounterRef = doc(firestore, 'counters', 'purchaseOrders');
+            const poCounterDoc = await transaction.get(poCounterRef);
             
             const quote = supplierQuotations.find(q => q.vendorId === vendorToAward.id);
             if (!quote) throw new Error("لم يتم العثور على عرض السعر المختار.");
 
             const rfqRefDoc = doc(firestore, 'rfqs', rfq.id!);
-            
             let finalVendorId = vendorToAward.id;
 
+            // إذا كان المورد محتملاً، نحوله لمورد رسمي
             if (isProspective) {
                 const newVendorRef = doc(collection(firestore, 'vendors'));
                 finalVendorId = newVendorRef.id;
+                
                 transaction.set(newVendorRef, {
                     name: vendorToAward.name,
                     contactPerson: 'تم التحويل من طلب تسعير (مورد محتمل سابقاً)',
                     createdAt: serverTimestamp(),
                 });
+
+                // تحديث عرض السعر ليرتبط بـ ID المورد الرسمي الجديد
                 const quoteRef = doc(firestore, 'supplierQuotations', quote.id!);
                 transaction.update(quoteRef, { vendorId: finalVendorId });
+
+                // تحديث طلب التسعير لنقل المورد من "محتملاً" إلى "مسجلاً" لضمان ظهور البيانات
+                transaction.update(rfqRefDoc, {
+                    prospectiveVendors: arrayRemove({ id: vendorToAward.id, name: vendorToAward.name }),
+                    vendorIds: arrayUnion(finalVendorId)
+                });
             }
 
-            let nextNumber = 1;
-            if (counterDoc.exists()) {
-                const counts = counterDoc.data()?.counts || {};
-                nextNumber = (counts[currentYear] || 0) + 1;
+            let nextPoNumber = 1;
+            if (poCounterDoc.exists()) {
+                const counts = poCounterDoc.data()?.counts || {};
+                nextPoNumber = (counts[currentYear] || 0) + 1;
             }
-            const poNumber = `PO-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+            const poNumber = `PO-${currentYear}-${String(nextPoNumber).padStart(4, '0')}`;
 
             const poItems = rfq.items.map(item => {
                 const quoteItem = quote.items.find(qi => qi.rfqItemId === item.id);
@@ -205,7 +214,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             };
 
             transaction.set(newPoRef, cleanFirestoreData(poData));
-            transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            transaction.set(poCounterRef, { counts: { [currentYear]: nextPoNumber } }, { merge: true });
             
             transaction.update(rfqRefDoc, { 
                 status: 'closed',
