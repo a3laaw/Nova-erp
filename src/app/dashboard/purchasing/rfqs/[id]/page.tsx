@@ -8,7 +8,7 @@ import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertTriangle, UserPlus, Loader2, Search } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, AlertTriangle, UserPlus, Loader2, Search, PlusCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -53,7 +53,7 @@ export default function RfqDetailsPage() {
     const [dataLoading, setDataLoading] = useState(true);
 
     const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
-    const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef?.path || null);
+    const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef ? rfqRef.path : null);
 
     // Fetch all system vendors for the "Add Vendor" feature
     const { data: allSystemVendors } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
