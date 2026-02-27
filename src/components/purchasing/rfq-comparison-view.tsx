@@ -284,7 +284,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             margin-top: 2px;
             font-weight: bold;
           }
-          button { display: none !important; }
+          .no-print, button { display: none !important; }
         }
       `}} />
 
@@ -306,13 +306,18 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           </div>
         </div>
 
+        <div className="flex justify-end mb-4 no-print">
+            <Button onClick={handlePrint} variant="outline" className="gap-2 rounded-xl font-bold border-2">
+                <Printer className="h-4 w-4"/> طباعة التحليل
+            </Button>
+        </div>
+
         <div className="comparison-table-container border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card print:border-none print:shadow-none">
-          {/* Changed table-fixed to table-auto for dynamic widths */}
           <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground min-w-[250px]">بيان الصنف المطلوب</TableHead>
-                <TableHead className="text-center font-bold text-xs whitespace-nowrap px-4">الكمية</TableHead>
+                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto">بيان الصنف المطلوب</TableHead>
+                <TableHead className="text-center font-bold text-xs whitespace-nowrap px-4 w-auto">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                   const itemsTotal = rfq.items.reduce((sum, item) => {
@@ -343,7 +348,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                           <div className="flex justify-between text-[9px]"><span className="text-muted-foreground">الدفع:</span> <span className="font-bold text-blue-600 truncate max-w-[80px]">{quote?.paymentTerms || 'نقدي'}</span></div>
                           <div className="flex justify-between text-[9px] text-green-600"><span className="font-medium">الخصم:</span> <span className="font-bold">{formatCurrency(quote?.discountAmount || 0)}</span></div>
                           <div className="flex justify-between text-[9px] text-red-600"><span className="font-medium">التوصيل:</span> <span className="font-bold">{formatCurrency(quote?.deliveryFees || 0)}</span></div>
-                          <div className="flex justify-between text-[10px] font-black text-primary border-t border-primary/10 pt-1 mt-1"><span>الصافي:</span> <span>{formatCurrency(netTotal)}</span></div>
+                          <Separator className="my-1 opacity-50"/>
+                          <div className="flex justify-between text-[10px] font-black text-primary"><span>الصافي:</span> <span>{formatCurrency(netTotal)}</span></div>
                         </div>
                       </div>
                     </TableHead>
@@ -355,7 +361,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <TableBody>
               {tableData.map(({ item, quotes, minPrice }) => (
                 <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b last:border-0">
-                  <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
+                  <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l whitespace-nowrap">{item.itemName}</TableCell>
                   <TableCell className="text-center font-mono font-bold bg-muted/5 whitespace-nowrap px-4">{item.quantity}</TableCell>
                   {allVendors.map(vendor => {
                     const quote = quotes.find(q => q.vendorId === vendor.id);
@@ -381,7 +387,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                               {isSelected && <CheckCircle2 className="h-3 w-3 no-print" />}
                               {formatCurrency(quote.price)}
                             </div>
-                            {isSelected && <div className="hidden awarded-label-print font-black text-[7pt]">[ تمت الترسية ]</div>}
+                            {isSelected && <div className="hidden awarded-label-print font-black text-[7pt] text-center w-full">[ تمت الترسية ]</div>}
                           </div>
                         ) : (
                           <span className="text-[10px] text-muted-foreground/20 italic">-</span>
@@ -423,16 +429,13 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     </div>
                 </div>
                 <div className="flex gap-3">
-                    <Button variant="outline" onClick={handlePrint} className="h-14 px-8 rounded-2xl font-bold border-2">
-                        <Printer className="ml-2 h-5 w-5" /> طباعة المعاينة
-                    </Button>
                     <Button onClick={handleConfirmSplitAward} disabled={isAwarding || Object.values(selectedAwards).filter(Boolean).length === 0} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3">
                         {isAwarding ? <Loader2 className="h-6 w-6 animate-spin" /> : <Award className="h-6 w-6" />}
                         اعتماد وتحويل لأوامر شراء
                     </Button>
                 </div>
             </div>
-        ) : isLocked ? (
+        ) : isLocked && (
             <div className="p-6 bg-green-50 border-2 border-dashed border-green-200 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <CheckCircle2 className="h-10 w-10 text-green-600" />
@@ -442,21 +445,20 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={handlePrint} variant="outline" className="rounded-xl border-green-200 bg-white hover:bg-green-50">
-                        <Printer className="ml-2 h-4 w-4" /> طباعة المستند
-                    </Button>
                     <Button onClick={handleReopenRfq} disabled={isReopening} variant="ghost" className="rounded-xl text-orange-700 hover:bg-orange-50 font-bold gap-2">
                         {isReopening ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4" />}
                         إعادة فتح الترسية (للمدير)
                     </Button>
                 </div>
             </div>
-        ) : (
-            <Alert variant="default" className="rounded-2xl border-blue-200 bg-blue-50">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                <AlertTitle className="text-blue-800 font-bold">مرحلة العروض</AlertTitle>
-                <AlertDescription className="text-blue-700">
-                    الطلب لا يزال في مرحلة استقبال العروض. قم بإغلاق الطلب من صفحة التفاصيل لتتمكن من الترسية واختيار الفائزين.
+        )}
+        
+        {!isLocked && rfq.status === 'closed' && Object.keys(selectedAwards).length === 0 && (
+            <Alert variant="destructive" className="rounded-2xl">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>تنبيه: الترسية فارغة</AlertTitle>
+                <AlertDescription>
+                    لم تقم باختيار أي موردين بعد. يرجى الضغط على خلايا الأسعار في الجدول أعلاه لتحديد المورد المختار لكل صنف.
                 </AlertDescription>
             </Alert>
         )}
