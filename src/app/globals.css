@@ -97,12 +97,31 @@
             -webkit-print-color-adjust: exact;
             color-adjust: exact;
             height: auto !important;
+            width: 100% !important;
             overflow: visible !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
 
         /* إخفاء كل شيء غير ضروري للوثيقة */
-        .no-print, [role="navigation"], header, button, .sidebar, .sidebar-trigger {
+        .no-print, 
+        [role="navigation"], 
+        header, 
+        button, 
+        .sidebar, 
+        .sidebar-trigger,
+        nav,
+        .fixed,
+        [data-sidebar="sidebar"] {
             display: none !important;
+        }
+
+        /* إلغاء تأثيرات الـ Flex والـ Sidebar لضمان تمدد المحتوى */
+        main {
+            margin: 0 !important;
+            padding: 0 !important;
+            display: block !important;
+            width: 100% !important;
         }
 
         .printable-wrapper {
@@ -112,17 +131,22 @@
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
+            position: absolute;
+            left: 0;
+            top: 0;
         }
 
-        /* التحكم في الاتجاه الرأسي (Portrait) */
+        /* ─── التحكم في اتجاه الورقة ─── */
+        
+        /* الاتجاه الرأسي الافتراضي */
         .print-portrait {
             @page {
                 size: A4 portrait;
-                margin: 10mm;
+                margin: 15mm;
             }
         }
 
-        /* التحكم في الاتجاه الأفقي (Landscape) */
+        /* الاتجاه الأفقي للجداول العريضة */
         .print-landscape {
             @page {
                 size: A4 landscape;
@@ -133,6 +157,17 @@
         /* لضمان كسر الصفحة بشكل صحيح */
         .page-break {
             page-break-before: always;
+        }
+
+        /* تحسين ظهور الجداول في الطباعة */
+        table {
+            width: 100% !important;
+            table-layout: auto !important;
+            border-collapse: collapse !important;
+        }
+        
+        th, td {
+            word-break: break-word !important;
         }
     }
 }
