@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,6 @@ import { Loader2, Save, Table as TableIcon, X } from 'lucide-react';
 import type { Vendor, RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
-import { ScrollArea } from '../ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -165,93 +164,92 @@ export function SupplierQuotationForm({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
-          <div className="p-6 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
-              <div className="grid gap-2">
-                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                  مرجع المورد
-                </Label>
-                <Input
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="رقم عرض المورد..."
-                  className="rounded-xl h-10 border-2"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                  تاريخ العرض
-                </Label>
-                <DateInput value={date} onChange={setDate} className="h-10 rounded-xl" />
-              </div>
-              <div className="grid gap-2">
-                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                  مدة التوريد (أيام)
-                </Label>
-                <Input
-                  type="number"
-                  value={deliveryTime}
-                  onChange={(e) => setDeliveryTime(e.target.value)}
-                  placeholder="0"
-                  className="h-10 rounded-xl border-2"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
-                  شروط الدفع
-                </Label>
-                <Input
-                  value={paymentTerms}
-                  onChange={(e) => setPaymentTerms(e.target.value)}
-                  placeholder="مثال: نقداً..."
-                  className="h-10 rounded-xl border-2"
-                />
-              </div>
+        {/* Scrollable Container - This fixes the hidden items issue */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
+            <div className="grid gap-2">
+              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
+                مرجع المورد
+              </Label>
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder="رقم عرض المورد..."
+                className="rounded-xl h-10 border-2"
+              />
             </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 px-2">
-                <TableIcon className="h-5 w-5 text-primary" />
-                <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
-              </div>
-              <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow className="h-14 border-b-2">
-                      <TableHead className="px-8 font-black text-base">اسم الصنف المطلوب</TableHead>
-                      <TableHead className="w-56 text-center font-black text-base px-6">
-                        سعر الوحدة (د.ك)
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map((item) => (
-                      <TableRow
-                        key={item.rfqItemId}
-                        className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group"
-                      >
-                        <TableCell className="px-8 font-bold text-foreground/80">
-                          {item.itemName}
-                        </TableCell>
-                        <TableCell className="px-6">
-                          <Input
-                            type="number"
-                            step="0.001"
-                            value={item.unitPrice}
-                            onChange={(e) => handleItemPriceChange(item.rfqItemId, e.target.value)}
-                            className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30"
-                            placeholder="0.000"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+            <div className="grid gap-2">
+              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
+                تاريخ العرض
+              </Label>
+              <DateInput value={date} onChange={setDate} className="h-10 rounded-xl" />
+            </div>
+            <div className="grid gap-2">
+              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
+                مدة التوريد (أيام)
+              </Label>
+              <Input
+                type="number"
+                value={deliveryTime}
+                onChange={(e) => setDeliveryTime(e.target.value)}
+                placeholder="0"
+                className="h-10 rounded-xl border-2"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label className="font-bold text-xs pr-2 text-muted-foreground uppercase tracking-widest">
+                شروط الدفع
+              </Label>
+              <Input
+                value={paymentTerms}
+                onChange={(e) => setPaymentTerms(e.target.value)}
+                placeholder="مثال: نقداً..."
+                className="h-10 rounded-xl border-2"
+              />
             </div>
           </div>
-        </ScrollArea>
+
+          <div className="space-y-4 pb-4">
+            <div className="flex items-center gap-2 px-2">
+              <TableIcon className="h-5 w-5 text-primary" />
+              <Label className="text-xl font-black text-foreground">قائمة الأسعار المقدمة</Label>
+            </div>
+            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="h-14 border-b-2">
+                    <TableHead className="px-8 font-black text-base">اسم الصنف المطلوب</TableHead>
+                    <TableHead className="w-56 text-center font-black text-base px-6">
+                      سعر الوحدة (د.ك)
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow
+                      key={item.rfqItemId}
+                      className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group"
+                    >
+                      <TableCell className="px-8 font-bold text-foreground/80">
+                        {item.itemName}
+                      </TableCell>
+                      <TableCell className="px-6">
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={item.unitPrice}
+                          onChange={(e) => handleItemPriceChange(item.rfqItemId, e.target.value)}
+                          className="h-11 text-center font-black font-mono text-xl text-primary border-2 border-transparent group-hover:border-primary/20 transition-all bg-primary/5 rounded-xl shadow-inner focus-visible:ring-primary/30"
+                          placeholder="0.000"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
 
         <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
           <Button
