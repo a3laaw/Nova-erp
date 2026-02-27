@@ -197,22 +197,22 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   return (
     <div className="space-y-6">
       <div className="overflow-x-auto print:overflow-visible">
-        <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+        <Table className="w-full border-collapse print:table-fixed" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col className="w-[220px]" />
             <col className="w-[70px]" />
             {allVendors.map(v => <col key={v.id} className="min-w-[180px]" />)}
           </colgroup>
-          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-muted/20">
+          <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30 print:static print:bg-muted/10">
             <TableRow className="min-h-24 border-b-2">
-              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-transparent">بيان الصنف المطلوب</TableHead>
-              <TableHead className="text-center font-bold text-xs">الكمية</TableHead>
+              <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground print:static print:bg-transparent print:border-b-2">بيان الصنف المطلوب</TableHead>
+              <TableHead className="text-center font-bold text-xs print:border-b-2">الكمية</TableHead>
               {allVendors.map(vendor => {
                 const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                 const isCredit = quote?.paymentTerms?.toLowerCase().includes('credit') || quote?.paymentTerms?.includes('آجل') || quote?.paymentTerms?.includes('حساب');
                 
                 return (
-                  <TableHead key={vendor.id} className="p-2 border-r align-top">
+                  <TableHead key={vendor.id} className="p-2 border-r align-top print:border-b-2">
                     <div className="flex flex-col h-full gap-2 min-h-[100px]">
                       <div className="text-center px-1">
                         <p className="font-black text-primary text-sm whitespace-normal leading-tight break-words">
@@ -256,19 +256,32 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     <TableCell
                       key={vendor.id}
                       className={cn(
-                        "text-center cursor-pointer transition-all border-r p-0",
-                        isSelected ? "bg-primary/10" : isBest ? "bg-green-500/5" : "",
+                        "text-center cursor-pointer transition-all border-r p-0 print:border",
+                        isSelected ? "bg-primary/10 print:bg-blue-50 print:border-2 print:border-primary" : isBest ? "bg-green-500/5 print:bg-green-50" : "",
                         isLocked && "cursor-default"
                       )}
                       onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}
                     >
                       {quote?.price ? (
-                        <div className="flex flex-col items-center justify-center h-14 relative">
-                          <div className={cn("flex items-center gap-1 font-mono font-black", isSelected ? "text-primary text-lg" : isBest ? "text-green-700" : "text-foreground/60")}>
+                        <div className="flex flex-col items-center justify-center h-14 relative overflow-visible">
+                          <div className={cn(
+                            "flex items-center gap-1 font-mono font-black", 
+                            isSelected ? "text-primary text-lg" : isBest ? "text-green-700" : "text-foreground/60"
+                          )}>
                             {isSelected && <CheckCircle2 className="h-4 w-4 fill-primary/20 no-print" />}
                             {formatCurrency(quote.price)}
                           </div>
-                          {isBest && !isSelected && <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter">أفضل سعر</div>}
+                          {/* تمييز في الطباعة */}
+                          {isSelected && (
+                            <div className="hidden print:block absolute -top-1 right-1 text-[7px] font-black text-primary uppercase border border-primary px-1 rounded-sm bg-white">
+                              مختـــار
+                            </div>
+                          )}
+                          {isBest && !isSelected && (
+                            <div className="absolute top-1 left-1 text-[8px] font-bold text-green-600 uppercase tracking-tighter print:bg-white print:border print:px-1">
+                              أفضل سعر
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-[10px] text-muted-foreground/20 italic">-</span>
