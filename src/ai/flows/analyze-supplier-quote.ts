@@ -31,10 +31,13 @@ export async function analyzeSupplierQuote(input: {
   };
 
   var urls = [
-    { name: 'gemini-2.0-flash v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey },
-    { name: 'gemini-2.0-flash v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=' + apiKey },
-    { name: 'gemini-1.5-flash-latest v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey },
-    { name: 'gemini-1.5-flash-latest v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=' + apiKey }
+    { name: 'gemini-2.5-flash-preview-05-20 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=' + apiKey },
+    { name: 'gemini-2.0-flash-001 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent?key=' + apiKey },
+    { name: 'gemini-2.0-flash-001 v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-001:generateContent?key=' + apiKey },
+    { name: 'gemini-2.0-flash-lite-001 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite-001:generateContent?key=' + apiKey },
+    { name: 'gemini-2.0-flash-lite-001 v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite-001:generateContent?key=' + apiKey },
+    { name: 'gemini-1.5-flash-002 v1beta', url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=' + apiKey },
+    { name: 'gemini-1.5-flash-002 v1', url: 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-002:generateContent?key=' + apiKey }
   ];
 
   var allErrors: string[] = [];
@@ -61,7 +64,6 @@ export async function analyzeSupplierQuote(input: {
           errorText = response.statusText;
         }
         allErrors.push(entry.name + ' => HTTP ' + response.status + ': ' + errorText);
-
         if (response.status === 429) {
           await new Promise(function(resolve) { setTimeout(resolve, 5000); });
         }
@@ -71,7 +73,7 @@ export async function analyzeSupplierQuote(input: {
       var data = await response.json();
 
       if (!data || !data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0] || !data.candidates[0].content.parts[0].text) {
-        allErrors.push(entry.name + ' => رد فارغ او غير مكتمل: ' + JSON.stringify(data).substring(0, 300));
+        allErrors.push(entry.name + ' => رد فارغ: ' + JSON.stringify(data).substring(0, 300));
         continue;
       }
 
