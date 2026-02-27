@@ -12,17 +12,18 @@ export async function analyzeSupplierQuote(input: {
 }) {
   try {
     const response = await ai.generate({
+      model: 'googleai/gemini-1.5-flash',
       config: {
         responseMimeType: 'application/json',
       },
-      system: `أنت محاسب ومهندس خبير. استخرج البيانات من عرض السعر وطابقها مع معرفات RFQ المقدمة.`,
+      system: `أنت محاسب ومهندس خبير ومحلل بيانات. القاعدة الذهبية: ابحث عن القيم (المورد، الأصناف، الأسعار) مهما كانت المسميات (مثلا 'البيان' بدل 'الصنف'). استخرج البيانات وطابقها مع معرفات RFQ المقدمة.`,
       prompt: [
         { text: "حلل صورة الجدول المستخرج. استخرج: البند، الكمية، السعر. المخرجات JSON فقط بهذا التنسيق:" },
         { text: `{ "vendorName": "...", "date": "YYYY-MM-DD", "totalAmount": 0, "extractedPrices": [ { "rfqItemId": "id", "unitPrice": 0 } ] }` },
         { 
           media: { 
             url: input.quoteFileDataUri, 
-            contentType: 'image/jpeg' // ضروري جداً لتجنب خطأ plugin is not a function
+            contentType: 'image/jpeg' 
           } 
         }
       ]
@@ -37,6 +38,6 @@ export async function analyzeSupplierQuote(input: {
 
   } catch (e: any) {
     console.error("AI Flow Error:", e);
-    throw new Error("حدث خطأ في معالجة الصورة، يرجى التأكد من تحديث المكتبات وتجربة صورة أكثر وضوحاً.");
+    throw new Error("حدث خطأ في معالجة الصورة، يرجى التأكد من وضوح الصورة والمحاولة مرة أخرى.");
   }
 }
