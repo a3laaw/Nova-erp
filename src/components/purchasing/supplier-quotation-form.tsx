@@ -152,7 +152,7 @@ export function SupplierQuotationForm({
         className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl shadow-2xl border-none bg-background"
         dir="rtl"
       >
-        {/* Fixed Header */}
+        {/* رأس ثابت */}
         <DialogHeader className="p-6 bg-muted/20 border-b flex-shrink-0">
           <div className="flex justify-between items-start">
             <div>
@@ -166,7 +166,7 @@ export function SupplierQuotationForm({
           </div>
         </DialogHeader>
 
-        {/* Scrollable Content Area */}
+        {/* منطقة المحتوى القابلة للتمرير (ScrollArea) */}
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-5 rounded-2xl border border-primary/5">
@@ -255,7 +255,7 @@ export function SupplierQuotationForm({
           </div>
         </ScrollArea>
 
-        {/* Fixed Footer */}
+        {/* تذييل ثابت يحتوي على أزرار الحفظ */}
         <DialogFooter className="p-6 border-t bg-muted/10 flex-shrink-0">
           <Button
             variant="ghost"

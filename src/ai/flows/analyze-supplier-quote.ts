@@ -1,13 +1,13 @@
 'use server';
 
 /**
- * تم إيقاف ميزة التحليل الذكي بناءً على طلب المستخدم.
- * هذا الملف يعمل الآن كواجهة برمجية فارغة لمنع تعطل الاستدعاءات البرمجية الأخرى.
+ * @fileOverview ميزة التحليل الذكي متوقفة حالياً لضمان استقرار النظام.
  */
+
 export async function analyzeSupplierQuote(input: {
   quoteFileDataUri: string;
   rfqItems: { id: string; name: string }[];
 }) {
-  console.log('AI Analysis is currently disabled.');
+  console.log('AI Analysis is disabled.');
   return null;
 }
