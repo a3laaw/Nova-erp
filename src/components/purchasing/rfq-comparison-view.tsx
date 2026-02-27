@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Award, Loader2, CheckCircle2, Undo2, AlertCircle, Calculator, FileText } from 'lucide-react';
+import { Award, Loader2, CheckCircle2, Undo2, AlertCircle, Calculator, FileText, Printer, Separator } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +22,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '../ui/scroll-area';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '../layout/logo';
@@ -49,7 +48,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
-  // نعتبر الجدول مجمداً فقط إذا تم إصدار أوامر شراء فعلياً
   const isLocked = useMemo(() => {
     return rfq.status === 'cancelled' || (rfq.awardedPoIds && rfq.awardedPoIds.length > 0);
   }, [rfq.status, rfq.awardedPoIds]);
@@ -243,19 +241,10 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* 
-          أهم تحديث: كود CSS للطباعة قسري ومباشر لضمان ظهور الصفحة كاملة في الـ PDF.
-          يقوم هذا الكود بإلغاء كافة قيود الـ overflow والـ sticky التي تسبب القص والاختفاء.
-      */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          /* إخفاء كل شيء في الموقع */
           body * { visibility: hidden; }
-          
-          /* إظهار حاوية الطباعة فقط */
           #printable-comparison-area, #printable-comparison-area * { visibility: visible; }
-          
-          /* عزل الحاوية وجعلها في أعلى الصفحة وبكامل العرض */
           #printable-comparison-area {
             position: absolute !important;
             left: 0 !important;
@@ -265,25 +254,27 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             padding: 0 !important;
             background: white !important;
           }
-
-          /* إلغاء الـ sticky لضمان ظهور البيانات */
           .sticky { position: static !important; }
           th, td { position: static !important; background: transparent !important; }
-
-          /* تمديد الجدول ومنع الـ Overflow */
           .comparison-table-container { 
             overflow: visible !important; 
             width: 100% !important; 
             max-width: none !important;
             border: none !important;
           }
-          table { width: 100% !important; table-layout: auto !important; border-collapse: collapse !important; }
-          th, td { border: 1px solid #000 !important; font-size: 8pt !important; padding: 4px !important; }
-
-          /* تمييز الخلية المختارة في الطباعة بوضوح فائق */
+          table { 
+            width: 100% !important; 
+            table-layout: auto !important; 
+            border-collapse: collapse !important; 
+          }
+          th, td { 
+            border: 1px solid #000 !important; 
+            font-size: 8pt !important; 
+            padding: 6px !important; 
+          }
           .awarded-cell-print {
             background-color: #f3f4f6 !important;
-            border: 2px solid #000 !important;
+            border: 3px solid #000 !important;
             font-weight: 900 !important;
           }
           .awarded-label-print {
@@ -291,17 +282,15 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             font-size: 7pt !important;
             color: #000 !important;
             margin-top: 2px;
-            text-decoration: underline;
+            font-weight: bold;
           }
-          
-          /* إخفاء الأزرار داخل الجدول المطبوع */
           button { display: none !important; }
         }
       `}} />
 
       <div id="printable-comparison-area" className="space-y-6 bg-card rounded-2xl border-none p-4 md:p-6 print:p-0">
         
-        {/* ترويسة التقرير الرسمية */}
+        {/* Report Header */}
         <div className="flex justify-between items-start mb-8 border-b-4 border-primary/20 pb-6">
           <div className="flex items-center gap-4">
             <Logo className="h-16 w-16 !p-2" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
@@ -318,11 +307,12 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </div>
 
         <div className="comparison-table-container border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card print:border-none print:shadow-none">
-          <Table className="w-full border-collapse">
+          {/* Changed table-fixed to table-auto for dynamic widths */}
+          <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 sticky right-0 bg-muted/95 border-l font-black text-foreground min-w-[200px]">بيان الصنف المطلوب</TableHead>
-                <TableHead className="text-center font-bold text-xs w-16">الكمية</TableHead>
+                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground min-w-[250px]">بيان الصنف المطلوب</TableHead>
+                <TableHead className="text-center font-bold text-xs whitespace-nowrap px-4">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
                   const itemsTotal = rfq.items.reduce((sum, item) => {
@@ -365,8 +355,8 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             <TableBody>
               {tableData.map(({ item, quotes, minPrice }) => (
                 <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b last:border-0">
-                  <TableCell className="font-bold px-4 sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
-                  <TableCell className="text-center font-mono font-bold bg-muted/5">{item.quantity}</TableCell>
+                  <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
+                  <TableCell className="text-center font-mono font-bold bg-muted/5 whitespace-nowrap px-4">{item.quantity}</TableCell>
                   {allVendors.map(vendor => {
                     const quote = quotes.find(q => q.vendorId === vendor.id);
                     const isBest = quote?.price === minPrice && minPrice !== Infinity;
@@ -376,7 +366,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                       <TableCell
                         key={vendor.id}
                         className={cn(
-                          "text-center transition-all border-r p-0",
+                          "text-center transition-all border-r p-0 min-w-[120px]",
                           !isLocked && rfq.status === 'closed' && "cursor-pointer",
                           isSelected ? "bg-primary/10 border-2 border-primary ring-inset awarded-cell-print" : isBest ? "bg-green-500/5" : ""
                         )}
@@ -385,7 +375,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         {quote?.price ? (
                           <div className="flex flex-col items-center justify-center h-14 relative overflow-visible">
                             <div className={cn(
-                              "flex items-center gap-1 font-mono font-black", 
+                              "flex items-center gap-1 font-mono font-black whitespace-nowrap", 
                               isSelected ? "text-primary text-base scale-110" : isBest ? "text-green-700" : "text-foreground/60"
                             )}>
                               {isSelected && <CheckCircle2 className="h-3 w-3 no-print" />}
@@ -405,24 +395,23 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
           </Table>
         </div>
 
-        {/* تذييل الاعتماد للطباعة */}
+        {/* Signature Area for Printing */}
         <div className="hidden print:grid grid-cols-3 gap-12 mt-20 text-center text-sm border-t pt-10">
-            <div className="space-y-12">
-                <p className="font-black border-b pb-2 mb-4">قسم المشتريات</p>
+            <div className="space-y-16">
+                <p className="font-black border-b-2 border-foreground pb-2">قسم المشتريات</p>
                 <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">التوقيع والتاريخ</div>
             </div>
-            <div className="space-y-12">
-                <p className="font-black border-b pb-2 mb-4">المدير المالي</p>
+            <div className="space-y-16">
+                <p className="font-black border-b-2 border-foreground pb-2">المدير المالي</p>
                 <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">الختم والاعتماد</div>
             </div>
-            <div className="space-y-12">
-                <p className="font-black border-b pb-2 mb-4">مدير العمليات</p>
+            <div className="space-y-16">
+                <p className="font-black border-b-2 border-foreground pb-2">مدير العمليات</p>
                 <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">التوقيع النهائي</div>
             </div>
         </div>
       </div>
 
-      {/* منطقة الأزرار والتفاعلات (تختفي عند الطباعة) */}
       <div className="no-print space-y-6">
         {rfq.status === 'closed' && !isLocked ? (
             <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg">
@@ -475,5 +464,3 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     </div>
   );
 }
-
-import { Printer } from 'lucide-react';
