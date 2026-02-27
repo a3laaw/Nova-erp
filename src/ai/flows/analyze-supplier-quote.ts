@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
  * @fileOverview محرك تحليل صور عروض الأسعار باستخدام مكتبة Google الرسمية المباشرة.
- * تم تحسينه للتعامل مع أخطاء المفاتيح وتنظيف مخرجات JSON.
+ * تم تحسينه للتعامل مع أخطاء المفاتيح وتنظيف مخرجات JSON بشكل متطور.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -25,7 +25,7 @@ export async function analyzeSupplierQuote(input: {
       model: "gemini-1.5-flash",
       generationConfig: { 
         responseMimeType: "application/json",
-        temperature: 0.1 // درجة حرارة منخفضة لضمان دقة الأرقام
+        temperature: 0.1 
       }
     });
 
@@ -70,10 +70,9 @@ export async function analyzeSupplierQuote(input: {
     
     return JSON.parse(cleanJson);
   } catch (error: any) {
-    console.error("Direct AI Error:", error);
-    if (error.message?.includes("API_KEY_INVALID")) {
-        throw new Error("مفتاح الـ API غير صالح. يرجى التأكد من صلاحية المفتاح في ملف .env");
-    }
-    throw new Error("فشل التحليل الذكي. تأكد من وضوح الصورة ومن وجود مفتاح الـ API في الإعدادات.");
+    console.error("Direct AI Error Detail:", error);
+    // إرجاع رسالة الخطأ الأصلية للمستخدم للمساعدة في الحل
+    const technicalMessage = error.message || "Unknown AI Error";
+    throw new Error(`فشل التحليل الذكي: ${technicalMessage}. تأكد من صلاحية مفتاح الـ API ووضوح الصورة.`);
   }
 }

@@ -1,54 +1,33 @@
 'use server';
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 /**
- * @fileOverview AI-powered task prioritization suggestion flow.
- *
- * - suggestTaskPrioritization - A function that suggests task prioritization based on project timeline, dependencies, and resource availability.
- * - SuggestTaskPrioritizationInput - The input type for the suggestTaskPrioritization function.
- * - SuggestTaskPrioritizationOutput - The return type for the suggestTaskPrioritization function.
+ * @fileOverview محرك تحديد أولويات المهام باستخدام المكتبة الرسمية المباشرة.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
 
-const SuggestTaskPrioritizationInputSchema = z.object({
-  projectTimeline: z.string().describe('The project timeline in a textual format.'),
-  dependencies: z.string().describe('The task dependencies in a textual format.'),
-  resourceAvailability: z.string().describe('The resource availability in a textual format.'),
-});
-export type SuggestTaskPrioritizationInput = z.infer<typeof SuggestTaskPrioritizationInputSchema>;
+export async function suggestTaskPrioritization(input: { projectTimeline: string, dependencies: string, resourceAvailability: string }) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key missing");
 
-const SuggestTaskPrioritizationOutputSchema = z.object({
-  prioritizedTasks: z.string().describe('A list of tasks prioritized with explanations.'),
-});
-export type SuggestTaskPrioritizationOutput = z.infer<typeof SuggestTaskPrioritizationOutputSchema>;
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-export async function suggestTaskPrioritization(input: SuggestTaskPrioritizationInput): Promise<SuggestTaskPrioritizationOutput> {
-  return suggestTaskPrioritizationFlow(input);
-}
+    const prompt = `أنت مساعد ذكي للمهندسين. قم بترتيب أولويات المهام بناءً على المعطيات التالية:
+    الجدول الزمني: ${input.projectTimeline}
+    الاعتمادات: ${input.dependencies}
+    توفر الموارد: ${input.resourceAvailability}
+    
+    قدم قائمة مرتبة مع شرح الأسباب باللغة العربية.`;
 
-const prompt = ai.definePrompt({
-  name: 'suggestTaskPrioritizationPrompt',
-  input: {schema: SuggestTaskPrioritizationInputSchema},
-  output: {schema: SuggestTaskPrioritizationOutputSchema},
-  prompt: `You are an AI assistant helping engineers prioritize tasks based on project timeline, dependencies, and resource availability.
-
-  Analyze the following information:
-
-  Project Timeline: {{{projectTimeline}}}
-  Dependencies: {{{dependencies}}}
-  Resource Availability: {{{resourceAvailability}}}
-
-  Suggest a prioritized list of tasks with clear explanations for the prioritization.`,
-});
-
-const suggestTaskPrioritizationFlow = ai.defineFlow(
-  {
-    name: 'suggestTaskPrioritizationFlow',
-    inputSchema: SuggestTaskPrioritizationInputSchema,
-    outputSchema: SuggestTaskPrioritizationOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return { prioritizedTasks: response.text() };
+  } catch (error) {
+    console.error("Prioritization AI Error:", error);
+    throw new Error("تعذر تحديد الأولويات حالياً.");
   }
-);
+}

@@ -1,65 +1,36 @@
 'use server';
 
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 /**
- * @fileOverview AI flow to analyze project timelines and generate delay reports if project phases exceed deadlines.
- *
- * - generateDelayReport - A function that handles the generation of delay reports.
- * - GenerateDelayReportInput - The input type for the generateDelayReport function.
- * - GenerateDelayReportOutput - The return type for the generateDelayReport function.
+ * @fileOverview محرك توليد تقارير التأخير باستخدام المكتبة الرسمية المباشرة.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
 
-const GenerateDelayReportInputSchema = z.object({
-  projectTimelineData: z
-    .string()
-    .describe('A stringified JSON representing the project timeline data, including phases, start dates, end dates, and assigned engineers.'),
-  currentDate: z.string().describe('The current date to compare against deadlines, in ISO format (YYYY-MM-DD).'),
-});
-export type GenerateDelayReportInput = z.infer<typeof GenerateDelayReportInputSchema>;
+export async function generateDelayReport(input: { projectTimelineData: string, currentDate: string }) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key missing");
 
-const GenerateDelayReportOutputSchema = z.object({
-  delayReport: z.string().describe('A comprehensive delay report, highlighting phases exceeding deadlines, reasons for delays, and suggested corrective actions.'),
-});
-export type GenerateDelayReportOutput = z.infer<typeof GenerateDelayReportOutputSchema>;
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-export async function generateDelayReport(input: GenerateDelayReportInput): Promise<GenerateDelayReportOutput> {
-  return generateDelayReportFlow(input);
-}
+    const prompt = `أنت خبير في إدارة المشاريع الهندسية. قم بتحليل بيانات الجدول الزمني التالية وتوليد تقرير عن التأخيرات:
+    
+    بيانات المشروع: ${input.projectTimelineData}
+    تاريخ اليوم: ${input.currentDate}
+    
+    المطلوب:
+    1. تحديد المراحل المتأخرة.
+    2. حساب مدة التأخير.
+    3. اقتراح إجراءات تصحيحية باللغة العربية.`;
 
-const prompt = ai.definePrompt({
-  name: 'generateDelayReportPrompt',
-  input: {schema: GenerateDelayReportInputSchema},
-  output: {schema: GenerateDelayReportOutputSchema},
-  prompt: `You are an AI assistant specializing in project management and risk assessment. Your task is to analyze project timelines and generate delay reports, identifying phases that have exceeded their deadlines. Provide potential reasons for the delays and suggest corrective actions.
-
-Project Timeline Data: {{{projectTimelineData}}}
-Current Date: {{{currentDate}}}
-
-Based on the provided project timeline data and the current date, generate a delay report that includes:
-- A list of phases exceeding their deadlines.
-- The duration of the delay for each phase.
-- Potential reasons for the delays (e.g., resource constraints, unforeseen circumstances, scope changes).
-- Suggested corrective actions to mitigate further delays and get the project back on track.
-
-Ensure the report is clear, concise, and actionable, providing project managers with the information they need to address project delays effectively. Focus on providing as much value as possible.
-`,
-});
-
-const generateDelayReportFlow = ai.defineFlow(
-  {
-    name: 'generateDelayReportFlow',
-    inputSchema: GenerateDelayReportInputSchema,
-    outputSchema: GenerateDelayReportOutputSchema,
-  },
-  async input => {
-    try {
-      JSON.parse(input.projectTimelineData);
-    } catch (e) {
-      throw new Error('Invalid JSON format for projectTimelineData: ' + e);
-    }
-    const {output} = await prompt(input);
-    return output!;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return { delayReport: response.text() };
+  } catch (error) {
+    console.error("Delay Report AI Error:", error);
+    throw new Error("تعذر توليد تقرير التأخير حالياً.");
   }
-);
+}
