@@ -32,6 +32,7 @@ import {
   ClipboardList,
   Loader2,
   Undo2,
+  AlertTriangle
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import {
@@ -125,15 +126,29 @@ export function RfqsList() {
     try {
       const rfqId = itemToDelete.id!;
       
-      // 1. جلب عروض الأسعار المرتبطة
-      const quotesRef = collection(firestore, 'supplierQuotations');
-      const quotesQuery = query(quotesRef, where('rfqId', '==', rfqId));
-      const quotesSnap = await getDocs(quotesQuery);
-
-      // 2. جلب أوامر الشراء المرتبطة (إن وجدت)
+      // 1. التحقق من حالة أوامر الشراء المرتبطة قبل الحذف
       const poRef = collection(firestore, 'purchaseOrders');
       const poQuery = query(poRef, where('rfqId', '==', rfqId));
       const poSnap = await getDocs(poQuery);
+
+      // فحص إذا كان هناك أي أمر شراء معتمد أو مستلم
+      const hasActivePO = poSnap.docs.some(d => ['approved', 'received', 'partially_received'].includes(d.data().status));
+      
+      if (hasActivePO) {
+          toast({ 
+              variant: 'destructive', 
+              title: 'منع الحذف', 
+              description: 'لا يمكن حذف طلب تسعير مرتبط بأمر شراء معتمد أو مستلم. يرجى التراجع عن اعتماد أمر الشراء أولاً.' 
+          });
+          setIsDeleting(false);
+          setItemToDelete(null);
+          return;
+      }
+
+      // 2. جلب عروض الأسعار المرتبطة لحذفها
+      const quotesRef = collection(firestore, 'supplierQuotations');
+      const quotesQuery = query(quotesRef, where('rfqId', '==', rfqId));
+      const quotesSnap = await getDocs(quotesQuery);
 
       const batch = writeBatch(firestore);
       
@@ -145,22 +160,16 @@ export function RfqsList() {
         batch.delete(quoteDoc.ref);
       });
 
-      // حذف أوامر الشراء (فقط إذا كانت مسودة) أو فصل الارتباط
+      // حذف أوامر الشراء المرتبطة (ستكون كلها في حالة draft بناءً على الفحص أعلاه)
       poSnap.docs.forEach((poDoc) => {
-          const poData = poDoc.data();
-          if (poData.status === 'draft') {
-              batch.delete(poDoc.ref);
-          } else {
-              // إذا كان الأمر معتمداً أو مستلماً، لا نحذفه بل نمسح رابط طلب التسعير منه فقط
-              batch.update(poDoc.ref, { rfqId: null, supplierQuotationId: null });
-          }
+          batch.delete(poDoc.ref);
       });
 
       await batch.commit();
 
       toast({
         title: 'نجاح',
-        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر ${poSnap.size > 0 ? 'وأوامر الشراء المرتبطة' : ''}.`,
+        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر ${poSnap.size > 0 ? 'وأوامر الشراء المرتبطة' : ''} بنجاح.`,
       });
     } catch (error) {
       console.error('Failed to delete RFQ:', error);
@@ -298,7 +307,8 @@ export function RfqsList() {
       <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
         <AlertDialogContent dir="rtl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive font-black text-xl">
+            <AlertDialogTitle className="text-destructive font-black text-xl flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6" />
               تأكيد حذف طلب التسعير؟
             </AlertDialogTitle>
             <AlertDialogDescription>
@@ -308,7 +318,13 @@ export function RfqsList() {
               </span>{' '}
               وكافة عروض الأسعار المرتبطة به نهائياً. 
               {itemToDelete?.status === 'closed' && (
-                  <p className="mt-2 text-amber-600 font-bold">تنبيه: سيتم أيضاً حذف مسودة أمر الشراء المرتبطة بهذا الطلب.</p>
+                  <div className="mt-4 p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-sm">
+                      <p className="font-bold">تنبيه حماية البيانات:</p>
+                      <ul className="list-disc pr-4 mt-1">
+                          <li>سيتم حذف مسودة أمر الشراء المرتبطة بهذا الطلب آلياً.</li>
+                          <li>إذا كان أمر الشراء معتمداً، سيمنعك النظام من الحذف حتى تراجع حالته.</li>
+                      </ul>
+                  </div>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

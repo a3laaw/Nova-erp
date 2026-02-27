@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,9 @@ import {
     Target, 
     CheckCircle, 
     XCircle, 
-    Loader2,
-    Info
+    Loader2, 
+    Info,
+    Undo2
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
@@ -86,6 +87,38 @@ export default function PurchaseOrderDetailPage() {
         }
     };
 
+    const handleUndoApproval = async () => {
+        if (!poRef || !currentUser || !po) return;
+        
+        setIsUpdating(true);
+        try {
+            // التحقق مما إذا كان هناك أي إذن استلام مرتبط
+            const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', po.id), where('status', '!=', 'cancelled'));
+            const grnsSnap = await getDocs(grnsQuery);
+            
+            if (!grnsSnap.empty) {
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'لا يمكن التراجع', 
+                    description: 'تم البدء باستلام بضاعة لهذا الأمر بالفعل. يجب إلغاء أذونات الاستلام أولاً.' 
+                });
+                return;
+            }
+
+            await updateDoc(poRef, { 
+                status: 'draft',
+                approvedBy: null,
+                approvedAt: null
+            });
+            
+            toast({ title: 'تم التراجع', description: 'تمت إعادة أمر الشراء لحالة المسودة بنجاح.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الاعتماد.' });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
     const handleCancel = async () => {
         if (!poRef) return;
         setIsUpdating(true);
@@ -129,16 +162,22 @@ export default function PurchaseOrderDetailPage() {
                 <div className="flex gap-2">
                     {po.status === 'draft' && (
                         <>
-                            <Button onClick={handleApprove} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700 gap-2">
+                            <Button onClick={handleApprove} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700 gap-2 rounded-xl font-bold">
                                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle className="h-4 w-4"/>}
                                 اعتماد وتحويل للتوريد
                             </Button>
-                            <Button variant="outline" onClick={handleCancel} disabled={isUpdating} className="text-destructive border-destructive hover:bg-destructive/10">
+                            <Button variant="outline" onClick={handleCancel} disabled={isUpdating} className="text-destructive border-destructive hover:bg-destructive/10 rounded-xl">
                                 <XCircle className="h-4 w-4 ml-2"/> إلغاء الطلب
                             </Button>
                         </>
                     )}
-                    <Button onClick={handlePrint} variant="outline" className="gap-2">
+                    {po.status === 'approved' && (
+                        <Button onClick={handleUndoApproval} disabled={isUpdating} variant="outline" className="text-orange-600 border-orange-200 hover:bg-orange-50 gap-2 rounded-xl font-bold">
+                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4"/>}
+                            تراجع عن الاعتماد (إعادة لمسودة)
+                        </Button>
+                    )}
+                    <Button onClick={handlePrint} variant="outline" className="gap-2 rounded-xl border-2">
                         <Printer className="h-4 w-4"/> طباعة المستند
                     </Button>
                 </div>
