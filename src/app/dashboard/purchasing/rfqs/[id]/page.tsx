@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -9,7 +8,7 @@ import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2, UserSearch } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2, UserSearch, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -77,12 +76,24 @@ export default function RfqDetailsPage() {
     
     const handleChangeStatus = async (newStatus: RequestForQuotation['status']) => {
         if (!rfqRef) return;
+
+        // الرقابة: منع الإغلاق إذا لم توجد عروض أسعار
+        if (newStatus === 'closed' && supplierQuotations.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'لا يمكن الإغلاق',
+                description: 'يجب إضافة عرض سعر واحد على الأقل من الموردين قبل بدء عملية المقارنة والترسية.'
+            });
+            return;
+        }
+
         setIsUpdatingStatus(true);
         try {
             await updateDoc(rfqRef, { status: newStatus });
             toast({ title: 'تحديث الحالة', description: `تم تغيير حالة الطلب إلى ${statusTranslations[newStatus]}.` });
         } catch (e) {
             console.error("Failed to update status", e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الطلب.' });
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -167,7 +178,14 @@ export default function RfqDetailsPage() {
                                 </Button>
                             )}
                             {rfq.status === 'sent' && (
-                                <Button onClick={() => handleChangeStatus('closed')} disabled={isUpdatingStatus} className="bg-green-600 hover:bg-green-700 gap-2 rounded-xl font-bold shadow-lg shadow-green-200">
+                                <Button 
+                                    onClick={() => handleChangeStatus('closed')} 
+                                    disabled={isUpdatingStatus} 
+                                    className={cn(
+                                        "bg-green-600 hover:bg-green-700 gap-2 rounded-xl font-bold shadow-lg",
+                                        supplierQuotations.length === 0 ? "opacity-50" : "shadow-green-200"
+                                    )}
+                                >
                                     <XCircle className="h-4 w-4" /> إغلاق وبدء المقارنة
                                 </Button>
                             )}
