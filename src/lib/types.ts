@@ -38,7 +38,7 @@ export interface InventoryAdjustment {
     notes?: string;
     createdAt?: any;
     createdBy?: string;
-};
+}
 
 export interface ConstructionProject {
   id?: string;
@@ -57,9 +57,27 @@ export interface ConstructionProject {
   boqId?: string; 
   createdAt?: any;
   createdBy?: string;
-};
+}
 
-// ... other types from previous versions
+export interface PurchaseRequest {
+    id?: string;
+    requestNumber: string;
+    date: any;
+    requesterId: string;
+    requesterName: string;
+    projectId: string;
+    items: {
+        internalItemId: string;
+        itemName: string;
+        quantity: number;
+        notes?: string;
+    }[];
+    status: 'pending' | 'approved' | 'rejected' | 'converted';
+    createdAt: any;
+    approvedBy?: string;
+    approvedAt?: any;
+}
+
 export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 export interface UserProfile {
   id?: string;
@@ -186,3 +204,5 @@ export interface Item {
 }
 export interface Warehouse { id?: string; name: string; isDefault?: boolean; location?: string; projectId?: string | null; companyId?: string | null; createdAt?: any; }
 export interface JournalEntry { id?: string; entryNumber: string; date: any; narration: string; totalDebit: number; totalCredit: number; status: string; lines: any[]; createdAt: any; }
+export interface DailySiteReport { id?: string; projectId: string; date: any; engineerId: string; engineerName: string; workCompleted: string; workersCount: number; encounteredIssues?: string; weatherStatus?: string; photoUrls: string[]; createdAt: any; }
+export interface PaymentApplication { id?: string; applicationNumber: string; date: any; projectId: string; clientId: string; clientName: string; projectName: string; items: any[]; totalAmount: number; status: 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled'; journalEntryId?: string; createdAt: any; createdBy: string; }
