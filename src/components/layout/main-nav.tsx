@@ -170,7 +170,7 @@ const navItems = {
             { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: Book },
             { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
             { href: '/dashboard/accounting/vendor-statements', label: 'كشوفات الموردين', icon: Truck },
-            { href: '/dashboard/accounting/client-statements', label: 'كشوفات العملاء', icon: Users },
+            { href: '/dashboard/accounting/client-statements', label: 'مديونيات العملاء وتحصيلها', icon: Users },
             { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
             { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل', icon: TrendingUp },
             { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
