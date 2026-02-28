@@ -1,10 +1,9 @@
-
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where } from 'firebase/firestore';
-import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType, BoqReferenceItem, SubcontractorType, ConstructionWorkStage } from '@/lib/types';
+import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where, serverTimestamp, deleteField, limit } from 'firebase/firestore';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType, BoqReferenceItem, SubcontractorType, ConstructionWorkStage, Employee } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -32,7 +31,6 @@ import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
-import { CompanyManager } from './company-manager';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
@@ -188,58 +186,58 @@ function ManagerView({
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  const [primaryItems, setPrimaryItems] = React.useState<any[]>([]);
-  const [secondaryItems, setSecondaryItems] = React.useState<any[]>([]);
-  const [selectedPrimary, setSelectedPrimary] = React.useState<any | null>(null);
+  const [primaryItems, setPrimaryItems] = useState<any[]>([]);
+  const [secondaryItems, setSecondaryItems] = useState<any[]>([]);
+  const [selectedPrimary, setSelectedPrimary] = useState<any | null>(null);
   
-  const [loadingPrimary, setLoadingPrimary] = React.useState(true);
-  const [loadingSecondary, setLoadingSecondary] = React.useState(false);
+  const [loadingPrimary, setLoadingPrimary] = useState(true);
+  const [loadingSecondary, setLoadingSecondary] = useState(false);
 
-  const [isPrimaryDialogOpen, setIsPrimaryDialogOpen] = React.useState(false);
-  const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = React.useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isPrimaryDialogOpen, setIsPrimaryDialogOpen] = useState(false);
+  const [isSecondaryDialogOpen, setIsSecondaryDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  const [editingItem, setEditingItem] = React.useState<any | null>(null);
-  const [itemToDelete, setItemToDelete] = React.useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, type: 'primary' | 'secondary' } | null>(null);
   
   // Form state
-  const [itemName, setItemName] = React.useState('');
-  const [itemUnit, setItemUnit] = React.useState('');
-  const [itemActivityTypes, setItemActivityTypes] = React.useState<string[]>([]);
-  const [itemRoles, setItemRoles] = React.useState<string[]>([]);
-  const [itemStageType, setItemStageType] = React.useState<'sequential' | 'parallel'>('sequential');
-  const [itemTrackingType, setItemTrackingType] = React.useState<'duration' | 'occurrence' | 'none'>('duration');
-  const [itemDuration, setItemDuration] = React.useState<number | ''>('');
-  const [itemMaxOccurrences, setItemMaxOccurrences] = React.useState<number | ''>('');
-  const [itemAllowManualCompletion, setItemAllowManualCompletion] = React.useState(false);
-  const [itemEnableModificationTracking, setItemEnableModificationTracking] = React.useState(false);
-  const [itemNextStageIds, setItemNextStageIds] = React.useState<string[]>([]);
-  const [itemAllowedDuringStages, setItemAllowedDuringStages] = React.useState<string[]>([]);
+  const [itemName, setItemName] = useState('');
+  const [itemUnit, setItemUnit] = useState('');
+  const [itemActivityTypes, setItemActivityTypes] = useState<string[]>([]);
+  const [itemRoles, setItemRoles] = useState<string[]>([]);
+  const [itemStageType, setItemStageType] = useState<'sequential' | 'parallel'>('sequential');
+  const [itemTrackingType, setItemTrackingType] = useState<'duration' | 'occurrence' | 'none'>('duration');
+  const [itemDuration, setItemDuration] = useState<number | ''>('');
+  const [itemMaxOccurrences, setItemMaxOccurrences] = useState<number | ''>('');
+  const [itemAllowManualCompletion, setItemAllowManualCompletion] = useState(false);
+  const [itemEnableModificationTracking, setItemEnableModificationTracking] = useState(false);
+  const [itemNextStageIds, setItemNextStageIds] = useState<string[]>([]);
+  const [itemAllowedDuringStages, setItemAllowedDuringStages] = useState<string[]>([]);
   
-  const [isHeader, setIsHeader] = React.useState(false);
-  const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = React.useState<string[]>([]);
-  const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = React.useState<string[]>([]);
-  const [itemTransactionTypeIds, setItemTransactionTypeIds] = React.useState<string[]>([]);
-  const [parentCategory, setParentCategory] = React.useState<any | null>(null);
+  const [isHeader, setIsHeader] = useState(false);
+  const [itemSubcontractorTypeIds, setItemSubcontractorTypeIds] = useState<string[]>([]);
+  const [itemActivityTypeIdsForBoq, setItemActivityTypeIdsForBoq] = useState<string[]>([]);
+  const [itemTransactionTypeIds, setItemTransactionTypeIds] = useState<string[]>([]);
+  const [parentCategory, setParentCategory] = useState<any | null>(null);
 
-  const [primaryOrderValues, setPrimaryOrderValues] = React.useState<Record<string, string>>({});
-  const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = React.useState(false);
-  const [secondaryOrderValues, setSecondaryOrderValues] = React.useState<Record<string, string>>({});
-  const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = React.useState(false);
+  const [primaryOrderValues, setPrimaryOrderValues] = useState<Record<string, string>>({});
+  const [isPrimaryOrderChanged, setIsPrimaryOrderChanged] = useState(false);
+  const [secondaryOrderValues, setSecondaryOrderValues] = useState<Record<string, string>>({});
+  const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = useState(false);
 
-  const [isImporting, setIsImporting] = React.useState(false);
-  const [isImportConfirmOpen, setIsImportConfirmOpen] = React.useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
 
-  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
-  React.useEffect(() => {
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       setPortalTarget(document.body);
     }
   }, []);
 
-  const [departmentActivityFilter, setDepartmentActivityFilter] = React.useState('all');
+  const [departmentActivityFilter, setDepartmentActivityFilter] = useState('all');
 
-  const filteredPrimaryItems = React.useMemo(() => {
+  const filteredPrimaryItems = useMemo(() => {
     let items = primaryItems;
     if (primaryCollectionName === 'departments') {
         if (departmentActivityFilter !== 'all') {
@@ -254,14 +252,14 @@ function ManagerView({
   const isBoqView = primaryCollectionName === 'boqReferenceItems';
   const isRecursiveView = primaryCollectionName === 'constructionWorkStages' || isBoqView;
 
-  const [allWorkStages, setAllWorkStages] = React.useState<MultiSelectOption[]>([]);
-  const [allSequentialStages, setAllSequentialStages] = React.useState<MultiSelectOption[]>([]);
-  const [allJobs, setAllJobs] = React.useState<{ value: string; label: string }[]>([]);
-  const [refDataLoading, setRefDataLoading] = React.useState(false);
+  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
+  const [allSequentialStages, setAllSequentialStages] = useState<MultiSelectOption[]>([]);
+  const [allJobs, setAllJobs] = useState<{ value: string; label: string }[]>([]);
+  const [refDataLoading, setRefDataLoading] = useState(false);
 
-  const [openCategories, setOpenCategories] = React.useState<Set<string>>(new Set<string>());
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set<string>());
 
-  const fetchPrimaryItems = React.useCallback(async () => {
+  const fetchPrimaryItems = useCallback(async () => {
     if (!firestore) return;
     setLoadingPrimary(true);
     try {
@@ -285,11 +283,11 @@ function ManagerView({
     }
   }, [firestore, primaryCollectionName, primaryTitle, toast]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchPrimaryItems();
   }, [fetchPrimaryItems]);
   
-  const fetchSecondaryItems = React.useCallback(async () => {
+  const fetchSecondaryItems = useCallback(async () => {
     if (!selectedPrimary || !firestore || !secondaryCollectionName) {
         setSecondaryItems([]);
         return;
@@ -323,7 +321,7 @@ function ManagerView({
     setSelectedPrimary(item);
   };
   
-  React.useEffect(() => {
+  useEffect(() => {
     const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
     if (!primaryExists && primaryItems.length > 0) {
       setSelectedPrimary(primaryItems[0]);
@@ -332,12 +330,12 @@ function ManagerView({
     }
   }, [primaryItems, selectedPrimary]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchSecondaryItems();
   }, [fetchSecondaryItems]);
 
 
-  const fetchReferenceDataForDialog = React.useCallback(async () => {
+  const fetchReferenceDataForDialog = useCallback(async () => {
     if (!firestore) return;
     setRefDataLoading(true);
     try {
@@ -374,13 +372,13 @@ function ManagerView({
   }, [firestore, toast]);
 
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isWorkStageView && (isSecondaryDialogOpen || isPrimaryDialogOpen)) {
       fetchReferenceDataForDialog();
     }
   }, [isWorkStageView, isPrimaryDialogOpen, isSecondaryDialogOpen, fetchReferenceDataForDialog]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isHeader) {
       setParentCategory(null);
     }
@@ -687,21 +685,21 @@ function ManagerView({
         }
     };
 
-    const activityTypeMap = React.useMemo(() => new Map((companyActivityTypes || []).map(t => [t.id, t.name])), [companyActivityTypes]);
-    const transactionTypeMap = React.useMemo(() => new Map((transactionTypes || []).map(t => [t.id, t.name])), [transactionTypes]);
-    const subTypeMap = React.useMemo(() => new Map((subcontractorTypes || []).map(t => [t.id, t.name])), [subcontractorTypes]);
+    const activityTypeMap = useMemo(() => new Map((companyActivityTypes || []).map(t => [t.id, t.name])), [companyActivityTypes]);
+    const transactionTypeMap = useMemo(() => new Map((transactionTypes || []).map(t => [t.id, t.name])), [transactionTypes]);
+    const subTypeMap = useMemo(() => new Map((subcontractorTypes || []).map(t => [t.id, t.name])), [subcontractorTypes]);
 
-    const subcontractorTypeOptions: MultiSelectOption[] = React.useMemo(() => 
+    const subcontractorTypeOptions: MultiSelectOption[] = useMemo(() => 
         (subcontractorTypes || []).map(t => ({ value: t.id!, label: t.name })),
         [subcontractorTypes]
     );
     
-    const activityTypeOptions: MultiSelectOption[] = React.useMemo(() =>
+    const activityTypeOptions: MultiSelectOption[] = useMemo(() =>
         (companyActivityTypes || []).map(t => ({ value: t.id!, label: t.name })),
         [companyActivityTypes]
     );
 
-    const filteredTransactionTypeOptionsForBoq: MultiSelectOption[] = React.useMemo(() => {
+    const filteredTransactionTypeOptionsForBoq: MultiSelectOption[] = useMemo(() => {
         if (!transactionTypes || !companyActivityTypes) return [];
 
         if (!itemActivityTypeIdsForBoq || itemActivityTypeIdsForBoq.length === 0) {
@@ -721,14 +719,14 @@ function ManagerView({
     }, [transactionTypes, companyActivityTypes, itemActivityTypeIdsForBoq]);
 
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (isRecursiveView && isPrimaryDialogOpen) {
             const validTransactionTypeIds = new Set(filteredTransactionTypeOptionsForBoq.map(opt => opt.value));
             setItemTransactionTypeIds(prev => prev.filter(id => validTransactionTypeIds.has(id)));
         }
     }, [itemActivityTypeIdsForBoq, isRecursiveView, isPrimaryDialogOpen, filteredTransactionTypeOptionsForBoq]);
 
-    const recursiveTree = React.useMemo(() => {
+    const recursiveTree = useMemo(() => {
         if (!primaryItems || !isRecursiveView) return [];
         const items = primaryItems;
         const map = new Map<string, any>();
@@ -1167,21 +1165,21 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
     const { data: transactionTypes, loading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
     const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments');
 
-    const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-    const [editingItem, setEditingItem] = React.useState<TransactionType | null>(null);
-    const [itemToDelete, setItemToDelete] = React.useState<TransactionType | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<TransactionType | null>(null);
+    const [itemToDelete, setItemToDelete] = useState<TransactionType | null>(null);
     
-    const [itemName, setItemName] = React.useState('');
-    const [itemActivityType, setItemActivityType] = React.useState('');
-    const [selectedDepartments, setSelectedDepartments] = React.useState<string[]>([]);
+    const [itemName, setItemName] = useState('');
+    const [itemActivityType, setItemActivityType] = useState('');
+    const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
     
-    const [isSaving, setIsSaving] = React.useState(false);
-    const [searchQuery, setSearchQuery] = React.useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     
-    const departmentsMap = React.useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
-    const departmentOptions = React.useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
+    const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
+    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
 
-    const filteredTransactionTypes = React.useMemo(() => {
+    const filteredTransactionTypes = useMemo(() => {
         if (!searchQuery) return transactionTypes;
         return transactionTypes.filter(type => 
             type.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1326,10 +1324,10 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = React.useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkStages'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkStages'>('dashboard');
 
-    const [counts, setCounts] = React.useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionWorkStages: 0 });
-    const [loadingCounts, setLoadingCounts] = React.useState(true);
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionWorkStages: 0 });
+    const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
@@ -1338,7 +1336,7 @@ export function ReferenceDataManager() {
     const { data: transactionTypes, loading: transactionTypesLoading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
 
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (!firestore) return;
 
         const fetchCounts = async () => {
