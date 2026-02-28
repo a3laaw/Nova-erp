@@ -440,6 +440,8 @@ export type PurchaseOrder = {
     projectId?: string;
     items: { internalItemId?: string; itemName: string; quantity: number; unitPrice: number; total: number; }[];
     totalAmount: number;
+    discountAmount?: number;
+    deliveryFees?: number;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
     rfqId?: string;
     supplierQuotationId?: string;
@@ -559,7 +561,7 @@ export type InventoryAdjustment = {
     id?: string;
     adjustmentNumber: string;
     date: any;
-    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'other';
+    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'purchase_return' | 'sales_return' | 'transfer' | 'other';
     journalEntryId?: string;
     items: any[];
     projectId?: string;

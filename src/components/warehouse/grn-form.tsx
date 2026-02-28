@@ -262,7 +262,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     };
                 });
 
-                // FIX: Store the journalEntryId in the GRN document
                 transaction.set(newGrnRef, cleanFirestoreData({
                     grnNumber, 
                     purchaseOrderId: data.purchaseOrderId, 
