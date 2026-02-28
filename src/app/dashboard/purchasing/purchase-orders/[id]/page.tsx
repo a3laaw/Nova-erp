@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, getDocs, collection, query, where, deleteField, writeBatch } from 'firebase/firestore';
 import type { PurchaseOrder } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -92,14 +93,11 @@ export default function PurchaseOrderDetailPage() {
         
         setIsUpdating(true);
         try {
-            // Simplified query to check for any linked GRNs
             const grnsQuery = query(
                 collection(firestore, 'grns'), 
                 where('purchaseOrderId', '==', po.id)
             );
             const grnsSnap = await getDocs(grnsQuery);
-            
-            // Filter non-cancelled GRNs in memory to avoid needing a composite index
             const activeGrns = grnsSnap.docs.filter(d => d.data().status !== 'cancelled');
             
             if (activeGrns.length > 0) {
