@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -62,7 +61,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'rfqs': 'طلبات التسعير',
     'vendors': 'الموردون',
     'grns': 'أذونات الاستلام',
-    'material-issue': 'صرف المواد',
+    'material-issue': 'صرف مواد المشاريع',
+    'sales-deliveries': 'مبيعات المعرض',
     'transfers': 'التحويلات',
     'warehouses': 'المستودعات',
     'delayed-stages': 'المهام المتأخرة',

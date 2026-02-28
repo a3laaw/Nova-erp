@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -27,7 +26,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 
-export function MaterialIssueList() {
+interface MaterialIssueListProps {
+    filterType?: 'project_site' | 'direct_sale';
+}
+
+export function MaterialIssueList({ filterType }: MaterialIssueListProps) {
   const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
@@ -35,10 +38,16 @@ export function MaterialIssueList() {
   const [itemToDelete, setItemToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const issueQuery = useMemo(() => [
-    where('type', '==', 'material_issue'),
-    orderBy('date', 'desc')
-  ], []);
+  const issueQuery = useMemo(() => {
+    const constraints = [
+        where('type', '==', 'material_issue'),
+        orderBy('date', 'desc')
+    ];
+    if (filterType) {
+        constraints.push(where('issueType', '==', filterType));
+    }
+    return constraints;
+  }, [filterType]);
 
   const { data: issues, loading } = useSubscription<InventoryAdjustment>(firestore, 'inventoryAdjustments', issueQuery);
 
@@ -65,9 +74,9 @@ export function MaterialIssueList() {
     setIsDeleting(true);
     try {
         await deleteDoc(doc(firestore, 'inventoryAdjustments', itemToDelete.id!));
-        toast({ title: 'نجاح', description: 'تم حذف إذن الصرف بنجاح.' });
+        toast({ title: 'نجاح', description: 'تم حذف السجل بنجاح.' });
     } catch (error) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الإذن.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف السجل.' });
     } finally {
         setIsDeleting(false);
         setItemToDelete(null);
@@ -91,11 +100,11 @@ export function MaterialIssueList() {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>رقم الإذن</TableHead>
+                        <TableHead>رقم السند</TableHead>
                         <TableHead>التاريخ</TableHead>
+                        <TableHead>الجهة المستلمة</TableHead>
                         <TableHead>عدد الأصناف</TableHead>
-                        <TableHead className="text-left">القيمة المصروفة</TableHead>
-                        <TableHead>الملاحظات</TableHead>
+                        <TableHead className="text-left">القيمة الإجمالية</TableHead>
                         <TableHead className="w-[80px]"><span className="sr-only">الإجراءات</span></TableHead>
                     </TableRow>
                 </TableHeader>
@@ -103,7 +112,7 @@ export function MaterialIssueList() {
                     {filteredIssues.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                {loading ? <Loader2 className="animate-spin mx-auto h-6 w-6 text-primary" /> : 'لا توجد أذونات صرف مسجلة.'}
+                                {loading ? <Loader2 className="animate-spin mx-auto h-6 w-6 text-primary" /> : 'لا توجد سجلات مسجلة.'}
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -120,22 +129,28 @@ export function MaterialIssueList() {
                                                             <AlertCircle className="h-4 w-4 text-red-600" />
                                                         </TooltipTrigger>
                                                         <TooltipContent>
-                                                            <p>خلل مالي: لا يوجد قيد تكلفة مرتبط بهذا الصرف.</p>
+                                                            <p>خلل مالي: لا يوجد قيد تكلفة مرتبط بهذا الإذن.</p>
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
                                             )}
-                                            <Link href={`/dashboard/warehouse/material-issue/${issue.id}`} className="hover:underline">
+                                            <Link href={issue.issueType === 'direct_sale' ? `/dashboard/sales/invoices/${issue.id}` : `/dashboard/warehouse/material-issue/${issue.id}`} className="hover:underline">
                                                 {issue.adjustmentNumber}
                                             </Link>
                                         </div>
                                     </TableCell>
                                     <TableCell>{formatDate(issue.date)}</TableCell>
+                                    <TableCell>
+                                        {issue.issueType === 'project_site' ? (
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700">مشروع موقع</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="bg-purple-50 text-purple-700">مبيعات معرض</Badge>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{issue.items?.length || 0}</TableCell>
                                     <TableCell className="text-left font-mono font-semibold">
-                                        {formatCurrency(issue.items?.reduce((sum, i) => sum + i.totalCost, 0) || 0)}
+                                        {formatCurrency(issue.items?.reduce((sum, i) => sum + (i.totalCost || 0), 0) || 0)}
                                     </TableCell>
-                                    <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{issue.notes || '-'}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -143,7 +158,7 @@ export function MaterialIssueList() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl">
                                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/material-issue/${issue.id}`)}>
+                                                <DropdownMenuItem onClick={() => router.push(issue.issueType === 'direct_sale' ? `/dashboard/sales/invoices/${issue.id}` : `/dashboard/warehouse/material-issue/${issue.id}`)}>
                                                     <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => setItemToDelete(issue)} className="text-destructive">
@@ -163,8 +178,8 @@ export function MaterialIssueList() {
         <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>تأكيد حذف إذن الصرف؟</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم حذف سجل إذن الصرف من النظام. يرجى التأكد من أن هذا الإجراء لا يؤثر على موازنة المشروع.</AlertDialogDescription>
+                    <AlertDialogTitle>تأكيد الحذف؟</AlertDialogTitle>
+                    <AlertDialogDescription>سيتم حذف السجل من النظام. يرجى التأكد من أن هذا الإجراء لا يؤثر على موازنة المشاريع أو حسابات العملاء.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>

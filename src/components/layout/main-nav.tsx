@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -125,7 +124,7 @@ const navItems = {
       hrefPrefix: '/dashboard/sales',
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/warehouse/material-issue', label: 'فواتير المبيعات / التسليم', icon: Receipt },
+        { href: '/dashboard/warehouse/sales-deliveries', label: 'فواتير المبيعات / التسليم', icon: Receipt },
         { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
       ]
     },
@@ -137,6 +136,7 @@ const navItems = {
       children: [
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات', icon: ClipboardList },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: HardHat },
         { href: '/dashboard/construction/subcontractors/certificates/new', label: 'شهادة إنجاز مقاول (تكلفة)', icon: FileCheck },
         { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص (إيراد)', icon: Coins },
@@ -182,7 +182,6 @@ const navItems = {
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
