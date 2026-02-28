@@ -14,9 +14,9 @@ export default function GrnsPage() {
                     <div>
                         <CardTitle className="flex items-center gap-2">
                             <FileCheck className="text-primary" />
-                            أذونات استلام المواد (GRN)
+                            استلام بضاعة (GRN)
                         </CardTitle>
-                        <CardDescription>متابعة عمليات التوريد الواردة من الموردين وتأكيد دخولها للمخازن.</CardDescription>
+                        <CardDescription>إثبات وصول المواد للمخازن بناءً على أوامر الشراء المعتمدة.</CardDescription>
                     </div>
                     <Button asChild size="sm">
                         <Link href="/dashboard/warehouse/grns/new">
