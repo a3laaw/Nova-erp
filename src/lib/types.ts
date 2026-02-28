@@ -247,3 +247,13 @@ export interface LetterOfCredit {
     notes?: string;
     createdAt: any;
 }
+
+export interface ConstructionWorkStage {
+    id?: string;
+    name: string;
+    description?: string;
+    parentId: string | null;
+    order?: number;
+    activityTypeIds?: string[];
+    createdAt?: any;
+}
