@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
 interface Anomaly {
-  type: 'inventory' | 'accounting' | 'payroll';
+  type: 'inventory' | 'accounting' | 'payroll' | 'construction';
   title: string;
   count: number;
   description: string;
@@ -37,42 +38,61 @@ export function DataAnomalyAlert() {
       const grnsSnap = await getDocs(collection(firestore, 'grns'));
       const orphanedGrns = grnsSnap.docs.filter(doc => {
         const data = doc.data();
-        // إذن استلام بضاعة يملك ID قيد ولكن القيد غير موجود فعلياً
-        return data.journalEntryId && !allJeIds.has(data.journalEntryId);
+        // خلل إذا لم يوجد ID قيد أو القيد غير موجود فعلياً
+        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
       });
 
       if (orphanedGrns.length > 0) {
         foundAnomalies.push({
           type: 'inventory',
-          title: 'خلل في قيود المخزون',
+          title: 'خلل في قيود استلام البضاعة',
           count: orphanedGrns.length,
-          description: `تم اكتشاف ${orphanedGrns.length} إذن استلام بضاعة تم حذف قيودها المحاسبية، مما يسبب عدم تطابق بين رصيد المخزن والحسابات العامة.`,
+          description: `يوجد ${orphanedGrns.length} إذن استلام بضاعة (GRN) لا تملك أثراً مالياً في الدفاتر، مما يعني أن كميات المخزون زادت دون إثبات مديونية الموردين.`,
           link: '/dashboard/warehouse/grns'
         });
       }
 
-      // 3. فحص فجوات سندات القبض
+      // 3. فحص فجوات صرف المواد للمشاريع
+      const adjustmentsSnap = await getDocs(collection(firestore, 'inventoryAdjustments'));
+      const orphanedIssues = adjustmentsSnap.docs.filter(doc => {
+        const data = doc.data();
+        // التركيز على أذونات الصرف فقط
+        if (data.type !== 'material_issue') return false;
+        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
+      });
+
+      if (orphanedIssues.length > 0) {
+        foundAnomalies.push({
+          type: 'inventory',
+          title: 'خلل في قيود صرف المواد',
+          count: orphanedIssues.length,
+          description: `يوجد ${orphanedIssues.length} إذن صرف مواد للمواقع تم حذف قيود تكلفتها، مما يسبب تضارباً في تكاليف المشاريع الفعلية.`,
+          link: '/dashboard/warehouse/material-issue'
+        });
+      }
+
+      // 4. فحص فجوات سندات القبض
       const receiptsSnap = await getDocs(collection(firestore, 'cashReceipts'));
       const orphanedReceipts = receiptsSnap.docs.filter(doc => {
         const data = doc.data();
-        return data.journalEntryId && !allJeIds.has(data.journalEntryId);
+        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
       });
 
       if (orphanedReceipts.length > 0) {
         foundAnomalies.push({
           type: 'accounting',
-          title: 'خلل في قيود التحصيل',
+          title: 'خلل في قيود تحصيل العملاء',
           count: orphanedReceipts.length,
-          description: `يوجد سندات قبض بدون قيود مالية مقابلة في الدفاتر، مما يعني أن مديونيات العملاء المسجلة غير دقيقة.`,
+          description: `يوجد ${orphanedReceipts.length} سند قبض بدون قيود محاسبية، مديونيات العملاء في التقارير قد تكون غير دقيقة.`,
           link: '/dashboard/accounting/cash-receipts'
         });
       }
 
-      // 4. فحص فجوات سندات الصرف
+      // 5. فحص فجوات سندات الصرف
       const paymentsSnap = await getDocs(collection(firestore, 'paymentVouchers'));
       const orphanedPayments = paymentsSnap.docs.filter(doc => {
         const data = doc.data();
-        return data.journalEntryId && !allJeIds.has(data.journalEntryId);
+        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
       });
 
       if (orphanedPayments.length > 0) {
@@ -80,7 +100,7 @@ export function DataAnomalyAlert() {
           type: 'accounting',
           title: 'خلل في قيود المصروفات',
           count: orphanedPayments.length,
-          description: `يوجد سندات صرف تم حذف قيودها، مما يسبب تضارباً في أرصدة البنوك والمصروفات الإدارية.`,
+          description: `يوجد ${orphanedPayments.length} سند صرف تم حذف قيودها، أرصدة الخزينة والبنوك قد تكون غير مطابقة للواقع.`,
           link: '/dashboard/accounting/payment-vouchers'
         });
       }
@@ -107,7 +127,7 @@ export function DataAnomalyAlert() {
           <ShieldAlert className="h-5 w-5 !text-red-600" />
           <AlertTitle className="font-black text-red-700 dark:text-red-400 flex items-center justify-between">
             <span className="flex items-center gap-2">تنبيه خلل في سلامة البيانات: {anomaly.title}</span>
-            <Badge variant="destructive" className="animate-pulse">خطير</Badge>
+            <Badge variant="destructive" className="animate-pulse">إجراء مطلوب</Badge>
           </AlertTitle>
           <AlertDescription className="text-red-600 dark:text-red-300 mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <p className="max-w-xl font-medium leading-relaxed">{anomaly.description}</p>

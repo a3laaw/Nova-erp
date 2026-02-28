@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -11,10 +12,10 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
-import { orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { Search, Loader2, MoreHorizontal, Eye, Trash2 } from 'lucide-react';
+import { Search, Loader2, MoreHorizontal, Eye, Trash2, AlertCircle } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -23,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function GrnList() {
   const { firestore } = useFirebase();
@@ -31,9 +33,18 @@ export function GrnList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [existingJeIds, setExistingJeIds] = useState<Set<string>>(new Set());
 
   const queryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
   const { data: grns, loading } = useSubscription<any>(firestore, 'grns', queryConstraints);
+
+  // فحص القيود المحاسبية الموجودة لتمييز الإذونات التي بها خلل
+  useEffect(() => {
+    if (!firestore) return;
+    getDocs(collection(firestore, 'journalEntries')).then(snap => {
+        setExistingJeIds(new Set(snap.docs.map(d => d.id)));
+    });
+  }, [firestore, grns]);
 
   const filteredGrns = useMemo(() => {
     if (!grns) return [];
@@ -91,7 +102,7 @@ export function GrnList() {
                         <TableHead>رقم الإذن (GRN)</TableHead>
                         <TableHead>المورد</TableHead>
                         <TableHead>التاريخ</TableHead>
-                        <TableHead>{'عدد الأصناف'}</TableHead>
+                        <TableHead>الأصناف</TableHead>
                         <TableHead className="text-left">إجمالي القيمة</TableHead>
                         <TableHead className="w-[80px]"><span className="sr-only">الإجراءات</span></TableHead>
                     </TableRow>
@@ -104,37 +115,54 @@ export function GrnList() {
                             </TableCell>
                         </TableRow>
                     ) : (
-                        filteredGrns.map((grn) => (
-                            <TableRow key={grn.id}>
-                                <TableCell className="font-mono font-bold">
-                                    <Link href={`/dashboard/warehouse/grns/${grn.id}`} className="text-primary hover:underline">
-                                        {grn.grnNumber}
-                                    </Link>
-                                </TableCell>
-                                <TableCell className="font-medium">{grn.vendorName}</TableCell>
-                                <TableCell>{formatDate(grn.date)}</TableCell>
-                                <TableCell>{grn.itemsReceived?.length || 0}</TableCell>
-                                <TableCell className="text-left font-mono font-semibold">
-                                    {formatCurrency(grn.totalValue || 0)}
-                                </TableCell>
-                                <TableCell>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" dir="rtl">
-                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/grns/${grn.id}`)}>
-                                                <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setItemToDelete(grn)} className="text-destructive">
-                                                <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))
+                        filteredGrns.map((grn) => {
+                            const hasIntegrityError = !grn.journalEntryId || !existingJeIds.has(grn.journalEntryId);
+                            return (
+                                <TableRow key={grn.id} className={cn(hasIntegrityError && "bg-red-50/30 hover:bg-red-50/50")}>
+                                    <TableCell className="font-mono font-bold">
+                                        <div className="flex items-center gap-2">
+                                            {hasIntegrityError && (
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <AlertCircle className="h-4 w-4 text-red-600" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>خلل مالي: لا يوجد قيد محاسبي مرتبط بهذا الإذن.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
+                                            <Link href={`/dashboard/warehouse/grns/${grn.id}`} className="text-primary hover:underline">
+                                                {grn.grnNumber}
+                                            </Link>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="font-medium">{grn.vendorName}</TableCell>
+                                    <TableCell>{formatDate(grn.date)}</TableCell>
+                                    <TableCell>{grn.itemsReceived?.length || 0}</TableCell>
+                                    <TableCell className="text-left font-mono font-semibold">
+                                        {formatCurrency(grn.totalValue || 0)}
+                                    </TableCell>
+                                    <TableCell>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" dir="rtl">
+                                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/grns/${grn.id}`)}>
+                                                    <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setItemToDelete(grn)} className="text-destructive">
+                                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })
                     )}
                 </TableBody>
             </Table>
@@ -144,7 +172,7 @@ export function GrnList() {
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
                     <AlertDialogTitle>حذف إذن الاستلام؟</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم حذف الإذن فقط، ولن يتم التراجع عن الحركات المخزنية أو المحاسبية آلياً. يفضل عمل "تسوية" بدلاً من الحذف.</AlertDialogDescription>
+                    <AlertDialogDescription>سيتم حذف سجل الإذن نهائياً. يرجى التأكد من أنك قمت بمسح القيد المحاسبي المرتبط إذا كان موجوداً يدوياً.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>

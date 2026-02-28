@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -11,11 +12,11 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
-import { orderBy, where, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, where, doc, deleteDoc } from 'firebase/firestore';
 import type { InventoryAdjustment } from '@/lib/types';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
-import { Search, Loader2, MoreHorizontal, Eye, Trash2 } from 'lucide-react';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Search, Loader2, MoreHorizontal, Eye, Trash2, AlertCircle } from 'lucide-react';
 import { Input } from '../ui/input';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
@@ -23,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function MaterialIssueList() {
   const { firestore } = useFirebase();
@@ -31,6 +33,7 @@ export function MaterialIssueList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [existingJeIds, setExistingJeIds] = useState<Set<string>>(new Set());
 
   const issueQuery = useMemo(() => [
     where('type', '==', 'material_issue'),
@@ -38,6 +41,13 @@ export function MaterialIssueList() {
   ], []);
 
   const { data: issues, loading } = useSubscription<InventoryAdjustment>(firestore, 'inventoryAdjustments', issueQuery);
+
+  useEffect(() => {
+    if (!firestore) return;
+    getDocs(collection(firestore, 'journalEntries')).then(snap => {
+        setExistingJeIds(new Set(snap.docs.map(d => d.id)));
+    });
+  }, [firestore, issues]);
 
   const filteredIssues = useMemo(() => {
     if (!issues) return [];
@@ -101,36 +111,54 @@ export function MaterialIssueList() {
                             </TableCell>
                         </TableRow>
                     ) : (
-                        filteredIssues.map((issue) => (
-                            <TableRow key={issue.id}>
-                                <TableCell className="font-mono font-bold text-primary">
-                                    <Link href={`/dashboard/warehouse/material-issue/${issue.id}`} className="hover:underline">
-                                        {issue.adjustmentNumber}
-                                    </Link>
-                                </TableCell>
-                                <TableCell>{formatDate(issue.date)}</TableCell>
-                                <TableCell>{issue.items?.length || 0}</TableCell>
-                                <TableCell className="text-left font-mono font-semibold">
-                                    {formatCurrency(issue.items?.reduce((sum, i) => sum + i.totalCost, 0) || 0)}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{issue.notes || '-'}</TableCell>
-                                <TableCell>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" dir="rtl">
-                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/material-issue/${issue.id}`)}>
-                                                <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setItemToDelete(issue)} className="text-destructive">
-                                                <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))
+                        filteredIssues.map((issue) => {
+                            const hasIntegrityError = !issue.journalEntryId || !existingJeIds.has(issue.journalEntryId);
+                            return (
+                                <TableRow key={issue.id} className={cn(hasIntegrityError && "bg-red-50/30 hover:bg-red-50/50")}>
+                                    <TableCell className="font-mono font-bold text-primary">
+                                        <div className="flex items-center gap-2">
+                                            {hasIntegrityError && (
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <AlertCircle className="h-4 w-4 text-red-600" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>خلل مالي: لا يوجد قيد تكلفة مرتبط بهذا الصرف.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            )}
+                                            <Link href={`/dashboard/warehouse/material-issue/${issue.id}`} className="hover:underline">
+                                                {issue.adjustmentNumber}
+                                            </Link>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{formatDate(issue.date)}</TableCell>
+                                    <TableCell>{issue.items?.length || 0}</TableCell>
+                                    <TableCell className="text-left font-mono font-semibold">
+                                        {formatCurrency(issue.items?.reduce((sum, i) => sum + i.totalCost, 0) || 0)}
+                                    </TableCell>
+                                    <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">{issue.notes || '-'}</TableCell>
+                                    <TableCell>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" dir="rtl">
+                                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/material-issue/${issue.id}`)}>
+                                                    <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setItemToDelete(issue)} className="text-destructive">
+                                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })
                     )}
                 </TableBody>
             </Table>
@@ -139,7 +167,7 @@ export function MaterialIssueList() {
         <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>تأكيد الحذف؟</AlertDialogTitle>
+                    <AlertDialogTitle>تأكيد حذف إذن الصرف؟</AlertDialogTitle>
                     <AlertDialogDescription>سيتم حذف سجل إذن الصرف من النظام. يرجى التأكد من أن هذا الإجراء لا يؤثر على موازنة المشروع.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
