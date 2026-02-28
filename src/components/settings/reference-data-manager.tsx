@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -27,7 +28,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen, GitBranch } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen, GitBranch, LayoutGrid } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -250,6 +251,7 @@ function ManagerView({
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
   const isBoqView = primaryCollectionName === 'boqReferenceItems';
+  const isRecursiveSecondary = secondaryCollectionName === 'stages' && primaryCollectionName === 'construction_types';
   const isRecursiveView = primaryCollectionName === 'constructionWorkStages' || isBoqView;
 
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
@@ -407,7 +409,7 @@ function ManagerView({
         }
         setIsPrimaryDialogOpen(true);
     } else {
-        setParentCategory(null);
+        setParentCategory(parent);
         setItemName(item?.name || '');
         if (isWorkStageView) {
             setItemRoles(item?.allowedRoles || []);
@@ -468,6 +470,9 @@ function ManagerView({
                 parentId: parentCategory?.id || null,
                 parentBoqReferenceItemId: primaryCollectionName === 'boqReferenceItems' ? (parentCategory?.id || null) : undefined,
            };
+       }
+       if (isRecursiveSecondary && type === 'secondary') {
+           dataToSave.parentId = parentCategory?.id || null;
        }
        if (isWorkStageView && type === 'secondary') {
           dataToSave.stageType = itemStageType;
@@ -758,6 +763,38 @@ function ManagerView({
         return roots;
     }, [primaryItems, isRecursiveView]);
 
+    const recursiveSecondaryTree = useMemo(() => {
+        if (!secondaryItems || !isRecursiveSecondary) return [];
+        const items = secondaryItems;
+        const map = new Map<string, any>();
+        const roots: any[] = [];
+
+        items.forEach(item => {
+            map.set(item.id!, { ...item, children: [] });
+        });
+
+        items.forEach(item => {
+            const pId = item.parentId;
+            if (pId && map.has(pId)) {
+                map.get(pId)!.children.push(map.get(item.id!)!);
+            } else {
+                roots.push(map.get(item.id!)!);
+            }
+        });
+
+        const sortRecursive = (nodes: any[]) => {
+            nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
+            nodes.forEach(node => {
+                if (node.children && node.children.length > 0) {
+                    sortRecursive(node.children);
+                }
+            });
+        };
+        sortRecursive(roots);
+
+        return roots;
+    }, [secondaryItems, isRecursiveSecondary]);
+
     const primaryOptions = useMemo(() => {
         if (!primaryItems) return [];
         return primaryItems
@@ -878,6 +915,22 @@ function ManagerView({
                     </div>
                     <ScrollArea className="h-72 border rounded-md">
                         {loadingSecondary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : !selectedPrimary ? <div className='text-center text-muted-foreground p-4'>...</div> : secondaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+                        isRecursiveSecondary ? (
+                            <div className="p-2">
+                                {recursiveSecondaryTree.map(node => (
+                                    <RecursiveTreeItem
+                                        key={node.id}
+                                        node={node}
+                                        level={0}
+                                        onEdit={item => openDialog('secondary', item)}
+                                        onDelete={item => openDeleteDialog(item, 'secondary')}
+                                        onAddSub={parent => openDialog('secondary', null, parent)}
+                                        openCategories={openCategories}
+                                        setOpenCategories={setOpenCategories}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
                         secondaryItems.map((item) => (
                             <div key={item.id} className="flex justify-between items-center p-2 rounded-md hover:bg-muted/50">
                                 <div className="flex items-center gap-2 flex-wrap">
@@ -903,9 +956,9 @@ function ManagerView({
                             </div>
                             </div>
                         ))
-                        )}
+                        ))}
                     </ScrollArea>
-                    {isSecondaryOrderChanged && (
+                    {isSecondaryOrderChanged && !isRecursiveSecondary && (
                         <div className="flex justify-end mt-2">
                             <Button size="sm" onClick={() => handleSaveOrder('secondary')}>
                                 <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
@@ -938,7 +991,7 @@ function ManagerView({
                 <ScrollArea className="max-h-[70vh]">
                     <div className="py-4 px-2 space-y-6">
                         <div className="px-4 grid gap-2">
-                             {parentCategory && isPrimaryDialogOpen && (
+                             {parentCategory && (
                                 <div className="grid gap-2 mb-4">
                                     <Label>البند الأب</Label>
                                     <Input value={parentCategory.name} disabled readOnly />
@@ -1324,9 +1377,9 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
 
 // --- Main Component (Router) ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkStages'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkflow'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionWorkStages: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionTypes: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -1342,7 +1395,7 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap, boqRefItemsSnap, constrStagesSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap, boqRefItemsSnap, constrTypesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
                     getDocs(query(collectionGroup(firestore, 'jobs'))),
@@ -1353,7 +1406,7 @@ export function ReferenceDataManager() {
                     getDocs(query(collectionGroup(firestore, 'specializations'))),
                     getDocs(query(collection(firestore, 'companyActivityTypes'))),
                     getDocs(query(collection(firestore, 'boqReferenceItems'))),
-                    getDocs(query(collection(firestore, 'constructionWorkStages'))),
+                    getDocs(query(collection(firestore, 'construction_types'))),
                 ]);
 
                 setCounts({
@@ -1367,7 +1420,7 @@ export function ReferenceDataManager() {
                     subcontractorSpecializations: subSpecsSnap.size,
                     companyActivityTypes: companyActivityTypesSnap.size,
                     boqReferenceItems: boqRefItemsSnap.size,
-                    constructionWorkStages: constrStagesSnap.size,
+                    constructionTypes: constrTypesSnap.size,
                 });
 
             } catch (error) {
@@ -1471,15 +1524,16 @@ export function ReferenceDataManager() {
         />
     }
 
-    if (view === 'constructionWorkStages') {
+    if (view === 'constructionWorkflow') {
         return <ManagerView
-            primaryTitle="مراحل المقاولات"
-            primarySingularTitle="مرحلة عمل"
-            primaryCollectionName="constructionWorkStages"
-            icon={<GitBranch className="h-full w-full" />}
+            primaryTitle="أنواع المقاولات"
+            primarySingularTitle="نوع مقاولات"
+            primaryCollectionName="construction_types"
+            secondaryTitle="المراحل الشجرية"
+            secondarySingularTitle="مرحلة عمل"
+            secondaryCollectionName="stages"
+            icon={<LayoutGrid className="h-full w-full" />}
             onBack={() => setView('dashboard')}
-            companyActivityTypes={companyActivityTypes || []}
-            loadingCompanyActivityTypes={activityTypesLoading}
         />
     }
 
@@ -1550,10 +1604,10 @@ export function ReferenceDataManager() {
                     loading={loadingCounts} 
                 />
                 <StatCard 
-                    title="مكتبة مراحل المقاولات" 
-                    count={counts.constructionWorkStages} 
-                    icon={<GitBranch className="h-full w-full" />} 
-                    onNavigate={() => setView('constructionWorkStages')} 
+                    title="سير عمل المقاولات" 
+                    count={counts.constructionTypes} 
+                    icon={<LayoutGrid className="h-full w-full" />} 
+                    onNavigate={() => setView('constructionWorkflow')} 
                     color="blue" 
                     loading={loadingCounts} 
                 />

@@ -248,6 +248,12 @@ export interface LetterOfCredit {
     createdAt: any;
 }
 
+export interface ConstructionType {
+    id?: string;
+    name: string;
+    order?: number;
+}
+
 export interface ConstructionWorkStage {
     id?: string;
     name: string;
