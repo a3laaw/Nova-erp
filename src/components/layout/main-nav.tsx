@@ -78,7 +78,8 @@ import {
   Star,
   Store,
   FileStack,
-  Coins
+  Coins,
+  Calculator
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -102,25 +103,19 @@ import {
 
 const navItems = {
   ar: [
-    { href: '/dashboard', label: 'لوحة التحكم', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'لوحة التحكم العامة', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
-      label: 'إدارة علاقات العملاء (CRM)', 
+      label: 'علاقات العملاء (CRM)', 
       icon: LineChart, 
       roles: ['Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
-        { 
-          label: 'تقارير المتابعة',
-          icon: ClipboardCheck,
-          children: [
-            { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: Clock },
-            { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: Hourglass },
-            { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
-            { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ShoppingBag },
-          ]
-        },
+        { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: Clock },
+        { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: Hourglass },
+        { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
+        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ShoppingBag },
       ]
     },
     { 
@@ -135,7 +130,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'المقاولات',
+      label: 'المقاولات والمنشآت',
       icon: Construction,
       roles: ['Admin', 'Engineer'],
       hrefPrefix: '/dashboard/construction',
@@ -150,39 +145,24 @@ const navItems = {
     { 
       label: 'المحاسبة والمالية', 
       icon: Wallet, 
-      roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
+      roles: ['Admin', 'Accountant', 'Secretary'],
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
-        {
-          label: 'العمليات المالية',
-          icon: CreditCard,
-          children: [
-            { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
-            { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
-            { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-            { href: '/dashboard/accounting/invoices', label: 'الفواتير الضريبية', icon: FileStack },
-          ]
-        },
-        {
-          label: 'التقارير والقوائم',
-          icon: BarChart3,
-          children: [
-            { href: '/dashboard/accounting/reports/daily-summary', label: 'التقرير اليومي', icon: CalendarDays },
-            { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: Scale },
-            { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: Book },
-            { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
-            { href: '/dashboard/accounting/vendor-statements', label: 'كشوفات الموردين', icon: Truck },
-            { href: '/dashboard/accounting/client-statements', label: 'مديونيات العملاء وتحصيلها', icon: Users },
-            { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
-            { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل', icon: TrendingUp },
-            { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
-          ]
-        }
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/invoices', label: 'الفواتير الضريبية', icon: FileStack },
+        { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: Scale },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: Book },
+        { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
+        { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: TrendingUp },
+        { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
+        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
       ]
     },
     { 
-      label: 'الموارد البشرية', 
+      label: 'شؤون الموظفين (HR)', 
       icon: HeartHandshake, 
       roles: ['Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
@@ -190,8 +170,9 @@ const navItems = {
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarX },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان', icon: Clock },
-        { href: '/dashboard/hr/payroll', label: 'كشوف الرواتب', icon: Banknote },
-        { href: '/dashboard/hr/reports', label: 'تقارير الموظفين', icon: FileBarChart },
+        { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة', icon: Calculator },
+        { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
     },
     { 
@@ -205,21 +186,11 @@ const navItems = {
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات والأفرع', icon: Building2 },
+        { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات', icon: Building2 },
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
-        { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },
-        { 
-          label: 'تقارير المخزون', 
-          icon: BarChart3,
-          children: [
-            { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
-            { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
-            { href: '/dashboard/warehouse/reports/item-cost', label: 'تكلفة وأسعار الأصناف', icon: DollarSign },
-            { href: '/dashboard/warehouse/reports/stagnant-items', label: 'الأصناف الراكدة', icon: TrendingDown },
-            { href: '/dashboard/warehouse/reports/best-sellers', label: 'الأصناف الأكثر طلباً', icon: Star },
-          ]
-        }
+        { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
       ]
     },
     { 
@@ -231,7 +202,8 @@ const navItems = {
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
         { href: '/dashboard/contracts', label: 'نماذج العقود', icon: FileSignature },
-        { href: '/dashboard/settings/classifications', label: 'الفئات', icon: Tags },
+        { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },
+        { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
       ]
     },
   ],
@@ -243,8 +215,8 @@ const navItems = {
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile, state: sidebarState } = useSidebar();
 
-  if (!item.roles || !item.roles.includes(userRole)) {
-    if (item.roles) return null;
+  if (item.roles && !item.roles.includes(userRole)) {
+    return null;
   }
 
   if (!item.children && item.href) {
@@ -400,7 +372,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
             <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-sm border" />
             <div className="flex flex-col">
               <span className="text-lg font-black tracking-tight text-primary leading-tight">{branding?.company_name || 'Nova ERP'}</span>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Business Suite</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Enterprise Suite</span>
             </div>
         </div>
       </SidebarHeader>

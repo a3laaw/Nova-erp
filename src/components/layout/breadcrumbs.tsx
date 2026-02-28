@@ -65,6 +65,16 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'material-issue': 'صرف المواد',
     'transfers': 'التحويلات',
     'warehouses': 'المستودعات',
+    'delayed-stages': 'المهام المتأخرة',
+    'stalled-stages': 'المراحل الخاملة',
+    'prospective-clients': 'تحليل المحتملين',
+    'upsell-opportunities': 'فرص بيع إضافية',
+    'construction': 'المقاولات',
+    'subcontractors': 'المقاولين',
+    'certificates': 'شهادات الإنجاز',
+    'payment-applications': 'المستخلصات',
+    'reconciliation': 'التسويات البنكية',
+    'sales': 'المبيعات',
   },
   en: {
     dashboard: 'Dashboard',
@@ -134,6 +144,7 @@ const getDynamicSegmentLabel = (parentSegment: string | undefined, lang: 'ar' | 
             case 'grns': return 'إذن استلام';
             case 'material-issue': return 'إذن صرف';
             case 'adjustments': return 'إذن تسوية';
+            case 'payment-applications': return 'تفاصيل المستخلص';
             default: return 'تفاصيل';
         }
     }
