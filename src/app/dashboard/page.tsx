@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Card,
@@ -28,8 +27,8 @@ export default function DashboardPage() {
   const totalClients = clients.length;
 
   return (
-    <div className="space-y-6">
-        {/* نظام تنبيهات الخلل وسلامة البيانات */}
+    <div className="space-y-6" dir="rtl">
+        {/* نظام تنبيهات الخلل وسلامة البيانات - يظهر فقط عند وجود مشاكل */}
         <DataAnomalyAlert />
 
         <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
