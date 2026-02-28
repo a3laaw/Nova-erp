@@ -1,13 +1,13 @@
+
 'use client';
 
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { GoodsReceiptNote, Warehouse } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Printer, ArrowRight, FileCheck, Package, Building2, Calendar } from 'lucide-react';
+import { Printer, ArrowRight, FileCheck, Package, Building2, Calendar, FileText } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -16,6 +16,7 @@ import { ar } from 'date-fns/locale';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import Link from 'next/link';
 
 export default function GrnDetailPage() {
     const params = useParams();
@@ -44,13 +45,20 @@ export default function GrnDetailPage() {
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto p-4 sm:p-6" dir="rtl">
-            <div className="flex justify-between items-center no-print">
+            <div className="flex justify-between items-center no-print bg-background/80 backdrop-blur-sm sticky top-0 z-10 py-4 border-b">
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2">
                     <ArrowRight className="h-4 w-4"/> العودة للقائمة
                 </Button>
-                <Button onClick={handlePrint} className="gap-2">
-                    <Printer className="h-4 w-4"/> طباعة إذن الاستلام
-                </Button>
+                <div className="flex gap-2">
+                    <Button asChild variant="outline" className="gap-2 rounded-xl border-blue-600 text-blue-700 hover:bg-blue-50">
+                        <Link href={`/dashboard/purchasing/invoices/${id}`}>
+                            <FileText className="h-4 w-4"/> عرض كفاتورة مشتريات
+                        </Link>
+                    </Button>
+                    <Button onClick={handlePrint} className="gap-2 rounded-xl">
+                        <Printer className="h-4 w-4"/> طباعة إذن الاستلام
+                    </Button>
+                </div>
             </div>
 
             <Card className="print:border-none shadow-lg rounded-2xl overflow-hidden bg-white dark:bg-card">

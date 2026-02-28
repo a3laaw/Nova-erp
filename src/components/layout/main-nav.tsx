@@ -76,7 +76,8 @@ import {
   DollarSign,
   TrendingDown,
   Star,
-  Store
+  Store,
+  FileStack
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -128,7 +129,7 @@ const navItems = {
       hrefPrefix: '/dashboard/sales',
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/warehouse/material-issue', label: 'أذونات تسليم المبيعات', icon: ArrowUpFromLine },
+        { href: '/dashboard/warehouse/material-issue', label: 'فواتير المبيعات / التسليم', icon: Receipt },
         { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
       ]
     },
@@ -157,7 +158,7 @@ const navItems = {
             { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
             { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
             { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-            { href: '/dashboard/accounting/invoices', label: 'الفواتير', icon: Receipt },
+            { href: '/dashboard/accounting/invoices', label: 'الفواتير الضريبية', icon: FileStack },
           ]
         },
         {
@@ -200,7 +201,7 @@ const navItems = {
         { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
-        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
+        { href: '/dashboard/warehouse/grns', label: 'فواتير المشتريات / الاستلام', icon: FileCheck },
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
         { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },

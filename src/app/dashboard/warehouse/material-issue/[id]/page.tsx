@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -7,7 +8,7 @@ import { doc } from 'firebase/firestore';
 import type { InventoryAdjustment, ConstructionProject } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Printer, ArrowRight, ArrowUpFromLine, Building2, Calendar, ClipboardList } from 'lucide-react';
+import { Printer, ArrowRight, ArrowUpFromLine, Building2, Calendar, ClipboardList, Receipt } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -16,6 +17,7 @@ import { ar } from 'date-fns/locale';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import Link from 'next/link';
 
 export default function MaterialIssueDetailPage() {
     const params = useParams();
@@ -41,16 +43,26 @@ export default function MaterialIssueDetailPage() {
     if (!issue || issue.type !== 'material_issue') return <div className="text-center p-20">لم يتم العثور على إذن الصرف.</div>;
 
     const issueDate = toFirestoreDate(issue.date);
+    const isDirectSale = !!issue.clientId;
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto p-4 sm:p-6" dir="rtl">
-            <div className="flex justify-between items-center no-print">
+            <div className="flex justify-between items-center no-print bg-background/80 backdrop-blur-sm sticky top-0 z-10 py-4 border-b">
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2">
                     <ArrowRight className="h-4 w-4"/> العودة للقائمة
                 </Button>
-                <Button onClick={handlePrint} className="gap-2">
-                    <Printer className="h-4 w-4"/> طباعة إذن الصرف
-                </Button>
+                <div className="flex gap-2">
+                    {isDirectSale && (
+                        <Button asChild variant="outline" className="gap-2 rounded-xl border-primary text-primary hover:bg-primary/5">
+                            <Link href={`/dashboard/sales/invoices/${id}`}>
+                                <Receipt className="h-4 w-4"/> عرض كفاتورة مبيعات
+                            </Link>
+                        </Button>
+                    )}
+                    <Button onClick={handlePrint} className="gap-2 rounded-xl">
+                        <Printer className="h-4 w-4"/> طباعة إذن الصرف
+                    </Button>
+                </div>
             </div>
 
             <Card className="print:border-none shadow-lg rounded-2xl overflow-hidden bg-white dark:bg-card">
@@ -66,7 +78,7 @@ export default function MaterialIssueDetailPage() {
                         </div>
                         <div className="text-left space-y-1">
                             <h2 className="text-2xl font-black text-orange-600 flex items-center gap-2">
-                                <ArrowUpFromLine className="h-6 w-6"/> إذن صرف مواد للموقع
+                                <ArrowUpFromLine className="h-6 w-6"/> {isDirectSale ? 'إذن تسليم مبيعات' : 'إذن صرف مواد للموقع'}
                             </h2>
                             <p className="font-mono text-sm font-bold">{issue.adjustmentNumber}</p>
                         </div>
@@ -78,8 +90,8 @@ export default function MaterialIssueDetailPage() {
                             <div className="flex items-center gap-3">
                                 <Building2 className="h-4 w-4 text-orange-600" />
                                 <div>
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">مركز التكلفة / المشروع:</p>
-                                    <p className="font-bold text-lg">مشروع إنشائي - تحميل على المقايسة</p>
+                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">الجهة المستلمة:</p>
+                                    <p className="font-bold text-lg">{isDirectSale ? 'تسليم مباشر لعميل معرض' : 'مشروع إنشائي - تحميل على المقايسة'}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -119,7 +131,7 @@ export default function MaterialIssueDetailPage() {
                                         <TableCell className="text-center font-mono text-xs">{idx + 1}</TableCell>
                                         <TableCell>
                                             <div className="font-bold">{item.itemName}</div>
-                                            <p className="text-[10px] text-muted-foreground">مرتبط ببند المقايسة المعتمد</p>
+                                            {item.boqItemId && <p className="text-[10px] text-muted-foreground">مرتبط ببند المقايسة المعتمد</p>}
                                         </TableCell>
                                         <TableCell className="text-center font-mono font-black text-lg text-orange-600">{item.quantity}</TableCell>
                                         <TableCell className="text-left font-mono">{formatCurrency(item.unitCost || 0)}</TableCell>
@@ -129,7 +141,7 @@ export default function MaterialIssueDetailPage() {
                             </TableBody>
                             <TableFooter>
                                 <TableRow className="bg-orange-50/50 h-16">
-                                    <TableCell colSpan={4} className="text-right px-8 font-black text-lg text-orange-800">إجمالي التكلفة المحملة على المشروع:</TableCell>
+                                    <TableCell colSpan={4} className="text-right px-8 font-black text-lg text-orange-800">إجمالي التكلفة المنصرفة:</TableCell>
                                     <TableCell className="text-left font-mono text-xl font-black text-orange-700 px-6">
                                         {formatCurrency(issue.items?.reduce((sum, i) => sum + i.totalCost, 0) || 0)}
                                     </TableCell>
@@ -145,7 +157,7 @@ export default function MaterialIssueDetailPage() {
                             <div className="pt-2 text-muted-foreground">التوقيع</div>
                         </div>
                         <div className="space-y-12">
-                            <p className="font-black border-b-2 border-foreground pb-2">المسؤول بالموقع (المستلم)</p>
+                            <p className="font-black border-b-2 border-foreground pb-2">المسؤول عن الاستلام</p>
                             <div className="pt-2 text-muted-foreground">التوقيع</div>
                         </div>
                         <div className="space-y-12">
