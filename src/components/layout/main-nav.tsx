@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -78,7 +79,9 @@ import {
   Store,
   FileStack,
   Coins,
-  Calculator
+  Calculator,
+  RotateCcw,
+  Landmark as BankIcon
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -125,7 +128,37 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/warehouse/sales-deliveries', label: 'فواتير المبيعات / التسليم', icon: Receipt },
+        { href: '/dashboard/warehouse/adjustments?type=sales_return', label: 'مردود مبيعات', icon: RotateCcw },
         { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
+      ]
+    },
+    { 
+      label: 'المشتريات',
+      icon: ShoppingCart,
+      roles: ['Admin', 'Accountant', 'Engineer'],
+      hrefPrefix: '/dashboard/purchasing',
+      children: [
+        { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي', icon: FileStack },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
+        { href: '/dashboard/warehouse/adjustments?type=purchase_return', label: 'مردود مشتريات', icon: RotateCcw },
+        { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },
+        { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: BankIcon },
+      ]
+    },
+    { 
+      label: 'المخازن والمستودعات',
+      icon: Warehouse,
+      roles: ['Admin', 'Accountant', 'Engineer'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
+        { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات', icon: Building2 },
+        { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
+        { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
+        { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
       ]
     },
     { 
@@ -173,23 +206,6 @@ const navItems = {
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
         { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة', icon: Calculator },
         { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
-      ]
-    },
-    { 
-      label: 'المخازن والمشتريات',
-      icon: Warehouse,
-      roles: ['Admin', 'Accountant', 'Engineer'],
-      hrefPrefix: '/dashboard/warehouse',
-      children: [
-        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
-        { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات', icon: Building2 },
-        { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
-        { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
-        { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
       ]
     },
     { 

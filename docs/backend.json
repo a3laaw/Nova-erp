@@ -27,6 +27,33 @@
         "isActive": { "type": "boolean" }
       }
     },
+    "PurchaseRequest": {
+      "title": "Purchase Request",
+      "description": "Internal request for materials before becoming a formal PO.",
+      "type": "object",
+      "properties": {
+        "requestNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "projectId": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "internalItemId": { "type": "string" },
+              "itemName": { "type": "string" },
+              "quantity": { "type": "number" },
+              "notes": { "type": "string" }
+            }
+          }
+        },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "converted"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requestNumber", "requesterId", "items", "status"]
+    },
     "ConstructionProject": {
       "title": "Construction Project",
       "description": "Represents an active construction site/project.",
@@ -41,38 +68,6 @@
         "boqId": { "type": "string" }
       }
     },
-    "BoqItem": {
-      "title": "Bill of Quantities Item",
-      "description": "A single line item in a BOQ with scheduling data.",
-      "type": "object",
-      "properties": {
-        "itemNumber": { "type": "string" },
-        "description": { "type": "string" },
-        "unit": { "type": "string" },
-        "quantity": { "type": "number" },
-        "sellingUnitPrice": { "type": "number" },
-        "isHeader": { "type": "boolean" },
-        "parentId": { "type": "string" },
-        "level": { "type": "number" },
-        "startDate": { "type": "string", "format": "date-time" },
-        "endDate": { "type": "string", "format": "date-time" }
-      }
-    },
-    "DailySiteReport": {
-      "title": "Daily Site Report",
-      "description": "Technical progress report submitted daily by the site engineer.",
-      "type": "object",
-      "properties": {
-        "projectId": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "engineerId": { "type": "string" },
-        "engineerName": { "type": "string" },
-        "workCompleted": { "type": "string" },
-        "photoUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["projectId", "date", "workCompleted"]
-    },
     "InventoryAdjustment": {
         "title": "Inventory Adjustment / Return",
         "description": "Records stock changes including sales and purchase returns.",
@@ -85,7 +80,8 @@
             "vendorId": { "type": "string" },
             "projectId": { "type": "string" },
             "warehouseId": { "type": "string" },
-            "journalEntryId": { "type": "string" }
+            "journalEntryId": { "type": "string" },
+            "items": { "type": "array", "items": { "type": "object" } }
         }
     }
   },
@@ -97,13 +93,13 @@
       "schema": { "$ref": "#/entities/CompanyBranding" },
       "description": "Stores company-wide settings."
     },
+    "/purchase_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/PurchaseRequest" },
+      "description": "Internal purchase requisitions."
+    },
     "/projects/{projectId}": {
       "schema": { "$ref": "#/entities/ConstructionProject" },
       "description": "Main projects collection."
-    },
-    "/boqs/{boqId}/items/{itemId}": {
-      "schema": { "$ref": "#/entities/BoqItem" },
-      "description": "BOQ items with scheduling."
     },
     "/inventoryAdjustments/{adjustmentId}": {
       "schema": { "$ref": "#/entities/InventoryAdjustment" },
