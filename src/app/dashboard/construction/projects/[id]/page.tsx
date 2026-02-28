@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle } from 'lucide-react';
+import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle, Coins } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -23,6 +23,7 @@ import { ProjectProcurementTab } from '@/components/construction/project-procure
 import { ProjectFinancialsTab } from '@/components/construction/project-financials-tab';
 import { DailyReportsList } from '@/components/construction/daily-reports-list';
 import { DailyReportForm } from '@/components/construction/daily-report-form';
+import { ProjectApplicationsTab } from '@/components/construction/project-applications-tab';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -31,18 +32,6 @@ const statusColors: Record<string, string> = {
     'معلق': 'bg-gray-100 text-gray-800',
     'ملغى': 'bg-red-100 text-red-800',
 };
-
-const StatCard = ({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) => (
-    <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            <div className="text-muted-foreground">{icon}</div>
-        </CardHeader>
-        <CardContent>
-            <div className="text-2xl font-bold">{value}</div>
-        </CardContent>
-    </Card>
-);
 
 export default function ProjectDetailPage() {
     const params = useParams();
@@ -63,17 +52,19 @@ export default function ProjectDetailPage() {
 
     const loading = projectLoading || clientLoading || engineerLoading;
     
-    const formatDate = (date: any, includeTime = false) => {
+    const formatDate = (date: any) => {
         const d = toFirestoreDate(date);
         if (!d) return '-';
-        return format(d, includeTime ? 'PPP p' : 'PPP', { locale: ar });
+        return format(d, 'PPP', { locale: ar });
     };
 
     const daysRemaining = useMemo(() => {
         if (!project?.endDate) return null;
         const endDate = toFirestoreDate(project.endDate);
         if (!endDate || !project || project.status !== 'قيد التنفيذ') return null;
-        return formatDistanceToNow(endDate, { addSuffix: true, locale: ar });
+        try {
+            return formatDistanceToNow(endDate, { addSuffix: true, locale: ar });
+        } catch { return null; }
     }, [project]);
 
     if (loading) {
@@ -145,16 +136,21 @@ export default function ProjectDetailPage() {
             </Card>
 
             <Tabs defaultValue="financials" className="w-full">
-                <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
-                    <TabsTrigger value="financials" className="gap-2 py-3 rounded-lg"><BarChart3 className="h-4 w-4"/> ملخص التكاليف</TabsTrigger>
-                    <TabsTrigger value="reports" className="gap-2 py-3 rounded-lg"><Camera className="h-4 w-4"/> تقارير التنفيذ</TabsTrigger>
-                    <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> جداول الكميات</TabsTrigger>
+                <TabsList className="grid grid-cols-2 md:grid-cols-6 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
+                    <TabsTrigger value="financials" className="gap-2 py-3 rounded-lg"><BarChart3 className="h-4 w-4"/> التكاليف</TabsTrigger>
+                    <TabsTrigger value="applications" className="gap-2 py-3 rounded-lg"><Coins className="h-4 w-4"/> المستخلصات</TabsTrigger>
+                    <TabsTrigger value="reports" className="gap-2 py-3 rounded-lg"><Camera className="h-4 w-4"/> التنفيذ</TabsTrigger>
+                    <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> المقايسة</TabsTrigger>
                     <TabsTrigger value="procurement" className="gap-2 py-3 rounded-lg"><ShoppingCart className="h-4 w-4"/> المشتريات</TabsTrigger>
                     <TabsTrigger value="subcontracts" className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="financials">
                     <ProjectFinancialsTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="applications">
+                    <ProjectApplicationsTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="reports" className="space-y-6">
