@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, runTransaction, doc, serverTimestamp, orderBy, updateDoc } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
+import type { RequestForQuotation, Vendor, SupplierQuotation, PurchaseOrder } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -33,7 +33,6 @@ interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
 }
 
-// ثوابت التحكم في الطباعة العرضية
 const VENDORS_PER_PAGE = 3; 
 
 export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
@@ -47,7 +46,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const [isReopening, setIsReopening] = useState(false);
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
-  // --- 1. جلب البيانات اللحظية ---
   const { data: allVendorsList, loading: vendorsLoading } = useSubscription<Vendor>(
     firestore, 
     'vendors', 
@@ -61,7 +59,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     quotesQuery
   );
 
-  // دمج الموردين المسجلين والمحتملين
   const allVendors = useMemo(() => {
     if (!allVendorsList) return [];
     const registered = allVendorsList.filter(v => rfq.vendorIds?.includes(v.id!));
@@ -69,7 +66,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     return [...registered, ...prospective];
   }, [allVendorsList, rfq.vendorIds, rfq.prospectiveVendors]);
 
-  // تقسيم الموردين لمجموعات للطباعة العرضية
   const vendorChunks = useMemo(() => {
     const chunks = [];
     for (let i = 0; i < allVendors.length; i += VENDORS_PER_PAGE) {
@@ -185,6 +181,12 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 const newPoRef = doc(collection(firestore, 'purchaseOrders'));
                 newPoIds.push(newPoRef.id);
 
+                // حساب الصافي: (مجموع البنود) - الخصم + التوصيل
+                // ملاحظة: إذا كانت الترسية جزئية، قد ترغب في توزيع الخصم والتوصيل تناسبياً، 
+                // ولكن للتبسيط سنعتبر الخصم والتوصيل يطبق بالكامل على المورد المختار.
+                const itemsSum = poItems.reduce((sum, i) => sum + i.total, 0);
+                const finalTotal = itemsSum - (quote.discountAmount || 0) + (quote.deliveryFees || 0);
+
                 transaction.set(newPoRef, {
                     poNumber,
                     orderDate: serverTimestamp(),
@@ -192,7 +194,9 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                     vendorName: vendorData.name,
                     projectId: rfq.projectId || null,
                     items: poItems,
-                    totalAmount: (poItems.reduce((sum, i) => sum + i.total, 0) - (quote.discountAmount || 0) + (quote.deliveryFees || 0)),
+                    totalAmount: finalTotal,
+                    discountAmount: quote.discountAmount || 0,
+                    deliveryFees: quote.deliveryFees || 0,
                     status: 'draft',
                     rfqId: rfq.id,
                     supplierQuotationId: quote.id,
@@ -296,7 +300,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         }
       `}} />
 
-      {/* وضع العرض في الشاشة */}
       <div className="no-print space-y-6">
         <div className="border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card">
           <Table className="w-full border-collapse table-auto">
@@ -403,7 +406,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
         </div>
       </div>
 
-      {/* وضع الطباعة المجزأ */}
       <div id="printable-multi-page-area" className="hidden print:block">
         {vendorChunks.map((chunk, chunkIndex) => (
           <div key={chunkIndex} className="print-page-container">

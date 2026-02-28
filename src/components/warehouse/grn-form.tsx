@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -131,7 +132,20 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
     const poOptions = useMemo(() => pos.map(p => ({ value: p.id!, label: `${p.poNumber} - ${p.vendorName}` })), [pos]);
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
-    const totalValue = useMemo(() => (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantityReceived) || 0) * (item.unitPrice || 0), 0), [watchedItems]);
+    
+    // حساب القيمة الإجمالية للاستلام الحالي مع مراعاة الخصم ورسوم التوصيل من أمر الشراء
+    const totalValue = useMemo(() => {
+        if (!selectedPo) return 0;
+        
+        const itemsTotal = (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantityReceived) || 0) * (item.unitPrice || 0), 0);
+        
+        // إذا كان الاستلام مكتملاً، نضيف كامل الخصم والرسوم. إذا كان جزئياً، نطبقها تناسبياً أو بالكامل حسب السياسة.
+        // هنا سنطبق كامل الخصم والرسوم لتطابق إجمالي مديونية المورد في أمر الشراء.
+        const discount = selectedPo.discountAmount || 0;
+        const delivery = selectedPo.deliveryFees || 0;
+        
+        return itemsTotal - discount + delivery;
+    }, [watchedItems, selectedPo]);
 
     const handleRegisterVendor = async () => {
         if (!selectedPo || !firestore) return;
@@ -144,7 +158,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
         setIsSaving(true);
         try {
-            // --- منع تكرار الهاتف عند التسجيل السريع ---
             const vendorsRef = collection(firestore, 'vendors');
             const phoneQuery = query(vendorsRef, where('phone', '==', phoneTrimmed));
             const phoneSnap = await getDocs(phoneQuery);
@@ -153,7 +166,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 toast({ 
                     variant: 'destructive', 
                     title: 'رقم مكرر', 
-                    description: 'رقم الهاتف هذا مسجل بالفعل لمورد آخر في النظام. يرجى استخدامه أو تعديل البيانات.' 
+                    description: 'رقم الهاتف هذا مسجل بالفعل لمورد آخر في النظام.' 
                 });
                 setIsSaving(false);
                 return;
@@ -204,25 +217,12 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 ]);
 
                 let inventoryAcc = allAccounts.find(a => a.code === '1104');
-                let vendorsParentAcc = allAccounts.find(a => a.code === '2101');
                 let vendorAcc = allAccounts.find(a => a.name === selectedPo.vendorName && a.parentCode === '2101');
 
                 const nextGrnNumber = ((grnCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const grnNumber = `GRN-${currentYear}-${String(nextGrnNumber).padStart(4, '0')}`;
                 
                 let nextVendorNum = coaVendorCounterDoc.data()?.lastNumber || 0;
-
-                if (!inventoryAcc) {
-                    const newInvRef = doc(accountsRef);
-                    inventoryAcc = { id: newInvRef.id, code: '1104', name: 'المخزون', type: 'asset', level: 2, parentCode: '11', isPayable: false, statement: 'Balance Sheet', balanceType: 'Debit' };
-                    transaction.set(newInvRef, inventoryAcc);
-                }
-
-                if (!vendorsParentAcc) {
-                    const newVenPRef = doc(accountsRef);
-                    vendorsParentAcc = { id: newVenPRef.id, code: '2101', name: 'الموردون', type: 'liability', level: 2, parentCode: '21', isPayable: true, statement: 'Balance Sheet', balanceType: 'Credit' };
-                    transaction.set(newVenPRef, vendorsParentAcc);
-                }
 
                 if (!vendorAcc) {
                     nextVendorNum++;
@@ -243,12 +243,13 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     createdAt: serverTimestamp(), createdBy: currentUser.id,
                 }));
 
+                // القيد المحاسبي بالصافي (التكلفة الواصلة)
                 transaction.set(newJournalEntryRef, cleanFirestoreData({
                     entryNumber: `JE-${grnNumber}`, date: data.date,
-                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName}`,
+                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} (شامل الخصومات والتوصيل)`,
                     status: 'posted', totalDebit: totalValue, totalCredit: totalValue,
                     lines: [
-                        { accountId: inventoryAcc.id!, accountName: inventoryAcc.name, debit: totalValue, credit: 0 },
+                        { accountId: inventoryAcc!.id!, accountName: inventoryAcc!.name, debit: totalValue, credit: 0 },
                         { accountId: vendorAcc.id!, accountName: vendorAcc.name, debit: 0, credit: totalValue }
                     ],
                     createdAt: serverTimestamp(), createdBy: currentUser.id,
@@ -260,7 +261,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.update(doc(firestore, 'purchaseOrders', data.purchaseOrderId), { status: isFullyReceived ? 'received' : 'partially_received' });
             });
 
-            toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية آلياً.' });
+            toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية بالصافي النهائي.' });
             router.push('/dashboard/warehouse/grns');
         } catch (error: any) {
             console.error("GRN Transaction Error:", error);
@@ -321,7 +322,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     <AlertTriangle className="h-5 w-5" />
                     <AlertTitle className="font-black text-lg">المورد غير مسجل في النظام!</AlertTitle>
                     <AlertDescription className="space-y-4">
-                        <p>لا يمكن إتمام عملية الاستلام وإصدار قيد مالي لمورد "محتمل". يجب عليك أولاً إكمال بيانات المورد (خاصة رقم الهاتف) وتحويله لمورد رسمي لمنع تكرار الحسابات المحاسبية.</p>
+                        <p>لا يمكن إتمام عملية الاستلام وإصدار قيد مالي لمورد "محتمل". يجب عليك أولاً إكمال بيانات المورد وتحويله لمورد رسمي لمنع تكرار الحسابات المحاسبية.</p>
                         <Button type="button" onClick={() => setIsRegistrationDialogOpen(true)} className="bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl gap-2">
                             <UserPlus className="h-4 w-4" /> إكمال بيانات المورد الآن
                         </Button>
@@ -331,14 +332,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
             {fields.length > 0 && !isProspectiveVendor && (
                 <div className="space-y-4">
-                    <Alert variant="default" className="bg-blue-50 border-blue-200">
-                        <Info className="h-4 w-4 text-blue-600" />
-                        <AlertTitle className="text-blue-800 font-bold">تعليمات الاستلام الجزئي</AlertTitle>
-                        <AlertDescription className="text-blue-700 text-xs">
-                            يمكنك تعديل "الكمية الحالية" إذا لم يتم توريد كامل البند. سيقوم النظام بحفظ الباقي للاستلام لاحقاً.
-                        </AlertDescription>
-                    </Alert>
-
                     <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
                         <Table>
                             <TableHeader className="bg-muted/50">
@@ -374,8 +367,20 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                                 })}
                             </TableBody>
                             <TableFooter className="bg-primary/5">
+                                {selectedPo && (selectedPo.discountAmount > 0 || selectedPo.deliveryFees > 0) && (
+                                    <>
+                                        <TableRow className="bg-green-50/50">
+                                            <TableCell colSpan={4} className="text-right px-12 text-sm font-bold text-green-700">(-) خصم مكتسب من المورد:</TableCell>
+                                            <TableCell className="text-left font-mono font-bold text-green-700 px-8 border-r">{formatCurrency(selectedPo.discountAmount)}</TableCell>
+                                        </TableRow>
+                                        <TableRow className="bg-red-50/50">
+                                            <TableCell colSpan={4} className="text-right px-12 text-sm font-bold text-red-700">(+) رسوم توصيل بضاعة:</TableCell>
+                                            <TableCell className="text-left font-mono font-bold text-red-700 px-8 border-r">{formatCurrency(selectedPo.deliveryFees)}</TableCell>
+                                        </TableRow>
+                                    </>
+                                )}
                                 <TableRow className="h-24 border-t-4 border-primary/20">
-                                    <TableCell colSpan={4} className="text-right px-12 font-black text-2xl">إجمالي القيمة المالية المستلمة:</TableCell>
+                                    <TableCell colSpan={4} className="text-right px-12 font-black text-2xl">إجمالي مديونية المورد (الصافي):</TableCell>
                                     <TableCell className="text-left font-mono text-3xl font-black text-primary px-8 border-r bg-primary/5">
                                         {formatCurrency(totalValue)}
                                     </TableCell>
@@ -394,14 +399,13 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             </div>
         </form>
 
-        {/* حوار تسجيل المورد */}
         <Dialog open={isRegistrationDialogOpen} onOpenChange={setIsRegistrationDialogOpen}>
             <DialogContent dir="rtl" className="rounded-3xl max-w-lg">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-black flex items-center gap-2">
                         <ShieldCheck className="text-green-600" /> تسجيل بيانات المورد الرسمي
                     </DialogTitle>
-                    <DialogDescription>يجب إكمال بيانات المورد: <span className="font-bold text-foreground">{selectedPo?.vendorName}</span> للمتابعة المحاسبية.</DialogDescription>
+                    <DialogDescription>يجب إكمال بيانات المورد للمتابعة المحاسبية.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                     <div className="grid gap-2">
@@ -410,11 +414,11 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     </div>
                     <div className="grid gap-2">
                         <Label>جهة الاتصال</Label>
-                        <Input value={vendorData.contactPerson} onChange={e => setVendorData(p => ({...p, contactPerson: e.target.value}))} placeholder="اسم الشخص المسؤول عند المورد..." />
+                        <Input value={vendorData.contactPerson} onChange={e => setVendorData(p => ({...p, contactPerson: e.target.value}))} placeholder="اسم الشخص المسؤول..." />
                     </div>
                     <div className="grid gap-2">
                         <Label>عنوان الشركة</Label>
-                        <Textarea value={vendorData.address} onChange={e => setVendorData(p => ({...p, address: e.target.value}))} placeholder="المقر الرئيسي أو فرع التوريد..." />
+                        <Textarea value={vendorData.address} onChange={e => setVendorData(p => ({...p, address: e.target.value}))} placeholder="المقر الرئيسي..." />
                     </div>
                 </div>
                 <DialogFooter className="gap-2">
