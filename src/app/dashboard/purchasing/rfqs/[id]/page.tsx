@@ -1,10 +1,11 @@
+
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, where, updateDoc, arrayUnion, orderBy } from 'firebase/firestore';
-import type { RequestForQuotation, Vendor, SupplierQuotation } from '@/lib/types';
+import { doc, collection, query, where, updateDoc, arrayUnion, orderBy, writeBatch, getDocs, deleteField } from 'firebase/firestore';
+import type { RequestForQuotation, Vendor, SupplierQuotation, PurchaseOrder } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -54,46 +55,80 @@ export default function RfqDetailsPage() {
     const rfqRef = useMemo(() => (firestore && id ? doc(firestore, 'rfqs', id) : null), [firestore, id]);
     const { data: rfq, loading: rfqLoading } = useDocument<RequestForQuotation>(firestore, rfqRef ? rfqRef.path : null);
 
-    // 2. اشتراك لحظي في جميع الموردين للمطابقة
+    // 2. اشتراك لحظي في جميع الموردين
     const { data: allSystemVendors, loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
 
-    // 3. اشتراك لحظي في عروض الأسعار المرتبطة بهذا الطلب
-    const quotesQuery = useMemo(() => {
-        if (!firestore || !id) return [];
-        return [where('rfqId', '==', id)];
-    }, [firestore, id]);
-    const { data: supplierQuotations, loading: quotesLoading } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations', quotesQuery);
+    // 3. اشتراك لحظي في عروض الأسعار
+    const quotesQuery = useMemo(() => [where('rfqId', '==', id)], [id]);
+    const { data: supplierQuotations } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations', quotesQuery);
 
-    // 4. دمج الموردين (المسجلين والمحتملين) بشكل تفاعلي
     const displayVendors = useMemo(() => {
         if (!rfq || !allSystemVendors) return [];
-        
         const registered = allSystemVendors.filter(v => rfq.vendorIds?.includes(v.id!));
         const prospective = rfq.prospectiveVendors || [];
-        
         return [...registered, ...prospective];
     }, [rfq, allSystemVendors]);
     
+    const handleReopenRfq = async () => {
+        if (!rfqRef || !firestore || !rfq) return;
+
+        setIsUpdatingStatus(true);
+        try {
+            // الرقابة الصارمة: التحقق من وجود بضاعة مستلمة مرتبطة
+            const poIds = rfq.awardedPoIds || [];
+            if (poIds.length > 0) {
+                const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', 'in', poIds));
+                const grnsSnap = await getDocs(grnsQuery);
+                const activeGrns = grnsSnap.docs.filter(d => d.data().status !== 'cancelled');
+
+                if (activeGrns.length > 0) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'منع التراجع الرقابي',
+                        description: 'لا يمكن التراجع عن الترسية بعد أن تم استلام بضاعة للمخزن فعلياً. يجب إلغاء أذونات الاستلام أولاً.'
+                    });
+                    setIsUpdatingStatus(false);
+                    return;
+                }
+            }
+
+            const batch = writeBatch(firestore);
+            
+            // 1. حذف أوامر الشراء التي لم يتم توريدها
+            poIds.forEach(poId => {
+                batch.delete(doc(firestore, 'purchaseOrders', poId));
+            });
+
+            // 2. تصفير بيانات الترسية وإعادة فتح الطلب
+            batch.update(rfqRef, {
+                status: 'sent',
+                awardedVendorId: deleteField(),
+                awardedPoIds: deleteField(),
+                awardedItems: deleteField()
+            });
+
+            await batch.commit();
+            toast({ title: 'تم التراجع عن الترسية', description: 'تم حذف أوامر الشراء غير المنفذة وإعادة فتح الطلب للمقارنة.' });
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الترسية.' });
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
     const handleChangeStatus = async (newStatus: RequestForQuotation['status']) => {
         if (!rfqRef) return;
-
-        // الرقابة: منع الإغلاق إذا لم توجد عروض أسعار
         if (newStatus === 'closed' && supplierQuotations.length === 0) {
-            toast({
-                variant: 'destructive',
-                title: 'لا يمكن البدء بالمقارنة',
-                description: 'يجب إضافة عرض سعر واحد على الأقل من الموردين قبل إغلاق باب التقديم والبدء في الترسية.'
-            });
+            toast({ variant: 'destructive', title: 'منع الإغلاق', description: 'يجب إضافة عرض سعر واحد على الأقل قبل الإغلاق.' });
             return;
         }
-
         setIsUpdatingStatus(true);
         try {
             await updateDoc(rfqRef, { status: newStatus });
             toast({ title: 'تحديث الحالة', description: `تم تغيير حالة الطلب إلى ${statusTranslations[newStatus]}.` });
         } catch (e) {
-            console.error("Failed to update status", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الطلب.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث الحالة.' });
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -101,23 +136,17 @@ export default function RfqDetailsPage() {
 
     const handleAddVendor = async (type: 'registered' | 'prospective') => {
         if (!rfqRef) return;
-        
         setIsAddingVendor(true);
         try {
             if (type === 'registered') {
                 if (!newVendorId) return;
-                await updateDoc(rfqRef, {
-                    vendorIds: arrayUnion(newVendorId)
-                });
+                await updateDoc(rfqRef, { vendorIds: arrayUnion(newVendorId) });
             } else {
                 if (!prospectiveName.trim()) return;
                 const tempId = `prospective-${Math.random().toString(36).substring(2, 9)}`;
-                await updateDoc(rfqRef, {
-                    prospectiveVendors: arrayUnion({ id: tempId, name: prospectiveName.trim() })
-                });
+                await updateDoc(rfqRef, { prospectiveVendors: arrayUnion({ id: tempId, name: prospectiveName.trim() }) });
             }
-            
-            toast({ title: 'تمت الإضافة', description: 'تمت إضافة المورد للطلب بنجاح.' });
+            toast({ title: 'نجاح', description: 'تمت إضافة المورد للطلب.' });
             setIsAddVendorOpen(false);
             setNewVendorId('');
             setProspectiveName('');
@@ -130,38 +159,22 @@ export default function RfqDetailsPage() {
 
     const vendorOptions = useMemo(() => {
         const existingIds = new Set(rfq?.vendorIds || []);
-        return (allSystemVendors || [])
-            .filter(v => !existingIds.has(v.id!))
-            .map(v => ({ value: v.id!, label: v.name }));
+        return (allSystemVendors || []).filter(v => !existingIds.has(v.id!)).map(v => ({ value: v.id!, label: v.name }));
     }, [allSystemVendors, rfq?.vendorIds]);
 
-    const loading = rfqLoading || vendorsLoading;
-
-    if (loading) {
-        return (
-            <div className="space-y-6" dir="rtl">
-                <Skeleton className="h-32 w-full rounded-2xl" />
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <Skeleton className="h-64 w-full rounded-2xl" />
-                    <Skeleton className="h-64 w-full rounded-2xl" />
-                    <Skeleton className="h-64 w-full rounded-2xl" />
-                </div>
-            </div>
-        );
-    }
-    
+    if (rfqLoading || vendorsLoading) return <div className="space-y-6" dir="rtl"><Skeleton className="h-32 w-full rounded-2xl" /><div className="grid md:grid-cols-3 gap-6"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div></div>;
     if (!rfq) return <div className="text-center py-20 text-muted-foreground">لم يتم العثور على طلب التسعير.</div>;
 
     const safeDate = toFirestoreDate(rfq.date);
 
     return (
         <div className="space-y-6" dir="rtl">
-             <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+             <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50">
                 <CardHeader>
                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div className="space-y-2">
                             <div className="flex items-center gap-3">
-                                <CardTitle className="text-3xl font-black text-foreground flex items-center gap-2">
+                                <CardTitle className="text-3xl font-black flex items-center gap-2">
                                     <FileText className="text-primary"/>
                                     {`طلب تسعير #${rfq.rfqNumber}`}
                                 </CardTitle>
@@ -178,49 +191,42 @@ export default function RfqDetailsPage() {
                                 </Button>
                             )}
                             {rfq.status === 'sent' && (
-                                <Button 
-                                    onClick={() => handleChangeStatus('closed')} 
-                                    disabled={isUpdatingStatus} 
-                                    className={cn(
-                                        "bg-green-600 hover:bg-green-700 gap-2 rounded-xl font-bold shadow-lg",
-                                        supplierQuotations.length === 0 ? "opacity-50" : "shadow-green-200"
-                                    )}
-                                >
+                                <Button onClick={() => handleChangeStatus('closed')} disabled={isUpdatingStatus} className="bg-green-600 hover:bg-green-700 gap-2 rounded-xl font-bold shadow-lg shadow-green-100">
                                     <XCircle className="h-4 w-4" /> إغلاق وبدء المقارنة
                                 </Button>
                             )}
                             {rfq.status === 'closed' && (
                                 <>
-                                    <Button onClick={() => handleChangeStatus('sent')} disabled={isUpdatingStatus} variant="outline" className="gap-2 rounded-xl font-bold border-orange-200 text-orange-700 hover:bg-orange-50">
-                                        <Undo2 className="h-4 w-4" /> إعادة فتح لاستلام العروض
+                                    <Button onClick={handleReopenRfq} disabled={isUpdatingStatus} variant="outline" className="gap-2 rounded-xl font-bold border-orange-200 text-orange-700 hover:bg-orange-50">
+                                        {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4" />}
+                                        تراجع عن الترسية وإعادة الفتح
                                     </Button>
                                     <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2 rounded-xl font-bold">
                                         <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
-                                            <BarChart className="h-4 w-4" /> مصفوفة المقارنة والترسية
+                                            <BarChart className="h-4 w-4" /> مصفوفة المقارنة
                                         </Link>
                                     </Button>
                                 </>
                             )}
-                            <Button variant="ghost" onClick={() => router.back()} className="gap-2 rounded-xl"><ArrowRight className="h-4 w-4"/> العودة</Button>
+                            <Button variant="ghost" onClick={() => router.back()} className="gap-2"><ArrowRight className="h-4 w-4"/> العودة</Button>
                          </div>
                     </div>
                 </CardHeader>
                  <CardContent>
-                    <div className="p-4 bg-white/50 dark:bg-muted/20 rounded-xl border flex flex-col md:flex-row justify-between gap-4">
+                    <div className="p-4 bg-white/50 rounded-xl border flex flex-col md:flex-row justify-between gap-4">
                         <div className="flex-grow">
-                            <h3 className="text-sm font-bold text-muted-foreground mb-3">الأصناف المطلوبة للتحليل:</h3>
+                            <h3 className="text-sm font-bold text-muted-foreground mb-3">الأصناف المطلوبة:</h3>
                             <div className="flex flex-wrap gap-2">
                                 {rfq.items.map(item => (
-                                    <Badge key={item.id} variant="secondary" className="px-3 py-1 text-xs font-bold bg-background border shadow-sm">
+                                    <Badge key={item.id} variant="secondary" className="bg-background border shadow-sm">
                                         {item.itemName} ({item.quantity})
                                     </Badge>
                                 ))}
                             </div>
                         </div>
                         {rfq.status !== 'closed' && (
-                            <Button variant="outline" className="rounded-xl border-dashed border-primary/50 text-primary hover:bg-primary/5 gap-2 h-auto py-3" onClick={() => setIsAddVendorOpen(true)}>
-                                <UserPlus className="h-5 w-5" />
-                                إضافة مورد إضافي للطلب
+                            <Button variant="outline" className="rounded-xl border-dashed border-primary/50 text-primary gap-2 h-auto py-3" onClick={() => setIsAddVendorOpen(true)}>
+                                <UserPlus className="h-5 w-5" /> إضافة مورد
                             </Button>
                         )}
                     </div>
@@ -229,80 +235,46 @@ export default function RfqDetailsPage() {
 
             <div className="flex items-center gap-3 mb-2">
                 <GanttChartSquare className="text-primary h-6 w-6" />
-                <h3 className="text-xl font-black">عروض أسعار الموردين المستلمة</h3>
+                <h3 className="text-xl font-black">عروض أسعار الموردين</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {displayVendors.map(vendor => {
-                    const existingQuote = supplierQuotations.find(q => q.vendorId === vendor.id);
-                    return (
-                        <SupplierQuotationCard 
-                            key={vendor.id}
-                            rfq={rfq}
-                            vendor={vendor}
-                            existingQuote={existingQuote}
-                        />
-                    )
+                    const existingQuote = supplierQuotations?.find(q => q.vendorId === vendor.id);
+                    return <SupplierQuotationCard key={vendor.id} rfq={rfq} vendor={vendor} existingQuote={existingQuote} />;
                 })}
-                {!loading && displayVendors.length === 0 && (
-                    <div className="col-span-full h-48 flex flex-col items-center justify-center border-2 border-dashed rounded-[2rem] bg-muted/5 opacity-40">
-                        <Search className="h-12 w-12 mb-2" />
-                        <p className="font-bold">لا يوجد موردون حالياً، أضف مورد لبدء التسعير.</p>
-                    </div>
-                )}
             </div>
 
-            {/* Add Vendor Dialog */}
             <Dialog open={isAddVendorOpen} onOpenChange={setIsAddVendorOpen}>
                 <DialogContent dir="rtl" className="rounded-2xl max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>إضافة مورد لطلب التسعير</DialogTitle>
-                        <DialogDescription>يمكنك اختيار مورد مسجل من النظام أو إدخال مورد محتمل جديد لهذا الطلب فقط.</DialogDescription>
+                        <DialogTitle>إضافة مورد للطلب</DialogTitle>
+                        <DialogDescription>اختر مورد مسجل أو أدخل بيانات مورد محتمل جديد.</DialogDescription>
                     </DialogHeader>
-                    
                     <Tabs defaultValue="registered" className="py-4">
-                        <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                        <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="registered">مورد مسجل</TabsTrigger>
                             <TabsTrigger value="prospective">مورد محتمل</TabsTrigger>
                         </TabsList>
-                        
                         <TabsContent value="registered" className="space-y-4 pt-4">
                             <div className="grid gap-2">
-                                <Label className="font-bold">اختر المورد من القائمة:</Label>
-                                <InlineSearchList 
-                                    value={newVendorId}
-                                    onSelect={setNewVendorId}
-                                    options={vendorOptions}
-                                    placeholder="ابحث باسم المورد..."
-                                    className="h-12 rounded-xl"
-                                />
+                                <Label>اختر المورد:</Label>
+                                <InlineSearchList value={newVendorId} onSelect={setNewVendorId} options={vendorOptions} placeholder="ابحث..." />
                             </div>
-                            <Button onClick={() => handleAddVendor('registered')} disabled={!newVendorId || isAddingVendor} className="w-full h-12 rounded-xl font-bold">
-                                {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <PlusCircle className="h-4 w-4 ml-2"/>}
-                                إضافة المورد المختار
+                            <Button onClick={() => handleAddVendor('registered')} disabled={!newVendorId || isAddingVendor} className="w-full h-12 rounded-xl">
+                                {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <PlusCircle className="h-4 w-4 ml-2"/>} إضافة المورد
                             </Button>
                         </TabsContent>
-                        
                         <TabsContent value="prospective" className="space-y-4 pt-4">
                             <div className="grid gap-2">
-                                <Label className="font-bold">اسم المورد المحتمل:</Label>
-                                <Input 
-                                    value={prospectiveName} 
-                                    onChange={(e) => setProspectiveName(e.target.value)} 
-                                    placeholder="ادخل اسم الشركة أو المورد..." 
-                                    className="h-12 rounded-xl border-2"
-                                />
+                                <Label>اسم المورد المحتمل:</Label>
+                                <Input value={prospectiveName} onChange={(e) => setProspectiveName(e.target.value)} placeholder="اسم الشركة..." />
                             </div>
-                            <Button onClick={() => handleAddVendor('prospective')} disabled={!prospectiveName.trim() || isAddingVendor} className="w-full h-12 rounded-xl font-bold bg-orange-600 hover:bg-orange-700">
-                                {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <UserSearch className="h-4 w-4 ml-2"/>}
-                                إضافة كمورد محتمل
+                            <Button onClick={() => handleAddVendor('prospective')} disabled={!prospectiveName.trim() || isAddingVendor} className="w-full h-12 rounded-xl bg-orange-600">
+                                {isAddingVendor ? <Loader2 className="h-4 w-4 animate-spin ml-2"/> : <UserSearch className="h-4 w-4 ml-2"/>} إضافة محتمل
                             </Button>
                         </TabsContent>
                     </Tabs>
-                    
-                    <DialogFooter className="mt-4">
-                        <Button variant="ghost" onClick={() => setIsAddVendorOpen(false)} disabled={isAddingVendor}>إلغاء</Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

@@ -5,18 +5,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, RefreshCw, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
 interface Anomaly {
-  type: 'inventory' | 'accounting' | 'payroll' | 'construction';
+  type: 'inventory' | 'accounting' | 'procurement';
   title: string;
   count: number;
   description: string;
   link: string;
+  variant: 'destructive' | 'warning';
 }
 
 export function DataAnomalyAlert() {
@@ -30,78 +31,62 @@ export function DataAnomalyAlert() {
     const foundAnomalies: Anomaly[] = [];
 
     try {
-      // 1. جلب كافة القيود المحاسبية للمقارنة
+      // جلب البيانات اللازمة للفحص
       const jesSnap = await getDocs(collection(firestore, 'journalEntries'));
       const allJeIds = new Set(jesSnap.docs.map(d => d.id));
+      
+      const rfqsSnap = await getDocs(collection(firestore, 'rfqs'));
+      const allRfqIds = new Set(rfqsSnap.docs.map(d => d.id));
 
-      // 2. فحص فجوات المخزون (GRNs vs JEs)
+      // 1. فحص فجوات المخزون (GRNs vs JEs)
       const grnsSnap = await getDocs(collection(firestore, 'grns'));
       const orphanedGrns = grnsSnap.docs.filter(doc => {
         const data = doc.data();
-        // خلل إذا لم يوجد ID قيد أو القيد غير موجود فعلياً
         return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
       });
 
       if (orphanedGrns.length > 0) {
         foundAnomalies.push({
           type: 'inventory',
-          title: 'خلل في قيود استلام البضاعة',
+          title: 'خلل مالي في استلام البضاعة',
           count: orphanedGrns.length,
-          description: `يوجد ${orphanedGrns.length} إذن استلام بضاعة (GRN) لا تملك أثراً مالياً في الدفاتر، مما يعني أن كميات المخزون زادت دون إثبات مديونية الموردين.`,
-          link: '/dashboard/warehouse/grns'
+          description: `يوجد ${orphanedGrns.length} إذن استلام بضاعة لا يملك أثراً مالياً، مما يسبب تضارباً في أرصدة الموردين والمخزون.`,
+          link: '/dashboard/warehouse/grns',
+          variant: 'destructive'
         });
       }
 
-      // 3. فحص فجوات صرف المواد للمشاريع
-      const adjustmentsSnap = await getDocs(collection(firestore, 'inventoryAdjustments'));
-      const orphanedIssues = adjustmentsSnap.docs.filter(doc => {
+      // 2. فحص فجوات دورة المشتريات (أوامر شراء بدون طلب تسعير)
+      const posSnap = await getDocs(collection(firestore, 'purchaseOrders'));
+      const directPurchases = posSnap.docs.filter(doc => {
         const data = doc.data();
-        // التركيز على أذونات الصرف فقط
-        if (data.type !== 'material_issue') return false;
-        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
+        // خلل إجرائي: أمر شراء غير مرتبط بـ RFQ (شراء مباشر)
+        return !data.rfqId || !allRfqIds.has(data.rfqId);
       });
 
-      if (orphanedIssues.length > 0) {
+      if (directPurchases.length > 0) {
         foundAnomalies.push({
-          type: 'inventory',
-          title: 'خلل في قيود صرف المواد',
-          count: orphanedIssues.length,
-          description: `يوجد ${orphanedIssues.length} إذن صرف مواد للمواقع تم حذف قيود تكلفتها، مما يسبب تضارباً في تكاليف المشاريع الفعلية.`,
-          link: '/dashboard/warehouse/material-issue'
+          type: 'procurement',
+          title: 'تنبيه إجرائي: شراء مباشر',
+          count: directPurchases.length,
+          description: `يوجد ${directPurchases.length} أمر شراء تم إصدارها مباشرة دون طلب تسعير (RFQ). يرجى مراجعة مبررات الشراء المباشر.`,
+          link: '/dashboard/purchasing/purchase-orders',
+          variant: 'warning'
         });
       }
 
-      // 4. فحص فجوات سندات القبض
+      // 3. فحص فجوات سندات القبض
       const receiptsSnap = await getDocs(collection(firestore, 'cashReceipts'));
-      const orphanedReceipts = receiptsSnap.docs.filter(doc => {
-        const data = doc.data();
-        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
-      });
+      const orphanedReceipts = receiptsSnap.docs.filter(doc => !doc.data().journalEntryId || !allJeIds.has(doc.data().journalEntryId));
 
       if (orphanedReceipts.length > 0) {
         foundAnomalies.push({
           type: 'accounting',
-          title: 'خلل في قيود تحصيل العملاء',
+          title: 'خلل مالي في سندات القبض',
           count: orphanedReceipts.length,
-          description: `يوجد ${orphanedReceipts.length} سند قبض بدون قيود محاسبية، مديونيات العملاء في التقارير قد تكون غير دقيقة.`,
-          link: '/dashboard/accounting/cash-receipts'
-        });
-      }
-
-      // 5. فحص فجوات سندات الصرف
-      const paymentsSnap = await getDocs(collection(firestore, 'paymentVouchers'));
-      const orphanedPayments = paymentsSnap.docs.filter(doc => {
-        const data = doc.data();
-        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
-      });
-
-      if (orphanedPayments.length > 0) {
-        foundAnomalies.push({
-          type: 'accounting',
-          title: 'خلل في قيود المصروفات',
-          count: orphanedPayments.length,
-          description: `يوجد ${orphanedPayments.length} سند صرف تم حذف قيودها، أرصدة الخزينة والبنوك قد تكون غير مطابقة للواقع.`,
-          link: '/dashboard/accounting/payment-vouchers'
+          description: `يوجد ${orphanedReceipts.length} سند قبض لم يولّد قيداً محاسبياً، مما يؤدي لعدم تحديث مديونية العميل.`,
+          link: '/dashboard/accounting/cash-receipts',
+          variant: 'destructive'
         });
       }
 
@@ -121,22 +106,28 @@ export function DataAnomalyAlert() {
   if (anomalies.length === 0) return null;
 
   return (
-    <div className="space-y-3 mb-6 animate-in fade-in slide-in-from-top-4 duration-500 no-print" dir="rtl">
+    <div className="space-y-3 mb-6 no-print" dir="rtl">
       {anomalies.map((anomaly, idx) => (
-        <Alert key={idx} variant="destructive" className="border-2 border-red-500 bg-red-50 dark:bg-red-950/20 shadow-lg shadow-red-100">
-          <ShieldAlert className="h-5 w-5 !text-red-600" />
-          <AlertTitle className="font-black text-red-700 dark:text-red-400 flex items-center justify-between">
-            <span className="flex items-center gap-2">تنبيه خلل في سلامة البيانات: {anomaly.title}</span>
-            <Badge variant="destructive" className="animate-pulse">إجراء مطلوب</Badge>
+        <Alert 
+            key={idx} 
+            variant={anomaly.variant === 'destructive' ? 'destructive' : 'default'} 
+            className={cn(
+                "border-2 shadow-lg",
+                anomaly.variant === 'destructive' ? "bg-red-50 border-red-500 shadow-red-100" : "bg-amber-50 border-amber-500 shadow-amber-100"
+            )}
+        >
+          <ShieldAlert className={cn("h-5 w-5", anomaly.variant === 'destructive' ? "text-red-600" : "text-amber-600")} />
+          <AlertTitle className={cn("font-black flex items-center justify-between", anomaly.variant === 'destructive' ? "text-red-700" : "text-amber-700")}>
+            <span className="flex items-center gap-2">{anomaly.title}</span>
+            <Badge variant={anomaly.variant === 'destructive' ? 'destructive' : 'secondary'}>
+                {anomaly.variant === 'destructive' ? 'خلل مالي حاد' : 'ملاحظة إجرائية'}
+            </Badge>
           </AlertTitle>
-          <AlertDescription className="text-red-600 dark:text-red-300 mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <AlertDescription className={cn("mt-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4", anomaly.variant === 'destructive' ? "text-red-600" : "text-amber-700")}>
             <p className="max-w-xl font-medium leading-relaxed">{anomaly.description}</p>
             <div className="flex gap-2 shrink-0">
-                <Button variant="outline" size="sm" onClick={checkIntegrity} className="h-8 border-red-200 text-red-700 hover:bg-red-100">
-                    <RefreshCw className="h-3 w-3 ml-1" /> فحص مجدداً
-                </Button>
-                <Button asChild size="sm" className="h-8 bg-red-600 hover:bg-red-700 font-bold">
-                    <Link href={anomaly.link}>مراجعة وحل المشكلة ({anomaly.count})</Link>
+                <Button asChild size="sm" variant="outline" className="h-8 border-current bg-transparent">
+                    <Link href={anomaly.link}>مراجعة وحل ({anomaly.count})</Link>
                 </Button>
             </div>
           </AlertDescription>
@@ -144,4 +135,8 @@ export function DataAnomalyAlert() {
       ))}
     </div>
   );
+}
+
+function cn(...inputs: any[]) {
+    return inputs.filter(Boolean).join(' ');
 }
