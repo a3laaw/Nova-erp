@@ -171,9 +171,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         if (!firestore || !currentUser) return;
         
         const inventoryAccount = accounts.find(a => a.code === '1104');
-        
-        // Determine expense account based on issue type
-        // 5104 for Project Material, 5101 for COGS (Trading)
         const expenseCode = data.issueType === 'project_site' ? '5104' : '5101';
         const projectExpenseAccount = accounts.find(a => a.code === expenseCode) || accounts.find(a => a.code === '51');
 
@@ -325,7 +322,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                 />
                             )}
                         />
-                        {errors.projectId && <p className="text-xs text-destructive">{errors.projectId.message}</p>}
                     </div>
                 ) : (
                     <div className="grid gap-2">
@@ -343,7 +339,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                 />
                             )}
                         />
-                        {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
                     </div>
                 )}
                 <div className="grid gap-2">
@@ -361,7 +356,6 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                             />
                         )}
                     />
-                    {errors.warehouseId && <p className="text-xs text-destructive">{errors.warehouseId.message}</p>}
                 </div>
                 <div className="grid gap-2">
                     <Label className="font-bold">تاريخ الصرف</Label>
@@ -392,7 +386,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const lineItem = watchedItems?.[index];
-                                const lineTotal = (Number(lineItem?.quantity) || 0) * (Number(lineItem?.unitCost) || 0);
+                                const lineTotal = (Number(lineItem?.quantity) || 0) * (Number(lineItem?.unitPrice) || 0);
                                 const allowedItems = getFilteredItemOptions(lineItem?.boqItemId);
 
                                 return (
@@ -473,7 +467,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
 
             <div className="grid gap-3">
                 <Label htmlFor="notes" className="font-bold text-muted-foreground pr-2">ملاحظات الإذن</Label>
-                <Textarea id="notes" {...register('notes')} placeholder="تفاصيل إضافية عن التسليم أو الحالة..." className="rounded-2xl border-2" rows={3}/>
+                <Textarea id="notes" {...register('notes')} placeholder="تفاصيل إضافية..." className="rounded-2xl border-2" rows={3}/>
             </div>
 
             <div className="flex justify-end gap-4 pt-8 border-t">

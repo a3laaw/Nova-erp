@@ -41,6 +41,23 @@
         "boqId": { "type": "string" }
       }
     },
+    "BoqItem": {
+      "title": "Bill of Quantities Item",
+      "description": "A single line item in a BOQ with scheduling data.",
+      "type": "object",
+      "properties": {
+        "itemNumber": { "type": "string" },
+        "description": { "type": "string" },
+        "unit": { "type": "string" },
+        "quantity": { "type": "number" },
+        "sellingUnitPrice": { "type": "number" },
+        "isHeader": { "type": "boolean" },
+        "parentId": { "type": "string" },
+        "level": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" }
+      }
+    },
     "DailySiteReport": {
       "title": "Daily Site Report",
       "description": "Technical progress report submitted daily by the site engineer.",
@@ -50,14 +67,26 @@
         "date": { "type": "string", "format": "date-time" },
         "engineerId": { "type": "string" },
         "engineerName": { "type": "string" },
-        "workCompleted": { "type": "string", "description": "Detailed description of work done today." },
-        "workersCount": { "type": "number", "description": "Number of workers on site today." },
-        "encounteredIssues": { "type": "string", "description": "Any blockers or technical problems." },
+        "workCompleted": { "type": "string" },
         "photoUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
-        "weatherStatus": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["projectId", "date", "workCompleted", "workersCount"]
+      "required": ["projectId", "date", "workCompleted"]
+    },
+    "InventoryAdjustment": {
+        "title": "Inventory Adjustment / Return",
+        "description": "Records stock changes including sales and purchase returns.",
+        "type": "object",
+        "properties": {
+            "adjustmentNumber": { "type": "string" },
+            "date": { "type": "string", "format": "date-time" },
+            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "material_issue", "purchase_return", "sales_return", "transfer", "other"] },
+            "clientId": { "type": "string" },
+            "vendorId": { "type": "string" },
+            "projectId": { "type": "string" },
+            "warehouseId": { "type": "string" },
+            "journalEntryId": { "type": "string" }
+        }
     }
   },
   "auth": {
@@ -72,9 +101,13 @@
       "schema": { "$ref": "#/entities/ConstructionProject" },
       "description": "Main projects collection."
     },
-    "/projects/{projectId}/daily_reports/{reportId}": {
-      "schema": { "$ref": "#/entities/DailySiteReport" },
-      "description": "Daily technical reports for a specific project."
+    "/boqs/{boqId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/BoqItem" },
+      "description": "BOQ items with scheduling."
+    },
+    "/inventoryAdjustments/{adjustmentId}": {
+      "schema": { "$ref": "#/entities/InventoryAdjustment" },
+      "description": "Stock adjustments and returns."
     }
   }
 }

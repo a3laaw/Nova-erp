@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, PlusCircle, Trash2, Ban, RotateCcw } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor } from '@/lib/types';

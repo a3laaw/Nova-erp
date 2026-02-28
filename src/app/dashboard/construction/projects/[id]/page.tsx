@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle, Coins } from 'lucide-react';
+import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle, Coins, Clock3 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -24,6 +24,7 @@ import { ProjectFinancialsTab } from '@/components/construction/project-financia
 import { DailyReportsList } from '@/components/construction/daily-reports-list';
 import { DailyReportForm } from '@/components/construction/daily-report-form';
 import { ProjectApplicationsTab } from '@/components/construction/project-applications-tab';
+import { ProjectScheduleTab } from '@/components/construction/project-schedule-tab';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -136,8 +137,9 @@ export default function ProjectDetailPage() {
             </Card>
 
             <Tabs defaultValue="financials" className="w-full">
-                <TabsList className="grid grid-cols-2 md:grid-cols-6 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
+                <TabsList className="grid grid-cols-2 md:grid-cols-7 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
                     <TabsTrigger value="financials" className="gap-2 py-3 rounded-lg"><BarChart3 className="h-4 w-4"/> التكاليف</TabsTrigger>
+                    <TabsTrigger value="schedule" className="gap-2 py-3 rounded-lg"><Clock3 className="h-4 w-4"/> الجدولة</TabsTrigger>
                     <TabsTrigger value="applications" className="gap-2 py-3 rounded-lg"><Coins className="h-4 w-4"/> المستخلصات</TabsTrigger>
                     <TabsTrigger value="reports" className="gap-2 py-3 rounded-lg"><Camera className="h-4 w-4"/> التنفيذ</TabsTrigger>
                     <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> المقايسة</TabsTrigger>
@@ -147,6 +149,10 @@ export default function ProjectDetailPage() {
                 
                 <TabsContent value="financials">
                     <ProjectFinancialsTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="schedule">
+                    <ProjectScheduleTab project={project} />
                 </TabsContent>
 
                 <TabsContent value="applications">
