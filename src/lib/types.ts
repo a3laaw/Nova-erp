@@ -834,10 +834,11 @@ export type InventoryAdjustment = {
     id?: string;
     adjustmentNumber: string;
     date: any;
-    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'other';
+    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'sales_delivery' | 'other';
     notes?: string;
     journalEntryId?: string;
-    projectId?: string; // NEW: Link to cost center
+    projectId?: string; // Link to cost center
+    clientId?: string; // NEW: For direct sales delivery
     warehouseId?: string; // For adjustments
     fromWarehouseId?: string; // For transfers
     toWarehouseId?: string; // For transfers
@@ -848,7 +849,7 @@ export type InventoryAdjustment = {
         unitCost: number;
         totalCost: number;
         expiryDate?: any;
-        boqItemId?: string; // NEW: Linked BOQ line item
+        boqItemId?: string; // Linked BOQ line item
     }[];
     createdAt?: any;
     createdBy?: string;

@@ -75,7 +75,8 @@ import {
   History,
   DollarSign,
   TrendingDown,
-  Star
+  Star,
+  Store
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -121,6 +122,17 @@ const navItems = {
       ]
     },
     { 
+      label: 'المبيعات والتجارة',
+      icon: Store,
+      roles: ['Admin', 'Accountant', 'Secretary'],
+      hrefPrefix: '/dashboard/sales',
+      children: [
+        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
+        { href: '/dashboard/warehouse/material-issue', label: 'أذونات تسليم المبيعات', icon: ArrowUpFromLine },
+        { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
+      ]
+    },
+    { 
       label: 'المقاولات',
       icon: Construction,
       roles: ['Admin', 'Engineer'],
@@ -137,7 +149,6 @@ const navItems = {
       roles: ['Admin', 'Accountant', 'Secretary', 'Engineer'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
         {
           label: 'العمليات المالية',
@@ -190,7 +201,6 @@ const navItems = {
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
         { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
         { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },

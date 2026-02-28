@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -9,19 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info, ShoppingCart, User } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
-import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse } from '@/lib/types';
+import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse, Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const lineSchema = z.object({
-  boqItemId: z.string().min(1, "بند المقايسة مطلوب."),
+  boqItemId: z.string().optional(), // Optional for direct sales
   itemId: z.string().min(1, "الصنف مطلوب."),
   quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().positive("الكمية مطلوبة")),
   unitCost: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0, "التكلفة مطلوبة")),
@@ -29,7 +31,9 @@ const lineSchema = z.object({
 
 const issueSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
-  projectId: z.string().min(1, "يجب تحديد المشروع (مركز التكلفة)."),
+  issueType: z.enum(['project_site', 'direct_sale']),
+  projectId: z.string().optional().nullable(),
+  clientId: z.string().optional().nullable(),
   warehouseId: z.string().min(1, "يجب تحديد المستودع المصدر."),
   notes: z.string().optional(),
   items: z.array(lineSchema).min(1, 'يجب إضافة صنف واحد على الأقل.'),
@@ -53,6 +57,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     const { data: allItems = [], loading: itemsLoading } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     const { data: categories = [] } = useSubscription<ItemCategory>(firestore, 'itemCategories');
     const { data: warehouses = [], loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
+    const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
 
     const [boqItems, setBoqItems] = useState<BoqItem[]>([]);
     const [loadingBoq, setLoadingBoq] = useState(false);
@@ -61,13 +66,16 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         resolver: zodResolver(issueSchema),
         defaultValues: {
             date: new Date(),
+            issueType: 'project_site',
             items: [{ boqItemId: '', itemId: '', quantity: 1, unitCost: 0 }],
         }
     });
 
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
     const watchedItems = useWatch({ control, name: "items" });
+    const issueType = watch('issueType');
     const selectedProjectId = watch('projectId');
+    const selectedClientId = watch('clientId');
 
     const totalCost = useMemo(() =>
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
@@ -113,7 +121,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     }, [firestore, toast]);
 
     useEffect(() => {
-        if (!selectedProjectId || !firestore) {
+        if (issueType !== 'project_site' || !selectedProjectId || !firestore) {
             setBoqItems([]);
             return;
         }
@@ -135,15 +143,19 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
             }
         }
         fetchBoq();
-    }, [selectedProjectId, firestore, projects]);
+    }, [selectedProjectId, firestore, projects, issueType]);
 
     const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
+    const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
     const boqItemOptions = useMemo(() => boqItems.map(i => ({ value: i.id!, label: `${i.itemNumber} - ${i.description}` })), [boqItems]);
+    const itemOptions = useMemo(() => allItems.map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [allItems]);
 
-    const getFilteredItemOptions = useCallback((boqItemId: string) => {
+    const getFilteredItemOptions = useCallback((boqItemId?: string) => {
+        if (!boqItemId) return itemOptions;
+        
         const boqItem = boqItems.find(i => i.id === boqItemId);
-        if (!boqItem || !boqItem.itemId) return [];
+        if (!boqItem || !boqItem.itemId) return itemOptions;
 
         const allowedCategoryIds = new Set(
             categories.filter(cat => cat.boqReferenceItemIds?.includes(boqItem.itemId!)).map(c => c.id)
@@ -152,17 +164,21 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         return allItems
             .filter(item => allowedCategoryIds.has(item.categoryId))
             .map(i => ({ value: i.id!, label: i.name, searchKey: i.sku }));
-    }, [boqItems, allItems, categories]);
+    }, [boqItems, allItems, categories, itemOptions]);
 
 
     const onSubmit = async (data: IssueFormValues) => {
         if (!firestore || !currentUser) return;
         
         const inventoryAccount = accounts.find(a => a.code === '1104');
-        const projectExpenseAccount = accounts.find(a => a.code === '5104') || accounts.find(a => a.code === '51');
+        
+        // Determine expense account based on issue type
+        // 5104 for Project Material, 5101 for COGS (Trading)
+        const expenseCode = data.issueType === 'project_site' ? '5104' : '5101';
+        const projectExpenseAccount = accounts.find(a => a.code === expenseCode) || accounts.find(a => a.code === '51');
 
         if (!inventoryAccount || !projectExpenseAccount) {
-            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'حسابات المخزون أو مصاريف المشروع غير معرفة.' });
+            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'حسابات المخزون أو التكاليف غير معرفة.' });
             return;
         }
 
@@ -182,17 +198,29 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 const newIssueRef = doc(collection(firestore, 'inventoryAdjustments'));
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
-                const project = projects.find(p => p.id === data.projectId);
-                const engineer = employees.find(e => e.id === project?.assignedEngineerId);
-                const department = departments.find(d => d.name === engineer?.department);
+                let autoTags = {};
+                let narration = '';
 
-                const autoTags = {
-                    clientId: project?.clientId,
-                    transactionId: data.projectId,
-                    auto_profit_center: data.projectId,
-                    auto_resource_id: project?.assignedEngineerId,
-                    ...(department && { auto_dept_id: department.id }),
-                };
+                if (data.issueType === 'project_site') {
+                    const project = projects.find(p => p.id === data.projectId);
+                    const engineer = employees.find(e => e.id === project?.assignedEngineerId);
+                    const department = departments.find(d => d.name === engineer?.department);
+                    narration = `صرف مواد لمشروع: ${project?.transactionType} (${data.notes || ''})`;
+                    
+                    autoTags = {
+                        clientId: project?.clientId,
+                        transactionId: data.projectId,
+                        auto_profit_center: data.projectId,
+                        auto_resource_id: project?.assignedEngineerId,
+                        ...(department && { auto_dept_id: department.id }),
+                    };
+                } else {
+                    const client = clients.find(c => c.id === data.clientId);
+                    narration = `تسليم بضاعة مباعة للعميل: ${client?.nameAr} (${data.notes || ''})`;
+                    autoTags = {
+                        clientId: data.clientId,
+                    };
+                }
 
                 const processedItems = data.items.map(item => {
                     const selectedItem = allItems.find(i => i.id === item.itemId)!;
@@ -202,7 +230,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                         quantity: Number(item.quantity),
                         unitCost: Number(item.unitCost),
                         totalCost: Number(item.quantity) * Number(item.unitCost),
-                        boqItemId: item.boqItemId,
+                        boqItemId: item.boqItemId || null,
                     };
                 });
 
@@ -212,7 +240,8 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     type: 'material_issue',
                     notes: data.notes,
                     items: processedItems,
-                    projectId: data.projectId,
+                    projectId: data.projectId || null,
+                    clientId: data.clientId || null,
                     warehouseId: data.warehouseId,
                     journalEntryId: newJournalEntryRef.id,
                     createdAt: serverTimestamp(),
@@ -222,16 +251,16 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 transaction.set(newJournalEntryRef, cleanFirestoreData({
                     entryNumber: `JE-${issueNumber}`,
                     date: data.date,
-                    narration: `صرف مواد لمشروع: ${project?.transactionType} (${data.notes || ''})`,
+                    narration,
                     status: 'posted',
                     totalDebit: totalCost,
                     totalCredit: totalCost,
                     lines: [
-                        { accountId: projectExpenseAccount.id, accountName: projectExpenseAccount.name, debit: totalCost, credit: 0, ...autoTags },
-                        { accountId: inventoryAccount.id, accountName: inventoryAccount.name, debit: 0, credit: totalCost }
+                        { accountId: projectExpenseAccount.id!, accountName: projectExpenseAccount.name, debit: totalCost, credit: 0, ...autoTags },
+                        { accountId: inventoryAccount.id!, accountName: inventoryAccount.name, debit: 0, credit: totalCost }
                     ],
-                    clientId: project?.clientId,
-                    transactionId: data.projectId,
+                    clientId: data.clientId || null,
+                    transactionId: data.projectId || null,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
                 }));
@@ -239,7 +268,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
 
-            toast({ title: 'نجاح', description: 'تم حفظ إذن الصرف وتحميل التكلفة على المشروع.' });
+            toast({ title: 'نجاح', description: 'تم حفظ إذن الصرف وتحميل التكلفة آلياً.' });
             router.push('/dashboard/warehouse/material-issue');
 
         } catch (error) {
@@ -252,24 +281,71 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
 
     return (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+            <div className="flex justify-center p-4 bg-primary/5 rounded-2xl border-2 border-primary/10">
+                <Controller
+                    control={control}
+                    name="issueType"
+                    render={({ field }) => (
+                        <div className="flex gap-4">
+                            <Button 
+                                type="button" 
+                                variant={field.value === 'project_site' ? 'default' : 'outline'}
+                                onClick={() => field.onChange('project_site')}
+                                className="rounded-xl font-bold"
+                            >
+                                <Building2 className="ml-2 h-4 w-4" /> صرف لمشروع إنشائي
+                            </Button>
+                            <Button 
+                                type="button" 
+                                variant={field.value === 'direct_sale' ? 'default' : 'outline'}
+                                onClick={() => field.onChange('direct_sale')}
+                                className="rounded-xl font-bold"
+                            >
+                                <ShoppingCart className="ml-2 h-4 w-4" /> تسليم بضاعة مباعة
+                            </Button>
+                        </div>
+                    )}
+                />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 p-6 rounded-2xl border border-primary/10">
-                <div className="grid gap-2">
-                    <Label className="font-bold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary"/> المشروع (مركز التكلفة) *</Label>
-                    <Controller
-                        control={control}
-                        name="projectId"
-                        render={({ field }) => (
-                            <InlineSearchList 
-                                value={field.value} 
-                                onSelect={field.onChange} 
-                                options={projectOptions}
-                                placeholder={loadingRefs ? "تحميل..." : "اختر المشروع..."}
-                                disabled={loadingRefs || isSaving}
-                            />
-                        )}
-                    />
-                    {errors.projectId && <p className="text-xs text-destructive">{errors.projectId.message}</p>}
-                </div>
+                {issueType === 'project_site' ? (
+                    <div className="grid gap-2">
+                        <Label className="font-bold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary"/> المشروع (مركز التكلفة) *</Label>
+                        <Controller
+                            control={control}
+                            name="projectId"
+                            render={({ field }) => (
+                                <InlineSearchList 
+                                    value={field.value || ''} 
+                                    onSelect={field.onChange} 
+                                    options={projectOptions}
+                                    placeholder={loadingRefs ? "تحميل..." : "اختر المشروع..."}
+                                    disabled={loadingRefs || isSaving}
+                                />
+                            )}
+                        />
+                        {errors.projectId && <p className="text-xs text-destructive">{errors.projectId.message}</p>}
+                    </div>
+                ) : (
+                    <div className="grid gap-2">
+                        <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> العميل المستلم *</Label>
+                        <Controller
+                            control={control}
+                            name="clientId"
+                            render={({ field }) => (
+                                <InlineSearchList 
+                                    value={field.value || ''} 
+                                    onSelect={field.onChange} 
+                                    options={clientOptions}
+                                    placeholder={clientsLoading ? "تحميل..." : "ابحث عن عميل..."}
+                                    disabled={clientsLoading || isSaving}
+                                />
+                            )}
+                        />
+                        {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
+                    </div>
+                )}
                 <div className="grid gap-2">
                     <Label className="font-bold">المستودع المصدر *</Label>
                     <Controller
@@ -307,7 +383,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                         <TableHeader className="bg-muted/50">
                             <TableRow className="h-14 border-b-2">
                                 <TableHead className="w-[60px]"></TableHead>
-                                <TableHead className="w-[250px] font-bold">بند المقايسة (BOQ)</TableHead>
+                                {issueType === 'project_site' && <TableHead className="w-[250px] font-bold">بند المقايسة (BOQ)</TableHead>}
                                 <TableHead className="font-bold">الصنف المصروف</TableHead>
                                 <TableHead className="w-32 text-center font-bold">الكمية</TableHead>
                                 <TableHead className="w-40 text-left font-bold px-6">إجمالي التكلفة</TableHead>
@@ -326,25 +402,27 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </TableCell>
-                                        <TableCell>
-                                            <Controller
-                                                control={control}
-                                                name={`items.${index}.boqItemId`}
-                                                render={({ field: boqField }) => (
-                                                    <InlineSearchList 
-                                                        value={boqField.value} 
-                                                        onSelect={(val) => {
-                                                            boqField.onChange(val);
-                                                            setValue(`items.${index}.itemId`, '');
-                                                        }} 
-                                                        options={boqItemOptions}
-                                                        placeholder={loadingBoq ? "جاري التحميل..." : !selectedProjectId ? "اختر مشروعاً أولاً" : "اختر بند المقايسة..."}
-                                                        disabled={loadingBoq || !selectedProjectId}
-                                                        className="border-none shadow-none focus-visible:ring-0 text-sm font-semibold"
-                                                    />
-                                                )}
-                                            />
-                                        </TableCell>
+                                        {issueType === 'project_site' && (
+                                            <TableCell>
+                                                <Controller
+                                                    control={control}
+                                                    name={`items.${index}.boqItemId`}
+                                                    render={({ field: boqField }) => (
+                                                        <InlineSearchList 
+                                                            value={boqField.value || ''} 
+                                                            onSelect={(val) => {
+                                                                boqField.onChange(val);
+                                                                setValue(`items.${index}.itemId`, '');
+                                                            }} 
+                                                            options={boqItemOptions}
+                                                            placeholder={loadingBoq ? "جاري التحميل..." : !selectedProjectId ? "اختر مشروعاً أولاً" : "اختر بند المقايسة..."}
+                                                            disabled={loadingBoq || !selectedProjectId}
+                                                            className="border-none shadow-none focus-visible:ring-0 text-sm font-semibold"
+                                                        />
+                                                    )}
+                                                />
+                                            </TableCell>
+                                        )}
                                         <TableCell>
                                             <Controller
                                                 control={control}
@@ -358,8 +436,8 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                                             if (itemData) setValue(`items.${index}.unitCost`, itemData.costPrice || 0);
                                                         }}
                                                         options={allowedItems}
-                                                        placeholder={!lineItem?.boqItemId ? "حدد بند المقايسة أولاً" : "اختر مادة..."}
-                                                        disabled={!lineItem?.boqItemId || isSaving}
+                                                        placeholder={issueType === 'project_site' && !lineItem?.boqItemId ? "حدد بند المقايسة أولاً" : "اختر مادة..."}
+                                                        disabled={(issueType === 'project_site' && !lineItem?.boqItemId) || isSaving}
                                                         className="border-none shadow-none focus-visible:ring-0 text-lg font-bold"
                                                     />
                                                 )}
@@ -377,7 +455,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                         </TableBody>
                         <TableFooter className="bg-primary/5">
                             <TableRow className="h-20 border-t-4 border-primary/20">
-                                <TableCell colSpan={4} className="text-right px-8 font-black text-xl">إجمالي قيمة الإذن:</TableCell>
+                                <TableCell colSpan={issueType === 'project_site' ? 4 : 3} className="text-right px-8 font-black text-xl">إجمالي قيمة التكلفة المنصرفة:</TableCell>
                                 <TableCell className="text-left font-mono text-2xl font-black text-primary px-6 border-r bg-primary/5">
                                     {formatCurrency(totalCost)}
                                 </TableCell>
@@ -395,14 +473,14 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
 
             <div className="grid gap-3">
                 <Label htmlFor="notes" className="font-bold text-muted-foreground pr-2">ملاحظات الإذن</Label>
-                <Textarea id="notes" {...register('notes')} placeholder="تفاصيل إضافية..." className="rounded-2xl border-2" rows={3}/>
+                <Textarea id="notes" {...register('notes')} placeholder="تفاصيل إضافية عن التسليم أو الحالة..." className="rounded-2xl border-2" rows={3}/>
             </div>
 
             <div className="flex justify-end gap-4 pt-8 border-t">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                 <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20">
                     {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin"/> : <Save className="ml-3 h-5 w-5"/>}
-                    حفظ وترحيل التكلفة
+                    {issueType === 'direct_sale' ? 'إتمام التسليم والبيع' : 'حفظ وترحيل التكلفة'}
                 </Button>
             </div>
         </form>

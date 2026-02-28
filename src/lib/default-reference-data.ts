@@ -1,14 +1,16 @@
-import type { Department, Job, Governorate, Area, TransactionType, WorkStage, ItemCategory } from '@/lib/types';
+
+import type { Department, Job, Governorate, Area, TransactionType, WorkStage, ItemCategory, CompanyActivityType } from '@/lib/types';
 
 export const defaultDepartments: Omit<Department, 'id'>[] = [
   { name: 'القسم المعماري', order: 1, activityTypes: ['consulting'] },
   { name: 'القسم الإنشائي', order: 2, activityTypes: ['consulting', 'construction'] },
   { name: 'قسم الكهرباء', order: 3, activityTypes: ['consulting', 'construction'] },
   { name: 'قسم الميكانيك', order: 4, activityTypes: ['consulting', 'construction'] },
-  { name: 'الإدارة', order: 5, activityTypes: ['consulting', 'construction', 'sales'] },
-  { name: 'المحاسبة', order: 6, activityTypes: ['consulting', 'construction', 'sales'] },
-  { name: 'الموارد البشرية', order: 7, activityTypes: ['consulting', 'construction', 'sales'] },
-  { name: 'سكرتارية', order: 8, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'قسم المبيعات', order: 5, activityTypes: ['sales'] },
+  { name: 'الإدارة', order: 6, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'المحاسبة', order: 7, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'الموارد البشرية', order: 8, activityTypes: ['consulting', 'construction', 'sales'] },
+  { name: 'سكرتارية', order: 9, activityTypes: ['consulting', 'construction', 'sales'] },
 ];
 
 export const defaultJobs: Record<string, Omit<Job, 'id'>[]> = {
@@ -18,6 +20,10 @@ export const defaultJobs: Record<string, Omit<Job, 'id'>[]> = {
   ],
   'القسم الإنشائي': [
     { name: 'مهندس مدني', order: 1 },
+  ],
+  'قسم المبيعات': [
+    { name: 'مسؤول مبيعات', order: 1 },
+    { name: 'مندوب مبيعات', order: 2 },
   ],
   'الإدارة': [
       { name: 'مدير عام', order: 1 },
@@ -57,8 +63,8 @@ export const defaultTransactionTypes: (Omit<TransactionType, 'id'> & { departmen
     { name: 'تصميم كهرباء', departmentNames: ['قسم الكهرباء'], order: 2, activityType: 'consulting' },
     { name: 'تصميم إنشائي', departmentNames: ['القسم الإنشائي'], order: 3, activityType: 'consulting' },
     { name: 'إشراف على التنفيذ', departmentNames: ['القسم المعماري', 'القسم الإنشائي'], order: 4, activityType: 'consulting' },
-    { name: 'تصميم واجهات', departmentNames: ['القسم المعماري'], order: 5, activityType: 'consulting' },
-    { name: 'تصميم ديكور داخلي', departmentNames: ['القسم المعماري'], order: 6, activityType: 'consulting' },
+    { name: 'أمر بيع بضاعة', departmentNames: ['قسم المبيعات'], order: 5, activityType: 'sales' },
+    { name: 'توريد وتركيب', departmentNames: ['القسم الإنشائي', 'قسم المبيعات'], order: 6, activityType: 'construction' },
 ];
 
 export const defaultWorkStages: Record<string, (Omit<WorkStage, 'id'> & { nextStageNames?: string[], allowedDuringStagesNames?: string[] })[]> = {
@@ -73,12 +79,16 @@ export const defaultWorkStages: Record<string, (Omit<WorkStage, 'id'> & { nextSt
         { name: 'التصميم الإنشائي', order: 1, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 14, allowedRoles: ['مهندس مدني'], nextStageNames: ['مراجعة البلدية'] },
         { name: 'مراجعة البلدية', order: 2, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 5, allowedRoles: [] },
     ],
+    'قسم المبيعات': [
+        { name: 'تجهيز الطلبية', order: 1, stageType: 'sequential', trackingType: 'duration', expectedDurationDays: 1, allowedRoles: ['مسؤول مبيعات'], nextStageNames: ['تم التسليم للعميل'] },
+        { name: 'تم التسليم للعميل', order: 2, stageType: 'sequential', trackingType: 'none', allowedRoles: ['مندوب مبيعات'], nextStageNames: [] },
+    ]
 };
 
 export const defaultItemCategories: Omit<ItemCategory, 'id'>[] = [
-    { name: 'مواد غذائية', parentCategoryId: null, order: 1 },
-    { name: 'مواد استهلاكية', parentCategoryId: null, order: 2 },
-    { name: 'خدمات', parentCategoryId: null, order: 3 },
-    { name: 'مواد بناء', parentCategoryId: null, order: 4 },
-    { name: 'مواد تشطيبات', parentCategoryId: null, order: 5 },
+    { name: 'مواد غذائية', parentCategoryId: null, order: 1, activityTypeIds: [] },
+    { name: 'مواد استهلاكية', parentCategoryId: null, order: 2, activityTypeIds: [] },
+    { name: 'خدمات', parentCategoryId: null, order: 3, activityTypeIds: [] },
+    { name: 'مواد بناء', parentCategoryId: null, order: 4, activityTypeIds: [] },
+    { name: 'مواد تشطيبات', parentCategoryId: null, order: 5, activityTypeIds: [] },
 ];
