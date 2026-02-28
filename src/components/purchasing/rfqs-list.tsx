@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -131,14 +132,14 @@ export function RfqsList() {
       const poQuery = query(poRef, where('rfqId', '==', rfqId));
       const poSnap = await getDocs(poQuery);
 
-      // فحص إذا كان هناك أي أمر شراء معتمد أو مستلم
-      const hasActivePO = poSnap.docs.some(d => ['approved', 'received', 'partially_received'].includes(d.data().status));
+      // فحص إذا كان هناك أي أمر شراء ولد قيوداً محاسبية (received)
+      const hasFinancialImpact = poSnap.docs.some(d => ['received', 'partially_received'].includes(d.data().status));
       
-      if (hasActivePO) {
+      if (hasFinancialImpact) {
           toast({ 
               variant: 'destructive', 
-              title: 'منع الحذف', 
-              description: 'لا يمكن حذف طلب تسعير مرتبط بأمر شراء معتمد أو مستلم. يرجى التراجع عن اعتماد أمر الشراء أولاً.' 
+              title: 'منع الحذف الرقابي', 
+              description: 'لا يمكن حذف طلب تسعير ولد أوامر شراء مرتبطة بقيود محاسبية قائمة. يجب إلغاء أذونات الاستلام المرتبطة أولاً.' 
           });
           setIsDeleting(false);
           setItemToDelete(null);
@@ -152,15 +153,13 @@ export function RfqsList() {
 
       const batch = writeBatch(firestore);
       
-      // حذف الطلب الرئيسي
       batch.delete(doc(firestore, 'rfqs', rfqId));
       
-      // حذف العروض المرتبطة
       quotesSnap.docs.forEach((quoteDoc) => {
         batch.delete(quoteDoc.ref);
       });
 
-      // حذف أوامر الشراء المرتبطة (ستكون كلها في حالة draft بناءً على الفحص أعلاه)
+      // حذف أوامر الشراء المرتبطة (التي ليس لها أثر مالي بعد)
       poSnap.docs.forEach((poDoc) => {
           batch.delete(poDoc.ref);
       });
@@ -169,7 +168,7 @@ export function RfqsList() {
 
       toast({
         title: 'نجاح',
-        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر ${poSnap.size > 0 ? 'وأوامر الشراء المرتبطة' : ''} بنجاح.`,
+        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر بنجاح.`,
       });
     } catch (error) {
       console.error('Failed to delete RFQ:', error);
@@ -316,16 +315,9 @@ export function RfqsList() {
               <span className="font-bold text-foreground">
                 &quot;{itemToDelete?.rfqNumber}&quot;
               </span>{' '}
-              وكافة عروض الأسعار المرتبطة به نهائياً. 
-              {itemToDelete?.status === 'closed' && (
-                  <div className="mt-4 p-3 bg-amber-50 text-amber-800 rounded-xl border border-amber-200 text-sm">
-                      <p className="font-bold">تنبيه حماية البيانات:</p>
-                      <ul className="list-disc pr-4 mt-1">
-                          <li>سيتم حذف مسودة أمر الشراء المرتبطة بهذا الطلب آلياً.</li>
-                          <li>إذا كان أمر الشراء معتمداً، سيمنعك النظام من الحذف حتى تراجع حالته.</li>
-                      </ul>
-                  </div>
-              )}
+              وكافة عروض الأسعار وأوامر الشراء المرتبطة به نهائياً. 
+              <br/><br/>
+              <span className="font-bold text-destructive underline">تنبيه حماية البيانات:</span> لا يمكن حذف هذا الطلب إذا كان قد تم توريد بضائع بناءً على أوامر الشراء المنبثقة منه (أي يوجد قيد مالي قائم).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

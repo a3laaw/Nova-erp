@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -15,7 +16,7 @@ import { collection, query, orderBy, doc, deleteDoc, writeBatch, where, getDocs,
 import type { PurchaseOrder } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search, Undo2, Loader2 } from 'lucide-react';
+import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search, Undo2, Loader2, AlertTriangle } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -96,11 +97,9 @@ export function PurchaseOrdersList() {
 
     setIsProcessing(true);
     try {
-        // Simplified query to check for any linked GRNs
         const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', po.id));
         const grnsSnap = await getDocs(grnsQuery);
         
-        // Filter in memory to avoid index requirements
         const activeGrns = grnsSnap.docs.filter(d => d.data().status !== 'cancelled');
         
         if (activeGrns.length > 0) {
@@ -132,6 +131,23 @@ export function PurchaseOrdersList() {
     if (!itemToDelete || !firestore) return;
     setIsDeleting(true);
     try {
+        // --- الرقابة: منع الحذف إذا كان مرتبطاً بقيد محاسبي (عبر إذن الاستلام) ---
+        const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', '==', itemToDelete.id));
+        const grnsSnap = await getDocs(grnsQuery);
+        
+        const activeGrns = grnsSnap.docs.filter(d => d.data().status !== 'cancelled');
+        
+        if (activeGrns.length > 0) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'منع الحذف الرقابي', 
+                description: 'لا يمكن حذف أمر شراء مرتبط بقيود محاسبية (أذونات استلام). يرجى إلغاء أذونات الاستلام أولاً لتصفية الأثر المالي.' 
+            });
+            setIsDeleting(false);
+            setItemToDelete(null);
+            return;
+        }
+
         const batch = writeBatch(firestore);
         
         batch.delete(doc(firestore, 'purchaseOrders', itemToDelete.id!));
@@ -278,17 +294,21 @@ export function PurchaseOrdersList() {
          <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="text-destructive h-5 w-5"/> تأكيد الحذف الرقابي
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
                         {itemToDelete?.rfqId 
                             ? `سيتم حذف أمر الشراء رقم "${itemToDelete?.poNumber}" وإعادة فتح طلب التسعير المرتبط به للمفاضلة مرة أخرى.`
                             : `سيتم حذف أمر الشراء رقم "${itemToDelete?.poNumber}" بشكل دائم.`}
+                        <br/><br/>
+                        <span className="font-bold text-destructive">تنبيه:</span> لا يمكن حذف الأوامر التي ولّدت قيوداً محاسبية (التي تم استلام بضائعها بالفعل).
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                        {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
+                        {isDeleting ? 'جاري الفحص والحذف...' : 'نعم، قم بالحذف'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
