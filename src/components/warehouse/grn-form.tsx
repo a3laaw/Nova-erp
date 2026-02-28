@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2, AlertTriangle, Info, UserPlus, ShieldCheck, Tag, Truck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit, writeBatch } from 'firebase/firestore';
 import type { PurchaseOrder, Account, Warehouse, Item, Vendor } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -60,6 +60,8 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
     const [vendorData, setVendorData] = useState({ phone: '', address: '', contactPerson: '' });
 
+    const prevPoIdRef = useRef<string | null>(null);
+
     const { data: pos = [], loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', [
         where('status', 'in', ['approved', 'partially_received'])
     ]);
@@ -85,18 +87,30 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const selectedPo = useMemo(() => pos.find(p => p.id === selectedPoId), [pos, selectedPoId]);
 
     useEffect(() => {
+        if (!selectedPoId) {
+            if (prevPoIdRef.current !== null) {
+                prevPoIdRef.current = null;
+                setIsProspectiveVendor(false);
+                setValue('discountAmount', 0);
+                setValue('deliveryFees', 0);
+            }
+            return;
+        }
+
         if (selectedPo) {
+            // تحديث حالة تسجيل المورد فقط عند تغير المورد أو القائمة
             const isRegistered = registeredVendors.some(v => v.id === selectedPo.vendorId);
             setIsProspectiveVendor(!isRegistered);
-            // ملء الخصوم والرسوم من أمر الشراء بشكل افتراضي
-            setValue('discountAmount', selectedPo.discountAmount || 0);
-            setValue('deliveryFees', selectedPo.deliveryFees || 0);
-        } else {
-            setIsProspectiveVendor(false);
-            setValue('discountAmount', 0);
-            setValue('deliveryFees', 0);
+
+            // ملء الخصوم والرسوم فقط إذا كان هذا أمر شراء جديد يتم اختياره
+            // لمنع تصفير القيم عند حدوث تحديثات في الخلفية للبيانات
+            if (selectedPoId !== prevPoIdRef.current) {
+                prevPoIdRef.current = selectedPoId;
+                setValue('discountAmount', selectedPo.discountAmount || 0);
+                setValue('deliveryFees', selectedPo.deliveryFees || 0);
+            }
         }
-    }, [selectedPo, registeredVendors, setValue]);
+    }, [selectedPo, selectedPoId, registeredVendors, setValue]);
 
     useEffect(() => {
         if (!selectedPoId || !firestore) {
@@ -147,7 +161,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const poOptions = useMemo(() => pos.map(p => ({ value: p.id!, label: `${p.poNumber} - ${p.vendorName}` })), [pos]);
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
     
-    // حساب القيمة الإجمالية الصافية لحظياً بناءً على مدخلات المستخدم الحالية
     const totalValue = useMemo(() => {
         const itemsSubtotal = (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantityReceived) || 0) * (item.unitPrice || 0), 0);
         return itemsSubtotal - (Number(currentDiscount) || 0) + (Number(currentDelivery) || 0);
@@ -242,7 +255,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 const newGrnRef = doc(collection(firestore, 'grns'));
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
-                // حساب التوزيع التناسبي بناءً على القيم المعدلة يدوياً في النموذج
                 const itemsSubtotal = data.itemsReceived.reduce((sum, i) => sum + (i.quantityReceived * i.unitPrice), 0);
                 
                 const processedItems = data.itemsReceived.map(item => {
@@ -367,7 +379,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
             {fields.length > 0 && !isProspectiveVendor && (
                 <div className="space-y-6">
-                    {/* قسم تعديل الخصومات والرسوم يدوياً */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border-2 border-dashed rounded-3xl bg-muted/10">
                         <div className="grid gap-2">
                             <Label className="font-bold text-green-700 flex items-center gap-2"><Tag className="h-4 w-4"/> الخصم الإجمالي الفعلي (د.ك)</Label>
