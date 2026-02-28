@@ -1,4 +1,29 @@
 
+export interface FieldVisit {
+  id?: string;
+  clientId: string;
+  clientName: string;
+  transactionId: string;
+  transactionType: string;
+  engineerId: string;
+  engineerName: string;
+  scheduledDate: any;
+  plannedStageId: string;
+  plannedStageName: string;
+  status: 'planned' | 'confirmed' | 'cancelled';
+  confirmationData?: {
+    confirmedAt: any;
+    notes: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+    };
+    isCompleted: boolean;
+  };
+  createdAt: any;
+}
+
 export interface BoqItem {
   id?: string;
   itemId?: string; 
@@ -202,7 +227,7 @@ export interface Item {
     costPrice?: number; 
     sellingPrice?: number; 
     reorderLevel?: number;
-    warrantyYears?: number; // مضافة لتتبع الكفالات بالسنوات
+    warrantyYears?: number; 
 }
 export interface Warehouse { id?: string; name: string; isDefault?: boolean; location?: string; projectId?: string | null; companyId?: string | null; createdAt?: any; }
 export interface JournalEntry { id?: string; entryNumber: string; date: any; narration: string; totalDebit: number; totalCredit: number; status: string; lines: any[]; createdAt: any; }

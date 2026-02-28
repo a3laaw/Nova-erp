@@ -27,62 +27,40 @@
         "isActive": { "type": "boolean" }
       }
     },
-    "PurchaseRequest": {
-      "title": "Purchase Request",
-      "description": "Internal request for materials before becoming a formal PO.",
+    "FieldVisit": {
+      "title": "Field Visit",
+      "description": "A scheduled or confirmed site visit by an engineer.",
       "type": "object",
       "properties": {
-        "requestNumber": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "requesterId": { "type": "string" },
-        "requesterName": { "type": "string" },
-        "projectId": { "type": "string" },
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "internalItemId": { "type": "string" },
-              "itemName": { "type": "string" },
-              "quantity": { "type": "number" },
-              "notes": { "type": "string" }
-            }
+        "clientId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "transactionType": { "type": "string" },
+        "engineerId": { "type": "string" },
+        "engineerName": { "type": "string" },
+        "scheduledDate": { "type": "string", "format": "date-time" },
+        "plannedStageId": { "type": "string" },
+        "plannedStageName": { "type": "string" },
+        "status": { "type": "string", "enum": ["planned", "confirmed", "cancelled"] },
+        "confirmationData": {
+          "type": "object",
+          "properties": {
+            "confirmedAt": { "type": "string", "format": "date-time" },
+            "notes": { "type": "string" },
+            "location": {
+              "type": "object",
+              "properties": {
+                "latitude": { "type": "number" },
+                "longitude": { "type": "number" },
+                "accuracy": { "type": "number" }
+              }
+            },
+            "isCompleted": { "type": "boolean" }
           }
         },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "converted"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["requestNumber", "requesterId", "items", "status"]
-    },
-    "ConstructionProject": {
-      "title": "Construction Project",
-      "description": "Represents an active construction site/project.",
-      "type": "object",
-      "properties": {
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "clientId": { "type": "string" },
-        "status": { "type": "string", "enum": ["مخطط", "قيد التنفيذ", "مكتمل", "معلق", "ملغى"] },
-        "contractValue": { "type": "number" },
-        "progressPercentage": { "type": "number" },
-        "boqId": { "type": "string" }
-      }
-    },
-    "InventoryAdjustment": {
-        "title": "Inventory Adjustment / Return",
-        "description": "Records stock changes including sales and purchase returns.",
-        "type": "object",
-        "properties": {
-            "adjustmentNumber": { "type": "string" },
-            "date": { "type": "string", "format": "date-time" },
-            "type": { "type": "string", "enum": ["opening_balance", "damage", "theft", "material_issue", "purchase_return", "sales_return", "transfer", "other"] },
-            "clientId": { "type": "string" },
-            "vendorId": { "type": "string" },
-            "projectId": { "type": "string" },
-            "warehouseId": { "type": "string" },
-            "journalEntryId": { "type": "string" },
-            "items": { "type": "array", "items": { "type": "object" } }
-        }
+      "required": ["clientId", "transactionId", "scheduledDate", "engineerId", "status"]
     }
   },
   "auth": {
@@ -93,17 +71,9 @@
       "schema": { "$ref": "#/entities/CompanyBranding" },
       "description": "Stores company-wide settings."
     },
-    "/purchase_requests/{requestId}": {
-      "schema": { "$ref": "#/entities/PurchaseRequest" },
-      "description": "Internal purchase requisitions."
-    },
-    "/projects/{projectId}": {
-      "schema": { "$ref": "#/entities/ConstructionProject" },
-      "description": "Main projects collection."
-    },
-    "/inventoryAdjustments/{adjustmentId}": {
-      "schema": { "$ref": "#/entities/InventoryAdjustment" },
-      "description": "Stock adjustments and returns."
+    "/field_visits/{visitId}": {
+      "schema": { "$ref": "#/entities/FieldVisit" },
+      "description": "Scheduled and confirmed field visits."
     }
   }
 }

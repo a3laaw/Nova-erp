@@ -77,6 +77,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'reconciliation': 'التسويات البنكية',
     'sales': 'المبيعات',
     'schedules': 'مراجعة الجداول الزمنية',
+    'field-visits': 'الزيارات الميدانية',
   },
   en: {
     dashboard: 'Dashboard',
@@ -129,6 +130,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'vendor-statements': 'Vendor Statements',
     'client-statements': 'Client Statements',
     'schedules': 'Review Timelines',
+    'field-visits': 'Field Visits',
   },
 };
 
@@ -148,6 +150,7 @@ const getDynamicSegmentLabel = (parentSegment: string | undefined, lang: 'ar' | 
             case 'material-issue': return 'إذن صرف';
             case 'adjustments': return 'إذن تسوية';
             case 'payment-applications': return 'تفاصيل المستخلص';
+            case 'field-visits': return 'تفاصيل الزيارة الميدانية';
             default: return 'تفاصيل';
         }
     }
@@ -159,6 +162,7 @@ const getDynamicSegmentLabel = (parentSegment: string | undefined, lang: 'ar' | 
         case 'journal-entries': return 'Entry Details';
         case 'cash-receipts': return 'Receipt Details';
         case 'vendors': return 'Vendor Profile';
+        case 'field-visits': return 'Field Visit Details';
         default: return 'Details';
     }
 }
