@@ -60,7 +60,8 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
     const [vendorData, setVendorData] = useState({ phone: '', address: '', contactPerson: '' });
 
-    const prevPoIdRef = useRef<string | null>(null);
+    // مراجع لمنع إعادة تعيين البيانات عند تحديث الحالة في الخلفية
+    const lastLoadedPoIdRef = useRef<string | null>(null);
 
     const { data: pos = [], loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', [
         where('status', 'in', ['approved', 'partially_received'])
@@ -86,42 +87,30 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
     const selectedPo = useMemo(() => pos.find(p => p.id === selectedPoId), [pos, selectedPoId]);
 
+    // محرك تحميل بيانات أمر الشراء - يعمل فقط عند تغيير المعرف
     useEffect(() => {
-        if (!selectedPoId) {
-            if (prevPoIdRef.current !== null) {
-                prevPoIdRef.current = null;
-                setIsProspectiveVendor(false);
+        if (!selectedPoId || !firestore || !selectedPo) {
+            if (!selectedPoId) {
+                lastLoadedPoIdRef.current = null;
+                replace([]);
                 setValue('discountAmount', 0);
                 setValue('deliveryFees', 0);
+                setIsProspectiveVendor(false);
             }
             return;
         }
 
-        if (selectedPo) {
-            // تحديث حالة تسجيل المورد فقط عند تغير المورد أو القائمة
-            const isRegistered = registeredVendors.some(v => v.id === selectedPo.vendorId);
-            setIsProspectiveVendor(!isRegistered);
+        // إذا كان أمر الشراء هو نفسه الذي تم تحميله بالفعل، لا تفعل شيئاً للحفاظ على تعديلات المستخدم
+        if (selectedPoId === lastLoadedPoIdRef.current) return;
 
-            // ملء الخصوم والرسوم فقط إذا كان هذا أمر شراء جديد يتم اختياره
-            // لمنع تصفير القيم عند حدوث تحديثات في الخلفية للبيانات
-            if (selectedPoId !== prevPoIdRef.current) {
-                prevPoIdRef.current = selectedPoId;
-                setValue('discountAmount', selectedPo.discountAmount || 0);
-                setValue('deliveryFees', selectedPo.deliveryFees || 0);
-            }
-        }
-    }, [selectedPo, selectedPoId, registeredVendors, setValue]);
-
-    useEffect(() => {
-        if (!selectedPoId || !firestore) {
-            replace([]);
-            return;
-        }
-
-        const loadPoWithHistory = async () => {
+        const loadPoData = async () => {
             setLoadingPoStatus(true);
             try {
-                if (!selectedPo) return;
+                // 1. فحص هل المورد مسجل أم محتمل
+                const isRegistered = registeredVendors.some(v => v.id === selectedPo.vendorId);
+                setIsProspectiveVendor(!isRegistered);
+
+                // 2. جلب تاريخ الاستلام السابق لهذا الأمر
                 const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('purchaseOrderId', '==', selectedPoId)));
                 const receivedTotals = new Map<string, number>();
                 grnsSnap.forEach(doc => {
@@ -132,6 +121,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     });
                 });
 
+                // 3. تحضير بنود الاستلام بالكميات المتبقية
                 const itemsWithBalance = selectedPo.items.map(item => {
                     const previouslyReceived = receivedTotals.get(item.internalItemId!) || 0;
                     const remaining = Math.max(0, item.quantity - previouslyReceived);
@@ -140,23 +130,31 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                         itemName: item.itemName,
                         quantityOrdered: item.quantity,
                         quantityPreviouslyReceived: previouslyReceived,
-                        quantityReceived: remaining,
+                        quantityReceived: remaining, // القيمة الافتراضية هي المتبقي، ولكنها قابلة للتعديل
                         unitPrice: item.unitPrice,
                         batchNumber: '',
                         expiryDate: null
                     };
                 }).filter(i => i.quantityOrdered > i.quantityPreviouslyReceived);
 
+                // 4. تعيين القيم في النموذج
                 replace(itemsWithBalance);
+                setValue('discountAmount', selectedPo.discountAmount || 0);
+                setValue('deliveryFees', selectedPo.deliveryFees || 0);
+                
+                // تحديث المرجع لضمان عدم التكرار
+                lastLoadedPoIdRef.current = selectedPoId;
+
             } catch (error) {
-                console.error(error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل سجل الاستلام.' });
+                console.error("Load PO Error:", error);
+                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل بيانات أمر الشراء.' });
             } finally {
                 setLoadingPoStatus(false);
             }
         };
-        loadPoWithHistory();
-    }, [selectedPoId, firestore, selectedPo, replace, toast]);
+
+        loadPoData();
+    }, [selectedPoId, firestore, selectedPo, registeredVendors, replace, setValue, toast]);
 
     const poOptions = useMemo(() => pos.map(p => ({ value: p.id!, label: `${p.poNumber} - ${p.vendorName}` })), [pos]);
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
@@ -290,7 +288,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.set(newJournalEntryRef, cleanFirestoreData({
                     entryNumber: `JE-${grnNumber}`, 
                     date: data.date,
-                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} (شامل الخصومات والتوصيل المعدلة يدوياً)`,
+                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} (تعديل يدوي للكميات والخصوم)`,
                     status: 'posted', 
                     totalDebit: totalValue, 
                     totalCredit: totalValue,
@@ -377,7 +375,12 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 </Alert>
             )}
 
-            {fields.length > 0 && !isProspectiveVendor && (
+            {loadingPoStatus ? (
+                <div className="p-12 text-center">
+                    <Loader2 className="animate-spin mx-auto h-10 w-10 text-primary" />
+                    <p className="mt-4 text-muted-foreground font-bold">جاري تحميل بنود الطلب وفحص السجلات السابقة...</p>
+                </div>
+            ) : fields.length > 0 && !isProspectiveVendor ? (
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border-2 border-dashed rounded-3xl bg-muted/10">
                         <div className="grid gap-2">
@@ -417,17 +420,22 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                                 {fields.map((field, index) => {
                                     const item = watchedItems?.[index];
                                     const lineTotal = (item?.quantityReceived || 0) * (item?.unitPrice || 0);
+                                    const remainingToReceive = (item?.quantityOrdered || 0) - (item?.quantityPreviouslyReceived || 0);
+
                                     return (
                                         <TableRow key={field.id} className="h-20 border-b last:border-0 hover:bg-muted/5">
                                             <TableCell className="px-6 font-bold text-lg">{item?.itemName}</TableCell>
                                             <TableCell className="text-center font-mono font-bold text-muted-foreground">{item?.quantityOrdered}</TableCell>
                                             <TableCell className="text-center font-mono text-indigo-600 font-bold">{item?.quantityPreviouslyReceived || 0}</TableCell>
                                             <TableCell className="bg-primary/[0.02] py-2">
-                                                <Input 
-                                                    type="number" step="any" 
-                                                    {...register(`itemsReceived.${index}.quantityReceived`)} 
-                                                    className="text-center font-black text-xl w-28 h-11 rounded-xl border-2 border-primary/20 shadow-inner"
-                                                />
+                                                <div className="flex flex-col items-center gap-1">
+                                                    <Input 
+                                                        type="number" step="any" 
+                                                        {...register(`itemsReceived.${index}.quantityReceived`)} 
+                                                        className="text-center font-black text-xl w-28 h-11 rounded-xl border-2 border-primary/20 shadow-inner"
+                                                    />
+                                                    <span className="text-[9px] text-muted-foreground">المتبقي: {remainingToReceive}</span>
+                                                </div>
                                             </TableCell>
                                             <TableCell className="text-left font-mono font-black text-xl px-8 bg-muted/5 border-r">
                                                 {formatCurrency(lineTotal)}
@@ -446,6 +454,11 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                             </TableFooter>
                         </Table>
                     </div>
+                </div>
+            ) : selectedPoId && !isProspectiveVendor && (
+                <div className="p-20 text-center border-2 border-dashed rounded-[3rem] bg-muted/5">
+                    <CheckCircle2 className="h-16 w-16 mx-auto mb-4 text-green-500 opacity-20" />
+                    <p className="text-lg font-bold text-muted-foreground">لقد تم استلام كافة بنود هذا الطلب سابقاً.</p>
                 </div>
             )}
 
