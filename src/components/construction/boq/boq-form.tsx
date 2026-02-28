@@ -358,7 +358,7 @@ export function BoqForm({
           <div className="border rounded-3xl overflow-hidden shadow-xl bg-card">
             <div className="overflow-x-auto">
               <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                <colgroup><col className="w-12" /><col className="min-w-[300px]" /><col className="w-32" /><col className="w-24" /><col className="w-32" /><col className="w-40" /><col className="w-48" /><col className="w-20" /></colgroup>
+                <colgroup><col className="w-12" /><col className="min-w-[300px]" /><col className="w-32" /><col className="w-24" /><col className="w-24" /><col className="w-32" /><col className="w-40" /><col className="w-20" /></colgroup>
                 <TableHeader className="bg-muted/80 backdrop-blur-sm">
                   <TableRow className="hover:bg-transparent border-b-2 h-14">
                     <TableHead className="text-center font-bold text-xs uppercase px-1">م</TableHead>
@@ -404,7 +404,7 @@ export function BoqForm({
             </div>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
