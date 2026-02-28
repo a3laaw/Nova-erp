@@ -132,8 +132,8 @@ const navItems = {
         { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة مقاولي الباطن', icon: HardHat },
-        { href: '/dashboard/construction/subcontractors/certificates/new', label: 'شهادة إنجاز مقاول (تكلفة)', icon: FileCheck },
-        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال (إيراد)', icon: Coins },
+        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات إنجاز الأعمال', icon: FileCheck },
+        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال', icon: Coins },
       ]
     },
 
@@ -419,9 +419,9 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
                     <p className="text-sm font-bold truncate">{currentUser.fullName}</p>
                     <p className="text-[10px] text-muted-foreground truncate font-medium">{currentUser.role}</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive group-data-[state=collapsed]:hidden" onClick={onLogout} title="تسجيل الخروج">
+                <button className="h-8 w-8 rounded-md hover:bg-destructive/10 hover:text-destructive group-data-[state=collapsed]:hidden flex items-center justify-center transition-colors" onClick={onLogout} title="تسجيل الخروج">
                     <LogOut className="h-4 w-4"/>
-                </Button>
+                </button>
             </div>
         </div>
       </SidebarFooter>
