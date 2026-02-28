@@ -1,6 +1,6 @@
 
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import type { ConstructionProject, Client, Employee } from '@/lib/types';
@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3 } from 'lucide-react';
+import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -21,6 +21,8 @@ import { Label } from '@/components/ui/label';
 import { ProjectBoqTab } from '@/components/construction/project-boq-tab';
 import { ProjectProcurementTab } from '@/components/construction/project-procurement-tab';
 import { ProjectFinancialsTab } from '@/components/construction/project-financials-tab';
+import { DailyReportsList } from '@/components/construction/daily-reports-list';
+import { DailyReportForm } from '@/components/construction/daily-report-form';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -29,7 +31,6 @@ const statusColors: Record<string, string> = {
     'معلق': 'bg-gray-100 text-gray-800',
     'ملغى': 'bg-red-100 text-red-800',
 };
-
 
 const StatCard = ({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) => (
     <Card>
@@ -43,12 +44,13 @@ const StatCard = ({ title, value, icon }: { title: string, value: string, icon: 
     </Card>
 );
 
-
 export default function ProjectDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { firestore } = useFirebase();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
+
+    const [isReporting, setIsReporting] = useState(false);
 
     const projectRef = useMemo(() => firestore && id ? doc(firestore, 'projects', id) : null, [firestore, id]);
     const { data: project, loading: projectLoading } = useDocument<ConstructionProject>(firestore, projectRef?.path || null);
@@ -145,14 +147,37 @@ export default function ProjectDetailPage() {
             <Tabs defaultValue="financials" className="w-full">
                 <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
                     <TabsTrigger value="financials" className="gap-2 py-3 rounded-lg"><BarChart3 className="h-4 w-4"/> ملخص التكاليف</TabsTrigger>
+                    <TabsTrigger value="reports" className="gap-2 py-3 rounded-lg"><Camera className="h-4 w-4"/> تقارير التنفيذ</TabsTrigger>
                     <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> جداول الكميات</TabsTrigger>
                     <TabsTrigger value="procurement" className="gap-2 py-3 rounded-lg"><ShoppingCart className="h-4 w-4"/> المشتريات</TabsTrigger>
-                    <TabsTrigger value="subcontracts" className="gap-2 py-3 rounded-lg"><HardHat className="h-4 w-4"/> المقاولون</TabsTrigger>
-                    <TabsTrigger value="overview" className="gap-2 py-3 rounded-lg">نظرة عامة</TabsTrigger>
+                    <TabsTrigger value="subcontracts" className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="financials">
                     <ProjectFinancialsTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="reports" className="space-y-6">
+                    <div className="flex justify-between items-center bg-muted/30 p-6 rounded-2xl border">
+                        <div className="space-y-1">
+                            <CardTitle className="text-xl font-black">سجل تقارير الموقع اليومية</CardTitle>
+                            <CardDescription>التوثيق الفني والصوري الميداني للمشروع.</CardDescription>
+                        </div>
+                        <Button onClick={() => setIsReporting(true)} disabled={isReporting} className="h-11 px-6 rounded-xl font-bold gap-2">
+                            <PlusCircle className="h-5 w-5" />
+                            إرسال تقرير يومي
+                        </Button>
+                    </div>
+
+                    {isReporting && (
+                        <DailyReportForm 
+                            projectId={project.id!} 
+                            onSuccess={() => setIsReporting(false)} 
+                            onCancel={() => setIsReporting(false)} 
+                        />
+                    )}
+
+                    <DailyReportsList projectId={project.id!} />
                 </TabsContent>
 
                 <TabsContent value="boq">
@@ -165,22 +190,14 @@ export default function ProjectDetailPage() {
 
                 <TabsContent value="subcontracts">
                     <div className="text-center p-12 border-2 border-dashed rounded-3xl bg-muted/10">
-                        <HardHat className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                        <h3 className="text-xl font-bold">إدارة مقاولي الباطن للموقع</h3>
+                        <h3 className="text-xl font-bold">إدارة مقاولي الباطن</h3>
                         <p className="text-muted-foreground mt-2 mb-6">يمكنك إصدار شهادات إنجاز أعمال للمقاولين وتحميل تكلفتها على المشروع.</p>
                         <Button asChild>
                             <Link href={`/dashboard/construction/subcontractors/certificates/new?projectId=${project.id}`}>
-                                <PlusCircle className="ml-2 h-4 w-4"/> إصدار شهادة إنجاز جديدة
+                                إصدار شهادة إنجاز جديدة
                             </Link>
                         </Button>
                     </div>
-                </TabsContent>
-
-                <TabsContent value="overview">
-                     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <StatCard title="قيمة العقد" value={formatCurrency(project.contractValue)} icon={<DollarSign className="text-green-600"/>}/>
-                        <StatCard title="نسبة الإنجاز" value={`${project.progressPercentage}%`} icon={<Percent className="text-blue-600"/>}/>
-                     </div>
                 </TabsContent>
             </Tabs>
         </div>

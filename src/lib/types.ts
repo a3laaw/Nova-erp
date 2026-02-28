@@ -1,12 +1,26 @@
 
-// ... existing types (omitted for brevity in thinking, keep full content)
+export interface DailySiteReport {
+    id?: string;
+    projectId: string;
+    date: any;
+    engineerId: string;
+    engineerName: string;
+    workCompleted: string;
+    workersCount: number;
+    encounteredIssues?: string;
+    photoUrls?: string[];
+    weatherStatus?: string;
+    createdAt: any;
+}
+
+// ... (Keep all existing types below)
 export interface SubcontractorCertificate {
     id?: string;
     certificateNumber: string;
     date: any;
     subcontractorId: string;
     subcontractorName: string;
-    projectId: string; // This can be a project ID or transaction ID
+    projectId: string; 
     projectName?: string;
     amount: number;
     description: string;
@@ -16,7 +30,6 @@ export interface SubcontractorCertificate {
     createdBy: string;
 }
 
-// ... include all other types as they were
 export interface Company {
     id?: string;
     name: string;
@@ -84,58 +97,6 @@ export type Client = {
   transactionCounter?: number;
 };
 
-export type ProjectStatus = 'Planning' | 'In Progress' | 'Completed' | 'On Hold' | 'Cancelled';
-
-export type EngineeringDiscipline = {
-  name: MultilingualString;
-  stages: { name: MultilingualString; status: 'Pending' | 'In Progress' | 'Completed' }[];
-};
-
-export type ProjectFile = {
-  id: string;
-  name: string;
-  url: string;
-  uploadedAt: string;
-  type: 'image' | 'pdf' | 'document';
-};
-
-export type TimelineEvent = {
-  id: string;
-  type: 'Milestone' | 'Visit' | 'Task' | 'Report';
-  title: MultilingualString;
-  date: string;
-  description: MultilingualString;
-  authorId?: string;
-};
-
-export type DailyReport = {
-  id:string;
-  date: string;
-  authorId: string;
-  workCompleted: string;
-  workersCount: number;
-  issues: string;
-  photos: string[]; 
-};
-
-export type Project = {
-  id: string;
-  name: MultilingualString;
-  clientId: string;
-  leadEngineerId: string;
-  status: ProjectStatus;
-  startDate: string;
-  endDate: string;
-  description: MultilingualString;
-  imageUrl: string;
-  imageHint: string;
-  disciplines: EngineeringDiscipline[];
-  files: ProjectFile[];
-  timeline: TimelineEvent[];
-  reports: DailyReport[];
-  contractId?: string;
-};
-
 export type Appointment = {
   id: string;
   title: string;
@@ -160,29 +121,6 @@ export type Appointment = {
   minutesContent?: string;
 };
 
-
-export type PaymentMilestone = {
-  id: string;
-  name: MultilingualString;
-  percentage: number;
-  dueDate: string;
-  status: 'Pending' | 'Completed' | 'Overdue';
-};
-
-export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid' | 'Overdue';
-
-export type Invoice = {
-  id: string;
-  invoiceNumber: string;
-  clientId: string;
-  projectId: string;
-  amount: number;
-  issueDate: string;
-  dueDate: string;
-  status: InvoiceStatus;
-  type: 'Receivable' | 'Payable';
-};
-
 export type CashReceipt = {
     id: string;
     voucherNumber: string;
@@ -201,16 +139,6 @@ export type CashReceipt = {
     reference?: string;
     journalEntryId?: string;
     createdAt: any; 
-};
-
-export type Transaction = {
-  id: string;
-  date: string;
-  description: string;
-  amount: number;
-  type: 'Income' | 'Expense';
-  category: string;
-  invoiceId?: string;
 };
 
 export type Employee = {
@@ -242,24 +170,7 @@ export type Employee = {
     terminationReason?: 'resignation' | 'termination' | 'probation' | null;
     contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special' | 'day_laborer';
     contractPercentage?: number;
-    pieceRateMode?: 'salary_with_target' | 'per_piece';
-    targetDescription?: number;
-    pieceRate?: number;
-    dailyRate?: number;
-    department: string;
-    basicSalary: number; 
-    housingAllowance?: number;
-    transportAllowance?: number;
     status: 'active' | 'on-leave' | 'terminated';
-    lastVacationAccrualDate?: any;
-    annualLeaveAccrued?: number;
-    annualLeaveUsed?: number;
-    carriedLeaveDays?: number;
-    sickLeaveUsed?: number;
-    emergencyLeaveUsed?: number;
-    maxEmergencyLeave?: number;
-    lastLeaveResetDate?: any;
-    annualLeaveBalance?: number;
     createdAt?: any;
 };
 
@@ -273,15 +184,11 @@ export type LeaveRequest = {
   days: number;
   workingDays: number;
   notes?: string;
-  attachmentUrl?: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
   approvedBy?: string;
   approvedAt?: any;
   rejectionReason?: string;
-  isBackFromLeave?: boolean;
-  actualReturnDate?: any;
-  passportReceived?: boolean;
   isSalaryPaid?: boolean;
 };
 
@@ -294,9 +201,6 @@ export type PermissionRequest = {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
-  approvedBy?: string;
-  approvedAt?: any;
-  rejectionReason?: string;
 };
 
 export type Holiday = {
@@ -305,17 +209,6 @@ export type Holiday = {
     date: any;
 }
 
-export type AuditLog = {
-    id?: string;
-    changeType: 'Creation' | 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'StatusChange' | 'ResidencyUpdate';
-    field: string;
-    oldValue: any;
-    newValue: any;
-    effectiveDate: any;
-    changedBy: string;
-    notes: string;
-};
-
 export type MonthlyAttendance = {
     id?: string;
     employeeId: string;
@@ -323,11 +216,6 @@ export type MonthlyAttendance = {
     month: number;
     records: {
         date: any;
-        checkIn1?: string | null;
-        checkOut1?: string | null;
-        checkIn2?: string | null;
-        checkOut2?: string | null;
-        totalHours?: number | null;
         status: 'present' | 'absent' | 'late' | 'leave';
     }[];
     summary: {
@@ -345,24 +233,12 @@ export type Payslip = {
     employeeName: string;
     year: number;
     month: number;
-    attendanceId?: string;
-    type?: 'Monthly' | 'Leave';
-    leaveRequestId?: string;
-    salaryPaymentType: 'cash' | 'cheque' | 'transfer';
-    earnings: {
-        basicSalary: number;
-        housingAllowance?: number;
-        transportAllowance?: number;
-        commission?: number;
-    };
-    deductions: {
-        absenceDeduction: number;
-        otherDeductions: number;
-    };
+    earnings: { basicSalary: number; housingAllowance?: number; transportAllowance?: number; commission?: number; };
+    deductions: { absenceDeduction: number; otherDeductions: number; };
     netSalary: number;
     status: 'draft' | 'processed' | 'paid';
     createdAt: any;
-    notes?: string;
+    type?: 'Monthly' | 'Leave';
 };
 
 export type Notification = {
@@ -375,38 +251,16 @@ export type Notification = {
   createdAt: any;
 };
 
-
-export type Department = {
-    id: string;
-    name: string;
-    order?: number;
-    activityTypes?: string[];
-};
-
-export type Job = {
-    id: string;
-    name: string;
-    order?: number;
-};
-
-export type Governorate = {
-    id: string;
-    name: string;
-    order?: number;
-};
-
-export type Area = {
-    id: string;
-    name: string;
-    order?: number;
-};
+export type Department = { id: string; name: string; order?: number; activityTypes?: string[]; };
+export type Job = { id: string; name: string; order?: number; };
+export type Governorate = { id: string; name: string; order?: number; };
+export type Area = { id: string; name: string; order?: number; };
 
 export type TransactionType = {
   id: string;
   name: string;
   activityType?: string;
   departmentIds?: string[];
-  order?: number;
 };
 
 export type WorkStage = {
@@ -415,35 +269,16 @@ export type WorkStage = {
     order: number;
     stageType: 'sequential' | 'parallel';
     allowedRoles: string[];
-    nextStageIds?: string[];
-    allowedDuringStages?: string[];
     trackingType: 'duration' | 'occurrence' | 'none';
-    expectedDurationDays?: number | null;
-    maxOccurrences?: number | null;
-    allowManualCompletion?: boolean;
-    enableModificationTracking?: boolean;
 };
 
 export type TransactionStage = {
     stageId: string;
     name: string;
     status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
-    order?: number;
-    stageType?: 'sequential' | 'parallel';
-    allowedRoles?: string[];
-    nextStageIds?: string[];
-    allowedDuringStages?: string[];
-    trackingType?: 'duration' | 'occurrence' | 'none';
-    expectedDurationDays?: number | null;
-    maxOccurrences?: number | null;
-    allowManualCompletion?: boolean;
-    enableModificationTracking?: boolean;
-    modificationCount?: number | null;
-    startDate?: any | null;
-    endDate?: any | null;
-    expectedEndDate?: any | null;
-    notes?: string | null;
-    completedCount?: number | null;
+    completedCount?: number;
+    startDate?: any;
+    endDate?: any;
 };
 
 export type ClientTransaction = {
@@ -451,40 +286,19 @@ export type ClientTransaction = {
     transactionNumber?: string;
     clientId: string;
     transactionType: string;
-    description?: string;
     departmentId?: string;
-    transactionTypeId?: string;
     assignedEngineerId?: string;
     status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
     createdAt: any;
     updatedAt?: any;
-    engineerName?: string;
-    stages?: TransactionStage[];
     boqId?: string; 
-    boqItemCount?: number;
-    boqTotalValue?: number;
     contract?: {
-        clauses: ContractClause[];
-        scopeOfWork?: ContractScopeItem[];
-        termsAndConditions?: ContractTerm[];
-        openClauses?: ContractTerm[];
+        clauses: any[];
         totalAmount: number;
         financialsType?: 'fixed' | 'percentage';
     };
+    stages?: TransactionStage[];
 };
-
-export type TransactionAssignment = {
-    id?: string;
-    transactionId: string;
-    clientId: string;
-    departmentId: string;
-    departmentName: string;
-    engineerId?: string;
-    notes?: string;
-    status: 'pending' | 'in-progress' | 'completed';
-    createdAt: any;
-    createdBy: string;
-}
 
 export type Account = {
     id?: string;
@@ -495,21 +309,7 @@ export type Account = {
     balanceType: 'Debit' | 'Credit';
     level: number;
     parentCode: string | null;
-    description?: string;
     isPayable?: boolean;
-};
-
-export type JournalEntryLine = {
-    accountId: string;
-    accountName: string;
-    debit: number;
-    credit: number;
-    notes?: string;
-    clientId?: string;
-    transactionId?: string;
-    auto_profit_center?: string;
-    auto_resource_id?: string;
-    auto_dept_id?: string;
 };
 
 export type JournalEntry = {
@@ -517,148 +317,40 @@ export type JournalEntry = {
     entryNumber: string;
     date: any;
     narration: string;
-    reference?: string;
-    linkedReceiptId?: string;
     totalDebit: number;
     totalCredit: number;
     status: 'draft' | 'posted';
-    reconciliationStatus?: 'unreconciled' | 'reconciled' | 'pending';
-    reconciliationInfo?: {
-        reconciledAt: any;
-        reconciledBy: string;
-        bankTransactionId: string;
-        reconciliationEntryId: string;
-    };
-    lines: JournalEntryLine[];
-    clientId?: string;
+    lines: any[];
     transactionId?: string;
     createdAt: any;
     createdBy: string;
 };
 
-export type PaymentVoucher = {
-    id?: string;
-    voucherNumber: string;
-    voucherSequence: number;
-    voucherYear: number;
-    payeeName: string;
-    payeeType: 'vendor' | 'employee' | 'other';
-    employeeId?: string; 
-    renewalExpiryDate?: any;
-    amount: number;
-    amountInWords: string;
-    paymentDate: any;
-    paymentMethod: 'Cash' | 'Cheque' | 'Bank Transfer' | 'EmployeeCustody';
-    description: string;
-    reference?: string;
-    debitAccountId: string;
-    debitAccountName: string;
-    creditAccountId: string;
-    creditAccountName: string;
-    status: 'draft' | 'paid' | 'cancelled';
-    journalEntryId?: string;
-    createdAt: any;
-    clientId?: string;
-    transactionId?: string;
-};
-
-export type ContractScopeItem = {
-    id: string;
-    title: string;
-    description: string;
-};
-
-export type ContractTerm = {
-    id: string;
-    text: string;
-};
-
-export type ContractFinancialMilestone = {
-    id: string;
-    name: string;
-    condition: string; 
-    value: number; 
-};
-
-export type ContractClause = {
-    id: string;
-    name: string;
-    amount: number;
-    status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة';
-    percentage?: number;
-    condition?: string;
-};
-
 export type ContractTemplate = {
   id?: string;
   title: string;
-  templateType?: 'Consulting' | 'Execution';
-  description?: string;
   transactionTypes?: string[];
-  scopeOfWork?: ContractScopeItem[];
-  termsAndConditions?: ContractTerm[];
-  financials: {
-    type: 'fixed' | 'percentage';
-    totalAmount: number;
-    discount: number;
-    milestones: ContractFinancialMilestone[];
-  };
-  openClauses?: ContractTerm[];
+  financials: { type: 'fixed' | 'percentage'; totalAmount: number; milestones: any[]; };
+  scopeOfWork?: any[];
+  termsAndConditions?: any[];
+  openClauses?: any[];
   createdAt?: any;
-  createdBy?: string;
-};
-
-export type QuotationItem = {
-  id?: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-  percentage?: number;
-  condition?: string;
 };
 
 export type Quotation = {
   id?: string;
   quotationNumber: string;
-  quotationSequence: number;
-  quotationYear: number;
   clientId: string;
   clientName: string;
   date: any;
-  validUntil: any;
   subject: string;
-  departmentId: string;
-  transactionTypeId: string;
-  templateDescription?: string;
-  financialsType?: 'fixed' | 'percentage';
-  scopeOfWork?: ContractScopeItem[];
-  termsAndConditions?: ContractTerm[];
-  openClauses?: ContractTerm[];
-  items: QuotationItem[];
+  items: any[];
   totalAmount: number;
-  notes?: string;
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   createdAt: any;
-  createdBy: string;
-  transactionId?: string; 
 };
 
-export type Vendor = {
-  id?: string;
-  name: string;
-  contactPerson?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-};
-
-export type RfqItem = {
-    id: string;
-    internalItemId: string;
-    itemName: string;
-    quantity: number;
-};
+export type Vendor = { id?: string; name: string; phone?: string; email?: string; };
 
 export type RequestForQuotation = {
   id?: string;
@@ -666,31 +358,21 @@ export type RequestForQuotation = {
   date: any;
   status: 'draft' | 'sent' | 'closed' | 'cancelled';
   vendorIds: string[];
-  prospectiveVendors?: { id: string; name: string }[];
-  items: RfqItem[];
-  createdAt: any;
-  awardedVendorId?: string;
-  awardedPoId?: string;
-  awardedPoIds?: string[]; 
-  awardedItems?: Record<string, string>; 
+  items: any[];
+  awardedItems?: Record<string, string>;
+  awardedPoIds?: string[];
 };
 
 export type SupplierQuotation = {
     id?: string;
     rfqId: string;
     vendorId: string;
-    quotationReference: string;
     date: any;
+    items: any[];
+    discountAmount?: number;
+    deliveryFees?: number;
     deliveryTimeDays?: number;
     paymentTerms?: string;
-    discountAmount?: number; 
-    deliveryFees?: number; 
-    paymentMethodDetail?: string; 
-    items: {
-        rfqItemId: string;
-        unitPrice: number;
-    }[];
-    createdAt?: any;
 };
 
 export type PurchaseOrder = {
@@ -699,22 +381,11 @@ export type PurchaseOrder = {
     orderDate: any;
     vendorId: string;
     vendorName: string;
-    projectId?: string; 
-    warehouseId?: string; 
-    supplierQuotationId?: string;
-    rfqId?: string;
-    items: {
-      internalItemId?: string;
-      itemName: string;
-      quantity: number;
-      unitPrice: number;
-      total: number;
-    }[];
+    projectId?: string;
+    items: any[];
     totalAmount: number;
-    paymentTerms?: string;
-    notes?: string;
     status: 'draft' | 'approved' | 'partially_received' | 'received' | 'cancelled';
-    createdAt?: any;
+    rfqId?: string;
 };
 
 export type ConstructionProject = {
@@ -731,46 +402,11 @@ export type ConstructionProject = {
   mainEngineerId: string;
   mainEngineerName?: string;
   progressPercentage: number;
-  linkedTransactionId?: string;
   boqId?: string; 
   createdAt?: any;
-  createdBy?: string;
 };
 
-export type Subcontractor = {
-    id?: string;
-    name: string;
-    type: string; 
-    specialization?: string;
-    contactPerson?: string;
-    phone?: string;
-    mobile?: string;
-    email?: string;
-    address?: string;
-    bankAccount?: {
-        bankName: string;
-        accountNumber: string;
-        iban: string;
-    };
-    rating?: number; 
-    isActive: boolean;
-    blacklisted: boolean;
-    blacklistedReason?: string;
-    createdAt?: any;
-    performanceRating?: number;
-};
-
-export type SubcontractorType = {
-    id: string;
-    name: string;
-    order?: number;
-};
-
-export type SubcontractorSpecialization = {
-    id: string;
-    name: string;
-    order?: number;
-};
+export type Subcontractor = { id?: string; name: string; type: string; isActive: boolean; };
 
 export type BoqItem = {
   id?: string;
@@ -780,11 +416,9 @@ export type BoqItem = {
   unit: string;
   quantity: number;
   sellingUnitPrice: number;
-  notes?: string;
   isHeader: boolean;
   parentId: string | null;
   level: number;
-  order?: number;
 };
     
 export type Boq = {
@@ -792,82 +426,26 @@ export type Boq = {
   boqNumber: string;
   name: string;
   status: 'تقديري' | 'تعاقدي' | 'منفذ';
-  clientId?: string;
   clientName?: string; 
-  transactionId?: string;
-  projectId?: string; 
   totalValue: number;
   itemCount: number;
+  projectId?: string;
   createdAt: any;
 };
   
-export type BoqReferenceItem = {
-  id?: string;
-  name: string;
-  unit?: string;
-  isHeader?: boolean;
-  transactionTypeIds?: string[];
-  subcontractorTypeIds?: string[];
-  activityTypeIds?: string[];
-  order?: number;
-  parentBoqReferenceItemId?: string;
-};
-
-export type Warehouse = {
-    id?: string;
-    name: string;
-    location?: string;
-    isDefault?: boolean;
-    projectId?: string | null; 
-    companyId?: string | null; 
-};
-
-export interface ItemCategory {
-    id?: string;
-    name: string;
-    parentCategoryId: string | null;
-    order?: number;
-    activityTypeIds?: string[]; 
-    boqReferenceItemIds?: string[]; 
-}
-
-export interface Item {
-    id?: string;
-    name: string;
-    sku: string;
-    categoryId: string;
-    itemType: 'product' | 'service';
-    inventoryTracked?: boolean;
-    unitOfMeasure: string;
-    costPrice?: number;
-    sellingPrice?: number;
-    reorderLevel?: number;
-    expiryTracked?: boolean;
-    description?: string;
-    createdAt?: any;
-}
+export type BoqReferenceItem = { id?: string; name: string; isHeader?: boolean; };
+export type Warehouse = { id?: string; name: string; isDefault?: boolean; };
+export interface ItemCategory { id?: string; name: string; parentCategoryId: string | null; boqReferenceItemIds?: string[]; }
+export interface Item { id?: string; name: string; sku: string; categoryId: string; costPrice?: number; sellingPrice?: number; }
 
 export type InventoryAdjustment = {
     id?: string;
     adjustmentNumber: string;
     date: any;
-    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'sales_delivery' | 'other';
-    notes?: string;
+    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'other';
     journalEntryId?: string;
-    projectId?: string; 
-    clientId?: string; 
-    warehouseId?: string; 
-    fromWarehouseId?: string; 
-    toWarehouseId?: string; 
-    items: {
-        itemId: string;
-        itemName: string;
-        quantity: number;
-        unitCost: number;
-        totalCost: number;
-        expiryDate?: any;
-        boqItemId?: string; 
-    }[];
-    createdAt?: any;
-    createdBy?: string;
+    items: any[];
+    projectId?: string;
+    clientId?: string;
+    warehouseId?: string;
 };

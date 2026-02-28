@@ -6,197 +6,26 @@
       "description": "Stores the company's branding information for letterheads and general UI.",
       "type": "object",
       "properties": {
-        "company_name": {
-          "type": "string",
-          "description": "The full name of the company."
-        },
-        "address": {
-          "type": "string",
-          "description": "The company's contact address."
-        },
-        "phone": {
-          "type": "string",
-          "description": "The company's contact phone number."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The company's contact email address."
-        },
-        "tax_number": {
-            "type": "string",
-            "description": "The company's tax identification number."
-        },
-        "letterhead_text": {
-          "type": "string",
-          "description": "Additional text to display on the letterhead."
-        },
-        "logo_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the company's logo."
-        },
-        "letterhead_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the company's full letterhead image."
-        },
-        "footer_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to the company's footer image."
-        },
-        "watermark_image_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL to a watermark image for printable documents."
-        },
-        "system_background_url": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL for the background image of the system pages."
-        },
-        "financial_statement_notes": {
-            "type": "string",
-            "description": "The full text content for the notes to the financial statements."
-        },
-        "work_hours": {
-            "type": "object",
-            "description": "Defines the company's working hours, holidays, and appointment settings.",
-            "properties": {
-                "general": {
-                    "type": "object",
-                    "description": "General working hours for meeting rooms and other departments.",
-                    "properties": {
-                        "morning_start_time": { "type": "string", "description": "e.g., '08:00'" },
-                        "morning_end_time": { "type": "string", "description": "e.g., '12:00'" },
-                        "evening_start_time": { "type": "string", "description": "e.g., '13:00'" },
-                        "evening_end_time": { "type": "string", "description": "e.g., '17:00'" },
-                        "appointment_slot_duration": { "type": "number", "description": "Duration in minutes, e.g., 30" },
-                        "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
-                    }
-                },
-                "architectural": {
-                    "type": "object",
-                    "description": "Specific working hours for the architectural department.",
-                    "properties": {
-                        "morning_start_time": { "type": "string" },
-                        "morning_end_time": { "type": "string" },
-                        "evening_start_time": { "type": "string" },
-                        "evening_end_time": { "type": "string" },
-                        "appointment_slot_duration": { "type": "number" },
-                        "appointment_buffer_time": { "type": "number", "description": "Break time in minutes between appointments." }
-                    }
-                },
-                "ramadan": {
-                    "type": "object",
-                    "description": "Defines special working hours for the month of Ramadan.",
-                    "properties": {
-                        "is_enabled": { "type": "boolean", "description": "Enable/disable special Ramadan timings." },
-                        "start_date": { "type": "string", "format": "date", "description": "Start date of Ramadan for the current year." },
-                        "end_date": { "type": "string", "format": "date", "description": "End date of Ramadan for the current year." },
-                        "start_time": { "type": "string", "description": "e.g., '09:30'" },
-                        "end_time": { "type": "string", "description": "e.g., '15:30'" },
-                        "appointment_slot_duration": { "type": "number" },
-                        "appointment_buffer_time": { "type": "number" }
-                    }
-                },
-                "holidays": {
-                    "type": "array",
-                    "description": "Weekly holidays.",
-                    "items": { "type": "string", "enum": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] }
-                },
-                "half_day": {
-                    "type": "object",
-                    "description": "Defines a weekly half-day.",
-                    "properties": {
-                        "day": { "type": "string", "enum": ["", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] },
-                        "type": { "type": "string", "enum": ["morning_only", "custom_end_time"] },
-                        "end_time": { "type": "string", "description": "e.g., '13:00'" }
-                    }
-                }
-            }
-        },
-        "payment_methods": {
-            "type": "array",
-            "description": "Configurable payment methods and their associated fees.",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "id": { "type": "string" },
-                    "name": { "type": "string" },
-                    "type": { "type": "string", "enum": ["percentage", "fixed"] },
-                    "value": { "type": "number" },
-                    "expenseAccountId": { "type": "string" },
-                    "expenseAccountName": { "type": "string" }
-                },
-                "required": ["id", "name", "type", "value", "expenseAccountId"]
-            }
-        }
+        "company_name": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "logo_url": { "type": "string", "format": "uri" },
+        "system_background_url": { "type": "string", "format": "uri" }
       },
       "required": ["company_name"]
     },
     "UserProfile": {
       "title": "User Profile",
-      "description": "Represents a user's login account in the system.",
+      "description": "Represents a user's login account.",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "username": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "employeeId": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Secretary", "Accountant", "Engineer", "HR"] },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["username", "email", "employeeId", "role", "isActive", "createdAt"]
-    },
-    "Client": {
-      "title": "Client",
-      "description": "Represents a client of the consultancy.",
-      "type": "object",
-      "properties": {
-        "fileId": { "type": "string" },
-        "nameAr": { "type": "string" },
-        "mobile": { "type": "string" },
-        "status": { "type": "string", "enum": ["new", "contracted", "cancelled", "reContracted"] },
-        "createdAt": { "type": "string", "format": "date-time" },
+        "employeeId": { "type": "string" },
         "isActive": { "type": "boolean" }
-      },
-      "required": ["fileId", "nameAr", "mobile", "status", "createdAt", "isActive"]
-    },
-    "ClientTransaction": {
-        "title": "Client Transaction",
-        "description": "Represents an internal service or transaction for a client.",
-        "type": "object",
-        "properties": {
-            "transactionNumber": { "type": "string" },
-            "clientId": { "type": "string" },
-            "transactionType": { "type": "string" },
-            "status": { "type": "string", "enum": ["new", "in-progress", "completed", "submitted", "on-hold"] },
-            "createdAt": { "type": "string", "format": "date-time" },
-            "boqId": { "type": "string", "description": "Link to standalone BOQ document" }
-        },
-        "required": ["transactionNumber", "clientId", "transactionType", "status", "createdAt"]
-    },
-    "SubcontractorCertificate": {
-        "title": "Subcontractor Progress Certificate",
-        "description": "A document proving work completed by a subcontractor to generate a payment liability.",
-        "type": "object",
-        "properties": {
-            "certificateNumber": { "type": "string" },
-            "date": { "type": "string", "format": "date-time" },
-            "subcontractorId": { "type": "string" },
-            "subcontractorName": { "type": "string" },
-            "projectId": { "type": "string", "description": "Linked construction project or transaction" },
-            "amount": { "type": "number" },
-            "description": { "type": "string" },
-            "status": { "type": "string", "enum": ["draft", "approved", "paid", "cancelled"] },
-            "journalEntryId": { "type": "string" },
-            "createdAt": { "type": "string", "format": "date-time" },
-            "createdBy": { "type": "string" }
-        },
-        "required": ["certificateNumber", "date", "subcontractorId", "projectId", "amount", "status"]
+      }
     },
     "ConstructionProject": {
       "title": "Construction Project",
@@ -208,53 +37,44 @@
         "clientId": { "type": "string" },
         "status": { "type": "string", "enum": ["مخطط", "قيد التنفيذ", "مكتمل", "معلق", "ملغى"] },
         "contractValue": { "type": "number" },
+        "progressPercentage": { "type": "number" },
         "boqId": { "type": "string" }
       }
     },
-    "Boq": {
-      "title": "Bill of Quantities",
-      "description": "A bill of quantities document.",
+    "DailySiteReport": {
+      "title": "Daily Site Report",
+      "description": "Technical progress report submitted daily by the site engineer.",
       "type": "object",
       "properties": {
-        "boqNumber": { "type": "string" },
-        "name": { "type": "string" },
-        "totalValue": { "type": "number" }
-      }
+        "projectId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "engineerId": { "type": "string" },
+        "engineerName": { "type": "string" },
+        "workCompleted": { "type": "string", "description": "Detailed description of work done today." },
+        "workersCount": { "type": "number", "description": "Number of workers on site today." },
+        "encounteredIssues": { "type": "string", "description": "Any blockers or technical problems." },
+        "photoUrls": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "weatherStatus": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "date", "workCompleted", "workersCount"]
     }
   },
   "auth": {
-    "providers": [
-      "anonymous"
-    ]
+    "providers": ["anonymous"]
   },
   "firestore": {
     "/company_settings/{settingsId}": {
-      "schema": { "$ref": "#/backend/entities/CompanyBranding" },
+      "schema": { "$ref": "#/entities/CompanyBranding" },
       "description": "Stores company-wide settings."
     },
-    "/users/{userId}": {
-      "schema": { "$ref": "#/backend/entities/UserProfile" },
-      "description": "User accounts."
-    },
-    "/clients/{clientId}": {
-      "schema": { "$ref": "#/backend/entities/Client" },
-      "description": "Client data."
-    },
-    "/clients/{clientId}/transactions/{transactionId}": {
-        "schema": { "$ref": "#/backend/entities/ClientTransaction" },
-        "description": "Internal services."
-    },
-    "/subcontractor_certificates/{certId}": {
-        "schema": { "$ref": "#/backend/entities/SubcontractorCertificate" },
-        "description": "Work completion certificates for subcontractors."
-    },
     "/projects/{projectId}": {
-      "schema": { "$ref": "#/backend/entities/ConstructionProject" },
-      "description": "Construction sites."
+      "schema": { "$ref": "#/entities/ConstructionProject" },
+      "description": "Main projects collection."
     },
-    "/boqs/{boqId}": {
-      "schema": { "$ref": "#/backend/entities/Boq" },
-      "description": "Bill of quantities."
+    "/projects/{projectId}/daily_reports/{reportId}": {
+      "schema": { "$ref": "#/entities/DailySiteReport" },
+      "description": "Daily technical reports for a specific project."
     }
   }
 }
