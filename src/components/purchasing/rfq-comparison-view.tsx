@@ -181,9 +181,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 const newPoRef = doc(collection(firestore, 'purchaseOrders'));
                 newPoIds.push(newPoRef.id);
 
-                // حساب الصافي: (مجموع البنود) - الخصم + التوصيل
-                // ملاحظة: إذا كانت الترسية جزئية، قد ترغب في توزيع الخصم والتوصيل تناسبياً، 
-                // ولكن للتبسيط سنعتبر الخصم والتوصيل يطبق بالكامل على المورد المختار.
+                // حساب الصافي النهائي المعتمد في أمر الشراء
                 const itemsSum = poItems.reduce((sum, i) => sum + i.total, 0);
                 const finalTotal = itemsSum - (quote.discountAmount || 0) + (quote.deliveryFees || 0);
 
@@ -380,7 +378,7 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary h-14 w-14 flex items-center justify-center"><Calculator className="h-8 w-8" /></div>
                         <div>
                             <h4 className="font-black text-lg text-primary">اعتماد الترسية وإصدار الأوامر</h4>
-                            <p className="text-xs text-muted-foreground font-medium">سيتم إنشاء أوامر شراء منفصلة لكل مورد تم اختياره تلقائياً.</p>
+                            <p className="text-xs text-muted-foreground font-medium">سيتم إنشاء أوامر شراء منفصلة لكل مورد تم اختياره تلقائياً بنظام معامل التكلفة الصافي.</p>
                         </div>
                     </div>
                     <Button onClick={handleConfirmSplitAward} disabled={isAwarding || Object.values(selectedAwards).filter(Boolean).length === 0} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3">

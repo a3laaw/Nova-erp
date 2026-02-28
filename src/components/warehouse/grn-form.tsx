@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2, AlertTriangle, Info, UserPlus, ShieldCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit, addDoc } from 'firebase/firestore';
-import type { PurchaseOrder, Account, Warehouse, Item, GoodsReceiptNote, Vendor } from '@/lib/types';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit } from 'firebase/firestore';
+import type { PurchaseOrder, Account, Warehouse, Item, Vendor } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -133,14 +133,13 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const poOptions = useMemo(() => pos.map(p => ({ value: p.id!, label: `${p.poNumber} - ${p.vendorName}` })), [pos]);
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
     
-    // حساب القيمة الإجمالية للاستلام الحالي مع مراعاة الخصم ورسوم التوصيل من أمر الشراء
+    // حساب القيمة الإجمالية للاستلام الحالي مع مراعاة الخصم ورسوم التوصيل من أمر الشراء بنظام معامل التكلفة
     const totalValue = useMemo(() => {
         if (!selectedPo) return 0;
         
         const itemsTotal = (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantityReceived) || 0) * (item.unitPrice || 0), 0);
         
-        // إذا كان الاستلام مكتملاً، نضيف كامل الخصم والرسوم. إذا كان جزئياً، نطبقها تناسبياً أو بالكامل حسب السياسة.
-        // هنا سنطبق كامل الخصم والرسوم لتطابق إجمالي مديونية المورد في أمر الشراء.
+        // تطبيق الخصم والرسوم بالكامل على الصافي النهائي لمديونية المورد
         const discount = selectedPo.discountAmount || 0;
         const delivery = selectedPo.deliveryFees || 0;
         
@@ -236,17 +235,37 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 const newGrnRef = doc(collection(firestore, 'grns'));
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
+                // حساب التوزيع التناسبي للخصم والتوصيل على كل بند
+                const itemsSubtotal = data.itemsReceived.reduce((sum, i) => sum + (i.quantityReceived * i.unitPrice), 0);
+                
+                const processedItems = data.itemsReceived.map(item => {
+                    const itemRawTotal = item.quantityReceived * item.unitPrice;
+                    // النسبة المئوية للبند من إجمالي الفاتورة
+                    const ratio = itemsSubtotal > 0 ? (itemRawTotal / itemsSubtotal) : 0;
+                    
+                    // حساب نصيب البند من الخصم والتوصيل
+                    const itemShareOfDiscount = ratio * (selectedPo.discountAmount || 0);
+                    const itemShareOfDelivery = ratio * (selectedPo.deliveryFees || 0);
+                    const itemNetTotal = itemRawTotal - itemShareOfDiscount + itemShareOfDelivery;
+
+                    return {
+                        ...item,
+                        total: itemNetTotal, // القيمة الدفترية النهائية للبند (Landed Cost)
+                        rawTotal: itemRawTotal
+                    };
+                });
+
                 transaction.set(newGrnRef, cleanFirestoreData({
                     grnNumber, purchaseOrderId: data.purchaseOrderId, warehouseId: data.warehouseId,
-                    date: data.date, itemsReceived: data.itemsReceived.map(i => ({ ...i, total: i.quantityReceived * i.unitPrice })),
+                    date: data.date, itemsReceived: processedItems,
                     totalValue, vendorId: selectedPo.vendorId, vendorName: selectedPo.vendorName,
                     createdAt: serverTimestamp(), createdBy: currentUser.id,
                 }));
 
-                // القيد المحاسبي بالصافي (التكلفة الواصلة)
+                // القيد المحاسبي بالصافي النهائي لمديونية المورد
                 transaction.set(newJournalEntryRef, cleanFirestoreData({
                     entryNumber: `JE-${grnNumber}`, date: data.date,
-                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} (شامل الخصومات والتوصيل)`,
+                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} (شامل الخصومات والتوصيل بنظام معامل التكلفة)`,
                     status: 'posted', totalDebit: totalValue, totalCredit: totalValue,
                     lines: [
                         { accountId: inventoryAcc!.id!, accountName: inventoryAcc!.name, debit: totalValue, credit: 0 },
@@ -261,7 +280,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.update(doc(firestore, 'purchaseOrders', data.purchaseOrderId), { status: isFullyReceived ? 'received' : 'partially_received' });
             });
 
-            toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية بالصافي النهائي.' });
+            toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية بنظام التكلفة الواصلة الصافية.' });
             router.push('/dashboard/warehouse/grns');
         } catch (error: any) {
             console.error("GRN Transaction Error:", error);
@@ -370,11 +389,11 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                                 {selectedPo && (selectedPo.discountAmount > 0 || selectedPo.deliveryFees > 0) && (
                                     <>
                                         <TableRow className="bg-green-50/50">
-                                            <TableCell colSpan={4} className="text-right px-12 text-sm font-bold text-green-700">(-) خصم مكتسب من المورد:</TableCell>
+                                            <TableCell colSpan={4} className="text-right px-12 text-sm font-bold text-green-700">(-) خصم مكتسب (يوزع تناسبياً):</TableCell>
                                             <TableCell className="text-left font-mono font-bold text-green-700 px-8 border-r">{formatCurrency(selectedPo.discountAmount)}</TableCell>
                                         </TableRow>
                                         <TableRow className="bg-red-50/50">
-                                            <TableCell colSpan={4} className="text-right px-12 text-sm font-bold text-red-700">(+) رسوم توصيل بضاعة:</TableCell>
+                                            <TableCell colSpan={4} className="text-right px-12 text-sm font-bold text-red-700">(+) رسوم توصيل (توزع تناسبياً):</TableCell>
                                             <TableCell className="text-left font-mono font-bold text-red-700 px-8 border-r">{formatCurrency(selectedPo.deliveryFees)}</TableCell>
                                         </TableRow>
                                     </>
@@ -393,7 +412,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
             <div className="flex justify-end gap-4 pt-8 border-t">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-10 rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSaving || fields.length === 0 || isProspectiveVendor} className="h-12 px-16 rounded-xl font-black text-xl shadow-2xl shadow-primary/30 min-w-[280px]">
+                <Button type="submit" disabled={isSaving || fields.length === 0 || isProspectiveVendor} className="h-12 px-16 rounded-xl font-black text-lg shadow-xl shadow-primary/20 min-w-[280px]">
                     {isSaving ? <><Loader2 className="ml-3 h-6 w-6 animate-spin"/> جاري الحفظ...</> : <><Save className="ml-3 h-6 w-6"/> اعتماد الاستلام والترحيل</>}
                 </Button>
             </div>
