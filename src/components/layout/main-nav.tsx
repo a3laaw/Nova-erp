@@ -106,6 +106,7 @@ import {
 const navItems = {
   ar: [
     { href: '/dashboard', label: 'لوحة التحكم العامة', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    
     { 
       label: 'علاقات العملاء (CRM)', 
       icon: LineChart, 
@@ -120,6 +121,22 @@ const navItems = {
         { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ShoppingBag },
       ]
     },
+
+    { 
+      label: 'المقاولات والإنشاءات',
+      icon: Construction,
+      roles: ['Admin', 'Engineer', 'Accountant'],
+      hrefPrefix: '/dashboard/construction',
+      children: [
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
+        { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات (BOQ)', icon: ClipboardList },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة مقاولي الباطن', icon: HardHat },
+        { href: '/dashboard/construction/subcontractors/certificates/new', label: 'شهادة إنجاز مقاول (تكلفة)', icon: FileCheck },
+        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال (إيراد)', icon: Coins },
+      ]
+    },
+
     { 
       label: 'المبيعات والتجارة',
       icon: Store,
@@ -128,53 +145,42 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/warehouse/sales-deliveries', label: 'فواتير المبيعات / التسليم', icon: Receipt },
-        { href: '/dashboard/warehouse/adjustments?type=sales_return', label: 'مردود مبيعات', icon: RotateCcw },
+        { href: '/dashboard/warehouse/adjustments?type=sales_return', label: 'مردود مبيعات (مرتجع)', icon: RotateCcw },
         { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
       ]
     },
+
     { 
-      label: 'المشتريات',
+      label: 'إدارة المشتريات',
       icon: ShoppingCart,
       roles: ['Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
-        { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي', icon: FileStack },
+        { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
-        { href: '/dashboard/warehouse/adjustments?type=purchase_return', label: 'مردود مشتريات', icon: RotateCcw },
-        { href: '/dashboard/purchasing/vendors', label: 'الموردون', icon: Truck },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
+        { href: '/dashboard/warehouse/adjustments?type=purchase_return', label: 'مردود مشتريات للمورد', icon: RotateCcw },
+        { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: BankIcon },
       ]
     },
+
     { 
       label: 'المخازن والمستودعات',
       icon: Warehouse,
       roles: ['Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/warehouse',
       children: [
-        { href: '/dashboard/warehouse/grns', label: 'استلام بضاعة (GRN)', icon: FileCheck },
-        { href: '/dashboard/warehouse/items', label: 'إدارة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/warehouses', label: 'إدارة المستودعات', icon: Building2 },
-        { href: '/dashboard/warehouse/transfers', label: 'تحويلات مخزنية', icon: ArrowLeftRight },
-        { href: '/dashboard/warehouse/adjustments', label: 'تسويات (تلف/فقد)', icon: Ban },
-        { href: '/dashboard/warehouse/reports/balances', label: 'أرصدة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/reports/item-movement', label: 'بطاقة حركة الصنف', icon: History },
+        { href: '/dashboard/warehouse/grns', label: 'أذونات استلام البضاعة', icon: FileCheck },
+        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف والخدمات', icon: Package },
+        { href: '/dashboard/warehouse/warehouses', label: 'المستودعات والأفرع', icon: Building2 },
+        { href: '/dashboard/warehouse/transfers', label: 'تحويلات بين المخازن', icon: ArrowLeftRight },
+        { href: '/dashboard/warehouse/adjustments', label: 'تسويات العجز والتلف', icon: Ban },
+        { href: '/dashboard/warehouse/reports/balances', label: 'تقرير أرصدة الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/reports/item-movement', label: 'كرت الصنف (الحركة)', icon: History },
       ]
     },
-    { 
-      label: 'المقاولات والمنشآت',
-      icon: Construction,
-      roles: ['Admin', 'Engineer'],
-      hrefPrefix: '/dashboard/construction',
-      children: [
-        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
-        { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات', icon: ClipboardList },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
-        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: HardHat },
-        { href: '/dashboard/construction/subcontractors/certificates/new', label: 'شهادة إنجاز مقاول (تكلفة)', icon: FileCheck },
-        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص (إيراد)', icon: Coins },
-      ]
-    },
+
     { 
       label: 'المحاسبة والمالية', 
       icon: Wallet, 
@@ -182,18 +188,16 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/accounting/invoices', label: 'الفواتير الضريبية', icon: FileStack },
         { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: Scale },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: Book },
-        { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
         { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: TrendingUp },
-        { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
+        { href: '/dashboard/accounting/balance-sheet', label: 'قائمة المركز المالي', icon: Landmark },
         { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
       ]
     },
+
     { 
       label: 'شؤون الموظفين (HR)', 
       icon: HeartHandshake, 
@@ -208,6 +212,7 @@ const navItems = {
         { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
     },
+
     { 
       label: 'الإعدادات', 
       icon: Settings, 
