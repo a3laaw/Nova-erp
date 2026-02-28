@@ -22,7 +22,7 @@ import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { addMonths } from 'date-fns';
+import { addYears } from 'date-fns';
 
 const lineSchema = z.object({
   boqItemId: z.string().optional(),
@@ -196,8 +196,8 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                 const processedItems = data.items.map(item => {
                     const selectedItem = allItems.find(i => i.id === item.itemId)!;
                     let warrantyEndDate = null;
-                    if (selectedItem.warrantyMonths && selectedItem.warrantyMonths > 0) {
-                        warrantyEndDate = addMonths(data.date, selectedItem.warrantyMonths);
+                    if (selectedItem.warrantyYears && selectedItem.warrantyYears > 0) {
+                        warrantyEndDate = addYears(data.date, selectedItem.warrantyYears);
                     }
 
                     return {
@@ -343,9 +343,9 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                             <Controller control={control} name={`items.${index}.itemId`} render={({ field: itemField }) => (
                                                 <div className="flex flex-col gap-1">
                                                     <InlineSearchList value={itemField.value} onSelect={(val) => { itemField.onChange(val); const itemData = allItems.find(i => i.id === val); if (itemData) setValue(`items.${index}.unitCost`, itemData.costPrice || 0); }} options={allowedItems} placeholder="اختر مادة..." disabled={(issueType === 'project_site' && !lineItem?.boqItemId) || isSaving} className="border-none shadow-none focus-visible:ring-0 text-lg font-bold" />
-                                                    {selectedItemInfo?.warrantyMonths && selectedItemInfo.warrantyMonths > 0 && (
+                                                    {selectedItemInfo?.warrantyYears && selectedItemInfo.warrantyYears > 0 && (
                                                         <div className="px-3 flex items-center gap-1 text-[10px] text-primary font-bold">
-                                                            <ShieldCheck className="h-3 w-3" /> كفالة لمدة {selectedItemInfo.warrantyMonths} شهر
+                                                            <ShieldCheck className="h-3 w-3" /> كفالة لمدة {selectedItemInfo.warrantyYears} سنة
                                                         </div>
                                                     )}
                                                 </div>

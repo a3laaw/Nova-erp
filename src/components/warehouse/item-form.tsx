@@ -50,7 +50,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     sellingPrice: '',
     reorderLevel: '',
     expiryTracked: false,
-    warrantyMonths: '',
+    warrantyYears: '',
   });
 
   useEffect(() => {
@@ -67,14 +67,14 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
         sellingPrice: String(item.sellingPrice || ''),
         reorderLevel: String(item.reorderLevel || ''),
         expiryTracked: item.expiryTracked || false,
-        warrantyMonths: String(item.warrantyMonths || ''),
+        warrantyYears: String(item.warrantyYears || ''),
       });
     } else {
         setFormData({
             name: '', description: '', sku: '', categoryId: '',
             itemType: 'product', inventoryTracked: true, unitOfMeasure: '',
             costPrice: '', sellingPrice: '', reorderLevel: '', expiryTracked: false,
-            warrantyMonths: '',
+            warrantyYears: '',
         });
     }
   }, [item, isOpen]);
@@ -101,7 +101,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
             costPrice: Number(formData.costPrice) || 0,
             sellingPrice: Number(formData.sellingPrice) || 0,
             reorderLevel: Number(formData.reorderLevel) || 0,
-            warrantyMonths: Number(formData.warrantyMonths) || 0,
+            warrantyYears: Number(formData.warrantyYears) || 0,
             inventoryTracked: formData.itemType === 'product' ? formData.inventoryTracked : false,
             expiryTracked: formData.itemType === 'product' && formData.inventoryTracked ? formData.expiryTracked : false,
         };
@@ -164,10 +164,10 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
             </div>
             
             <div className="grid gap-2">
-                <Label htmlFor="warrantyMonths" className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-primary" /> فترة الكفالة (بالشهور)
+                <Label htmlFor="warrantyYears" className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> فترة الكفالة (بالسنوات)
                 </Label>
-                <Input id="warrantyMonths" type="number" value={formData.warrantyMonths} onChange={handleChange} placeholder="0 = بدون كفالة" dir="ltr" />
+                <Input id="warrantyYears" type="number" value={formData.warrantyYears} onChange={handleChange} placeholder="0 = بدون كفالة" dir="ltr" />
             </div>
 
             <div className="md:col-span-2 grid gap-2">
