@@ -1,15 +1,16 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useFirebase } from '@/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { useState, useEffect, useMemo } from 'react';
+import { useFirebase, useSubscription } from '@/firebase';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle, RefreshCw, ShieldAlert, ShoppingCart } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import type { JournalEntry, PurchaseOrder, RequestForQuotation, CashReceipt } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 interface Anomaly {
   type: 'inventory' | 'accounting' | 'procurement';
@@ -22,87 +23,64 @@ interface Anomaly {
 
 export function DataAnomalyAlert() {
   const { firestore } = useFirebase();
-  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const checkIntegrity = useCallback(async () => {
-    if (!firestore) return;
-    setLoading(true);
-    const foundAnomalies: Anomaly[] = [];
+  // جلب كافة البيانات المطلوبة للمراجعة بشكل لحظي
+  const { data: jes, loading: jesLoading } = useSubscription<JournalEntry>(firestore, 'journalEntries');
+  const { data: grns, loading: grnsLoading } = useSubscription<any>(firestore, 'grns');
+  const { data: rfqs, loading: rfqsLoading } = useSubscription<RequestForQuotation>(firestore, 'rfqs');
+  const { data: pos, loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders');
+  const { data: receipts, loading: receiptsLoading } = useSubscription<CashReceipt>(firestore, 'cashReceipts');
 
-    try {
-      // جلب البيانات اللازمة للفحص
-      const jesSnap = await getDocs(collection(firestore, 'journalEntries'));
-      const allJeIds = new Set(jesSnap.docs.map(d => d.id));
-      
-      const rfqsSnap = await getDocs(collection(firestore, 'rfqs'));
-      const allRfqIds = new Set(rfqsSnap.docs.map(d => d.id));
+  const anomalies = useMemo(() => {
+    if (jesLoading || grnsLoading || rfqsLoading || posLoading || receiptsLoading) return [];
+    
+    const found: Anomaly[] = [];
+    const allJeIds = new Set(jes.map(d => d.id));
+    const allRfqIds = new Set(rfqs.map(d => d.id));
 
-      // 1. فحص فجوات المخزون (GRNs vs JEs)
-      const grnsSnap = await getDocs(collection(firestore, 'grns'));
-      const orphanedGrns = grnsSnap.docs.filter(doc => {
-        const data = doc.data();
-        return !data.journalEntryId || !allJeIds.has(data.journalEntryId);
+    // 1. فحص فجوات المخزون (GRNs vs JEs)
+    const orphanedGrns = grns.filter(doc => !doc.journalEntryId || !allJeIds.has(doc.journalEntryId));
+    if (orphanedGrns.length > 0) {
+      found.push({
+        type: 'inventory',
+        title: 'خلل مالي في استلام البضاعة',
+        count: orphanedGrns.length,
+        description: `يوجد ${orphanedGrns.length} إذن استلام بضاعة لا يملك أثراً مالياً، مما يسبب تضارباً في أرصدة الموردين والمخزون.`,
+        link: '/dashboard/warehouse/grns',
+        variant: 'destructive'
       });
-
-      if (orphanedGrns.length > 0) {
-        foundAnomalies.push({
-          type: 'inventory',
-          title: 'خلل مالي في استلام البضاعة',
-          count: orphanedGrns.length,
-          description: `يوجد ${orphanedGrns.length} إذن استلام بضاعة لا يملك أثراً مالياً، مما يسبب تضارباً في أرصدة الموردين والمخزون.`,
-          link: '/dashboard/warehouse/grns',
-          variant: 'destructive'
-        });
-      }
-
-      // 2. فحص فجوات دورة المشتريات (أوامر شراء بدون طلب تسعير)
-      const posSnap = await getDocs(collection(firestore, 'purchaseOrders'));
-      const directPurchases = posSnap.docs.filter(doc => {
-        const data = doc.data();
-        // خلل إجرائي: أمر شراء غير مرتبط بـ RFQ (شراء مباشر)
-        return !data.rfqId || !allRfqIds.has(data.rfqId);
-      });
-
-      if (directPurchases.length > 0) {
-        foundAnomalies.push({
-          type: 'procurement',
-          title: 'تنبيه إجرائي: شراء مباشر',
-          count: directPurchases.length,
-          description: `يوجد ${directPurchases.length} أمر شراء تم إصدارها مباشرة دون طلب تسعير (RFQ). يرجى مراجعة مبررات الشراء المباشر.`,
-          link: '/dashboard/purchasing/purchase-orders',
-          variant: 'warning'
-        });
-      }
-
-      // 3. فحص فجوات سندات القبض
-      const receiptsSnap = await getDocs(collection(firestore, 'cashReceipts'));
-      const orphanedReceipts = receiptsSnap.docs.filter(doc => !doc.data().journalEntryId || !allJeIds.has(doc.data().journalEntryId));
-
-      if (orphanedReceipts.length > 0) {
-        foundAnomalies.push({
-          type: 'accounting',
-          title: 'خلل مالي في سندات القبض',
-          count: orphanedReceipts.length,
-          description: `يوجد ${orphanedReceipts.length} سند قبض لم يولّد قيداً محاسبياً، مما يؤدي لعدم تحديث مديونية العميل.`,
-          link: '/dashboard/accounting/cash-receipts',
-          variant: 'destructive'
-        });
-      }
-
-      setAnomalies(foundAnomalies);
-    } catch (error) {
-      console.error("Integrity check failed:", error);
-    } finally {
-      setLoading(false);
     }
-  }, [firestore]);
 
-  useEffect(() => {
-    checkIntegrity();
-  }, [checkIntegrity]);
+    // 2. فحص فجوات دورة المشتريات (أوامر شراء بدون طلب تسعير)
+    const directPurchases = pos.filter(doc => !doc.rfqId || !allRfqIds.has(doc.rfqId));
+    if (directPurchases.length > 0) {
+      found.push({
+        type: 'procurement',
+        title: 'تنبيه إجرائي: شراء مباشر',
+        count: directPurchases.length,
+        description: `يوجد ${directPurchases.length} أمر شراء تم إصدارها مباشرة دون طلب تسعير (RFQ).`,
+        link: '/dashboard/purchasing/purchase-orders',
+        variant: 'warning'
+      });
+    }
 
-  if (loading) return <Skeleton className="h-20 w-full mb-4 rounded-xl" />;
+    // 3. فحص فجوات سندات القبض
+    const orphanedReceipts = receipts.filter(doc => !doc.journalEntryId || !allJeIds.has(doc.journalEntryId));
+    if (orphanedReceipts.length > 0) {
+      found.push({
+        type: 'accounting',
+        title: 'خلل مالي في سندات القبض',
+        count: orphanedReceipts.length,
+        description: `يوجد ${orphanedReceipts.length} سند قبض لم يولّد قيداً محاسبيًا، مما يؤدي لعدم تحديث مديونية العميل.`,
+        link: '/dashboard/accounting/cash-receipts',
+        variant: 'destructive'
+      });
+    }
+
+    return found;
+  }, [jes, grns, rfqs, pos, receipts, jesLoading, grnsLoading, rfqsLoading, posLoading, receiptsLoading]);
+
+  if (jesLoading) return <Skeleton className="h-20 w-full mb-4 rounded-xl" />;
   if (anomalies.length === 0) return null;
 
   return (
@@ -135,8 +113,4 @@ export function DataAnomalyAlert() {
       ))}
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
 }

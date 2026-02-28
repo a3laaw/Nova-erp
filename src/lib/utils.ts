@@ -110,36 +110,31 @@ export function cleanFirestoreData(data: any): any {
   }
   
   if (data && typeof data === 'object') {
-    // Check if it's a Firestore-like object (e.g., Timestamp, serverTimestamp sentinel)
-    // by looking for a non-enumerable property or a specific method.
-    // A simple check like `data.constructor.name` can be unreliable after minification.
-    // Firestore Timestamps have a `toDate` method.
+    // التحقق من كائنات Firebase الخاصة (Timestamp, FieldValue sentinels)
     if (typeof data.toDate === 'function') {
-      return data; // It's a Timestamp, keep it.
+      return data; 
     }
-    // Firestore serverTimestamp sentinel is an object but doesn't have common properties.
-    // A robust check is difficult, but we can check for common sentinel patterns if needed.
-    // For now, we assume if it's not a Date, it's a plain object to be cleaned.
     
+    // منع تنظيف كائنات FieldValue (مثل serverTimestamp) عبر فحص النوع الداخلي إذا لم يكن كائناً عادياً
+    if (data.constructor?.name === 'FieldValue') {
+        return data;
+    }
+
     if (data instanceof Date) {
-      return data; // It's a standard Date, keep it.
+      return data; 
     }
 
     const cleanedData: { [key: string]: any } = {};
     for (const key in data) {
-      // Check if the property is its own, not inherited
       if (Object.prototype.hasOwnProperty.call(data, key)) {
         const value = data[key];
-        // The core logic: only include the property if its value is NOT undefined.
-        // null, 0, false, '' are all valid Firestore values.
         if (value !== undefined) {
-          cleanedData[key] = cleanFirestoreData(value); // Recurse for nested objects
+          cleanedData[key] = cleanFirestoreData(value); 
         }
       }
     }
     return cleanedData;
   }
   
-  // Return primitives (string, number, boolean, null) as is.
   return data;
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, getDocs, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, doc, deleteDoc, query, where, limit } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Search, Loader2, MoreHorizontal, Eye, Trash2, AlertCircle } from 'lucide-react';
@@ -24,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { JournalEntry } from '@/lib/types';
 
 export function GrnList() {
   const { firestore } = useFirebase();
@@ -32,18 +34,13 @@ export function GrnList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [existingJeIds, setExistingJeIds] = useState<Set<string>>(new Set());
 
   const queryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
-  const { data: grns, loading } = useSubscription<any>(firestore, 'grns', queryConstraints);
+  const { data: grns, loading: grnsLoading } = useSubscription<any>(firestore, 'grns', queryConstraints);
 
-  // فحص القيود المحاسبية الموجودة لتمييز الإذونات التي بها خلل
-  useEffect(() => {
-    if (!firestore) return;
-    getDocs(collection(firestore, 'journalEntries')).then(snap => {
-        setExistingJeIds(new Set(snap.docs.map(d => d.id)));
-    });
-  }, [firestore, grns]);
+  // فحص القيود المحاسبية الموجودة لتمييز الإذونات التي بها خلل - يعمل بالوقت الفعلي الآن
+  const { data: journalEntries } = useSubscription<JournalEntry>(firestore, 'journalEntries');
+  const existingJeIds = useMemo(() => new Set(journalEntries.map(d => d.id)), [journalEntries]);
 
   const filteredGrns = useMemo(() => {
     if (!grns) return [];
@@ -74,7 +71,7 @@ export function GrnList() {
     }
   };
 
-  if (loading && grns.length === 0) {
+  if (grnsLoading && grns.length === 0) {
     return (
         <div className="space-y-4">
             <Skeleton className="h-10 w-full rounded-lg" />
@@ -110,7 +107,7 @@ export function GrnList() {
                     {filteredGrns.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                {loading ? <Loader2 className="animate-spin mx-auto h-6 w-6 text-primary" /> : 'لا توجد أذونات استلام مسجلة.'}
+                                {grnsLoading ? <Loader2 className="animate-spin mx-auto h-6 w-6 text-primary" /> : 'لا توجد أذونات استلام مسجلة.'}
                             </TableCell>
                         </TableRow>
                     ) : (
