@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc, collectionGroup } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc, collectionGroup, addDoc } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -26,19 +26,19 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink } from 'lucide-react';
+import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink, Sparkles, Coins } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
-import type { Client, ClientTransaction, Employee, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
+import type { Client, ClientTransaction, Employee, TransactionType, WorkStage, TransactionStage, Account } from '@/lib/types';
 import { format, differenceInDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { TransactionTimeline } from '@/components/clients/transaction-timeline';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 
@@ -84,14 +84,6 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode, label: string,
         </div>
     );
 }
-
-const canStartStage = (stage: Partial<TransactionStage>, allStages: TransactionStage[]): { allowed: boolean, reason: string } => {
-    if (stage.stageType === 'parallel') return { allowed: true, reason: '' };
-    const predecessors = allStages.filter(s => s.nextStageIds?.includes(stage.stageId!));
-    if (predecessors.length === 0) return { allowed: true, reason: '' };
-    const arePredecessorsCompleted = predecessors.every(p => p.status === 'completed');
-    return arePredecessorsCompleted ? { allowed: true, reason: '' } : { allowed: false, reason: 'يجب إكمال المراحل السابقة أولاً.' };
-};
 
 export default function TransactionDetailPage() {
   const params = useParams();
@@ -139,7 +131,7 @@ export default function TransactionDetailPage() {
   }, [firestore, transaction?.transactionTypeId]);
 
   const handleStageStatusChange = async (stageId: string, newStatus: TransactionStage['status']) => {
-        if (!firestore || !currentUser || !transaction) return;
+        if (!firestore || !currentUser || !transaction || !transactionRef) return;
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
@@ -148,14 +140,109 @@ export default function TransactionDetailPage() {
             if (stageIndex === -1) throw new Error("Stage not found");
             const stage = currentStages[stageIndex];
             const stageTemplate = workStageTemplates.find(t => t.id === stageId);
+            
             stage.status = newStatus;
             const now = new Date();
             if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
             if (newStatus === 'completed') stage.endDate = now;
-            batch.update(transactionRef!, { stages: currentStages });
+
+            // --- أتمتة المستخلصات بناءً على مراحل العمل ---
+            if (newStatus === 'completed' && transaction.contract?.clauses) {
+                const matchedClause = transaction.contract.clauses.find(c => c.condition === stage.name && c.status === 'غير مستحقة');
+                
+                if (matchedClause) {
+                    // 1. توليد رقم مستخلص تلقائي
+                    const currentYear = new Date().getFullYear();
+                    const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
+                    const appCounterDoc = await getDoc(appCounterRef);
+                    const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                    const appNumber = `AUTO-APP-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
+
+                    // 2. إنشاء مستند المستخلص (مسودة)
+                    const newAppRef = doc(collection(firestore, 'payment_applications'));
+                    const newJeRef = doc(collection(firestore, 'journalEntries'));
+
+                    const appData = {
+                        applicationNumber: appNumber,
+                        date: serverTimestamp(),
+                        projectId: transactionId,
+                        clientId: clientId,
+                        clientName: client?.nameAr || 'غير معروف',
+                        projectName: transaction.transactionType,
+                        items: [{
+                            boqItemId: stageId,
+                            description: `دفعة مرحلة: ${stage.name}`,
+                            unit: 'مرحلة',
+                            unitPrice: matchedClause.amount,
+                            previousQuantity: 0,
+                            currentQuantity: 1,
+                            totalQuantity: 1,
+                            totalAmount: matchedClause.amount
+                        }],
+                        totalAmount: matchedClause.amount,
+                        status: 'draft',
+                        journalEntryId: newJeRef.id,
+                        createdAt: serverTimestamp(),
+                        createdBy: 'system-auto-workflow',
+                    };
+                    batch.set(newAppRef, appData);
+                    batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
+
+                    // 3. إنشاء القيد المحاسبي المرتبط (مسودة)
+                    const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
+                    const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', client?.nameAr), limit(1)));
+
+                    if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
+                        const revenueAcc = revenueAccountSnap.docs[0];
+                        const clientAcc = clientAccountSnap.docs[0];
+                        
+                        const jeData = {
+                            entryNumber: `JE-${appNumber}`,
+                            date: serverTimestamp(),
+                            narration: `[أتمتة] استحقاق دفعة إكمال مرحلة: ${stage.name} - مشروع: ${transaction.transactionType}`,
+                            status: 'draft',
+                            totalDebit: matchedClause.amount,
+                            totalCredit: matchedClause.amount,
+                            lines: [
+                                { accountId: clientAcc.id, accountName: client?.nameAr, debit: matchedClause.amount, credit: 0, auto_profit_center: transactionId },
+                                { accountId: revenueAcc.id, accountName: revenueAcc.data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: transactionId }
+                            ],
+                            clientId: clientId,
+                            transactionId: transactionId,
+                            createdAt: serverTimestamp(),
+                            createdBy: 'system-auto-workflow',
+                        };
+                        batch.set(newJeRef, jeData);
+                    }
+
+                    // 4. تحديث حالة بند العقد إلى "مستحقة"
+                    const updatedClauses = transaction.contract.clauses.map(c => 
+                        c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c
+                    );
+                    batch.update(transactionRef, { 'contract.clauses': updatedClauses });
+
+                    // 5. تسجيل حدث في التايم لاين
+                    const timelineRef = collection(transactionRef, 'timelineEvents');
+                    const autoLog = {
+                        type: 'comment',
+                        content: `**[أتمتة ذكية]** تم إكمال مرحلة "${stage.name}". بناءً عليه، قام النظام بتوليد **مسودة مستخلص** برقم ${appNumber} بقيمة ${formatCurrency(matchedClause.amount)} بانتظار مراجعة المحاسب.`,
+                        userId: 'system',
+                        userName: 'نظام Nova الذكي',
+                        createdAt: serverTimestamp(),
+                    };
+                    batch.set(doc(timelineRef), autoLog);
+
+                    toast({ title: 'أتمتة ذكية', description: `تم توليد مستخلص تلقائي لإكمال مرحلة: ${stage.name}` });
+                }
+            }
+
+            batch.update(transactionRef, { stages: currentStages });
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تحديث حالة المرحلة.' });
-        } catch (error) { toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' }); }
+        } catch (error) { 
+            console.error(error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' }); 
+        }
         finally { setIsProcessing(false); }
   };
 
@@ -199,17 +286,31 @@ export default function TransactionDetailPage() {
             </TabsList>
             <TabsContent value="stages" className="mt-6">
                 <Card>
-                    <CardHeader><CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> مراحل العمل</CardTitle></CardHeader>
+                    <CardHeader>
+                        <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> مراحل العمل</CardTitle>
+                        <CardDescription>بمجرد إكمال مرحلة مرتبطة بدفعة مالية، سيقوم النظام بإصدار مستخلص تلقائي.</CardDescription>
+                    </CardHeader>
                     <CardContent className="space-y-4">
                         {enrichedStages.map((stage) => (
                             <div key={stage.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
                                 <div className="flex items-center gap-2">
                                     <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
-                                    <span className="font-semibold">{stage.name}</span>
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold">{stage.name}</span>
+                                        {transaction.contract?.clauses?.some(c => c.condition === stage.name) && (
+                                            <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
+                                                <Sparkles className="h-3 w-3"/> مرتبطة بمطالبة مالية
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex gap-2">
                                     {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.id!, 'in-progress')} disabled={isProcessing}><Play className="ml-2 h-4 w-4"/> بدء</Button>}
-                                    {stage.status === 'in-progress' && <Button size="sm" variant="outline" className="bg-green-50 text-green-700" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing}><Check className="ml-2 h-4 w-4"/> إكمال</Button>}
+                                    {stage.status === 'in-progress' && (
+                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing}>
+                                            <Check className="ml-2 h-4 w-4"/> إكمال وتوليد مستخلص
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -234,7 +335,6 @@ export default function TransactionDetailPage() {
                                             <Plus className="ml-2 h-4 w-4"/> إنشاء جدول جديد
                                         </Link>
                                     </Button>
-                                    {/* TODO: Add Link Existing Button */}
                                 </div>
                             </div>
                         )}
