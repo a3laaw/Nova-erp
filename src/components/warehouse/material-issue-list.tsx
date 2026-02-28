@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -12,7 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, getDocs, orderBy, where, doc, deleteDoc } from 'firebase/firestore';
-import type { InventoryAdjustment } from '@/lib/types';
+import type { InventoryAdjustment, JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Search, Loader2, MoreHorizontal, Eye, Trash2, AlertCircle } from 'lucide-react';
@@ -24,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 
 export function MaterialIssueList() {
   const { firestore } = useFirebase();
@@ -32,7 +34,6 @@ export function MaterialIssueList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [itemToDelete, setItemToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [existingJeIds, setExistingJeIds] = useState<Set<string>>(new Set());
 
   const issueQuery = useMemo(() => [
     where('type', '==', 'material_issue'),
@@ -41,12 +42,8 @@ export function MaterialIssueList() {
 
   const { data: issues, loading } = useSubscription<InventoryAdjustment>(firestore, 'inventoryAdjustments', issueQuery);
 
-  useEffect(() => {
-    if (!firestore) return;
-    getDocs(collection(firestore, 'journalEntries')).then(snap => {
-        setExistingJeIds(new Set(snap.docs.map(d => d.id)));
-    });
-  }, [firestore, issues]);
+  const { data: journalEntries } = useSubscription<JournalEntry>(firestore, 'journalEntries');
+  const existingJeIds = useMemo(() => new Set(journalEntries.map(d => d.id)), [journalEntries]);
 
   const filteredIssues = useMemo(() => {
     if (!issues) return [];

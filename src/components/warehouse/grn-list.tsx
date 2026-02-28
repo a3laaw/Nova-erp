@@ -38,7 +38,6 @@ export function GrnList() {
   const queryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
   const { data: grns, loading: grnsLoading } = useSubscription<any>(firestore, 'grns', queryConstraints);
 
-  // فحص القيود المحاسبية الموجودة لتمييز الإذونات التي بها خلل - يعمل بالوقت الفعلي الآن
   const { data: journalEntries } = useSubscription<JournalEntry>(firestore, 'journalEntries');
   const existingJeIds = useMemo(() => new Set(journalEntries.map(d => d.id)), [journalEntries]);
 

@@ -60,7 +60,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
     const [vendorData, setVendorData] = useState({ phone: '', address: '', contactPerson: '' });
 
-    // مراجع لمنع إعادة تعيين البيانات عند تحديث الحالة في الخلفية
     const lastLoadedPoIdRef = useRef<string | null>(null);
 
     const { data: pos = [], loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', [
@@ -87,7 +86,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
 
     const selectedPo = useMemo(() => pos.find(p => p.id === selectedPoId), [pos, selectedPoId]);
 
-    // محرك تحميل بيانات أمر الشراء - يعمل فقط عند تغيير المعرف
     useEffect(() => {
         if (!selectedPoId || !firestore || !selectedPo) {
             if (!selectedPoId) {
@@ -100,17 +98,14 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             return;
         }
 
-        // إذا كان أمر الشراء هو نفسه الذي تم تحميله بالفعل، لا تفعل شيئاً للحفاظ على تعديلات المستخدم
         if (selectedPoId === lastLoadedPoIdRef.current) return;
 
         const loadPoData = async () => {
             setLoadingPoStatus(true);
             try {
-                // 1. فحص هل المورد مسجل أم محتمل
                 const isRegistered = registeredVendors.some(v => v.id === selectedPo.vendorId);
                 setIsProspectiveVendor(!isRegistered);
 
-                // 2. جلب تاريخ الاستلام السابق لهذا الأمر
                 const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('purchaseOrderId', '==', selectedPoId)));
                 const receivedTotals = new Map<string, number>();
                 grnsSnap.forEach(doc => {
@@ -121,7 +116,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     });
                 });
 
-                // 3. تحضير بنود الاستلام بالكميات المتبقية
                 const itemsWithBalance = selectedPo.items.map(item => {
                     const previouslyReceived = receivedTotals.get(item.internalItemId!) || 0;
                     const remaining = Math.max(0, item.quantity - previouslyReceived);
@@ -130,19 +124,17 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                         itemName: item.itemName,
                         quantityOrdered: item.quantity,
                         quantityPreviouslyReceived: previouslyReceived,
-                        quantityReceived: remaining, // القيمة الافتراضية هي المتبقي، ولكنها قابلة للتعديل
+                        quantityReceived: remaining,
                         unitPrice: item.unitPrice,
                         batchNumber: '',
                         expiryDate: null
                     };
                 }).filter(i => i.quantityOrdered > i.quantityPreviouslyReceived);
 
-                // 4. تعيين القيم في النموذج
                 replace(itemsWithBalance);
                 setValue('discountAmount', selectedPo.discountAmount || 0);
                 setValue('deliveryFees', selectedPo.deliveryFees || 0);
                 
-                // تحديث المرجع لضمان عدم التكرار
                 lastLoadedPoIdRef.current = selectedPoId;
 
             } catch (error) {
@@ -270,6 +262,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     };
                 });
 
+                // FIX: Store the journalEntryId in the GRN document
                 transaction.set(newGrnRef, cleanFirestoreData({
                     grnNumber, 
                     purchaseOrderId: data.purchaseOrderId, 
@@ -281,6 +274,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     deliveryFees: data.deliveryFees,
                     vendorId: selectedPo.vendorId, 
                     vendorName: selectedPo.vendorName,
+                    journalEntryId: newJournalEntryRef.id,
                     createdAt: serverTimestamp(), 
                     createdBy: currentUser.id,
                 }));
