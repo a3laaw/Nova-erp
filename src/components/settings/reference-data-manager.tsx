@@ -226,6 +226,7 @@ function ManagerView({
   const [secondaryOrderValues, setSecondaryOrderValues] = useState<Record<string, string>>({});
   const [isSecondaryOrderChanged, setIsSecondaryOrderChanged] = useState(false);
 
+  const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
 
@@ -447,6 +448,7 @@ function ManagerView({
     setItemSubcontractorTypeIds([]);
     setItemActivityTypeIdsForBoq([]);
     setParentCategory(null);
+    setIsSaving(false);
   }
 
   const handleSave = async (type: 'primary' | 'secondary') => {
@@ -454,6 +456,7 @@ function ManagerView({
     
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
     
+    setIsSaving(true);
     try {
       let dataToSave: any = { name: itemName };
        if (type === 'primary' && primaryCollectionName === 'departments') {
@@ -516,6 +519,8 @@ function ManagerView({
     } catch (e) {
        console.error(e);
        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ العنصر.' });
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -528,7 +533,9 @@ function ManagerView({
       if (!firestore || !itemToDelete) return;
       const { id, type } = itemToDelete;
       const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
-       try {
+       
+      setIsSaving(true);
+      try {
         await deleteDoc(doc(firestore, collectionPath, id));
         toast({ title: 'نجاح', description: 'تم حذف العنصر.' });
         if (type === 'primary') await fetchPrimaryItems();
@@ -537,6 +544,7 @@ function ManagerView({
         console.error(e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العنصر. قد يكون مرتبطًا ببيانات أخرى.' });
       } finally {
+        setIsSaving(false);
         setIsDeleteDialogOpen(false);
         setItemToDelete(null);
       }
@@ -558,6 +566,7 @@ function ManagerView({
     const fetchFn = type === 'primary' ? fetchPrimaryItems : fetchSecondaryItems;
     const collectionPath = type === 'primary' ? primaryCollectionName : `${primaryCollectionName}/${selectedPrimary?.id}/${secondaryCollectionName}`;
 
+    setIsSaving(true);
     const batch = writeBatch(firestore);
     list.forEach(item => {
         const newOrder = orders[item.id!];
@@ -574,6 +583,8 @@ function ManagerView({
         await fetchFn();
     } catch(e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الترتيب.'});
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -890,8 +901,8 @@ function ManagerView({
                     </ScrollArea>
                     {isPrimaryOrderChanged && !isRecursiveView && (
                         <div className="flex justify-end mt-2">
-                            <Button size="sm" onClick={() => handleSaveOrder('primary')}>
-                                <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                            <Button size="sm" onClick={() => handleSaveOrder('primary')} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />} حفظ الترتيب
                             </Button>
                         </div>
                     )}
@@ -960,8 +971,8 @@ function ManagerView({
                     </ScrollArea>
                     {isSecondaryOrderChanged && !isRecursiveSecondary && (
                         <div className="flex justify-end mt-2">
-                            <Button size="sm" onClick={() => handleSaveOrder('secondary')}>
-                                <Save className="ml-2 h-4 w-4" /> حفظ الترتيب
+                            <Button size="sm" onClick={() => handleSaveOrder('secondary')} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />} حفظ الترتيب
                             </Button>
                         </div>
                     )}
@@ -998,7 +1009,7 @@ function ManagerView({
                                 </div>
                              )}
                             <Label htmlFor="item-name">{`اسم ${isPrimaryDialogOpen ? primarySingularTitle : secondarySingularTitle}`}</Label>
-                            <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
+                            <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} disabled={isSaving} />
                         </div>
 
                         {isPrimaryDialogOpen && primaryCollectionName === 'departments' && (
@@ -1009,7 +1020,7 @@ function ManagerView({
                                     selected={itemActivityTypes}
                                     onChange={setItemActivityTypes}
                                     placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                    disabled={loadingCompanyActivityTypes}
+                                    disabled={loadingCompanyActivityTypes || isSaving}
                                 />
                             </div>
                         )}
@@ -1018,7 +1029,7 @@ function ManagerView({
                            <div className="px-4 space-y-4">
                                {isBoqView && (
                                    <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
-                                       <Checkbox id="isHeader" checked={isHeader} onCheckedChange={(checked) => setIsHeader(!!checked)} />
+                                       <Checkbox id="isHeader" checked={isHeader} onCheckedChange={(checked) => setIsHeader(!!checked)} disabled={isSaving} />
                                        <Label htmlFor="isHeader">بند رئيسي (عنوان فقط)</Label>
                                    </div>
                                )}
@@ -1027,7 +1038,7 @@ function ManagerView({
                                    {isBoqView && !isHeader && (
                                        <div className="grid gap-2">
                                            <Label htmlFor="item-unit">الوحدة الافتراضية</Label>
-                                           <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." />
+                                           <Input id="item-unit" value={itemUnit} onChange={(e) => setItemUnit(e.target.value)} placeholder="مثال: م3، م2، مقطوعية..." disabled={isSaving} />
                                        </div>
                                    )}
                                </div>
@@ -1041,7 +1052,7 @@ function ManagerView({
                                             selected={itemActivityTypeIdsForBoq}
                                             onChange={setItemActivityTypeIdsForBoq}
                                             placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                            disabled={loadingCompanyActivityTypes}
+                                            disabled={loadingCompanyActivityTypes || isSaving}
                                         />
                                     </div>
                                     <div className="grid gap-2">
@@ -1051,7 +1062,7 @@ function ManagerView({
                                             selected={itemTransactionTypeIds}
                                             onChange={setItemTransactionTypeIds}
                                             placeholder={transactionTypesLoading ? "تحميل..." : "اختر بناء على النشاط أولاً..."}
-                                            disabled={transactionTypesLoading}
+                                            disabled={transactionTypesLoading || isSaving}
                                         />
                                     </div>
                                     <div className="grid gap-2">
@@ -1061,7 +1072,7 @@ function ManagerView({
                                             selected={itemSubcontractorTypeIds}
                                             onChange={setItemSubcontractorTypeIds}
                                             placeholder={subcontractorTypesLoading ? "تحميل..." : "اختر نوعًا أو أكثر..."}
-                                            disabled={subcontractorTypesLoading}
+                                            disabled={subcontractorTypesLoading || isSaving}
                                         />
                                     </div>
                                 </div>
@@ -1077,7 +1088,7 @@ function ManagerView({
 
                                     <div className="grid gap-2">
                                         <Label>نوع المرحلة</Label>
-                                        <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)}>
+                                        <Select value={itemStageType} onValueChange={(v) => setItemStageType(v as any)} disabled={isSaving}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="sequential">تسلسلية (خطوة أساسية في سير العمل)</SelectItem>
@@ -1088,7 +1099,7 @@ function ManagerView({
                                     
                                     <div className="grid gap-2">
                                         <Label>نوع التتبع</Label>
-                                        <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)}>
+                                        <Select value={itemTrackingType} onValueChange={(v) => setItemTrackingType(v as any)} disabled={isSaving}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="duration">بالمدة الزمنية</SelectItem>
@@ -1101,17 +1112,17 @@ function ManagerView({
                                     {itemTrackingType === 'duration' && (
                                         <div className="grid gap-2">
                                             <Label htmlFor="item-duration">المدة المتوقعة (بالأيام)</Label>
-                                            <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} />
+                                            <Input id="item-duration" type="number" value={itemDuration} onChange={(e) => setItemDuration(e.target.value === '' ? '' : Number(e.target.value))} disabled={isSaving} />
                                         </div>
                                     )}
                                     {itemTrackingType === 'occurrence' && (
                                     <div className="p-3 border rounded-md space-y-4 bg-background">
                                         <div className="grid gap-2">
                                             <Label htmlFor="item-occurrences">الحد الأقصى للتكرار</Label>
-                                            <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" />
+                                            <Input id="item-occurrences" type="number" value={itemMaxOccurrences} onChange={(e) => setItemMaxOccurrences(e.target.value === '' ? '' : Number(e.target.value))} placeholder="مثال: 5" disabled={isSaving} />
                                         </div>
                                         <div className="flex items-center space-x-2">
-                                        <Checkbox id="allowManualCompletion" checked={itemAllowManualCompletion} onCheckedChange={(checked) => setItemAllowManualCompletion(!!checked)} />
+                                        <Checkbox id="allowManualCompletion" checked={itemAllowManualCompletion} onCheckedChange={(checked) => setItemAllowManualCompletion(!!checked)} disabled={isSaving} />
                                         <Label htmlFor="allowManualCompletion">السماح بالإكمال اليدوي قبل الوصول للحد الأقصى</Label>
                                         </div>
                                     </div>
@@ -1129,7 +1140,7 @@ function ManagerView({
                                             selected={itemRoles}
                                             onChange={setItemRoles}
                                             placeholder="اتركه فارغًا ليكون متاحًا للجميع"
-                                            disabled={refDataLoading}
+                                            disabled={refDataLoading || isSaving}
                                         />
                                     </div>
 
@@ -1141,7 +1152,7 @@ function ManagerView({
                                                 selected={itemAllowedDuringStages}
                                                 onChange={setItemAllowedDuringStages}
                                                 placeholder="اتركه فارغًا ليظهر دائماً..."
-                                                disabled={refDataLoading}
+                                                disabled={refDataLoading || isSaving}
                                             />
                                         </div>
                                     )}
@@ -1153,12 +1164,12 @@ function ManagerView({
                                             selected={itemNextStageIds}
                                             onChange={setItemNextStageIds}
                                             placeholder="اختر مرحلة أو أكثر للانتقال إليها..."
-                                            disabled={refDataLoading}
+                                            disabled={refDataLoading || isSaving}
                                         />
                                     </div>
 
                                     <div className="flex items-center space-x-2 pt-4">
-                                        <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} />
+                                        <Checkbox id="enableModificationTracking" checked={itemEnableModificationTracking} onCheckedChange={(checked) => setItemEnableModificationTracking(!!checked)} disabled={isSaving} />
                                         <Label htmlFor="enableModificationTracking">تفعيل عداد التعديلات لهذه المرحلة</Label>
                                     </div>
                                 </div>
@@ -1167,8 +1178,10 @@ function ManagerView({
                     </div>
                 </ScrollArea>
                 <DialogFooter className="pt-4 border-t">
-                    <Button variant="outline" onClick={closeDialog}>إلغاء</Button>
-                    <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')}>حفظ</Button>
+                    <Button variant="outline" onClick={closeDialog} disabled={isSaving}>إلغاء</Button>
+                    <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />} حفظ
+                    </Button>
                 </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1182,8 +1195,10 @@ function ManagerView({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">نعم، حذف</AlertDialogAction>
+                        <AlertDialogCancel disabled={isSaving}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">
+                            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Trash2 className="ml-2 h-4 w-4" />} نعم، حذف
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
@@ -1339,10 +1354,10 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid gap-2"><Label>اسم نوع المعاملة</Label><Input value={itemName} onChange={(e) => setItemName(e.target.value)} /></div>
+                        <div className="grid gap-2"><Label>اسم نوع المعاملة</Label><Input value={itemName} onChange={(e) => setItemName(e.target.value)} disabled={isSaving} /></div>
                         <div className="grid gap-2">
                             <Label>نوع النشاط</Label>
-                            <Select value={itemActivityType} onValueChange={(v) => setItemActivityType(v as any)} disabled={loadingCompanyActivityTypes}>
+                            <Select value={itemActivityType} onValueChange={(v) => setItemActivityType(v as any)} disabled={loadingCompanyActivityTypes || isSaving}>
                                 <SelectTrigger>
                                     <SelectValue placeholder={loadingCompanyActivityTypes ? "تحميل..." : "اختر نوع النشاط..."} />
                                 </SelectTrigger>
@@ -1360,12 +1375,12 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
                                 selected={selectedDepartments}
                                 onChange={setSelectedDepartments}
                                 placeholder="اختر قسمًا أو أكثر..."
-                                disabled={deptsLoading}
+                                disabled={deptsLoading || isSaving}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDialogOpen(false)}>إلغاء</Button>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
                         <Button onClick={handleSave} disabled={isSaving}>{isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin"/>} حفظ</Button>
                     </DialogFooter>
                 </DialogContent>
