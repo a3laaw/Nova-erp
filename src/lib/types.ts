@@ -30,8 +30,9 @@ export interface InventoryAdjustment {
     journalEntryId?: string;
     items: any[];
     projectId?: string;
+    projectName?: string;
     clientId?: string;
-    vendorId?: string;
+    clientName?: string;
     warehouseId?: string;
     fromWarehouseId?: string;
     toWarehouseId?: string;
@@ -201,6 +202,7 @@ export interface Item {
     costPrice?: number; 
     sellingPrice?: number; 
     reorderLevel?: number;
+    warrantyMonths?: number; // مضافة لتتبع الكفالات
 }
 export interface Warehouse { id?: string; name: string; isDefault?: boolean; location?: string; projectId?: string | null; companyId?: string | null; createdAt?: any; }
 export interface JournalEntry { id?: string; entryNumber: string; date: any; narration: string; totalDebit: number; totalCredit: number; status: string; lines: any[]; createdAt: any; }

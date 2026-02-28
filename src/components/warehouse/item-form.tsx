@@ -19,7 +19,7 @@ import { Checkbox } from '../ui/checkbox';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, ShieldCheck } from 'lucide-react';
 import type { Item, ItemCategory } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { cleanFirestoreData } from '@/lib/utils';
@@ -50,6 +50,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
     sellingPrice: '',
     reorderLevel: '',
     expiryTracked: false,
+    warrantyMonths: '',
   });
 
   useEffect(() => {
@@ -60,18 +61,20 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
         sku: item.sku,
         categoryId: item.categoryId,
         itemType: item.itemType,
-        inventoryTracked: item.inventoryTracked ?? (item.itemType === 'product'), // Default to true for existing products if undefined
+        inventoryTracked: item.inventoryTracked ?? (item.itemType === 'product'),
         unitOfMeasure: item.unitOfMeasure,
         costPrice: String(item.costPrice || ''),
         sellingPrice: String(item.sellingPrice || ''),
         reorderLevel: String(item.reorderLevel || ''),
         expiryTracked: item.expiryTracked || false,
+        warrantyMonths: String(item.warrantyMonths || ''),
       });
     } else {
         setFormData({
             name: '', description: '', sku: '', categoryId: '',
             itemType: 'product', inventoryTracked: true, unitOfMeasure: '',
             costPrice: '', sellingPrice: '', reorderLevel: '', expiryTracked: false,
+            warrantyMonths: '',
         });
     }
   }, [item, isOpen]);
@@ -98,6 +101,7 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
             costPrice: Number(formData.costPrice) || 0,
             sellingPrice: Number(formData.sellingPrice) || 0,
             reorderLevel: Number(formData.reorderLevel) || 0,
+            warrantyMonths: Number(formData.warrantyMonths) || 0,
             inventoryTracked: formData.itemType === 'product' ? formData.inventoryTracked : false,
             expiryTracked: formData.itemType === 'product' && formData.inventoryTracked ? formData.expiryTracked : false,
         };
@@ -120,13 +124,8 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
 
   const categoryOptions = useMemo(() => {
     if (!categories) return [];
-    
-    // Create a Set of all category IDs that are used as a parent
     const parentIds = new Set(categories.map(cat => cat.parentCategoryId).filter(Boolean));
-    
-    // Filter out categories that are parents, leaving only leaf nodes
     const leafCategories = categories.filter(cat => !parentIds.has(cat.id!));
-    
     return leafCategories.map(cat => ({ value: cat.id!, label: cat.name, searchKey: cat.name }));
   }, [categories]);
 
@@ -163,6 +162,14 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
                 placeholder="اختر الفئة النهائية..."
               />
             </div>
+            
+            <div className="grid gap-2">
+                <Label htmlFor="warrantyMonths" className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-primary" /> فترة الكفالة (بالشهور)
+                </Label>
+                <Input id="warrantyMonths" type="number" value={formData.warrantyMonths} onChange={handleChange} placeholder="0 = بدون كفالة" dir="ltr" />
+            </div>
+
             <div className="md:col-span-2 grid gap-2">
               <Label htmlFor="description">الوصف</Label>
               <Textarea id="description" value={formData.description} onChange={handleChange} rows={2} />
@@ -174,9 +181,6 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
                     <Checkbox id="inventoryTracked" checked={formData.inventoryTracked} onCheckedChange={(c) => handleCheckboxChange('inventoryTracked', !!c)} />
                     <Label htmlFor="inventoryTracked" className="font-semibold">تتبع المخزون</Label>
                   </div>
-                  <p className="text-xs text-muted-foreground -mt-2">
-                      عند تفعيله، سيتم تتبع كميات هذا المنتج في المخزن (منتج مخزني). عند تعطيله، سيفترض النظام توفره دائمًا (منتج استهلاكي).
-                  </p>
                   {formData.inventoryTracked && (
                       <div className="grid grid-cols-2 gap-4 pt-2 border-t">
                           <div className="grid gap-2">
@@ -188,9 +192,6 @@ export function ItemForm({ isOpen, onClose, item, categories }: ItemFormProps) {
                                   <Checkbox id="expiryTracked" checked={formData.expiryTracked} onCheckedChange={(c) => handleCheckboxChange('expiryTracked', !!c)} />
                                   <Label htmlFor="expiryTracked">تتبع تاريخ الصلاحية</Label>
                               </div>
-                              <p className="text-xs text-muted-foreground pr-6">
-                                  عند تفعيله، سيطلب منك النظام إدخال تاريخ صلاحية عند استلام كميات جديدة من هذا الصنف في المخزن.
-                              </p>
                           </div>
                       </div>
                   )}
