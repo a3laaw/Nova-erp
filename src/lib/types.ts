@@ -206,3 +206,17 @@ export interface Warehouse { id?: string; name: string; isDefault?: boolean; loc
 export interface JournalEntry { id?: string; entryNumber: string; date: any; narration: string; totalDebit: number; totalCredit: number; status: string; lines: any[]; createdAt: any; }
 export interface DailySiteReport { id?: string; projectId: string; date: any; engineerId: string; engineerName: string; workCompleted: string; workersCount: number; encounteredIssues?: string; weatherStatus?: string; photoUrls: string[]; createdAt: any; }
 export interface PaymentApplication { id?: string; applicationNumber: string; date: any; projectId: string; clientId: string; clientName: string; projectName: string; items: any[]; totalAmount: number; status: 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled'; journalEntryId?: string; createdAt: any; createdBy: string; }
+
+export interface LetterOfCredit {
+    id?: string;
+    lcNumber: string;
+    issuingBank: string;
+    vendorId: string;
+    vendorName: string;
+    amount: number;
+    currency: string;
+    expiryDate: any;
+    status: 'open' | 'used' | 'expired' | 'cancelled';
+    notes?: string;
+    createdAt: any;
+}
