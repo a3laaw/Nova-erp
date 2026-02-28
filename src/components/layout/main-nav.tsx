@@ -39,6 +39,7 @@ import {
   UserSearch,
   FileCheck,
   Building2,
+  Building,
   ArrowLeftRight,
   Ban,
   ArrowUpFromLine,
@@ -74,6 +75,8 @@ import {
   RotateCcw,
   LayoutGrid,
   MapPin,
+  Scale,
+  Package,
   Landmark as BankIcon
 } from 'lucide-react';
 import { Logo } from './logo';
