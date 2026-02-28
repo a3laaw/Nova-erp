@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -16,7 +17,7 @@ import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/
 import type { JournalEntry } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search } from 'lucide-react';
+import { BookOpen, MoreHorizontal, Eye, Pencil, Trash2, Loader2, CheckCircle, Undo2, Search, ShieldCheck } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -255,7 +256,9 @@ export function JournalEntriesList() {
                         </TableCell>
                     </TableRow>
                 ) : (
-                    filteredEntries.map((entry) => (
+                    filteredEntries.map((entry) => {
+                        const isSystemEntry = entry.narration?.startsWith('[') || entry.linkedReceiptId;
+                        return (
                         <TableRow key={entry.id} className={cn(entry.narration?.includes('عمولة') && 'bg-blue-50 dark:bg-blue-900/20')}>
                         <TableCell className="font-mono">
                             <Link href={`/dashboard/accounting/journal-entries/${entry.id}`} className="hover:underline text-primary">
@@ -263,7 +266,12 @@ export function JournalEntriesList() {
                             </Link>
                         </TableCell>
                         <TableCell>{formatDate(entry.date)}</TableCell>
-                        <TableCell className="max-w-xs truncate">{entry.narration}</TableCell>
+                        <TableCell className="max-w-xs truncate">
+                            <div className="flex items-center gap-2">
+                                {isSystemEntry && <ShieldCheck className="h-3 w-3 text-blue-500 shrink-0" title="قيد مولد آلياً من النظام" />}
+                                <span>{entry.narration}</span>
+                            </div>
+                        </TableCell>
                         <TableCell className="text-left font-mono">{formatCurrency(entry.totalDebit)}</TableCell>
                         <TableCell>
                             <Badge variant="outline" className={statusColors[entry.status] || ''}>{statusTranslations[entry.status] || entry.status}</Badge>
@@ -308,7 +316,7 @@ export function JournalEntriesList() {
                                 </DropdownMenu>
                         </TableCell>
                         </TableRow>
-                    ))
+                    )})
                 )}
             </TableBody>
           </Table>
@@ -317,9 +325,18 @@ export function JournalEntriesList() {
          <AlertDialog open={!!entryToDelete} onOpenChange={() => setEntryToDelete(null)}>
             <AlertDialogContent dir="rtl">
                 <AlertDialogHeader>
-                    <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="text-destructive" />
+                        تأكيد حذف القيد
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                        سيتم حذف القيد رقم "{entryToDelete?.entryNumber}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
+                        {entryToDelete?.narration?.startsWith('[') ? (
+                            <span className="font-bold text-destructive">
+                                تحذير: هذا القيد مولد آلياً من النظام (إذن استلام، سند، أو عقد). حذفه سيؤدي إلى خلل في توازن البيانات المالية والمخزنية وسيظهر تنبيه "خلل" في لوحة التحكم.
+                            </span>
+                        ) : (
+                            `سيتم حذف القيد رقم "${entryToDelete?.entryNumber}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.`
+                        )}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
