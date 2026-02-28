@@ -81,6 +81,7 @@ import {
   Coins,
   Calculator,
   RotateCcw,
+  LayoutGrid,
   Landmark as BankIcon
 } from 'lucide-react';
 import { Logo } from './logo';
@@ -129,6 +130,7 @@ const navItems = {
       hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
+        { href: '/dashboard/construction/schedules', label: 'مراجعة الجداول الزمنية', icon: LayoutGrid },
         { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة مقاولي الباطن', icon: HardHat },
