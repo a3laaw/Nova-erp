@@ -142,6 +142,7 @@ const navItems = {
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات', icon: ClipboardList },
         { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: HardHat },
+        { href: '/dashboard/construction/subcontractors/certificates/new', label: 'إصدار شهادة إنجاز', icon: FileCheck },
       ]
     },
     { 

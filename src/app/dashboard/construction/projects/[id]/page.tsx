@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart } from 'lucide-react';
+import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { ProjectBoqTab } from '@/components/construction/project-boq-tab';
 import { ProjectProcurementTab } from '@/components/construction/project-procurement-tab';
+import { ProjectFinancialsTab } from '@/components/construction/project-financials-tab';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -141,21 +142,38 @@ export default function ProjectDetailPage() {
                 </CardContent>
             </Card>
 
-            <Tabs defaultValue="boq" className="w-full">
+            <Tabs defaultValue="financials" className="w-full">
                 <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
+                    <TabsTrigger value="financials" className="gap-2 py-3 rounded-lg"><BarChart3 className="h-4 w-4"/> ملخص التكاليف</TabsTrigger>
                     <TabsTrigger value="boq" className="gap-2 py-3 rounded-lg"><ClipboardList className="h-4 w-4"/> جداول الكميات</TabsTrigger>
-                    <TabsTrigger value="overview" className="gap-2 py-3 rounded-lg">نظرة عامة</TabsTrigger>
                     <TabsTrigger value="procurement" className="gap-2 py-3 rounded-lg"><ShoppingCart className="h-4 w-4"/> المشتريات</TabsTrigger>
-                    <TabsTrigger value="subcontracts" disabled className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
-                    <TabsTrigger value="financials" disabled className="gap-2 py-3 rounded-lg">المالية</TabsTrigger>
+                    <TabsTrigger value="subcontracts" className="gap-2 py-3 rounded-lg"><HardHat className="h-4 w-4"/> المقاولون</TabsTrigger>
+                    <TabsTrigger value="overview" className="gap-2 py-3 rounded-lg">نظرة عامة</TabsTrigger>
                 </TabsList>
                 
+                <TabsContent value="financials">
+                    <ProjectFinancialsTab project={project} />
+                </TabsContent>
+
                 <TabsContent value="boq">
                     <ProjectBoqTab project={project} client={client} />
                 </TabsContent>
 
                 <TabsContent value="procurement">
                     <ProjectProcurementTab project={project} />
+                </TabsContent>
+
+                <TabsContent value="subcontracts">
+                    <div className="text-center p-12 border-2 border-dashed rounded-3xl bg-muted/10">
+                        <HardHat className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                        <h3 className="text-xl font-bold">إدارة مقاولي الباطن للموقع</h3>
+                        <p className="text-muted-foreground mt-2 mb-6">يمكنك إصدار شهادات إنجاز أعمال للمقاولين وتحميل تكلفتها على المشروع.</p>
+                        <Button asChild>
+                            <Link href={`/dashboard/construction/subcontractors/certificates/new?projectId=${project.id}`}>
+                                <PlusCircle className="ml-2 h-4 w-4"/> إصدار شهادة إنجاز جديدة
+                            </Link>
+                        </Button>
+                    </div>
                 </TabsContent>
 
                 <TabsContent value="overview">

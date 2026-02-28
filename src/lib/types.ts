@@ -1,4 +1,22 @@
 
+// ... existing types (omitted for brevity in thinking, keep full content)
+export interface SubcontractorCertificate {
+    id?: string;
+    certificateNumber: string;
+    date: any;
+    subcontractorId: string;
+    subcontractorName: string;
+    projectId: string; // This can be a project ID or transaction ID
+    projectName?: string;
+    amount: number;
+    description: string;
+    status: 'draft' | 'approved' | 'paid' | 'cancelled';
+    journalEntryId?: string;
+    createdAt: any;
+    createdBy: string;
+}
+
+// ... include all other types as they were
 export interface Company {
     id?: string;
     name: string;
@@ -27,19 +45,19 @@ export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
 
 export type UserProfile = {
   id?: string;
-  uid?: string; // Firebase Auth UID
-  username: string; // Unique, for login
-  email: string; // Auto-generated internal email
-  passwordHash: string; // Hashed password
-  employeeId: string; // Reference to 'employees' collection
+  uid?: string; 
+  username: string;
+  email: string;
+  passwordHash: string;
+  employeeId: string;
   role: UserRole;
   isActive: boolean;
   createdAt?: any; 
   activatedAt?: any;
-  createdBy?: string; // UID of the admin who created the user
-  avatarUrl?: string; // Optional, from employee record
-  fullName?:string; // Optional, from employee record
-  jobTitle?: string; // Optional, from employee record
+  createdBy?: string;
+  avatarUrl?: string;
+  fullName?:string;
+  jobTitle?: string;
 };
 
 export type Client = {
@@ -97,7 +115,7 @@ export type DailyReport = {
   workCompleted: string;
   workersCount: number;
   issues: string;
-  photos: string[]; // URLs
+  photos: string[]; 
 };
 
 export type Project = {
@@ -121,11 +139,11 @@ export type Project = {
 export type Appointment = {
   id: string;
   title: string;
-  appointmentDate: any; // This will be the start time
-  endDate?: any; // This will be the end time
+  appointmentDate: any;
+  endDate?: any;
   clientId?: string;
   clientName?: string;
-  prospectiveClientId?: string; // NEW: Link to a prospective client record
+  prospectiveClientId?: string;
   clientMobile?: string;
   engineerId: string;
   engineerName?: string;
@@ -137,9 +155,8 @@ export type Appointment = {
   transactionId?: string;
   workStageUpdated?: boolean;
   workStageProgressId?: string;
-  // For architectural appointments with color logic
   visitCount?: number;
-  color?: string; // Hex color code
+  color?: string;
   minutesContent?: string;
 };
 
@@ -443,7 +460,7 @@ export type ClientTransaction = {
     updatedAt?: any;
     engineerName?: string;
     stages?: TransactionStage[];
-    boqId?: string; // Link to standalone Boq document
+    boqId?: string; 
     boqItemCount?: number;
     boqTotalValue?: number;
     contract?: {
@@ -526,7 +543,7 @@ export type PaymentVoucher = {
     voucherYear: number;
     payeeName: string;
     payeeType: 'vendor' | 'employee' | 'other';
-    employeeId?: string; // For residency renewal
+    employeeId?: string; 
     renewalExpiryDate?: any;
     amount: number;
     amountInWords: string;
@@ -559,8 +576,8 @@ export type ContractTerm = {
 export type ContractFinancialMilestone = {
     id: string;
     name: string;
-    condition: string; // Link to a work stage name
-    value: number; // Either fixed amount or percentage
+    condition: string; 
+    value: number; 
 };
 
 export type ContractClause = {
@@ -624,7 +641,7 @@ export type Quotation = {
   status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
   createdAt: any;
   createdBy: string;
-  transactionId?: string; // Link to transaction if converted
+  transactionId?: string; 
 };
 
 export type Vendor = {
@@ -654,8 +671,8 @@ export type RequestForQuotation = {
   createdAt: any;
   awardedVendorId?: string;
   awardedPoId?: string;
-  awardedPoIds?: string[]; // NEW: For multiple awards
-  awardedItems?: Record<string, string>; // NEW: Stores item-to-vendor mapping
+  awardedPoIds?: string[]; 
+  awardedItems?: Record<string, string>; 
 };
 
 export type SupplierQuotation = {
@@ -666,9 +683,9 @@ export type SupplierQuotation = {
     date: any;
     deliveryTimeDays?: number;
     paymentTerms?: string;
-    discountAmount?: number; // NEW
-    deliveryFees?: number; // NEW
-    paymentMethodDetail?: string; // NEW (e.g. 50/50 mix)
+    discountAmount?: number; 
+    deliveryFees?: number; 
+    paymentMethodDetail?: string; 
     items: {
         rfqItemId: string;
         unitPrice: number;
@@ -682,8 +699,8 @@ export type PurchaseOrder = {
     orderDate: any;
     vendorId: string;
     vendorName: string;
-    projectId?: string; // NEW: Link to construction project
-    warehouseId?: string; // NEW: Target site warehouse
+    projectId?: string; 
+    warehouseId?: string; 
     supplierQuotationId?: string;
     rfqId?: string;
     items: {
@@ -708,14 +725,14 @@ export type ConstructionProject = {
   clientName?: string;
   projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
   contractValue: number;
-  startDate: any; // Using 'any' for Firestore Timestamps
+  startDate: any; 
   endDate: any;
   status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى';
   mainEngineerId: string;
   mainEngineerName?: string;
   progressPercentage: number;
   linkedTransactionId?: string;
-  boqId?: string; // Link to Standalone BOQ
+  boqId?: string; 
   createdAt?: any;
   createdBy?: string;
 };
@@ -723,7 +740,7 @@ export type ConstructionProject = {
 export type Subcontractor = {
     id?: string;
     name: string;
-    type: string; // e.g., 'كهرباء', 'صحي'
+    type: string; 
     specialization?: string;
     contactPerson?: string;
     phone?: string;
@@ -735,7 +752,7 @@ export type Subcontractor = {
         accountNumber: string;
         iban: string;
     };
-    rating?: number; // 1-5
+    rating?: number; 
     isActive: boolean;
     blacklisted: boolean;
     blacklistedReason?: string;
@@ -757,7 +774,7 @@ export type SubcontractorSpecialization = {
 
 export type BoqItem = {
   id?: string;
-  itemId?: string; // Link to master BoqReferenceItem
+  itemId?: string; 
   itemNumber: string;
   description: string;
   unit: string;
@@ -776,9 +793,9 @@ export type Boq = {
   name: string;
   status: 'تقديري' | 'تعاقدي' | 'منفذ';
   clientId?: string;
-  clientName?: string; // For prospective
+  clientName?: string; 
   transactionId?: string;
-  projectId?: string; // Link back to construction project
+  projectId?: string; 
   totalValue: number;
   itemCount: number;
   createdAt: any;
@@ -802,7 +819,7 @@ export type Warehouse = {
     location?: string;
     isDefault?: boolean;
     projectId?: string | null; 
-    companyId?: string | null; // NEW: For branch/subsidiary specific store
+    companyId?: string | null; 
 };
 
 export interface ItemCategory {
@@ -810,8 +827,8 @@ export interface ItemCategory {
     name: string;
     parentCategoryId: string | null;
     order?: number;
-    activityTypeIds?: string[]; // Linked activity types
-    boqReferenceItemIds?: string[]; // NEW: Linked BOQ items for leaf nodes in construction
+    activityTypeIds?: string[]; 
+    boqReferenceItemIds?: string[]; 
 }
 
 export interface Item {
@@ -837,11 +854,11 @@ export type InventoryAdjustment = {
     type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'transfer' | 'sales_delivery' | 'other';
     notes?: string;
     journalEntryId?: string;
-    projectId?: string; // Link to cost center
-    clientId?: string; // NEW: For direct sales delivery
-    warehouseId?: string; // For adjustments
-    fromWarehouseId?: string; // For transfers
-    toWarehouseId?: string; // For transfers
+    projectId?: string; 
+    clientId?: string; 
+    warehouseId?: string; 
+    fromWarehouseId?: string; 
+    toWarehouseId?: string; 
     items: {
         itemId: string;
         itemName: string;
@@ -849,7 +866,7 @@ export type InventoryAdjustment = {
         unitCost: number;
         totalCost: number;
         expiryDate?: any;
-        boqItemId?: string; // Linked BOQ line item
+        boqItemId?: string; 
     }[];
     createdAt?: any;
     createdBy?: string;
