@@ -4,21 +4,21 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, addDoc, getDoc } from 'firebase/firestore';
-import type { FieldVisit, ClientTransaction } from '@/lib/types';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, addDoc, getDoc, query, where, limit, getDocs } from 'firebase/firestore';
+import type { FieldVisit, ClientTransaction, Account, PaymentApplication } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2, CheckCircle2, Save, ArrowRight, Navigation, ShieldCheck, Clock, ClipboardCheck } from 'lucide-react';
+import { MapPin, Loader2, CheckCircle2, Save, ArrowRight, Navigation, ShieldCheck, Clock, ClipboardCheck, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default function FieldVisitDetailPage() {
     const params = useParams();
@@ -63,7 +63,7 @@ export default function FieldVisitDetailPage() {
             (error) => {
                 console.error(error);
                 setIsCapturingLocation(false);
-                toast({ variant: 'destructive', title: 'فشل تحديد الموقع', description: 'يرجى تفعيل الـ GPS في هاتفك وإعطاء الصلاحية للمتصفح.' });
+                toast({ variant: 'destructive', title: 'فشل تحديد الموقع', description: 'يرجى تفعيل الـ GPS وإعطاء الصلاحية للمتصفح.' });
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
@@ -106,11 +106,95 @@ export default function FieldVisitDetailPage() {
                     batch.update(txRef, { stages: currentStages });
                 }
 
-                // 3. Log to transaction timeline
-                const timelineRef = collection(txRef, 'timelineEvents');
-                batch.set(doc(timelineRef), {
+                // --- أتمتة المستخلصات: التحقق من وجود دفعة مرتبطة بهذه المرحلة ---
+                if (txData.contract?.clauses) {
+                    const matchedClause = txData.contract.clauses.find(c => c.condition === visit.plannedStageName && c.status === 'غير مستحقة');
+                    
+                    if (matchedClause) {
+                        const currentYear = new Date().getFullYear();
+                        const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
+                        const appCounterDoc = await getDoc(appCounterRef);
+                        const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                        const appNumber = `AUTO-APP-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
+
+                        const newAppRef = doc(collection(firestore, 'payment_applications'));
+                        const newJeRef = doc(collection(firestore, 'journalEntries'));
+
+                        // إنشاء مستند المستخلص آلياً
+                        const appData = {
+                            applicationNumber: appNumber,
+                            date: serverTimestamp(),
+                            projectId: visit.transactionId,
+                            clientId: visit.clientId,
+                            clientName: visit.clientName,
+                            projectName: txData.transactionType,
+                            items: [{
+                                boqItemId: visit.plannedStageId,
+                                description: `استحقاق دفعة: ${visit.plannedStageName}`,
+                                unit: 'مرحلة',
+                                unitPrice: matchedClause.amount,
+                                previousQuantity: 0,
+                                currentQuantity: 1,
+                                totalQuantity: 1,
+                                totalAmount: matchedClause.amount
+                            }],
+                            totalAmount: matchedClause.amount,
+                            status: 'draft',
+                            journalEntryId: newJeRef.id,
+                            createdAt: serverTimestamp(),
+                            createdBy: 'system-auto-visit',
+                        };
+                        batch.set(newAppRef, appData);
+                        batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
+
+                        // إنشاء القيد المالي المرتبط (مسودة مراجعة)
+                        const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
+                        const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', visit.clientName), limit(1)));
+
+                        if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
+                            const revenueAcc = revenueAccountSnap.docs[0];
+                            const clientAcc = clientAccountSnap.docs[0];
+                            
+                            const jeData = {
+                                entryNumber: `JE-${appNumber}`,
+                                date: serverTimestamp(),
+                                narration: `[أتمتة زيارة] استحقاق دفعة إكمال مرحلة: ${visit.plannedStageName}`,
+                                status: 'draft',
+                                totalDebit: matchedClause.amount,
+                                totalCredit: matchedClause.amount,
+                                lines: [
+                                    { accountId: clientAcc.id, accountName: visit.clientName, debit: matchedClause.amount, credit: 0, auto_profit_center: visit.transactionId },
+                                    { accountId: revenueAcc.id, accountName: revenueAcc.data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: visit.transactionId }
+                                ],
+                                clientId: visit.clientId,
+                                transactionId: visit.transactionId,
+                                createdAt: serverTimestamp(),
+                                createdBy: 'system-auto-visit',
+                            };
+                            batch.set(newJeRef, jeData);
+                        }
+
+                        // تحديث حالة بند العقد
+                        const updatedClauses = txData.contract.clauses.map(c => 
+                            c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c
+                        );
+                        batch.update(txRef, { 'contract.clauses': updatedClauses });
+
+                        // تسجيل في التايم لاين
+                        batch.set(doc(collection(txRef, 'timelineEvents')), {
+                            type: 'comment',
+                            content: `**[أتمتة ذكية]** تم إكمال المرحلة ميدانياً. قام النظام بإصدار **مسودة مستخلص** برقم ${appNumber} بقيمة ${formatCurrency(matchedClause.amount)} بانتظار مراجعة المحاسب.`,
+                            userId: 'system',
+                            userName: 'نظام Nova الذكي',
+                            createdAt: serverTimestamp(),
+                        });
+                    }
+                }
+
+                // 3. Log basic activity to transaction timeline
+                batch.set(doc(collection(txRef, 'timelineEvents')), {
                     type: 'log',
-                    content: `[إنجاز ميداني] تم إكمال مرحلة "${visit.plannedStageName}" خلال زيارة ميدانية للمهندس ${visit.engineerName}.\nملاحظات: ${notes}`,
+                    content: `[إنجاز ميداني] تم إكمال مرحلة "${visit.plannedStageName}" خلال زيارة المهندس ${visit.engineerName}.\nملاحظات: ${notes}`,
                     userId: currentUser.id,
                     userName: currentUser.fullName,
                     userAvatar: currentUser.avatarUrl,
@@ -119,7 +203,7 @@ export default function FieldVisitDetailPage() {
             }
 
             await batch.commit();
-            toast({ title: 'تم التأكيد', description: 'تم حفظ تفاصيل الزيارة وتحديث حالة المشروع.' });
+            toast({ title: 'تم التأكيد', description: 'تم حفظ تفاصيل الزيارة وتحديث حالة المشروع والمطالبات المالية.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
             console.error(error);
@@ -142,7 +226,7 @@ export default function FieldVisitDetailPage() {
                     <ArrowRight className="h-4 w-4" /> العودة للخطة
                 </Button>
                 {visit.status === 'confirmed' && (
-                    <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2">
+                    <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2 text-white">
                         <CheckCircle2 className="h-4 w-4" /> مكتملة ومؤكدة
                     </Badge>
                 )}
@@ -168,7 +252,10 @@ export default function FieldVisitDetailPage() {
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المستهدفة</Label>
-                            <p className="font-black text-primary">{visit.plannedStageName}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="font-black text-primary">{visit.plannedStageName}</p>
+                                <Sparkles className="h-3 w-3 text-blue-500 animate-pulse" title="مرتبطة بمطالبة مالية" />
+                            </div>
                         </div>
                     </div>
                     

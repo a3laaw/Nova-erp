@@ -11,11 +11,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { ConstructionProject } from '@/lib/types';
 import { ProjectForm } from '@/components/construction/project-form';
+import { cleanFirestoreData } from '@/lib/utils';
 
 export default function NewProjectPage() {
     const router = useRouter();
@@ -24,7 +25,7 @@ export default function NewProjectPage() {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     
-    const handleSave = useCallback(async (newProjectData: Omit<ConstructionProject, 'id' | 'projectId' | 'createdAt'>) => {
+    const handleSave = useCallback(async (newProjectData: any) => {
         if (!firestore || !currentUser) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات أو تحديد المستخدم.' });
             return;
@@ -57,11 +58,33 @@ export default function NewProjectPage() {
                 
                 const newProjectRef = doc(collection(firestore, 'projects'));
                 newProjectId = newProjectRef.id;
-                transaction.set(newProjectRef, finalProjectData);
+                transaction.set(newProjectRef, cleanFirestoreData(finalProjectData));
+
+                // --- استنساخ مراحل العمل الشجرية من القالب المختار ---
+                if (newProjectData.constructionTypeId) {
+                    const stagesRef = collection(firestore, `construction_types/${newProjectData.constructionTypeId}/stages`);
+                    const stagesSnap = await getDocs(query(stagesRef, orderBy('order')));
+                    
+                    if (!stagesSnap.empty) {
+                        // سنقوم بنسخ المراحل إلى مجموعة فرعية داخل المشروع الفعلي
+                        // ملاحظة: في Firestore، المجموعات الفرعية لا تُنسخ مباشرة، بل ننشئ سجلات جديدة
+                        for (const stageDoc of stagesSnap.docs) {
+                            const templateStage = stageDoc.data();
+                            const projectStageRef = doc(collection(firestore, `projects/${newProjectId}/stages`));
+                            transaction.set(projectStageRef, {
+                                ...templateStage,
+                                templateStageId: stageDoc.id,
+                                status: 'pending',
+                                progress: 0,
+                                createdAt: serverTimestamp(),
+                            });
+                        }
+                    }
+                }
             });
             
-            toast({ title: 'نجاح', description: 'تم إنشاء المشروع بنجاح.' });
-            router.push('/dashboard/construction/projects');
+            toast({ title: 'نجاح', description: 'تم إنشاء المشروع واستنساخ مراحل العمل بنجاح.' });
+            router.push(`/dashboard/construction/projects/${newProjectId}`);
             
         } catch (error) {
             console.error("Error creating project:", error);
@@ -73,12 +96,12 @@ export default function NewProjectPage() {
     }, [firestore, currentUser, toast, router]);
 
     return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <CardHeader>
-                <CardTitle>إنشاء مشروع مقاولات جديد</CardTitle>
-                <CardDescription>أدخل تفاصيل المشروع التنفيذي لبدء إدارته.</CardDescription>
+        <Card className="max-w-4xl mx-auto rounded-3xl shadow-xl overflow-hidden border-none" dir="rtl">
+            <CardHeader className="bg-primary/5 pb-8">
+                <CardTitle className="text-3xl font-black">إنشاء مشروع مقاولات جديد</CardTitle>
+                <CardDescription className="text-base">أدخل تفاصيل المشروع التنفيذي لبدء إدارته بنظام الـ WBS المعتمد.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-8">
                 <ProjectForm
                     onSave={handleSave}
                     onClose={() => router.back()}
