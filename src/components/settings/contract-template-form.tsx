@@ -12,7 +12,6 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '../ui/scroll-area';
@@ -31,7 +30,8 @@ import {
   AlertCircle,
   X,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  AlertTriangle
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -42,6 +42,7 @@ import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Badge } from '../ui/badge';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
@@ -79,6 +80,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   const { data: constructionTypes, loading: typesLoading } = useSubscription<ConstructionType>(firestore, 'construction_types', useMemo(() => [orderBy('name')], []));
   
@@ -202,12 +204,40 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   
   const totalMilestoneValue = useMemo(() => financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0), [financials.milestones]);
 
+  const validationErrors = useMemo(() => {
+    const errors: string[] = [];
+    if (!title.trim()) errors.push("عنوان النموذج مطلوب.");
+    
+    if (financials.type === 'percentage') {
+        if (totalMilestoneValue !== 100) {
+            errors.push(`إجمالي نسب الدفعات يجب أن يكون 100% (الحالي: ${totalMilestoneValue}%).`);
+        }
+    } else {
+        if (financials.totalAmount > 0 && Math.abs(totalMilestoneValue - financials.totalAmount) > 0.001) {
+            errors.push(`إجمالي مبالغ الدفعات (${formatCurrency(totalMilestoneValue)}) يجب أن يساوي إجمالي الميزانية (${formatCurrency(financials.totalAmount)}).`);
+        }
+    }
+
+    if (templateType === 'Execution' && !constructionTypeId) {
+        errors.push("يجب اختيار نوع المقاولات المرتبط لعقود التنفيذ.");
+    }
+
+    if (templateType === 'Consulting' && selectedTransactionTypes.length === 0) {
+        errors.push("يجب اختيار نوع معاملة واحد على الأقل لعقود الاستشارات.");
+    }
+
+    return errors;
+  }, [title, financials, totalMilestoneValue, templateType, constructionTypeId, selectedTransactionTypes]);
+
   const handleSave = async () => {
     if (!firestore || !user) return;
-    if (!title) {
-        toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'الرجاء إدخال عنوان للنموذج.' });
+    
+    if (validationErrors.length > 0) {
+        setShowValidationErrors(true);
+        toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'يرجى مراجعة التنبيهات في أعلى النموذج.' });
         return;
     }
+
     setIsSaving(true);
     try {
         const templateData: Omit<ContractTemplate, 'id'> = {
@@ -274,15 +304,32 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
             <ScrollArea className="flex-grow">
                 <div className="p-6 space-y-8 pb-32">
+                    
+                    {/* Validation Error Alert */}
+                    {showValidationErrors && validationErrors.length > 0 && (
+                        <Alert variant="destructive" className="rounded-2xl border-2 shadow-lg animate-in fade-in slide-in-from-top-4">
+                            <AlertTriangle className="h-5 w-5" />
+                            <AlertTitle className="font-black text-lg">توجد أخطاء في البيانات</AlertTitle>
+                            <AlertDescription>
+                                <ul className="list-disc pr-5 mt-2 space-y-1 font-bold">
+                                    {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     {/* Basic Info */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-muted/5">
                         <div className="grid gap-2">
                             <Label className="text-sm font-bold">عنوان النموذج *</Label>
                             <Input 
                                 value={title} 
-                                onChange={e => setTitle(e.target.value)} 
+                                onChange={e => {
+                                    setTitle(e.target.value);
+                                    if(showValidationErrors) setShowValidationErrors(false);
+                                }} 
                                 placeholder="أدخل اسماً يميز هذا النموذج..." 
-                                className="h-10"
+                                className={cn("h-10", !title.trim() && showValidationErrors && "border-destructive")}
                             />
                         </div>
                         
@@ -296,6 +343,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                     onSelect={setConstructionTypeId}
                                     options={constructionTypeOptions}
                                     placeholder="اختر النوع لجلب المراحل..."
+                                    className={cn(!constructionTypeId && showValidationErrors && "border-destructive")}
                                 />
                             </div>
                         ) : (
@@ -308,7 +356,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                     selected={selectedTransactionTypes}
                                     onChange={setSelectedTransactionTypes}
                                     placeholder="اختر أنواع العمل..."
-                                    className="bg-background"
+                                    className={cn("bg-background", selectedTransactionTypes.length === 0 && showValidationErrors && "border-destructive")}
                                 />
                             </div>
                         )}
@@ -414,7 +462,11 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         {financials.milestones.length > 0 && (
                             <div className="flex justify-between items-center px-4 py-3 mt-4 border-t border-dashed">
                                 <span className="text-xs font-bold opacity-60">إجمالي التوزيع الحالي:</span>
-                                <Badge variant={cn(financials.type === 'percentage' && totalMilestoneValue !== 100 ? "destructive" : "secondary")} className="font-mono text-sm">
+                                <Badge variant={cn(
+                                    (financials.type === 'percentage' && totalMilestoneValue !== 100) || 
+                                    (financials.type === 'fixed' && financials.totalAmount > 0 && Math.abs(totalMilestoneValue - financials.totalAmount) > 0.001)
+                                    ? "destructive" : "secondary"
+                                )} className="font-mono text-sm">
                                     {totalMilestoneValue} {financials.type === 'fixed' ? 'KD' : '%'}
                                 </Badge>
                             </div>
@@ -449,7 +501,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
               <Button variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-lg font-bold">إلغاء</Button>
               <Button 
                 onClick={handleSave} 
-                disabled={isSaving || (financials.type === 'percentage' && totalMilestoneValue !== 100)} 
+                disabled={isSaving} 
                 className={cn(
                     "h-11 px-12 rounded-lg font-bold min-w-[180px] shadow-lg",
                     templateType === 'Consulting' ? "bg-primary" : "bg-amber-600 hover:bg-amber-700"
