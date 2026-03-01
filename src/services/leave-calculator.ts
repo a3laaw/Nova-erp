@@ -7,6 +7,9 @@ const dayNameToIndex: Record<string, number> = {
   'Thursday': 4, 'Friday': 5, 'Saturday': 6
 };
 
+/**
+ * حساب أيام العمل الفعلية بين تاريخين مع استبعاد العطلات الرسمية والأسبوعية.
+ */
 export function calculateWorkingDays(
   startDate: Date | undefined,
   endDate: Date | undefined,
@@ -38,14 +41,15 @@ export function calculateWorkingDays(
   return { totalDays, workingDays };
 }
 
+/**
+ * حساب رصيد الإجازات السنوية المتبقي للموظف بناءً على تاريخ التعيين والخصومات.
+ */
 export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDate: Date): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
 
-    // Calculate total months of service
+    // الاحتساب بناءً على 30 يوم إجازة لكل سنة عمل (2.5 يوم لكل شهر)
     const totalMonthsOfService = differenceInMonths(asOfDate, hireDate);
-    
-    // Accrual is 30 days per year, which is 2.5 days per month.
     const totalAccrued = (totalMonthsOfService / 12) * 30;
     
     const usedLeave = employee.annualLeaveUsed || 0;
@@ -56,7 +60,9 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
     return Math.floor(balance > 0 ? balance : 0);
 };
 
-
+/**
+ * حساب مكافأة نهاية الخدمة وفقاً لقانون العمل الكويتي (المادة 51).
+ */
 export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) {
@@ -71,27 +77,28 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
     }
 
     let rawGratuity = 0;
-    const dailyWage = lastSalary / 26; // As per common practice for Kuwait law
+    const dailyWage = lastSalary / 26; // الممارسة الشائعة في الكويت هي القسمة على 26 يوم عمل
 
-    // Kuwaiti Private Sector Labor Law No. 6 of 2010, Article 51
+    // معادلة المادة 51
     if (yearsOfService <= 5) {
-        // 15 days' remuneration for each of the first five years
+        // أجر 15 يوماً عن كل سنة من السنوات الخمس الأولى
         rawGratuity = yearsOfService * 15 * dailyWage;
     } else {
-        // 15 days for first 5 years + one month's remuneration for each year thereafter.
+        // أجر 15 يوماً عن أول 5 سنوات + أجر شهر كامل عن كل سنة تليها
         const firstFiveYearsGratuity = 5 * 15 * dailyWage;
         const subsequentYears = yearsOfService - 5;
         const subsequentYearsGratuity = subsequentYears * lastSalary;
         rawGratuity = firstFiveYearsGratuity + subsequentYearsGratuity;
     }
 
-    // Cap at 1.5 years salary
+    // الحد الأقصى للمكافأة هو أجر سنة ونصف
     const maxGratuity = 1.5 * 12 * lastSalary;
     rawGratuity = Math.min(rawGratuity, maxGratuity);
 
     let finalGratuity = rawGratuity;
     let notice = `بناءً على ${yearsOfService.toFixed(1)} سنوات من الخدمة.`;
 
+    // تعديلات في حال الاستقالة (قانون العمل الكويتي)
     if (employee.terminationReason === 'resignation') {
         if (yearsOfService < 3) {
             finalGratuity = 0;
@@ -103,7 +110,6 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
             finalGratuity = rawGratuity * (2 / 3);
             notice += " (يستحق ثلثي المكافأة لخدمة بين 5-10 سنوات عند الاستقالة)";
         }
-        // If > 10 years, they get the full amount, so no change needed.
     }
 
     const leaveBalance = calculateAnnualLeaveBalance(employee, asOfDate);

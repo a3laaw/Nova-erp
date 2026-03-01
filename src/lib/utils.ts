@@ -24,10 +24,10 @@ export function formatCurrency(amount: number) {
 function tafqeet(n: number, currency: { singular: string, dual: string, plural: string, accusative: string }): string {
     if (n === 0) return '';
     
-    const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة'];
+    const ones = ['', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'خمسة', 'سبعة', 'ثمانية', 'تسعة'];
     const teens = ['عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر'];
     const tens = ['', 'عشرة', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
-    const hundreds = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+    const hundreds = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسائة'];
 
     function convert(num: number): string {
         if (num < 10) return ones[num];
@@ -51,16 +51,6 @@ function tafqeet(n: number, currency: { singular: string, dual: string, plural: 
             else if (th >= 3 && th <= 10) thText = convert(th) + ' آلاف';
             else thText = convert(th) + ' ألف';
             return thText + (rest > 0 ? ' و' + convert(rest) : '');
-        }
-        if (num < 1000000000) {
-            const m = Math.floor(num / 1000000);
-            const rest = num % 1000000;
-            let mText = '';
-            if (m === 1) mText = 'مليون';
-            else if (m === 2) mText = 'مليونان';
-            else if (m >= 3 && m <= 10) mText = convert(m) + ' ملايين';
-            else mText = convert(m) + ' مليون';
-            return mText + (rest > 0 ? ' و' + convert(rest) : '');
         }
         return '';
     }
