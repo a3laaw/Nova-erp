@@ -32,14 +32,15 @@ import {
   FileText,
   Briefcase,
   Construction,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup, orderBy } from 'firebase/firestore';
 import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, WorkStage, ConstructionType } from '@/lib/types';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Badge } from '../ui/badge';
 import { InlineSearchList } from '../ui/inline-search-list';
