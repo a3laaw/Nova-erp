@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -291,32 +290,32 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
           }}
         >
             <DialogHeader className={cn(
-                "p-6 border-b flex-shrink-0",
+                "p-4 border-b flex-shrink-0",
                 templateType === 'Consulting' ? "border-primary/20 bg-primary/5" : "border-amber-600/20 bg-amber-600/5"
             )}>
-                <div className="flex items-center gap-4">
-                    <div className={cn("p-2.5 rounded-lg", templateType === 'Consulting' ? "bg-primary text-primary-foreground" : "bg-amber-600 text-white")}>
-                        {templateType === 'Execution' ? <Construction className="h-6 w-6" /> : <Briefcase className="h-6 w-6" />}
+                <div className="flex items-center gap-3">
+                    <div className={cn("p-2 rounded-lg", templateType === 'Consulting' ? "bg-primary text-primary-foreground" : "bg-amber-600 text-white")}>
+                        {templateType === 'Execution' ? <Construction className="h-5 w-5" /> : <Briefcase className="h-5 w-5" />}
                     </div>
                     <div>
-                        <DialogTitle className="text-xl font-bold">
+                        <DialogTitle className="text-lg font-bold leading-none">
                             {template ? 'تعديل نموذج' : 'إنشاء نموذج'} {templateType === 'Execution' ? 'عقد مقاولات' : 'عقد استشارات'}
                         </DialogTitle>
-                        <DialogDescription className="text-xs">صياغة وتوحيد بنود العقود والدفعات المالية.</DialogDescription>
+                        <DialogDescription className="text-[10px] mt-1">صياغة وتوحيد بنود العقود والدفعات المالية.</DialogDescription>
                     </div>
                 </div>
             </DialogHeader>
 
             <ScrollArea className="flex-grow">
-                <div className="p-6 space-y-8 pb-32">
+                <div className="p-5 space-y-6 pb-32">
                     
                     {/* Validation Error Alert */}
                     {showValidationErrors && validationErrors.length > 0 && (
-                        <Alert variant="destructive" className="rounded-2xl border-2 shadow-lg animate-in fade-in slide-in-from-top-4 mb-6">
-                            <AlertTriangle className="h-5 w-5" />
-                            <AlertTitle className="font-black text-lg">توجد أخطاء في البيانات</AlertTitle>
+                        <Alert variant="destructive" className="rounded-xl border-2 py-2 px-4 shadow-sm animate-in fade-in slide-in-from-top-2 mb-4">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle className="font-bold text-sm">تنبيه بالبيانات الناقصة</AlertTitle>
                             <AlertDescription>
-                                <ul className="list-disc pr-5 mt-2 space-y-1 font-bold">
+                                <ul className="list-disc pr-4 mt-1 space-y-0.5 text-[11px] font-semibold">
                                     {validationErrors.map((err, i) => <li key={i}>{err}</li>)}
                                 </ul>
                             </AlertDescription>
@@ -324,9 +323,9 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     )}
 
                     {/* Basic Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-muted/5">
-                        <div className="grid gap-2">
-                            <Label className="text-sm font-bold">عنوان النموذج *</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-xl bg-muted/5">
+                        <div className="grid gap-1.5">
+                            <Label className="text-[11px] font-bold text-muted-foreground">عنوان النموذج *</Label>
                             <Input 
                                 value={title} 
                                 onChange={e => {
@@ -334,67 +333,67 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                     if(showValidationErrors) setShowValidationErrors(false);
                                 }} 
                                 placeholder="أدخل اسماً يميز هذا النموذج..." 
-                                className={cn("h-10", !title.trim() && showValidationErrors && "border-destructive")}
+                                className={cn("h-9 text-sm", !title.trim() && showValidationErrors && "border-destructive")}
                             />
                         </div>
                         
                         {templateType === 'Execution' ? (
-                            <div className="grid gap-2">
-                                <Label className="text-sm font-bold flex items-center gap-2">
-                                    <LayoutGrid className="h-4 w-4 text-amber-600" /> نوع المقاولات المرتبط
+                            <div className="grid gap-1.5">
+                                <Label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                                    <LayoutGrid className="h-3 w-3 text-amber-600" /> نوع المقاولات المرتبط
                                 </Label>
                                 <InlineSearchList 
                                     value={constructionTypeId}
                                     onSelect={setConstructionTypeId}
                                     options={constructionTypeOptions}
-                                    placeholder="اختر النوع لجلب المراحل..."
-                                    className={cn(!constructionTypeId && showValidationErrors && "border-destructive")}
+                                    placeholder="اختر النوع..."
+                                    className={cn("h-9", !constructionTypeId && showValidationErrors && "border-destructive")}
                                 />
                             </div>
                         ) : (
-                            <div className="grid gap-2">
-                                <Label className="text-sm font-bold flex items-center gap-2">
-                                    <Briefcase className="h-4 w-4 text-primary" /> المعاملات المكتبية المرتبطة
+                            <div className="grid gap-1.5">
+                                <Label className="text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                                    <Briefcase className="h-3 w-3 text-primary" /> المعاملات المكتبية المرتبطة
                                 </Label>
                                 <MultiSelect
                                     options={allTransactionTypes}
                                     selected={selectedTransactionTypes}
                                     onChange={setSelectedTransactionTypes}
                                     placeholder="اختر أنواع العمل..."
-                                    className={cn("bg-background", selectedTransactionTypes.length === 0 && showValidationErrors && "border-destructive")}
+                                    className={cn(selectedTransactionTypes.length === 0 && showValidationErrors && "border-destructive")}
                                 />
                             </div>
                         )}
 
-                        <div className="md:col-span-2 grid gap-2">
-                            <Label className="text-sm font-bold">وصف النموذج (اختياري)</Label>
-                            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="شرح موجز للغرض من هذا القالب..." />
+                        <div className="md:col-span-2 grid gap-1.5">
+                            <Label className="text-[11px] font-bold text-muted-foreground">وصف النموذج (اختياري)</Label>
+                            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="شرح موجز..." className="h-9 text-xs" />
                         </div>
                     </div>
 
                     {/* Scope of Work */}
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-base font-bold flex items-center gap-2">
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center px-1">
+                            <h3 className="text-sm font-bold flex items-center gap-2">
                                 <ShoppingCart className={cn("h-4 w-4", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
                                 نطاق العمل (Scope of Work)
                             </h3>
-                            <Button size="sm" variant="outline" onClick={addScopeItem} className="h-8 gap-1.5 text-xs">
-                                <PlusCircle className="h-3.5 w-3.5"/> إضافة بند
+                            <Button size="sm" variant="outline" onClick={addScopeItem} className="h-7 gap-1 text-[10px] font-bold">
+                                <PlusCircle className="h-3 w-3 ml-1"/> إضافة بند
                             </Button>
                         </div>
-                        <div className="grid gap-4">
+                        <div className="grid gap-3">
                             {scopeOfWork.map((item, index) => (
-                                <div key={item.id} className="relative p-4 border rounded-xl bg-card shadow-sm group">
-                                    <div className="absolute left-2 top-2 opacity-0 group-hover:opacity-100">
-                                        <Button variant="ghost" size="icon" onClick={() => removeScopeItem(item.id)} className="h-7 w-7 text-destructive rounded-full hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>
+                                <div key={item.id} className="relative p-3 border rounded-lg bg-card shadow-sm group">
+                                    <div className="absolute left-1.5 top-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" onClick={() => removeScopeItem(item.id)} className="h-6 w-6 text-destructive rounded-full hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5"/></Button>
                                     </div>
-                                    <div className="space-y-3">
+                                    <div className="space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <Badge variant="secondary" className="font-mono h-5 px-1.5">{index + 1}</Badge>
-                                            <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} className="h-8 border-none font-bold shadow-none focus-visible:ring-0 p-0" />
+                                            <Badge variant="secondary" className="font-mono text-[9px] h-4 px-1">{index + 1}</Badge>
+                                            <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} className="h-7 border-none font-bold shadow-none focus-visible:ring-0 p-0 text-sm" />
                                         </div>
-                                        <Textarea placeholder="وصف الأعمال التفصيلية..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} className="text-xs resize-none" />
+                                        <Textarea placeholder="وصف الأعمال..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={1} className="text-[11px] min-h-[40px] resize-none border-none p-0 shadow-none focus-visible:ring-0 leading-relaxed" />
                                     </div>
                                 </div>
                             ))}
@@ -403,75 +402,75 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
                     {/* Financials */}
                     <div className={cn(
-                        "p-6 border rounded-xl",
+                        "p-4 border rounded-xl",
                         templateType === 'Consulting' ? "bg-primary/5 border-primary/10" : "bg-amber-600/5 border-amber-600/10"
                     )}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className={cn("font-bold flex items-center gap-2", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
-                                <Calculator className="h-5 w-5" /> الدفعات المالية (Milestones)
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className={cn("text-sm font-bold flex items-center gap-2", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
+                                <Calculator className="h-4 w-4" /> الدفعات المالية (Milestones)
                             </h3>
-                            <Button size="sm" onClick={addMilestone} className="h-8 text-xs font-bold">
-                                <PlusCircle className="h-3.5 w-3.5 ml-1.5"/> إضافة دفعة
+                            <Button size="sm" onClick={addMilestone} className="h-7 text-[10px] font-bold px-3">
+                                <PlusCircle className="h-3 w-3 ml-1"/> إضافة دفعة
                             </Button>
                         </div>
                         
-                        <div className="grid md:grid-cols-2 gap-6 mb-6">
-                            <div className="grid gap-1.5">
-                                <Label className="text-xs font-bold opacity-70">نوع العقد المالي</Label>
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                            <div className="grid gap-1">
+                                <Label className="text-[10px] font-bold opacity-60">نوع العقد المالي</Label>
                                 <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
-                                    <SelectTrigger className="h-9 text-sm bg-background"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="fixed">قيمة ثابتة (بالدينار)</SelectItem>
                                         <SelectItem value="percentage">نسبة مئوية (%)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-xs font-bold opacity-70">إجمالي الميزانية (لتحقق النسب)</Label>
-                                <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="h-9 text-sm font-bold bg-background" />
+                            <div className="grid gap-1">
+                                <Label className="text-[10px] font-bold opacity-60">إجمالي الميزانية (للتحقق)</Label>
+                                <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="h-8 text-xs font-bold bg-background" />
                             </div>
                         </div>
                         
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {financials.milestones.map((m, i) => (
-                                <div key={m.id} className="grid grid-cols-12 gap-3 items-center p-3 bg-background border rounded-lg shadow-sm">
+                                <div key={m.id} className="grid grid-cols-12 gap-2 items-center p-2 bg-background border rounded-lg shadow-sm">
                                     <div className="col-span-3">
-                                        <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="h-8 text-xs font-bold border-none shadow-none focus-visible:ring-0 p-0" />
+                                        <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="h-7 text-[11px] font-bold border-none shadow-none focus-visible:ring-0 p-0" />
                                     </div>
                                     <div className="col-span-5">
                                         <InlineSearchList 
                                             value={m.condition || ''}
                                             onSelect={v => updateMilestone(m.id, 'condition', v)}
                                             options={conditionOptions}
-                                            placeholder={loadingStages ? "جاري التحميل..." : "شرط الاستحقاق..."}
+                                            placeholder={loadingStages ? "تحميل..." : "شرط الاستحقاق..."}
                                             disabled={loadingStages || (templateType === 'Execution' && !constructionTypeId)}
-                                            className="h-8 text-[10px] bg-muted/30 border-none"
+                                            className="h-7 text-[10px] bg-muted/30 border-none px-2"
                                         />
                                     </div>
-                                    <div className="col-span-3 flex items-center gap-2">
+                                    <div className="col-span-3 flex items-center gap-1.5">
                                         <Input 
                                             type="number" 
                                             value={m.value} 
                                             onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} 
-                                            className="h-8 text-xs font-bold text-center w-20" 
+                                            className="h-7 text-xs font-black text-center w-16" 
                                         />
-                                        <span className="text-[10px] font-bold opacity-50">{financials.type === 'fixed' ? 'KD' : '%'}</span>
+                                        <span className="text-[9px] font-black opacity-50">{financials.type === 'fixed' ? 'KD' : '%'}</span>
                                     </div>
                                     <div className="col-span-1 flex justify-end">
-                                        <Button variant="ghost" size="icon" onClick={() => removeMilestone(m.id)} className="h-7 w-7 text-destructive rounded-full"><Trash2 className="h-3.5 w-3.5"/></Button>
+                                        <Button variant="ghost" size="icon" onClick={() => removeMilestone(m.id)} className="h-6 w-6 text-destructive rounded-full"><Trash2 className="h-3 w-3"/></Button>
                                     </div>
                                 </div>
                             ))}
                         </div>
 
                         {financials.milestones.length > 0 && (
-                            <div className="flex justify-between items-center px-4 py-3 mt-4 border-t border-dashed">
-                                <span className="text-xs font-bold opacity-60">إجمالي التوزيع الحالي:</span>
+                            <div className="flex justify-between items-center px-2 py-2 mt-3 border-t border-dashed border-muted-foreground/20">
+                                <span className="text-[10px] font-bold opacity-60">إجمالي التوزيع:</span>
                                 <Badge variant={cn(
                                     (financials.type === 'percentage' && totalMilestoneValue !== 100) || 
                                     (financials.type === 'fixed' && financials.totalAmount > 0 && Math.abs(totalMilestoneValue - financials.totalAmount) > 0.001)
                                     ? "destructive" : "secondary"
-                                )} className="font-mono text-sm">
+                                )} className="font-mono text-[11px] px-2 h-5">
                                     {totalMilestoneValue} {financials.type === 'fixed' ? 'KD' : '%'}
                                 </Badge>
                             </div>
@@ -479,22 +478,22 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     </div>
 
                     {/* Legal Terms */}
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-base font-bold flex items-center gap-2">
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center px-1">
+                            <h3 className="text-sm font-bold flex items-center gap-2">
                                 <ShieldCheck className={cn("h-4 w-4", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
                                 المواد القانونية والشروط
                             </h3>
-                            <Button size="sm" variant="outline" onClick={addTerm} className="h-8 gap-1.5 text-xs">
-                                <PlusCircle className="h-3.5 w-3.5"/> إضافة مادة
+                            <Button size="sm" variant="outline" onClick={addTerm} className="h-7 gap-1 text-[10px] font-bold">
+                                <PlusCircle className="h-3.5 w-3.5 ml-1"/> إضافة مادة
                             </Button>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {termsAndConditions.map((term, index) => (
-                                <div key={term.id} className="flex items-start gap-3 group">
-                                    <div className="mt-2 h-6 w-6 rounded bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{index + 1}</div>
-                                    <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow text-xs leading-relaxed resize-none shadow-none" placeholder="نص المادة القانونية..."/>
-                                    <Button variant="ghost" size="icon" onClick={() => removeTerm(term.id)} className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 rounded-full"><Trash2 className="h-4 w-4"/></Button>
+                                <div key={term.id} className="flex items-start gap-2 group">
+                                    <div className="mt-1 h-5 w-5 rounded bg-muted flex items-center justify-center text-[9px] font-black shrink-0">{index + 1}</div>
+                                    <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={1} className="flex-grow text-[11px] leading-relaxed resize-none shadow-none min-h-[38px] p-2" placeholder="نص المادة القانونية..."/>
+                                    <Button variant="ghost" size="icon" onClick={() => removeTerm(term.id)} className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 rounded-full transition-opacity"><Trash2 className="h-3.5 w-3.5"/></Button>
                                 </div>
                             ))}
                         </div>
@@ -502,18 +501,18 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                 </div>
             </ScrollArea>
 
-            <DialogFooter className="p-6 border-t bg-card mt-auto flex-shrink-0">
-              <Button variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-lg font-bold">إلغاء</Button>
+            <DialogFooter className="p-4 border-t bg-card mt-auto flex-shrink-0">
+              <Button variant="ghost" onClick={onClose} disabled={isSaving} className="h-10 px-6 text-xs font-bold">إلغاء</Button>
               <Button 
                 onClick={handleSave} 
                 disabled={isSaving} 
                 className={cn(
-                    "h-11 px-12 rounded-lg font-bold min-w-[180px] shadow-lg",
+                    "h-10 px-10 text-sm font-black min-w-[160px] shadow-lg",
                     templateType === 'Consulting' ? "bg-primary" : "bg-amber-600 hover:bg-amber-700"
                 )}
               >
                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                {template ? 'حفظ التعديلات' : 'اعتماد النموذج'}
+                {template ? 'حفظ التعديلات' : 'اعتماد القالب'}
               </Button>
             </DialogFooter>
         </DialogContent>
