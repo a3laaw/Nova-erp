@@ -1,263 +1,138 @@
 /**
  * @fileOverview تعريف كافة الأنماط (Interfaces) والكيانات في النظام.
- * هذا الملف هو المرجع الأساسي لهيكل البيانات في Firestore.
+ * هذا الملف هو "القاموس" الذي يحدد شكل البيانات في Firestore.
  */
 
+// 1. واجهة الزيارة الميدانية: تستخدم لتسجيل خروج المهندس للموقع
 export interface FieldVisit {
-  id?: string;
-  clientId: string;
-  clientName: string;
-  transactionId: string;
-  transactionType: string;
-  engineerId: string;
-  engineerName: string;
-  scheduledDate: any; // Firestore Timestamp
-  plannedStageId: string;
-  plannedStageName: string;
-  status: 'planned' | 'confirmed' | 'cancelled';
-  confirmationData?: {
-    confirmedAt: any;
-    notes: string;
-    location?: {
+  id?: string;                  // المعرف الفريد من Firebase
+  clientId: string;             // ربط بالعميل
+  clientName: string;           // اسم العميل (للسرعة في العرض)
+  transactionId: string;        // ربط بالمعاملة/المشروع
+  transactionType: string;      // نوع المعاملة
+  engineerId: string;           // المهندس الذي قام بالزيارة
+  engineerName: string;         // اسم المهندس
+  scheduledDate: any;           // تاريخ الموعد (Timestamp)
+  plannedStageId: string;       // المرحلة المستهدفة من الـ WBS
+  plannedStageName: string;     // اسم المرحلة
+  status: 'planned' | 'confirmed' | 'cancelled'; // حالة الزيارة
+  confirmationData?: {          // بيانات التأكيد عند وصول المهندس
+    confirmedAt: any;           // وقت التأكيد الفعلي
+    notes: string;              // ملاحظات المهندس الميدانية
+    location?: {                // إحداثيات الـ GPS لضمان المصداقية
       latitude: number;
       longitude: number;
       accuracy: number;
     };
-    isCompleted: boolean;
+    isCompleted: boolean;       // هل تم إنهاء المهمة
   };
-  createdAt: any;
+  createdAt: any;               // تاريخ إنشاء السجل
 }
 
+// 2. واجهة بنود جداول الكميات (BOQ): تمثل شجرة التكاليف
 export interface BoqItem {
-  id?: string;
-  itemId?: string; // المرجع للصنف في دليل المواد
-  itemNumber: string; // الترقيم الشجري (1.1, 1.1.1)
-  description: string;
-  unit: string;
-  quantity: number;
-  sellingUnitPrice: number; // السعر للعميل
-  costUnitPrice?: number; // التكلفة الفعلية (من المشتريات)
-  isHeader: boolean; // هل هو عنوان قسم أم بند عمل
-  parentId: string | null;
-  level: number;
-  notes?: string;
-  margin?: number;
-  executedQuantity?: number;
-  actualCost?: number;
-  deviation?: number;
-  startDate?: any;
-  endDate?: any;
-  createdAt?: any;
-  updatedAt?: any;
+  id?: string;                  // معرف البند
+  itemId?: string;              // ربط بدليل المواد المرجعي
+  itemNumber: string;           // رقم البند الشجري (مثل 1.2.1)
+  description: string;          // وصف العمل
+  unit: string;                 // الوحدة (م3، م2، مقطوعية)
+  quantity: number;             // الكمية المتعاقد عليها
+  sellingUnitPrice: number;     // سعر البيع للعميل
+  costUnitPrice?: number;       // سعر التكلفة التقديري
+  isHeader: boolean;            // هل هو عنوان قسم (لا يحسب) أم بند عمل
+  parentId: string | null;      // المعرف للأب (لبناء الشجرة)
+  level: number;                // مستوى العمق في الشجرة
+  notes?: string;               // ملاحظات إضافية
+  startDate?: any;              // تاريخ بدء التنفيذ المخطط
+  endDate?: any;                // تاريخ الانتهاء المخطط
 }
 
-export interface InventoryAdjustment {
-    id?: string;
-    adjustmentNumber: string;
-    date: any;
-    type: 'opening_balance' | 'damage' | 'theft' | 'material_issue' | 'purchase_return' | 'sales_return' | 'transfer' | 'other';
-    issueType?: 'project_site' | 'direct_sale';
-    journalEntryId?: string;
-    items: any[];
-    projectId?: string;
-    projectName?: string;
-    clientId?: string;
-    clientName?: string;
-    warehouseId?: string;
-    fromWarehouseId?: string;
-    toWarehouseId?: string;
-    notes?: string;
-    createdAt?: any;
-    createdBy?: string;
-}
-
+// 3. واجهة مشروع المقاولات: الكيان الرئيسي للتنفيذ
 export interface ConstructionProject {
-  id?: string;
-  projectId: string;
-  projectName: string;
-  clientId: string;
-  clientName?: string;
+  id?: string;                  // معرف الوثيقة
+  projectId: string;            // الرقم التسلسلي للمشروع (مثل PRJ-2024-001)
+  projectName: string;          // اسم المشروع (فيلا السيد...)
+  clientId: string;             // ربط بصاحب المشروع
+  clientName?: string;          // اسم العميل
   projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
-  constructionTypeId?: string; // المرجع لنوع المقاولات (هيكل أسود، إلخ)
-  constructionTypeName?: string;
-  contractValue: number;
-  startDate: any; 
-  endDate: any;
+  constructionTypeId?: string;  // ربط بنوع المقاولات (هيكل، ترميم)
+  contractValue: number;        // القيمة الإجمالية للعقد
+  startDate: any;               // تاريخ البدء الفعلي
+  endDate: any;                 // تاريخ التسليم التعاقدي
   status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى';
-  mainEngineerId: string;
-  mainEngineerName?: string;
-  progressPercentage: number;
-  boqId?: string; 
+  mainEngineerId: string;       // مدير المشروع
+  progressPercentage: number;   // نسبة الإنجاز الإجمالية
+  boqId?: string;               // ربط بجدول الكميات المعتمد
   createdAt?: any;
-  createdBy?: string;
 }
 
-export type UserRole = 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
-
-export interface UserProfile {
-  id?: string;
-  uid?: string; 
-  username: string;
-  email: string;
-  passwordHash: string;
-  employeeId: string;
-  role: UserRole;
-  isActive: boolean;
-  createdAt?: any; 
-  activatedAt?: any;
-  createdBy?: string;
-  avatarUrl?: string;
-  fullName?:string;
-  jobTitle?: string;
-}
-
+// 4. واجهة العميل: مركز العمليات
 export interface Client {
   id: string;
-  nameAr: string;
+  nameAr: string;               // الاسم بالعربية (أساسي للبحث)
   nameEn?: string;
-  mobile: string;
-  civilId?: string;
-  address?: {
+  mobile: string;               // رقم التواصل (فريد)
+  civilId?: string;             // الرقم المدني
+  address?: {                   // العنوان التفصيلي
     governorate: string;
     area: string;
     block: string;
     street: string;
     houseNumber: string;
   };
-  fileId: string; // الترقيم الرسمي (sequence/year)
-  fileNumber: number;
-  fileYear: number;
+  fileId: string;               // رقم الملف الرسمي (1/2024)
   status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
-  assignedEngineer?: string;
-  createdAt: any;
-  isActive: boolean;
-  transactionCounter?: number;
+  assignedEngineer?: string;    // المهندس المسؤول عن العميل
+  transactionCounter?: number;  // عداد لتوليد أرقام المعاملات
 }
 
+// 5. واجهة المعاملة: تمثل خدمة معينة للعميل
 export interface ClientTransaction {
     id?: string;
-    transactionNumber?: string;
-    clientId: string;
-    transactionType: string;
-    departmentId?: string;
-    assignedEngineerId?: string;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
-    createdAt: any;
-    updatedAt?: any;
-    boqId?: string; 
-    boqItemCount?: number;
-    boqTotalValue?: number;
-    contract?: {
-        clauses: any[];
-        totalAmount: number;
+    transactionNumber?: string; // رقم المعاملة (CL1-TX01)
+    clientId: string;           // ربط بالعميل
+    transactionType: string;    // نوع الخدمة
+    status: string;             // حالة سير العمل
+    contract?: {                // العقد المالي المرتبط بالمعاملة
+        clauses: any[];         // دفعات العقد
+        totalAmount: number;    // إجمالي قيمة المعاملة
         financialsType?: 'fixed' | 'percentage';
-        scopeOfWork?: any[];
-        termsAndConditions?: any[];
-        openClauses?: any[];
     };
-    stages?: any[];
+    stages?: any[];             // مراحل العمل الفعلية (WBS)
 }
 
-export interface Account {
-    id?: string;
-    code: string; // كود الحساب المحاسبي (مثال: 110101)
-    name: string;
-    type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-    statement: 'Balance Sheet' | 'Income Statement';
-    balanceType: 'Debit' | 'Credit';
-    level: number;
-    parentCode: string | null;
-    isPayable?: boolean;
-}
-
+// 6. واجهة القيد المحاسبي: العصب المالي للنظام
 export interface JournalEntry { 
     id?: string; 
-    entryNumber: string; 
-    date: any; 
-    narration: string; 
-    totalDebit: number; 
-    totalCredit: number; 
-    status: string; // draft | posted
-    lines: JournalEntryLine[]; 
-    createdAt: any; 
-    transactionId?: string; 
-    clientId?: string; 
+    entryNumber: string;        // رقم القيد (JV-2024-001)
+    date: any;                  // تاريخ الاستحقاق
+    narration: string;          // البيان/الوصف
+    totalDebit: number;         // إجمالي المدين
+    totalCredit: number;        // إجمالي الدائن (يجب أن يتساوى مع المدين)
+    status: string;             // draft (مسودة) | posted (مرحل)
+    lines: JournalEntryLine[];  // أسطر القيد التفصيلية
+    transactionId?: string;     // ربط بالمشروع (مركز ربحية)
+    clientId?: string;          // ربط بالعميل
 }
 
 export interface JournalEntryLine {
-    accountId: string;
-    accountName: string;
-    debit: number;
-    credit: number;
-    notes?: string;
-    auto_profit_center?: string; // لربط المصروف بالمشروع
-    auto_resource_id?: string;   // لربط المصروف بالمهندس
-    auto_dept_id?: string;       // لربط المصروف بالقسم
+    accountId: string;          // الحساب المتأثر من الشجرة
+    accountName: string;        // اسم الحساب
+    debit: number;              // المبلغ المدين
+    credit: number;             // المبلغ الدائن
+    auto_profit_center?: string;// وسم المشروع للتقارير التحليلية
+    auto_resource_id?: string;  // وسم المهندس لقياس الإنتاجية
 }
 
-export interface ContractTemplate {
-    id?: string;
-    title: string;
-    description?: string;
-    templateType?: 'Consulting' | 'Execution';
-    constructionTypeId?: string;
-    transactionTypes?: string[];
-    scopeOfWork?: ContractScopeItem[];
-    termsAndConditions?: ContractTerm[];
-    financials?: {
-        type: 'fixed' | 'percentage';
-        totalAmount: number;
-        discount: number;
-        milestones: ContractFinancialMilestone[];
-    };
-    openClauses?: ContractTerm[];
-    createdAt: any;
-    createdBy: string;
-}
-
-export interface ContractFinancialMilestone {
-    id: string;
-    name: string;
-    condition: string; // المرحلة التي يجب إنجازها لاستحقاق الدفعة
-    value: number; // مبلغ أو نسبة
-}
-
-export interface ContractTerm { id: string; text: string; }
-export interface ContractScopeItem { id: string; title: string; description: string; }
-
-export interface Vendor { id?: string; name: string; contactPerson?: string; phone?: string; email?: string; address?: string; createdAt?: any; }
-
-export interface PurchaseOrder {
-    id?: string;
-    poNumber: string;
-    orderDate: any;
-    vendorId: string;
-    vendorName: string;
-    projectId?: string;
-    rfqId?: string;
-    items: any[];
-    totalAmount: number;
-    status: string; // draft | approved | received
-    createdAt: any;
-}
-
+// 7. واجهة الموظف: لإدارة الموارد البشرية
 export interface Employee {
     id?: string;
-    employeeNumber: string;
-    fullName: string;
-    mobile: string;
-    civilId: string;
-    department: string;
-    jobTitle: string;
-    basicSalary: number;
-    housingAllowance?: number;
-    transportAllowance?: number;
-    status: 'active' | 'on-leave' | 'terminated';
-    hireDate: any;
-    terminationDate?: any;
-    terminationReason?: 'resignation' | 'termination';
-    contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special' | 'day_laborer';
-    annualLeaveUsed?: number;
-    carriedLeaveDays?: number;
-    annualLeaveAccrued?: number;
+    employeeNumber: string;     // الرقم الوظيفي
+    fullName: string;           // الاسم الرباعي
+    basicSalary: number;        // الراتب الأساسي
+    housingAllowance?: number;  // بدل السكن
+    transportAllowance?: number;// بدل المواصلات
+    status: 'active' | 'terminated';
+    hireDate: any;              // تاريخ التعيين
+    contractType: string;       // دائم، مؤقت، نسبة
 }
