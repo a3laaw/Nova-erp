@@ -43,14 +43,13 @@ const DialogContent = React.forwardRef<
       )}
       onPointerDownOutside={(e) => {
         const target = e.target as HTMLElement;
-        // Aggressive check for all portal types to prevent accidental close
         if (
             target.closest('[cmdk-root]') ||
             target.closest('[data-radix-popper-content-wrapper]') ||
             target.closest('.react-select__menu-portal') ||
             target.closest('[data-radix-select-content]') ||
-            target.closest('[data-inline-search-list-options]') ||
-            target.closest('[role="listbox"]')
+            target.closest('[role="listbox"]') ||
+            target.closest('[role="combobox"]')
         ) {
             e.preventDefault();
         }
