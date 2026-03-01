@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,20 +22,22 @@ import {
   Save, 
   Loader2, 
   LayoutGrid, 
-  Sparkles,
   ShoppingCart,
   Calculator,
   FileText,
   Briefcase,
   Construction,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  X,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, collectionGroup, orderBy } from 'firebase/firestore';
-import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, WorkStage, ConstructionType } from '@/lib/types';
+import type { ContractTemplate, ContractScopeItem, ContractTerm, ContractFinancialMilestone, Department, TransactionType, ConstructionType } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Badge } from '../ui/badge';
@@ -44,6 +45,14 @@ import { InlineSearchList } from '../ui/inline-search-list';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
+
+interface ContractTemplateFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSaveSuccess: () => void;
+  template: ContractTemplate | null;
+  initialType: 'Consulting' | 'Execution';
+}
 
 export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template, initialType }: ContractTemplateFormProps) {
   const { firestore } = useFirebase();
@@ -71,7 +80,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: constructionTypes, loading: typesLoading } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
+  const { data: constructionTypes, loading: typesLoading } = useSubscription<ConstructionType>(firestore, 'construction_types', useMemo(() => [orderBy('name')], []));
   
   const [constructionStages, setConstructionStages] = useState<MultiSelectOption[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
@@ -154,12 +163,11 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     }
   }, [template, isOpen]);
 
-  // CRITICAL FIX: Ensure condition options are strictly filtered by template type
   const conditionOptions = useMemo(() => {
     if (templateType === 'Execution') {
-        return constructionStages; // ONLY show construction stages
+        return constructionStages;
     }
-    return allWorkStages; // ONLY show office/consulting stages
+    return allWorkStages;
   }, [templateType, constructionStages, allWorkStages]);
 
 
@@ -239,257 +247,215 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           dir="rtl"
-          className={cn(
-            "max-w-4xl h-[90vh] flex flex-col p-0 rounded-[2.5rem] overflow-hidden border-4 transition-colors duration-500",
-            templateType === 'Consulting' ? "border-primary/20 bg-sky-50/10" : "border-amber-600/20 bg-amber-50/10"
-          )}
+          className="max-w-5xl h-[95vh] flex flex-col p-0 rounded-xl overflow-hidden"
           onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
-            if (target.closest('[data-inline-search-list-portal]')) {
+            if (target.closest('[data-inline-search-list-portal]') || target.closest('[cmdk-root]')) {
                 e.preventDefault();
             }
           }}
         >
             <DialogHeader className={cn(
-                "p-8 border-b flex-shrink-0 transition-colors duration-500",
-                templateType === 'Consulting' ? "bg-primary/5" : "bg-amber-600/5"
+                "p-6 border-b flex-shrink-0",
+                templateType === 'Consulting' ? "border-primary/20 bg-primary/5" : "border-amber-600/20 bg-amber-600/5"
             )}>
                 <div className="flex items-center gap-4">
-                    <div className={cn("p-3 rounded-2xl transition-colors", templateType === 'Consulting' ? "bg-primary/10 text-primary" : "bg-amber-600/10 text-amber-600")}>
-                        {templateType === 'Execution' ? <Construction className="h-8 w-8" /> : <Briefcase className="h-8 w-8" />}
+                    <div className={cn("p-2.5 rounded-lg", templateType === 'Consulting' ? "bg-primary text-primary-foreground" : "bg-amber-600 text-white")}>
+                        {templateType === 'Execution' ? <Construction className="h-6 w-6" /> : <Briefcase className="h-6 w-6" />}
                     </div>
                     <div>
-                        <DialogTitle className="text-2xl font-black">
+                        <DialogTitle className="text-xl font-bold">
                             {template ? 'تعديل نموذج' : 'إنشاء نموذج'} {templateType === 'Execution' ? 'عقد مقاولات' : 'عقد استشارات'}
                         </DialogTitle>
-                        <DialogDescription>توحيد وربط نماذج العقود بالقوائم المرجعية المناسبة لنوع العمل المختار.</DialogDescription>
+                        <DialogDescription className="text-xs">صياغة وتوحيد بنود العقود والدفعات المالية.</DialogDescription>
                     </div>
                 </div>
             </DialogHeader>
+
             <ScrollArea className="flex-grow">
-                <div className="p-8 space-y-10">
-                    <section className={cn(
-                        "space-y-6 p-8 border rounded-[2rem] bg-card shadow-sm transition-colors",
-                        templateType === 'Execution' ? "border-amber-600/10" : "border-primary/10"
-                    )}>
-                        <h3 className={cn("font-black text-lg flex items-center gap-2", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
-                            <FileText className="h-5 w-5" /> البيانات الأساسية للنموذج
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="p-6 space-y-8 pb-32">
+                    {/* Basic Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border rounded-xl bg-muted/5">
+                        <div className="grid gap-2">
+                            <Label className="text-sm font-bold">عنوان النموذج *</Label>
+                            <Input 
+                                value={title} 
+                                onChange={e => setTitle(e.target.value)} 
+                                placeholder="أدخل اسماً يميز هذا النموذج..." 
+                                className="h-10"
+                            />
+                        </div>
+                        
+                        {templateType === 'Execution' ? (
                             <div className="grid gap-2">
-                                <Label htmlFor="template-title" className="font-bold text-sm text-foreground/70">عنوان النموذج *</Label>
-                                <Input 
-                                    id="template-title" 
-                                    value={title} 
-                                    onChange={e => setTitle(e.target.value)} 
-                                    placeholder="مثال: عقد هيكل أسود مع المواد" 
-                                    className={cn("h-12 rounded-xl text-lg font-bold border-2", templateType === 'Execution' ? "focus:border-amber-600" : "focus:border-primary")} 
+                                <Label className="text-sm font-bold flex items-center gap-2">
+                                    <LayoutGrid className="h-4 w-4 text-amber-600" /> نوع المقاولات المرتبط
+                                </Label>
+                                <InlineSearchList 
+                                    value={constructionTypeId}
+                                    onSelect={setConstructionTypeId}
+                                    options={constructionTypeOptions}
+                                    placeholder="اختر النوع لجلب المراحل..."
                                 />
                             </div>
-                            
-                            {templateType === 'Execution' ? (
-                                <div className="grid gap-2">
-                                    <Label className="font-bold text-sm text-foreground/70 flex items-center gap-2">
-                                        <LayoutGrid className="h-4 w-4 text-amber-600" /> نوع المقاولات المعتمد *
-                                    </Label>
-                                    <InlineSearchList 
-                                        value={constructionTypeId}
-                                        onSelect={setConstructionTypeId}
-                                        options={constructionTypeOptions}
-                                        placeholder={typesLoading ? "جاري التحميل..." : "اختر نوع المقاولات..."}
-                                        className="h-12 rounded-xl border-2 border-amber-600/20"
-                                    />
-                                    <p className="text-[10px] text-amber-700/70 italic">عند الاختيار، سيتم جلب مراحل العمل الفنية لهذا النوع آلياً.</p>
-                                </div>
-                            ) : (
-                                <div className="grid gap-2">
-                                    <Label className="font-bold text-sm text-foreground/70 flex items-center gap-2">
-                                        <Briefcase className="h-4 w-4 text-primary" /> أنواع المعاملات المكتبية المرتبطة
-                                    </Label>
-                                    <MultiSelect
-                                        options={allTransactionTypes}
-                                        selected={selectedTransactionTypes}
-                                        onChange={setSelectedTransactionTypes}
-                                        placeholder={loadingRefData ? "تحميل..." : "اختر نوع معاملة أو أكثر..."}
-                                        disabled={loadingRefData}
-                                        className="rounded-xl border-2"
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        ) : (
+                            <div className="grid gap-2">
+                                <Label className="text-sm font-bold flex items-center gap-2">
+                                    <Briefcase className="h-4 w-4 text-primary" /> المعاملات المكتبية المرتبطة
+                                </Label>
+                                <MultiSelect
+                                    options={allTransactionTypes}
+                                    selected={selectedTransactionTypes}
+                                    onChange={setSelectedTransactionTypes}
+                                    placeholder="اختر أنواع العمل..."
+                                    className="bg-background"
+                                />
+                            </div>
+                        )}
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="template-description" className="font-bold text-sm text-foreground/70">وصف النموذج</Label>
-                            <Textarea id="template-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} className="rounded-xl border-2 resize-none" placeholder="شرح موجز لاستخدامات هذا القالب..." />
+                        <div className="md:col-span-2 grid gap-2">
+                            <Label className="text-sm font-bold">وصف النموذج (اختياري)</Label>
+                            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="شرح موجز للغرض من هذا القالب..." />
                         </div>
-                    </section>
+                    </div>
 
-                    <section className="space-y-6">
-                        <div className="flex justify-between items-center px-2">
-                            <h3 className="font-black text-lg flex items-center gap-2 text-foreground">
-                                <ShoppingCart className={cn("h-5 w-5", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
+                    {/* Scope of Work */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-base font-bold flex items-center gap-2">
+                                <ShoppingCart className={cn("h-4 w-4", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
                                 نطاق العمل (Scope of Work)
                             </h3>
-                            <Button 
-                                size="sm" 
-                                variant="outline" 
-                                type="button" 
-                                onClick={addScopeItem} 
-                                className={cn("rounded-xl gap-2 font-bold border-2 border-dashed", templateType === 'Consulting' ? "border-primary/30 hover:border-primary text-primary" : "border-amber-600/30 hover:border-amber-600 text-amber-600")}
-                            >
-                                <PlusCircle className="h-4 w-4"/> إضافة بند عمل
+                            <Button size="sm" variant="outline" onClick={addScopeItem} className="h-8 gap-1.5 text-xs">
+                                <PlusCircle className="h-3.5 w-3.5"/> إضافة بند
                             </Button>
                         </div>
-                        <div className="space-y-4">
+                        <div className="grid gap-4">
                             {scopeOfWork.map((item, index) => (
-                                <div key={item.id} className="flex items-start gap-3 p-6 border-2 border-muted bg-card rounded-3xl shadow-sm hover:shadow-md transition-all group">
-                                    <span className={cn("pt-2 font-black font-mono text-xl", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>{index + 1}.</span>
-                                    <div className="flex-grow space-y-4">
-                                        <Input placeholder="عنوان البند الرئيسي" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} className="font-black border-none shadow-none focus-visible:ring-0 text-xl p-0 h-auto bg-transparent" />
-                                        <Textarea placeholder="شرح تفصيلي لما سيتم تنفيذه ضمن هذا البند..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} className="text-sm border-none shadow-none focus-visible:ring-0 bg-muted/10 rounded-xl p-4 resize-none" />
+                                <div key={item.id} className="relative p-4 border rounded-xl bg-card shadow-sm group">
+                                    <div className="absolute left-2 top-2 opacity-0 group-hover:opacity-100">
+                                        <Button variant="ghost" size="icon" onClick={() => removeScopeItem(item.id)} className="h-7 w-7 text-destructive rounded-full hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>
                                     </div>
-                                    <Button variant="ghost" size="icon" type="button" onClick={() => removeScopeItem(item.id)} className="h-10 w-10 text-destructive opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-destructive/10"><Trash2 className="h-5 w-5"/></Button>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="secondary" className="font-mono h-5 px-1.5">{index + 1}</Badge>
+                                            <Input placeholder="عنوان البند" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} className="h-8 border-none font-bold shadow-none focus-visible:ring-0 p-0" />
+                                        </div>
+                                        <Textarea placeholder="وصف الأعمال التفصيلية..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} className="text-xs resize-none" />
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                    </section>
+                    </div>
 
-                    <section className={cn(
-                        "space-y-6 p-8 border-2 rounded-[2.5rem] shadow-inner relative overflow-hidden",
-                        templateType === 'Consulting' ? "border-primary/10 bg-primary/5" : "border-amber-600/10 bg-amber-600/5"
+                    {/* Financials */}
+                    <div className={cn(
+                        "p-6 border rounded-xl",
+                        templateType === 'Consulting' ? "bg-primary/5 border-primary/10" : "bg-amber-600/5 border-amber-600/10"
                     )}>
-                        <div className="absolute top-0 left-0 p-12 opacity-5 pointer-events-none">
-                            <Calculator className={cn("h-40 w-40", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} />
-                        </div>
-                        <div className="relative z-10">
-                            <div className="flex justify-between items-center mb-8">
-                                <h3 className={cn("font-black text-xl flex items-center gap-3", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
-                                    <Calculator className="h-6 w-6" /> الدفعات المالية (Milestones)
-                                </h3>
-                                <Button 
-                                    variant="default" 
-                                    size="sm" 
-                                    type="button" 
-                                    onClick={addMilestone} 
-                                    className={cn("rounded-xl gap-2 font-black shadow-lg", templateType === 'Consulting' ? "bg-primary shadow-primary/20" : "bg-amber-600 hover:bg-amber-700 shadow-amber-200")}
-                                >
-                                    <PlusCircle className="h-4 w-4"/> إضافة دفعة
-                                </Button>
-                            </div>
-                            
-                            <div className="grid md:grid-cols-2 gap-8 mb-8">
-                                <div className="grid gap-3">
-                                    <Label className="font-bold text-xs opacity-70 uppercase tracking-widest">نوع العقد المالي</Label>
-                                    <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
-                                        <SelectTrigger className="h-12 rounded-2xl border-2 bg-background font-bold"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="fixed">قيمة ثابتة (مبالغ بالدينار)</SelectItem>
-                                            <SelectItem value="percentage">نسبة مئوية (توزيع حصص %)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-3">
-                                    <Label className="font-bold text-xs opacity-70 uppercase tracking-widest">إجمالي الميزانية (للنسب)</Label>
-                                    <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="dir-ltr text-center h-12 font-black text-xl rounded-2xl bg-background border-2" />
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-3">
-                                {financials.milestones.map((m, i) => (
-                                    <div key={m.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-background rounded-[1.5rem] border-2 shadow-sm group transition-all">
-                                        <div className="col-span-3">
-                                            <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="h-10 font-black text-sm border-none shadow-none focus-visible:ring-0 px-0 bg-transparent" />
-                                        </div>
-                                        <div className="col-span-5">
-                                            <InlineSearchList 
-                                                value={m.condition || ''}
-                                                onSelect={v => updateMilestone(m.id, 'condition', v)}
-                                                options={conditionOptions}
-                                                placeholder={loadingStages ? "جاري التحميل..." : "شرط استحقاق الدفعة..."}
-                                                disabled={loadingStages || (templateType === 'Execution' && !constructionTypeId)}
-                                                className="h-10 border-none shadow-none focus-visible:ring-0 rounded-xl bg-muted/30 px-4 font-bold text-xs"
-                                            />
-                                        </div>
-                                        <div className="col-span-3 flex items-center gap-3">
-                                            <Input 
-                                                type="number" 
-                                                value={m.value} 
-                                                onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} 
-                                                className={cn("dir-ltr text-center h-10 font-black text-lg border-2 border-muted rounded-xl bg-muted/10 w-24", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} 
-                                            />
-                                            <span className="text-[10px] font-black text-muted-foreground uppercase">{financials.type === 'fixed' ? 'KD' : '%'}</span>
-                                        </div>
-                                        <div className="col-span-1 flex justify-center">
-                                            <Button variant="ghost" size="icon" type="button" onClick={() => removeMilestone(m.id)} className="h-10 w-10 text-destructive opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {financials.milestones.length > 0 && (
-                                <div className={cn(
-                                    "flex justify-between items-center p-6 rounded-3xl mt-6 border-2 transition-all",
-                                    (financials.type === 'percentage' && totalMilestoneValue !== 100) ? "bg-red-50 border-red-200" : "bg-white shadow-lg",
-                                    (financials.type === 'percentage' && totalMilestoneValue === 100 && templateType === 'Consulting') ? "border-primary/20" : "",
-                                    (financials.type === 'percentage' && totalMilestoneValue === 100 && templateType === 'Execution') ? "border-amber-600/20" : ""
-                                )}>
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-muted-foreground">إجمالي الدفعات الموزعة</span>
-                                        <p className={cn("text-3xl font-black font-mono", (financials.type === 'percentage' && totalMilestoneValue !== 100) ? "text-red-600" : (templateType === 'Consulting' ? "text-primary" : "text-amber-600"))}>
-                                            {totalMilestoneValue} {financials.type === 'fixed' ? 'KD' : '%'}
-                                        </p>
-                                    </div>
-                                    {financials.type === 'percentage' && totalMilestoneValue !== 100 && (
-                                        <div className="text-left text-red-700 animate-pulse">
-                                            <AlertCircle className="h-10 w-10 ml-auto mb-1" />
-                                            <p className="font-black text-sm">يجب أن يكون المجموع 100% بالضبط</p>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </section>
-
-                    <section className="space-y-6 px-2">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-black text-lg flex items-center gap-2">
-                                <ShieldCheck className={cn("h-5 w-5", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
-                                الشروط والأحكام القانونية
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className={cn("font-bold flex items-center gap-2", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
+                                <Calculator className="h-5 w-5" /> الدفعات المالية (Milestones)
                             </h3>
-                            <Button 
-                                size="sm" 
-                                variant="outline" 
-                                type="button" 
-                                onClick={addTerm} 
-                                className={cn("rounded-xl gap-2 font-bold border-2 border-dashed", templateType === 'Consulting' ? "border-primary/30 hover:border-primary text-primary" : "border-amber-600/30 hover:border-amber-600 text-amber-600")}
-                            >
-                                <PlusCircle className="h-4 w-4"/> إضافة مادة قانونية
+                            <Button size="sm" onClick={addMilestone} className="h-8 text-xs font-bold">
+                                <PlusCircle className="h-3.5 w-3.5 ml-1.5"/> إضافة دفعة
                             </Button>
                         </div>
-                        <div className="space-y-4">
-                            {termsAndConditions.map((term, index) => (
-                                <div key={term.id} className="flex items-start gap-4 p-4 bg-white rounded-2xl border-2 border-muted hover:border-primary/20 transition-all group shadow-sm">
-                                    <span className={cn("pt-2 font-black font-mono text-lg", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>{index + 1}.</span>
-                                    <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow border-none shadow-none focus-visible:ring-0 bg-transparent text-sm font-medium leading-relaxed resize-none" placeholder="اكتب نص المادة القانونية هنا..."/>
-                                    <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)} className="h-9 w-9 text-destructive opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>
+                        
+                        <div className="grid md:grid-cols-2 gap-6 mb-6">
+                            <div className="grid gap-1.5">
+                                <Label className="text-xs font-bold opacity-70">نوع العقد المالي</Label>
+                                <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
+                                    <SelectTrigger className="h-9 text-sm bg-background"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="fixed">قيمة ثابتة (بالدينار)</SelectItem>
+                                        <SelectItem value="percentage">نسبة مئوية (%)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-xs font-bold opacity-70">إجمالي الميزانية (للنسب)</Label>
+                                <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="h-9 text-sm font-bold bg-background" />
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                            {financials.milestones.map((m, i) => (
+                                <div key={m.id} className="grid grid-cols-12 gap-3 items-center p-3 bg-background border rounded-lg shadow-sm">
+                                    <div className="col-span-3">
+                                        <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="h-8 text-xs font-bold border-none shadow-none focus-visible:ring-0 p-0" />
+                                    </div>
+                                    <div className="col-span-5">
+                                        <InlineSearchList 
+                                            value={m.condition || ''}
+                                            onSelect={v => updateMilestone(m.id, 'condition', v)}
+                                            options={conditionOptions}
+                                            placeholder={loadingStages ? "جاري التحميل..." : "شرط الاستحقاق..."}
+                                            disabled={loadingStages || (templateType === 'Execution' && !constructionTypeId)}
+                                            className="h-8 text-[10px] bg-muted/30 border-none"
+                                        />
+                                    </div>
+                                    <div className="col-span-3 flex items-center gap-2">
+                                        <Input 
+                                            type="number" 
+                                            value={m.value} 
+                                            onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} 
+                                            className="h-8 text-xs font-bold text-center w-20" 
+                                        />
+                                        <span className="text-[10px] font-bold opacity-50">{financials.type === 'fixed' ? 'KD' : '%'}</span>
+                                    </div>
+                                    <div className="col-span-1 flex justify-end">
+                                        <Button variant="ghost" size="icon" onClick={() => removeMilestone(m.id)} className="h-7 w-7 text-destructive rounded-full"><Trash2 className="h-3.5 w-3.5"/></Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                    </section>
+
+                        {financials.milestones.length > 0 && (
+                            <div className="flex justify-between items-center px-4 py-3 mt-4 border-t border-dashed">
+                                <span className="text-xs font-bold opacity-60">إجمالي التوزيع الحالي:</span>
+                                <Badge variant={cn(financials.type === 'percentage' && totalMilestoneValue !== 100 ? "destructive" : "secondary")} className="font-mono text-sm">
+                                    {totalMilestoneValue} {financials.type === 'fixed' ? 'KD' : '%'}
+                                </Badge>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Legal Terms */}
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="text-base font-bold flex items-center gap-2">
+                                <ShieldCheck className={cn("h-4 w-4", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
+                                المواد القانونية والشروط
+                            </h3>
+                            <Button size="sm" variant="outline" onClick={addTerm} className="h-8 gap-1.5 text-xs">
+                                <PlusCircle className="h-3.5 w-3.5"/> إضافة مادة
+                            </Button>
+                        </div>
+                        <div className="space-y-3">
+                            {termsAndConditions.map((term, index) => (
+                                <div key={term.id} className="flex items-start gap-3 group">
+                                    <div className="mt-2 h-6 w-6 rounded bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">{index + 1}</div>
+                                    <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow text-xs leading-relaxed resize-none shadow-none" placeholder="نص المادة القانونية..."/>
+                                    <Button variant="ghost" size="icon" onClick={() => removeTerm(term.id)} className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 rounded-full"><Trash2 className="h-4 w-4"/></Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </ScrollArea>
-            <DialogFooter className="p-8 border-t bg-card flex-shrink-0">
-              <Button variant="outline" type="button" onClick={onClose} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg hover:bg-muted">إلغاء</Button>
+
+            <DialogFooter className="p-6 border-t bg-card mt-auto flex-shrink-0">
+              <Button variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-lg font-bold">إلغاء</Button>
               <Button 
-                type="button" 
                 onClick={handleSave} 
                 disabled={isSaving || (financials.type === 'percentage' && totalMilestoneValue !== 100)} 
                 className={cn(
-                    "h-14 px-16 rounded-2xl font-black text-xl shadow-2xl transition-all min-w-[240px]",
-                    templateType === 'Consulting' ? "bg-primary shadow-primary/30" : "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
+                    "h-11 px-12 rounded-lg font-bold min-w-[180px] shadow-lg",
+                    templateType === 'Consulting' ? "bg-primary" : "bg-amber-600 hover:bg-amber-700"
                 )}
               >
-                {isSaving ? <Loader2 className="ml-3 h-6 w-6 animate-spin" /> : <Save className="ml-3 h-6 w-6" />}
+                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                 {template ? 'حفظ التعديلات' : 'اعتماد النموذج'}
               </Button>
             </DialogFooter>
