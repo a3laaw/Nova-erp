@@ -47,6 +47,7 @@ export interface ClientTransaction {
         clauses: ContractClause[];
         scopeOfWork?: ContractScopeItem[];
         termsAndConditions?: ContractTerm[];
+        openClauses?: ContractTerm[];
     };
     stages?: TransactionStage[]; // مراحل العمل الفنية (WBS)
     boqId?: string;             // ربط بجدول الكميات
