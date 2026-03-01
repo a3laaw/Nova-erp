@@ -212,7 +212,7 @@ export interface Boq {
   projectId?: string;
   transactionId?: string;
   createdAt: any;
-  updatedAt?: any;
+  updatedAt: any;
   createdBy?: string;
 }
 export interface BoqReferenceItem { 
@@ -497,6 +497,7 @@ export interface ContractTemplate {
     title: string;
     description?: string;
     templateType?: 'Consulting' | 'Execution';
+    constructionTypeId?: string;
     transactionTypes?: string[];
     scopeOfWork?: ContractScopeItem[];
     termsAndConditions?: ContractTerm[];
@@ -563,7 +564,7 @@ export interface Quotation {
     items: any[];
     totalAmount: number;
     financialsType?: 'fixed' | 'percentage';
-    notes?: string;
+    notes: string;
     status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
     createdAt: any;
     createdBy: string;
