@@ -1,122 +1,116 @@
 /**
- * @fileOverview تعريف كافة الأنماط (Interfaces) والكيانات في النظام.
- * هذا الملف هو "القاموس" الذي يحدد شكل البيانات في Firestore.
+ * @fileOverview القاموس البرمجي لنظام Nova ERP.
+ * يحتوي على كافة الواجهات (Interfaces) التي تحدد شكل البيانات في Firestore.
  */
 
 import { Timestamp } from 'firebase/firestore';
 
-// 1. واجهة العميل: مركز العمليات
-// يرتبط بـ: ClientTransaction (علاقة 1 لـ متعدد)
+/**
+ * العميل: يمثل ملف العميل الرئيسي.
+ * العلاقات: 1:N مع ClientTransaction.
+ * استخدامات: صفحة العملاء، العقود، السندات المالية.
+ */
 export interface Client {
-  id: string;                   // المعرف الفريد - يتولد تلقائياً من Firebase
-  nameAr: string;               // الاسم بالعربية - أساس البحث والتقارير
-  nameEn?: string;              // الاسم بالإنجليزية - اختياري للمراسلات
-  mobile: string;               // رقم التواصل - فريد لمنع تكرار الملفات
-  civilId?: string;             // الرقم المدني - للتحقق القانوني
-  address?: {                   // العنوان التفصيلي للمشروع
+  id: string;                   // المعرف الفريد من Firebase
+  fileId: string;               // رقم الملف الرسمي (1/2024)
+  nameAr: string;               // الاسم بالعربي - أساس البحث
+  nameEn?: string;              // الاسم بالإنجليزي
+  mobile: string;               // رقم الجوال - فريد
+  civilId?: string;             // الرقم المدني
+  address?: {
     governorate: string;
     area: string;
     block: string;
     street: string;
     houseNumber: string;
   };
-  fileId: string;               // رقم الملف الرسمي (مثال: 1/2024)
-  status: 'new' | 'contracted' | 'cancelled' | 'reContracted'; // دورة حياة العميل
-  assignedEngineer?: string;    // المهندس المسؤول عن العميل (Reference to Employee ID)
-  transactionCounter?: number;  // عداد لتوليد أرقام المعاملات التسلسلية (TX01, TX02)
-  createdAt: Timestamp;         // تاريخ إنشاء الملف
-  isActive: boolean;            // حالة الملف (نشط/مجمد)
+  status: 'new' | 'contracted' | 'cancelled' | 'reContracted';
+  assignedEngineer?: string;    // ID الموظف المسؤول
+  transactionCounter?: number;  // لتوليد أرقام المعاملات
+  createdAt: Timestamp;
+  isActive: boolean;
 }
 
-// 2. واجهة المعاملة: تمثل خدمة أو مشروع معين للعميل
+/**
+ * المعاملة: تمثل خدمة هندسية معينة للعميل.
+ * العلاقات: 1:1 مع العقد (Contract).
+ */
 export interface ClientTransaction {
     id?: string;
-    transactionNumber?: string; // رقم المعاملة (CL1-TX01)
-    clientId: string;           // ربط بالعميل (Foreign Key)
-    transactionType: string;    // نوع الخدمة (تصميم بلدية، إشراف، إلخ)
-    transactionTypeId?: string; // ربط بقالب نوع المعاملة
-    departmentId?: string;      // القسم المسؤول حالياً عن المعاملة
-    assignedEngineerId?: string;// المهندس المباشر المتابع للعمل
-    status: string;             // حالة سير العمل (جديدة، قيد التنفيذ، منتهية)
-    contract?: {                // العقد المالي المرتبط بالمعاملة (إن وجد)
-        totalAmount: number;    // إجمالي قيمة المعاملة
-        financialsType: 'fixed' | 'percentage'; // نوع الحسبة (مبلغ ثابت أم نسبة)
-        clauses: ContractClause[]; // دفعات العقد وشروط استحقاقها
-        scopeOfWork?: any[];    // نطاق العمل المعتمد
-        termsAndConditions?: any[]; // الشروط القانونية
-        openClauses?: any[];    // بنود إضافية
+    transactionNumber?: string; // CL1-TX01
+    clientId: string;
+    transactionType: string;    // نوع الخدمة (صحي، كهرباء...)
+    transactionTypeId?: string;
+    departmentId?: string;
+    assignedEngineerId?: string;
+    status: string;             // جديدة، قيد التنفيذ، منتهية
+    contract?: {
+        totalAmount: number;
+        financialsType: 'fixed' | 'percentage';
+        clauses: ContractClause[];
+        scopeOfWork?: any[];
+        termsAndConditions?: any[];
+        openClauses?: any[];
     };
-    stages?: TransactionStage[];// مراحل العمل الفعلية (WBS)
-    boqId?: string;             // ربط بجدول الكميات المعتمد لهذه المعاملة
+    stages?: TransactionStage[]; // مراحل العمل الفنية
+    boqId?: string;             // ربط بجدول الكميات
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
 
-// 3. واجهة القيد المحاسبي: العصب المالي للنظام
+/**
+ * القيد المحاسبي: العمود الفقري للمحاسبة.
+ * يضمن توازن المدين والدائن.
+ */
 export interface JournalEntry { 
     id?: string; 
-    entryNumber: string;        // رقم القيد التسلسلي (JV-2024-001)
-    date: Timestamp;            // تاريخ الاستحقاق المحاسبي
-    narration: string;          // البيان/الوصف الشامل للقيد
-    totalDebit: number;         // إجمالي المدين (يجب أن يتساوى مع الدائن)
-    totalCredit: number;        // إجمالي الدائن
-    status: 'draft' | 'posted'; // حالة القيد (مسودة لا تؤثر في التقارير / مرحل يؤثر)
-    lines: JournalEntryLine[];  // أسطر القيد التفصيلية
-    transactionId?: string;     // ربط بالمشروع (مركز ربحية لتقرير P&L)
-    clientId?: string;          // ربط بالعميل (لمتابعة المديونية)
-    linkedReceiptId?: string;   // ربط بسند القبض المنشئ لهذا القيد
+    entryNumber: string;        // JV-2024-001
+    date: Timestamp;
+    narration: string;          // بيان القيد
+    totalDebit: number;
+    totalCredit: number;
+    status: 'draft' | 'posted';
+    lines: JournalEntryLine[];  // أسطر القيد
+    transactionId?: string;     // ربط بمركز الربحية (المشروع)
+    clientId?: string;          // ربط بالعميل (المديونية)
     createdAt: Timestamp;
     createdBy: string;
 }
 
 export interface JournalEntryLine {
-    accountId: string;          // الحساب المتأثر من شجرة الحسابات
-    accountName: string;        // اسم الحساب وقت إنشاء القيد
-    debit: number;              // المبلغ المدين
-    credit: number;             // المبلغ الدائن
-    notes?: string;             // ملاحظات على السطر
-    auto_profit_center?: string;// وسم المشروع للتقارير التحليلية
-    auto_resource_id?: string;  // وسم المهندس لقياس إنتاجية الموظف
-    auto_dept_id?: string;      // وسم القسم لتحليل أداء الأقسام
+    accountId: string;
+    accountName: string;
+    debit: number;
+    credit: number;
+    auto_profit_center?: string; // معرف المشروع للتقارير
+    auto_resource_id?: string;  // معرف المهندس للإنتاجية
 }
 
-// 4. واجهة الموظف: لإدارة الموارد البشرية والرواتب
+/**
+ * الموظف: لادارة الموارد البشرية والرواتب.
+ */
 export interface Employee {
     id?: string;
-    employeeNumber: string;     // الرقم الوظيفي الفريد
-    fullName: string;           // الاسم الرباعي بالعربي
-    nameEn?: string;            // الاسم بالإنجليزي
-    civilId: string;            // الرقم المدني
-    mobile: string;             // رقم التواصل
-    department: string;         // القسم الحالي
-    jobTitle: string;           // المسمى الوظيفي
-    basicSalary: number;        // الراتب الأساسي
-    housingAllowance?: number;  // بدل السكن
-    transportAllowance?: number;// بدل المواصلات
+    employeeNumber: string;
+    fullName: string;
+    basicSalary: number;
     status: 'active' | 'terminated' | 'on-leave';
-    hireDate: Timestamp;        // تاريخ التعيين (أساس حساب نهاية الخدمة)
+    hireDate: Timestamp;        // أساس حساب مكافأة نهاية الخدمة
     contractType: 'permanent' | 'temporary' | 'piece-rate' | 'percentage';
-    terminationDate?: Timestamp;// تاريخ إنهاء الخدمة
-    terminationReason?: 'resignation' | 'termination'; // سبب ترك العمل
-    annualLeaveUsed?: number;   // إجمالي الإجازات المستهلكة
-    carriedLeaveDays?: number;  // الرصيد المرحل من سنوات سابقة
 }
 
 export interface ContractClause {
     id: string;
-    name: string;               // وصف الدفعة (مثال: الدفعة الأولى)
-    amount: number;             // قيمة الدفعة بالدينار
-    percentage?: number;        // النسبة المئوية من العقد (إن وجدت)
+    name: string;
+    amount: number;
     status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة';
-    condition?: string;         // مرحلة العمل التي تفعل هذه الدفعة
+    condition?: string;         // المرحلة التي تفعل الدفعة
 }
 
 export interface TransactionStage {
     stageId: string;
-    name: string;               // اسم المرحلة (مثال: تسليم المخططات)
-    status: 'pending' | 'in-progress' | 'completed' | 'skipped';
-    startDate?: Timestamp;      // تاريخ بدء العمل بالمرحلة
-    endDate?: Timestamp;        // تاريخ الإنجاز الفعلي
-    expectedEndDate?: Timestamp;// تاريخ التسليم المخطط
-    completedCount?: number;    // عدد مرات الإكمال (للمراحل التكرارية)
+    name: string;
+    status: 'pending' | 'in-progress' | 'completed';
+    startDate?: Timestamp;
+    endDate?: Timestamp;
 }

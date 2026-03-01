@@ -1,92 +1,69 @@
-import { differenceInDays, differenceInMonths, differenceInYears } from 'date-fns';
+/**
+ * @fileOverview محرك الحسابات القانونية (HR Logic Engine).
+ * يطبق قوانين العمل في دولة الكويت بدقة رياضية.
+ */
+
+import { differenceInDays, differenceInMonths } from 'date-fns';
 import type { Employee } from '@/lib/types';
 import { toFirestoreDate } from './date-converter';
 
 /**
- * @fileOverview عقل حسابات الموارد البشرية (HR Logic Engine).
- * يحتوي على المعادلات القانونية والرياضية الدقيقة وفقاً لقانون العمل الكويتي.
- */
-
-/**
- * دالة حساب رصيد الإجازات السنوية:
- * الرصيد المعتمد هو 30 يوماً في السنة (2.5 يوم لكل شهر عمل).
+ * حساب رصيد الإجازات السنوية:
+ * الموظف يكتسب 30 يوماً في السنة (2.5 يوم شهرياً).
  */
 export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDate: Date): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return 0;
 
-    // حساب إجمالي أشهر الخدمة
-    const totalMonthsOfService = differenceInMonths(asOfDate, hireDate);
+    // حساب أشهر الخدمة من تاريخ التعيين
+    const months = differenceInMonths(asOfDate, hireDate);
+    const accrued = (months / 12) * 30; // الرصيد المكتسب
     
-    // الموظف يكتسب 2.5 يوم عن كل شهر
-    const totalAccrued = (totalMonthsOfService / 12) * 30;
-    
-    const usedLeave = employee.annualLeaveUsed || 0;
-    const carriedOver = employee.carriedLeaveDays || 0;
+    const used = employee.annualLeaveUsed || 0;
+    const carried = employee.carriedLeaveDays || 0;
 
-    // المعادلة: المكتسب + المرحل - المستخدم
-    const balance = totalAccrued + carriedOver - usedLeave;
-
-    return Math.floor(balance > 0 ? balance : 0);
+    // الرصيد النهائي = المكتسب + المرحل - المستخدم
+    const balance = accrued + carried - used;
+    return Math.floor(Math.max(0, balance));
 };
 
 /**
  * محرك مكافأة نهاية الخدمة (Gratuity Engine):
- * يطبق المادة 51 من قانون العمل الكويتي للقطاع الأهلي بدقة.
+ * يطبق المادة 51 من قانون العمل الكويتي.
  */
 export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
     const hireDate = toFirestoreDate(employee.hireDate);
-    if (!hireDate) return { total: 0, notice: 'تاريخ التعيين غير صالح' };
+    if (!hireDate) return { total: 0, notice: 'تاريخ تعيين غير صالح' };
 
-    const yearsOfService = differenceInDays(asOfDate, hireDate) / 365;
-    const lastSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-    const dailyWage = lastSalary / 26; // أجر اليوم الواحد حسب العرف المحاسبي الكويتي
+    const years = differenceInDays(asOfDate, hireDate) / 365;
+    const salary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
+    const dailyWage = salary / 26; // أجر اليوم القانوني
 
-    let rawGratuity = 0;
+    let gratuity = 0;
 
-    // تطبيق شرائح سنوات الخدمة
-    if (yearsOfService <= 5) {
-        // الـ 5 سنوات الأولى: أجر 15 يوماً عن كل سنة
-        rawGratuity = yearsOfService * 15 * dailyWage;
+    // الشرائح القانونية
+    if (years <= 5) {
+        gratuity = years * 15 * dailyWage; // 15 يوماً عن كل سنة في أول 5 سنوات
     } else {
-        // ما زاد عن 5 سنوات: أجر 15 يوماً للخمس الأولى + أجر شهر كامل لكل سنة بعدها
-        const firstFiveYearsGratuity = 5 * 15 * dailyWage;
-        const subsequentYears = yearsOfService - 5;
-        rawGratuity = firstFiveYearsGratuity + (subsequentYears * lastSalary);
+        gratuity = (5 * 15 * dailyWage) + ((years - 5) * salary); // شهر كامل عن كل سنة بعد الخامسة
     }
 
-    // سقف المكافأة القانوني: لا تتجاوز أجر سنة ونصف (18 شهراً)
-    const maxGratuity = 1.5 * 12 * lastSalary;
-    rawGratuity = Math.min(rawGratuity, maxGratuity);
+    // سقف المكافأة: لا تتجاوز أجر 18 شهراً
+    gratuity = Math.min(gratuity, 1.5 * 12 * salary);
 
-    let finalGratuity = rawGratuity;
-    let notice = `بناءً على ${yearsOfService.toFixed(1)} سنة خدمة.`;
-
-    // تعديل المستحق في حال الاستقالة (معامل الاستحقاق)
+    // معامل الاستقالة
     if (employee.terminationReason === 'resignation') {
-        if (yearsOfService < 3) {
-            finalGratuity = 0;
-            notice += " (الاستقالة قبل 3 سنوات: لا يستحق مكافأة)";
-        } else if (yearsOfService < 5) {
-            finalGratuity = rawGratuity * 0.5;
-            notice += " (الاستقالة بين 3-5 سنوات: يستحق النصف)";
-        } else if (yearsOfService < 10) {
-            finalGratuity = rawGratuity * (2/3);
-            notice += " (الاستقالة بين 5-10 سنوات: يستحق الثلثين)";
-        }
+        if (years < 3) gratuity = 0;
+        else if (years < 5) gratuity *= 0.5;
+        else if (years < 10) gratuity *= 0.66;
     }
 
-    const leaveBalance = calculateAnnualLeaveBalance(employee, asOfDate);
-    const leaveBalancePay = leaveBalance * dailyWage;
+    const leavePay = calculateAnnualLeaveBalance(employee, asOfDate) * dailyWage;
 
     return { 
-        gratuity: finalGratuity, 
-        leaveBalancePay, 
-        total: finalGratuity + leaveBalancePay, 
-        notice,
-        yearsOfService,
-        lastSalary,
-        leaveBalance,
-        dailyWage
+        gratuity, 
+        leavePay, 
+        total: gratuity + leavePay,
+        yearsOfService: years
     };
 };
