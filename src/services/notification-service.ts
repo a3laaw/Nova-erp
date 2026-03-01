@@ -10,9 +10,11 @@ interface NotificationData {
 }
 
 /**
- * إرسال إشعار لمستخدم محدد داخل النظام.
+ * محرك الإشعارات (Notification Engine):
+ * مسؤول عن إرسال التنبيهات اللحظية للمستخدمين لضمان سرعة الاستجابة في سير العمل.
  */
 export async function createNotification(db: Firestore, data: NotificationData) {
+    if (!db || !data.userId) return;
     try {
         await addDoc(collection(db, 'notifications'), {
             ...data,
@@ -25,22 +27,16 @@ export async function createNotification(db: Firestore, data: NotificationData) 
 }
 
 /**
- * البحث عن معرّف المستخدم (User UID) بناءً على الرقم الوظيفي (Employee ID).
+ * البحث عن معرّف المستخدم بناءً على الموظف:
+ * يُستخدم لتحويل الإسناد المهني (المهندس) إلى تنبيه للنظام (المستخدم).
  */
 export async function findUserIdByEmployeeId(db: Firestore, employeeId: string): Promise<string | null> {
-    if (!employeeId) return null;
-
+    if (!employeeId || !db) return null;
     try {
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('employeeId', '==', employeeId));
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-            return querySnapshot.docs[0].id; 
-        }
-        return null;
+        const q = query(collection(db, 'users'), where('employeeId', '==', employeeId));
+        const snap = await getDocs(q);
+        return snap.empty ? null : snap.docs[0].id;
     } catch (error) {
-        console.error("Failed to find user by employeeId:", error);
         return null;
     }
 }
