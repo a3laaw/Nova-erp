@@ -1,14 +1,13 @@
 {
-  "name": "nextn",
-  "version": "0.1.0",
-  "private": "true",
+  "name": "nova-erp",
+  "version": "1.0.0",
+  "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "fix-deps": "echo 'triggering dependency reinstall'"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
@@ -21,14 +20,12 @@
     "@radix-ui/react-dialog": "1.1.1",
     "@radix-ui/react-dropdown-menu": "2.1.1",
     "@radix-ui/react-label": "2.1.0",
-    "@radix-ui/react-menubar": "1.1.1",
     "@radix-ui/react-popover": "1.1.1",
     "@radix-ui/react-progress": "1.1.0",
     "@radix-ui/react-radio-group": "1.2.0",
     "@radix-ui/react-scroll-area": "1.1.0",
     "@radix-ui/react-select": "2.1.1",
     "@radix-ui/react-separator": "1.1.0",
-    "@radix-ui/react-slider": "1.2.0",
     "@radix-ui/react-slot": "1.1.0",
     "@radix-ui/react-switch": "1.1.0",
     "@radix-ui/react-tabs": "1.1.0",
@@ -40,12 +37,9 @@
     "cmdk": "1.0.0",
     "date-fns": "3.6.0",
     "dotenv": "16.4.5",
-    "embla-carousel-react": "8.1.5",
     "firebase": "10.14.1",
-    "firebase-admin": "12.1.0",
     "fuse.js": "7.0.0",
     "html2pdf.js": "0.10.1",
-    "localforage": "1.10.0",
     "lucide-react": "0.407.0",
     "next": "14.2.35",
     "react": "18.2.0",
@@ -58,7 +52,6 @@
     "remark-gfm": "4.0.0",
     "tailwind-merge": "2.3.0",
     "tailwindcss-animate": "1.0.7",
-    "use-debounce": "^10.0.1",
     "xlsx": "0.18.5",
     "zod": "3.23.8"
   },
@@ -66,7 +59,6 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/react-select": "^5.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
