@@ -1,11 +1,16 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+/**
+ * دالة دمج كلاسات Tailwind مع معالجة التعارضات.
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * تنسيق العملة بصيغة الدينار الكويتي.
+ */
 export function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
@@ -13,6 +18,9 @@ export function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+/**
+ * دالة التفقيط: تحويل الأرقام إلى نصوص عربية للسندات والعقود.
+ */
 function tafqeet(n: number, currency: { singular: string, dual: string, plural: string, accusative: string }): string {
     if (n === 0) return '';
     
@@ -54,14 +62,7 @@ function tafqeet(n: number, currency: { singular: string, dual: string, plural: 
             else mText = convert(m) + ' مليون';
             return mText + (rest > 0 ? ' و' + convert(rest) : '');
         }
-        const b = Math.floor(n / 1000000000);
-        const rest = n % 1000000000;
-         let bText = '';
-        if (b === 1) bText = 'مليار';
-        else if (b === 2) bText = 'ملياران';
-        else if (b >= 3 && b <= 10) bText = convert(b) + ' مليارات';
-        else bText = convert(b) + ' مليار';
-        return bText + (rest > 0 ? ' و' + convert(rest) : '');
+        return '';
     }
 
     function getUnit(num: number) {
@@ -78,7 +79,6 @@ function tafqeet(n: number, currency: { singular: string, dual: string, plural: 
     return words + ' ' + unit;
 }
 
-
 export function numberToArabicWords(inputNumber: number | string): string {
     const num = parseFloat(String(inputNumber).replace(/,/g, ''));
     if (isNaN(num)) return '';
@@ -91,50 +91,26 @@ export function numberToArabicWords(inputNumber: number | string): string {
     const filsCurrency = { singular: 'فلس', dual: 'فلسان', plural: 'فلوس', accusative: 'فلساً' };
 
     let result = [];
-    if (dinars > 0) {
-        result.push(tafqeet(dinars, dinarCurrency));
-    }
-    if (fils > 0) {
-        result.push(tafqeet(fils, filsCurrency));
-    }
-    
-    if (result.length === 0) return '';
+    if (dinars > 0) result.push(tafqeet(dinars, dinarCurrency));
+    if (fils > 0) result.push(tafqeet(fils, filsCurrency));
     
     return 'فقط ' + result.join(' و') + ' لا غير';
 }
 
-
+/**
+ * تنظيف الكائنات قبل إرسالها لـ Firestore لمنع أخطاء الحقول undefined.
+ */
 export function cleanFirestoreData(data: any): any {
-  if (Array.isArray(data)) {
-    return data.map(item => cleanFirestoreData(item));
-  }
-  
+  if (Array.isArray(data)) return data.map(item => cleanFirestoreData(item));
   if (data && typeof data === 'object') {
-    // التحقق من كائنات Firebase الخاصة (Timestamp, FieldValue sentinels)
-    if (typeof data.toDate === 'function') {
-      return data; 
-    }
-    
-    // منع تنظيف كائنات FieldValue (مثل serverTimestamp) عبر فحص النوع الداخلي إذا لم يكن كائناً عادياً
-    if (data.constructor?.name === 'FieldValue') {
-        return data;
-    }
-
-    if (data instanceof Date) {
-      return data; 
-    }
-
+    if (typeof data.toDate === 'function' || data instanceof Date || data.constructor?.name === 'FieldValue') return data;
     const cleanedData: { [key: string]: any } = {};
     for (const key in data) {
-      if (Object.prototype.hasOwnProperty.call(data, key)) {
-        const value = data[key];
-        if (value !== undefined) {
-          cleanedData[key] = cleanFirestoreData(value); 
-        }
+      if (Object.prototype.hasOwnProperty.call(data, key) && data[key] !== undefined) {
+        cleanedData[key] = cleanFirestoreData(data[key]);
       }
     }
     return cleanedData;
   }
-  
   return data;
 }
