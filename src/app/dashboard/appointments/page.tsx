@@ -16,12 +16,9 @@ import {
 import dynamic from 'next/dynamic';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// تهيئة المكونات بشكل آمن لمنع أخطاء الـ Chunks في Cloud Workstations
+// تحسين التحميل الديناميكي لتجنب أخطاء الـ Chunks المفقودة
 const ArchitecturalAppointmentsView = dynamic(
-    () => import('@/components/appointments/architectural-appointments-view').then(mod => {
-        if (!mod.ArchitecturalAppointmentsView) throw new Error("Component export mismatch");
-        return mod.ArchitecturalAppointmentsView;
-    }),
+    () => import('@/components/appointments/architectural-appointments-view').then(mod => mod.ArchitecturalAppointmentsView),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-2xl animate-pulse" />,
         ssr: false 
@@ -29,16 +26,12 @@ const ArchitecturalAppointmentsView = dynamic(
 );
 
 const RoomBookingCalendar = dynamic(
-    () => import('@/components/appointments/room-booking-calendar').then(mod => {
-        if (!mod.RoomBookingCalendar) throw new Error("Component export mismatch");
-        return mod.RoomBookingCalendar;
-    }),
+    () => import('@/components/appointments/room-booking-calendar').then(mod => mod.RoomBookingCalendar),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-2xl animate-pulse" />,
         ssr: false 
     }
 );
-
 
 export default function AppointmentsPage() {
     return (
@@ -46,7 +39,7 @@ export default function AppointmentsPage() {
             <CardHeader className="bg-muted/10 pb-6 border-b">
                 <CardTitle className="text-2xl font-black">إدارة المواعيد والتقويم</CardTitle>
                 <CardDescription className="text-base">
-                جدولة وتنظيم المواعيد للقسم المعماري وحجز قاعات الاجتماعات للأقسام الهندسية الأخرى بنظام ذكي لمنع التعارض.
+                جدولة وتنظيم المواعيد للقسم المعماري وحجز قاعات الاجتماعات بنظام ذكي لمنع التعارض.
                 </CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
@@ -55,10 +48,10 @@ export default function AppointmentsPage() {
                         <TabsTrigger value="architectural" className="py-3 rounded-xl font-bold data-[state=active]:shadow-lg">مواعيد القسم المعماري</TabsTrigger>
                         <TabsTrigger value="rooms" className="py-3 rounded-xl font-bold data-[state=active]:shadow-lg">حجوزات قاعات الاجتماعات</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="architectural" className="mt-0 animate-in fade-in duration-500">
+                    <TabsContent value="architectural" className="mt-0">
                         <ArchitecturalAppointmentsView />
                     </TabsContent>
-                    <TabsContent value="rooms" className="mt-0 animate-in fade-in duration-500">
+                    <TabsContent value="rooms" className="mt-0">
                         <RoomBookingCalendar />
                     </TabsContent>
                 </Tabs>
