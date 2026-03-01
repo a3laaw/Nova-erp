@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, FileText, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, FileSignature, Construction, Briefcase } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -17,49 +17,57 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ContractTemplate } from '@/lib/types';
 import { ContractTemplateForm } from '@/components/settings/contract-template-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-function TemplateListCard({
-  title,
+function TemplateList({
   templates,
-  onAdd,
   onEdit,
   onDelete,
   loading,
+  emptyMessage,
 }: {
-  title: string;
   templates: ContractTemplate[];
-  onAdd: () => void;
   onEdit: (template: ContractTemplate) => void;
   onDelete: (template: ContractTemplate) => void;
   loading: boolean;
+  emptyMessage: string;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{title}</CardTitle>
-        <Button size="sm" onClick={onAdd}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نموذج</Button>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {loading && Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
-        {!loading && templates.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">لا توجد نماذج.</div>
-        )}
-        {!loading && templates.map(template => (
-          <div key={template.id} className="flex items-center justify-between p-2 border rounded-md">
-            <div>
-              <p className="font-semibold">{template.title}</p>
-              <p className="text-xs text-muted-foreground">{template.description || 'لا يوجد وصف'}</p>
-            </div>
-            <div>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(template)}><Pencil className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(template)}><Trash2 className="h-4 w-4" /></Button>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <div className="space-y-3">
+      {loading ? (
+        Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)
+      ) : templates.length === 0 ? (
+        <div className="text-center py-16 border-2 border-dashed rounded-3xl bg-muted/5">
+          <FileSignature className="mx-auto h-12 w-12 text-muted-foreground opacity-20 mb-3" />
+          <p className="text-muted-foreground font-medium">{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {templates.map(template => (
+            <Card key={template.id} className="group hover:shadow-md transition-all border-2 border-transparent hover:border-primary/10 rounded-2xl overflow-hidden">
+              <CardHeader className="pb-3 bg-muted/10">
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-lg font-black">{template.title}</CardTitle>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => onEdit(template)}><Pencil className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-full" onClick={() => onDelete(template)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+                <CardDescription className="line-clamp-2 text-xs min-h-[32px]">{template.description || 'لا يوجد وصف متاح لهذا النموذج.'}</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4 flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                <span>{template.financials?.milestones.length || 0} دفعات</span>
+                <Badge variant="secondary" className="h-5 px-2">جاهز للاستخدام</Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
+
+import { Badge } from '@/components/ui/badge';
 
 export default function ContractsPage() {
   const { firestore } = useFirebase();
@@ -67,38 +75,33 @@ export default function ContractsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ContractTemplate | null>(null);
   const [templateToDelete, setTemplateToDelete] = useState<ContractTemplate | null>(null);
-  const [initialTemplateType, setInitialTemplateType] = useState<'Consulting' | 'Execution'>('Consulting');
+  const [activeType, setActiveType] = useState<'Consulting' | 'Execution'>('Consulting');
   
   const templatesQuery = useMemo(() => {
     if (!firestore) return null;
     return [orderBy('title')];
   }, [firestore]);
   
-  // The hook will automatically update when a document is deleted.
   const { data: templates, loading } = useSubscription<ContractTemplate>(firestore, 'contractTemplates', templatesQuery || []);
 
   const { consultingTemplates, executionTemplates } = useMemo(() => {
       const consulting: ContractTemplate[] = [];
       const execution: ContractTemplate[] = [];
       (templates || []).forEach(t => {
-          if (t.templateType === 'Execution') {
-              execution.push(t);
-          } else {
-              consulting.push(t);
-          }
+          if (t.templateType === 'Execution') execution.push(t);
+          else consulting.push(t);
       });
       return { consultingTemplates: consulting, executionTemplates: execution };
   }, [templates]);
 
-  const handleAdd = (type: 'Consulting' | 'Execution') => {
+  const handleAdd = () => {
     setSelectedTemplate(null);
-    setInitialTemplateType(type);
     setIsFormOpen(true);
   };
 
   const handleEdit = (template: ContractTemplate) => {
     setSelectedTemplate(template);
-    setInitialTemplateType(template.templateType || 'Consulting');
+    setActiveType(template.templateType || 'Consulting');
     setIsFormOpen(true);
   };
 
@@ -106,7 +109,7 @@ export default function ContractsPage() {
     if (!firestore || !templateToDelete) return;
     try {
       await deleteDoc(doc(firestore, 'contractTemplates', templateToDelete.id!));
-      toast({ title: 'نجاح', description: 'تم حذف النموذج.' });
+      toast({ title: 'نجاح', description: 'تم حذف نموذج العقد بنجاح.' });
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف النموذج.' });
     } finally {
@@ -115,60 +118,86 @@ export default function ContractsPage() {
   };
   
   return (
-    <>
-      <Card>
+    <div className="space-y-6" dir="rtl">
+      <Card className="rounded-3xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
         <CardHeader>
-          <CardTitle>إدارة نماذج العقود</CardTitle>
-          <CardDescription>
-            أنشئ وأدر نماذج العقود الاستشارية والتنفيذية لإعادة استخدامها عند إنشاء عقود العملاء.
-          </CardDescription>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="space-y-1">
+              <CardTitle className="text-2xl font-black flex items-center gap-3">
+                <FileSignature className="text-primary h-7 w-7" />
+                مكتبة نماذج العقود
+              </CardTitle>
+              <CardDescription>إدارة وتوحيد صيغ العقود والدفعات المالية للشركة بناءً على أنواع العمل.</CardDescription>
+            </div>
+            <Button onClick={handleAdd} className="h-12 px-8 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
+              <PlusCircle className="h-6 w-6" />
+              إنشاء نموذج جديد
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <TemplateListCard
-            title="نماذج عقود الاستشارات"
+      </Card>
+
+      <Tabs 
+        value={activeType} 
+        onValueChange={(v) => setActiveType(v as any)} 
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-2 h-auto p-1 bg-muted/50 rounded-2xl mb-8">
+          <TabsTrigger value="Consulting" className="py-4 rounded-xl gap-2 font-bold data-[state=active]:shadow-lg">
+            <Briefcase className="h-5 w-5" />
+            عقود الاستشارات الهندسية
+          </TabsTrigger>
+          <TabsTrigger value="Execution" className="py-4 rounded-xl gap-2 font-bold data-[state=active]:shadow-lg">
+            <Construction className="h-5 w-5" />
+            عقود المقاولات والإنشاءات
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="Consulting" className="animate-in fade-in slide-in-from-right-4 duration-300">
+          <TemplateList
             templates={consultingTemplates}
             loading={loading}
-            onAdd={() => handleAdd('Consulting')}
             onEdit={handleEdit}
             onDelete={setTemplateToDelete}
+            emptyMessage="لا توجد نماذج عقود استشارية حالياً."
           />
-          <TemplateListCard
-            title="نماذج عقود التنفيذ"
+        </TabsContent>
+
+        <TabsContent value="Execution" className="animate-in fade-in slide-in-from-left-4 duration-300">
+          <TemplateList
             templates={executionTemplates}
             loading={loading}
-            onAdd={() => handleAdd('Execution')}
             onEdit={handleEdit}
             onDelete={setTemplateToDelete}
+            emptyMessage="لا توجد نماذج عقود مقاولات حالياً."
           />
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
       
       {isFormOpen && (
         <ContractTemplateForm
           isOpen={isFormOpen}
           onClose={() => setIsFormOpen(false)}
-          onSaveSuccess={() => { /* Real-time, so no refetch needed */ }}
+          onSaveSuccess={() => {}}
           template={selectedTemplate}
-          initialType={initialTemplateType}
+          initialType={activeType}
         />
       )}
 
       <AlertDialog open={!!templateToDelete} onOpenChange={() => setTemplateToDelete(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                <AlertDialogTitle className="text-xl font-black">حذف نموذج العقد؟</AlertDialogTitle>
                 <AlertDialogDescription>
-                    هل أنت متأكد من رغبتك في حذف النموذج "{templateToDelete?.title}"؟
+                    هل أنت متأكد من رغبتك في حذف النموذج "{templateToDelete?.title}"؟ لا يؤثر هذا على العقود الموقعة مسبقاً، ولكنه سيختفي من قائمة القوالب الجديدة.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">حذف</AlertDialogAction>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">نعم، حذف</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   )
 }
-
-    
