@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -208,13 +209,17 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     const errors: string[] = [];
     if (!title.trim()) errors.push("عنوان النموذج مطلوب.");
     
-    if (financials.type === 'percentage') {
-        if (totalMilestoneValue !== 100) {
-            errors.push(`إجمالي نسب الدفعات يجب أن يكون 100% (الحالي: ${totalMilestoneValue}%).`);
-        }
+    if (financials.milestones.length === 0) {
+        errors.push("يجب إضافة دفعة مالية واحدة على الأقل في قسم البنود المالية.");
     } else {
-        if (financials.totalAmount > 0 && Math.abs(totalMilestoneValue - financials.totalAmount) > 0.001) {
-            errors.push(`إجمالي مبالغ الدفعات (${formatCurrency(totalMilestoneValue)}) يجب أن يساوي إجمالي الميزانية (${formatCurrency(financials.totalAmount)}).`);
+        if (financials.type === 'percentage') {
+            if (totalMilestoneValue !== 100) {
+                errors.push(`إجمالي نسب الدفعات يجب أن يكون 100% تماماً (الحالي: ${totalMilestoneValue}%).`);
+            }
+        } else {
+            if (financials.totalAmount > 0 && Math.abs(totalMilestoneValue - financials.totalAmount) > 0.001) {
+                errors.push(`إجمالي مبالغ الدفعات (${formatCurrency(totalMilestoneValue)}) يجب أن يساوي إجمالي ميزانية النموذج (${formatCurrency(financials.totalAmount)}).`);
+            }
         }
     }
 
@@ -307,7 +312,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     
                     {/* Validation Error Alert */}
                     {showValidationErrors && validationErrors.length > 0 && (
-                        <Alert variant="destructive" className="rounded-2xl border-2 shadow-lg animate-in fade-in slide-in-from-top-4">
+                        <Alert variant="destructive" className="rounded-2xl border-2 shadow-lg animate-in fade-in slide-in-from-top-4 mb-6">
                             <AlertTriangle className="h-5 w-5" />
                             <AlertTitle className="font-black text-lg">توجد أخطاء في البيانات</AlertTitle>
                             <AlertDescription>
@@ -422,7 +427,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                 </Select>
                             </div>
                             <div className="grid gap-1.5">
-                                <Label className="text-xs font-bold opacity-70">إجمالي الميزانية (للنسب)</Label>
+                                <Label className="text-xs font-bold opacity-70">إجمالي الميزانية (لتحقق النسب)</Label>
                                 <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="h-9 text-sm font-bold bg-background" />
                             </div>
                         </div>
