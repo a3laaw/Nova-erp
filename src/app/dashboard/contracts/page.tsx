@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -18,6 +19,8 @@ import type { ContractTemplate } from '@/lib/types';
 import { ContractTemplateForm } from '@/components/settings/contract-template-form';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 function TemplateList({
   templates,
@@ -25,12 +28,14 @@ function TemplateList({
   onDelete,
   loading,
   emptyMessage,
+  accentColor,
 }: {
   templates: ContractTemplate[];
   onEdit: (template: ContractTemplate) => void;
   onDelete: (template: ContractTemplate) => void;
   loading: boolean;
   emptyMessage: string;
+  accentColor: string;
 }) {
   return (
     <div className="space-y-3">
@@ -44,7 +49,7 @@ function TemplateList({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {templates.map(template => (
-            <Card key={template.id} className="group hover:shadow-md transition-all border-2 border-transparent hover:border-primary/10 rounded-2xl overflow-hidden">
+            <Card key={template.id} className={cn("group hover:shadow-md transition-all border-2 border-transparent rounded-2xl overflow-hidden", `hover:border-${accentColor}/20`)}>
               <CardHeader className="pb-3 bg-muted/10">
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg font-black">{template.title}</CardTitle>
@@ -66,8 +71,6 @@ function TemplateList({
     </div>
   );
 }
-
-import { Badge } from '@/components/ui/badge';
 
 export default function ContractsPage() {
   const { firestore } = useFirebase();
@@ -101,6 +104,7 @@ export default function ContractsPage() {
 
   const handleEdit = (template: ContractTemplate) => {
     setSelectedTemplate(template);
+    // Ensure we open in the correct mode based on the template
     setActiveType(template.templateType || 'Consulting');
     setIsFormOpen(true);
   };
@@ -119,17 +123,28 @@ export default function ContractsPage() {
   
   return (
     <div className="space-y-6" dir="rtl">
-      <Card className="rounded-3xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+      <Card className={cn(
+        "rounded-3xl border-none shadow-sm transition-all duration-500",
+        activeType === 'Consulting' 
+          ? "bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card" 
+          : "bg-gradient-to-l from-white to-amber-50 dark:from-card dark:to-card"
+      )}>
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="space-y-1">
-              <CardTitle className="text-2xl font-black flex items-center gap-3">
-                <FileSignature className="text-primary h-7 w-7" />
+            <div className="space-y-1 text-center md:text-right">
+              <CardTitle className="text-2xl font-black flex items-center justify-center md:justify-start gap-3">
+                <FileSignature className={cn("h-7 w-7", activeType === 'Consulting' ? "text-primary" : "text-amber-600")} />
                 مكتبة نماذج العقود
               </CardTitle>
               <CardDescription>إدارة وتوحيد صيغ العقود والدفعات المالية للشركة بناءً على أنواع العمل.</CardDescription>
             </div>
-            <Button onClick={handleAdd} className="h-12 px-8 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
+            <Button 
+              onClick={handleAdd} 
+              className={cn(
+                "h-12 px-8 rounded-2xl font-black text-lg gap-2 shadow-xl transition-all",
+                activeType === 'Consulting' ? "bg-primary shadow-primary/20" : "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
+              )}
+            >
               <PlusCircle className="h-6 w-6" />
               إنشاء نموذج جديد
             </Button>
@@ -143,11 +158,17 @@ export default function ContractsPage() {
         className="w-full"
       >
         <TabsList className="grid w-full grid-cols-2 h-auto p-1 bg-muted/50 rounded-2xl mb-8">
-          <TabsTrigger value="Consulting" className="py-4 rounded-xl gap-2 font-bold data-[state=active]:shadow-lg">
+          <TabsTrigger 
+            value="Consulting" 
+            className="py-4 rounded-xl gap-2 font-bold data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-lg"
+          >
             <Briefcase className="h-5 w-5" />
             عقود الاستشارات الهندسية
           </TabsTrigger>
-          <TabsTrigger value="Execution" className="py-4 rounded-xl gap-2 font-bold data-[state=active]:shadow-lg">
+          <TabsTrigger 
+            value="Execution" 
+            className="py-4 rounded-xl gap-2 font-bold data-[state=active]:bg-amber-600 data-[state=active]:text-white data-[state=active]:shadow-lg"
+          >
             <Construction className="h-5 w-5" />
             عقود المقاولات والإنشاءات
           </TabsTrigger>
@@ -159,6 +180,7 @@ export default function ContractsPage() {
             loading={loading}
             onEdit={handleEdit}
             onDelete={setTemplateToDelete}
+            accentColor="primary"
             emptyMessage="لا توجد نماذج عقود استشارية حالياً."
           />
         </TabsContent>
@@ -169,6 +191,7 @@ export default function ContractsPage() {
             loading={loading}
             onEdit={handleEdit}
             onDelete={setTemplateToDelete}
+            accentColor="amber-600"
             emptyMessage="لا توجد نماذج عقود مقاولات حالياً."
           />
         </TabsContent>

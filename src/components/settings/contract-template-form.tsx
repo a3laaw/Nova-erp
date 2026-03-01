@@ -1,7 +1,7 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -20,11 +20,8 @@ import { ScrollArea } from '../ui/scroll-area';
 import { 
   PlusCircle, 
   Trash2, 
-  ArrowUp, 
-  ArrowDown, 
   Save, 
   Loader2, 
-  Search, 
   LayoutGrid, 
   Sparkles,
   ShoppingCart,
@@ -44,14 +41,6 @@ import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { Badge } from '../ui/badge';
 import { InlineSearchList } from '../ui/inline-search-list';
-
-interface ContractTemplateFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSaveSuccess: () => void;
-  template: ContractTemplate | null;
-  initialType: 'Consulting' | 'Execution';
-}
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
@@ -139,7 +128,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
               uniqueStages.set(stageName, { value: stageName, label: stageName });
           }
         });
-        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')).map(s => ({ value: s.value, label: s.label })));
+        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
 
       } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل جلب البيانات المرجعية.' });
@@ -162,23 +151,15 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         setTermsAndConditions(template.termsAndConditions || []);
         setFinancials(template.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
         setOpenClauses(template.openClauses || []);
-    } else {
-        setTitle('');
-        setDescription('');
-        setConstructionTypeId('');
-        setSelectedTransactionTypes([]);
-        setScopeOfWork([]);
-        setTermsAndConditions([]);
-        setFinancials({ type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
-        setOpenClauses([]);
     }
   }, [template, isOpen]);
 
+  // CRITICAL FIX: Ensure condition options are strictly filtered by template type
   const conditionOptions = useMemo(() => {
-    if (templateType === 'Execution' && constructionStages.length > 0) {
-        return constructionStages;
+    if (templateType === 'Execution') {
+        return constructionStages; // ONLY show construction stages
     }
-    return allWorkStages;
+    return allWorkStages; // ONLY show office/consulting stages
   }, [templateType, constructionStages, allWorkStages]);
 
 
@@ -258,11 +239,23 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           dir="rtl"
-          className="max-w-4xl h-[90vh] flex flex-col p-0 rounded-[2.5rem] overflow-hidden"
+          className={cn(
+            "max-w-4xl h-[90vh] flex flex-col p-0 rounded-[2.5rem] overflow-hidden border-4 transition-colors duration-500",
+            templateType === 'Consulting' ? "border-primary/20 bg-sky-50/10" : "border-amber-600/20 bg-amber-50/10"
+          )}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-inline-search-list-portal]')) {
+                e.preventDefault();
+            }
+          }}
         >
-            <DialogHeader className="p-8 border-b bg-muted/10 flex-shrink-0">
+            <DialogHeader className={cn(
+                "p-8 border-b flex-shrink-0 transition-colors duration-500",
+                templateType === 'Consulting' ? "bg-primary/5" : "bg-amber-600/5"
+            )}>
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                    <div className={cn("p-3 rounded-2xl transition-colors", templateType === 'Consulting' ? "bg-primary/10 text-primary" : "bg-amber-600/10 text-amber-600")}>
                         {templateType === 'Execution' ? <Construction className="h-8 w-8" /> : <Briefcase className="h-8 w-8" />}
                     </div>
                     <div>
@@ -273,33 +266,45 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                     </div>
                 </div>
             </DialogHeader>
-            <ScrollArea className="flex-grow bg-muted/5">
+            <ScrollArea className="flex-grow">
                 <div className="p-8 space-y-10">
-                    <section className="space-y-6 p-8 border rounded-[2rem] bg-card shadow-sm">
-                        <h3 className="font-black text-lg flex items-center gap-2"><FileText className="text-primary h-5 w-5" /> البيانات الأساسية</h3>
+                    <section className={cn(
+                        "space-y-6 p-8 border rounded-[2rem] bg-card shadow-sm transition-colors",
+                        templateType === 'Execution' ? "border-amber-600/10" : "border-primary/10"
+                    )}>
+                        <h3 className={cn("font-black text-lg flex items-center gap-2", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
+                            <FileText className="h-5 w-5" /> البيانات الأساسية للنموذج
+                        </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="grid gap-2">
                                 <Label htmlFor="template-title" className="font-bold text-sm text-foreground/70">عنوان النموذج *</Label>
-                                <Input id="template-title" value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: عقد هيكل أسود مع المواد" className="h-12 rounded-xl text-lg font-bold border-2" />
+                                <Input 
+                                    id="template-title" 
+                                    value={title} 
+                                    onChange={e => setTitle(e.target.value)} 
+                                    placeholder="مثال: عقد هيكل أسود مع المواد" 
+                                    className={cn("h-12 rounded-xl text-lg font-bold border-2", templateType === 'Execution' ? "focus:border-amber-600" : "focus:border-primary")} 
+                                />
                             </div>
                             
                             {templateType === 'Execution' ? (
                                 <div className="grid gap-2">
                                     <Label className="font-bold text-sm text-foreground/70 flex items-center gap-2">
-                                        <LayoutGrid className="h-4 w-4" /> نوع المقاولات (Standard List)
+                                        <LayoutGrid className="h-4 w-4 text-amber-600" /> نوع المقاولات المعتمد *
                                     </Label>
                                     <InlineSearchList 
                                         value={constructionTypeId}
                                         onSelect={setConstructionTypeId}
                                         options={constructionTypeOptions}
                                         placeholder={typesLoading ? "جاري التحميل..." : "اختر نوع المقاولات..."}
-                                        className="h-12 rounded-xl border-2"
+                                        className="h-12 rounded-xl border-2 border-amber-600/20"
                                     />
+                                    <p className="text-[10px] text-amber-700/70 italic">عند الاختيار، سيتم جلب مراحل العمل الفنية لهذا النوع آلياً.</p>
                                 </div>
                             ) : (
                                 <div className="grid gap-2">
                                     <Label className="font-bold text-sm text-foreground/70 flex items-center gap-2">
-                                        <Briefcase className="h-4 w-4" /> أنواع المعاملات المكتبية المرتبطة
+                                        <Briefcase className="h-4 w-4 text-primary" /> أنواع المعاملات المكتبية المرتبطة
                                     </Label>
                                     <MultiSelect
                                         options={allTransactionTypes}
@@ -314,22 +319,33 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="template-description" className="font-bold text-sm text-foreground/70">وصف النموذج وملاحظات إضافية</Label>
+                            <Label htmlFor="template-description" className="font-bold text-sm text-foreground/70">وصف النموذج</Label>
                             <Textarea id="template-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} className="rounded-xl border-2 resize-none" placeholder="شرح موجز لاستخدامات هذا القالب..." />
                         </div>
                     </section>
 
                     <section className="space-y-6">
                         <div className="flex justify-between items-center px-2">
-                            <h3 className="font-black text-lg flex items-center gap-2 text-foreground"><ShoppingCart className="text-primary h-5 w-5" /> نطاق العمل (Scope of Work)</h3>
-                            <Button size="sm" variant="outline" type="button" onClick={addScopeItem} className="rounded-xl gap-2 font-bold border-2 border-dashed border-primary/30 hover:border-primary"><PlusCircle className="h-4 w-4"/> إضافة بند</Button>
+                            <h3 className="font-black text-lg flex items-center gap-2 text-foreground">
+                                <ShoppingCart className={cn("h-5 w-5", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
+                                نطاق العمل (Scope of Work)
+                            </h3>
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                type="button" 
+                                onClick={addScopeItem} 
+                                className={cn("rounded-xl gap-2 font-bold border-2 border-dashed", templateType === 'Consulting' ? "border-primary/30 hover:border-primary text-primary" : "border-amber-600/30 hover:border-amber-600 text-amber-600")}
+                            >
+                                <PlusCircle className="h-4 w-4"/> إضافة بند عمل
+                            </Button>
                         </div>
                         <div className="space-y-4">
                             {scopeOfWork.map((item, index) => (
                                 <div key={item.id} className="flex items-start gap-3 p-6 border-2 border-muted bg-card rounded-3xl shadow-sm hover:shadow-md transition-all group">
-                                    <span className="pt-2 font-black text-primary font-mono text-xl">{index + 1}.</span>
+                                    <span className={cn("pt-2 font-black font-mono text-xl", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>{index + 1}.</span>
                                     <div className="flex-grow space-y-4">
-                                        <Input placeholder="عنوان البند الرئيسي" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} className="font-black border-none shadow-none focus-visible:ring-0 text-xl p-0 h-auto" />
+                                        <Input placeholder="عنوان البند الرئيسي" value={item.title} onChange={(e) => updateScopeItem(item.id, 'title', e.target.value)} className="font-black border-none shadow-none focus-visible:ring-0 text-xl p-0 h-auto bg-transparent" />
                                         <Textarea placeholder="شرح تفصيلي لما سيتم تنفيذه ضمن هذا البند..." value={item.description} onChange={(e) => updateScopeItem(item.id, 'description', e.target.value)} rows={2} className="text-sm border-none shadow-none focus-visible:ring-0 bg-muted/10 rounded-xl p-4 resize-none" />
                                     </div>
                                     <Button variant="ghost" size="icon" type="button" onClick={() => removeScopeItem(item.id)} className="h-10 w-10 text-destructive opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-destructive/10"><Trash2 className="h-5 w-5"/></Button>
@@ -338,19 +354,32 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                         </div>
                     </section>
 
-                    <section className="space-y-6 p-8 border-2 border-primary/10 rounded-[2.5rem] bg-primary/5 shadow-inner relative overflow-hidden">
+                    <section className={cn(
+                        "space-y-6 p-8 border-2 rounded-[2.5rem] shadow-inner relative overflow-hidden",
+                        templateType === 'Consulting' ? "border-primary/10 bg-primary/5" : "border-amber-600/10 bg-amber-600/5"
+                    )}>
                         <div className="absolute top-0 left-0 p-12 opacity-5 pointer-events-none">
-                            <Calculator className="h-40 w-40 text-primary" />
+                            <Calculator className={cn("h-40 w-40", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} />
                         </div>
                         <div className="relative z-10">
                             <div className="flex justify-between items-center mb-8">
-                                <h3 className="font-black text-xl flex items-center gap-3 text-primary"><Calculator className="h-6 w-6" /> البنود المالية وتوزيع الدفعات</h3>
-                                <Button variant="default" size="sm" type="button" onClick={addMilestone} className="rounded-xl gap-2 font-black shadow-lg shadow-primary/20"><PlusCircle className="h-4 w-4"/> إضافة دفعة جديدة</Button>
+                                <h3 className={cn("font-black text-xl flex items-center gap-3", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>
+                                    <Calculator className="h-6 w-6" /> الدفعات المالية (Milestones)
+                                </h3>
+                                <Button 
+                                    variant="default" 
+                                    size="sm" 
+                                    type="button" 
+                                    onClick={addMilestone} 
+                                    className={cn("rounded-xl gap-2 font-black shadow-lg", templateType === 'Consulting' ? "bg-primary shadow-primary/20" : "bg-amber-600 hover:bg-amber-700 shadow-amber-200")}
+                                >
+                                    <PlusCircle className="h-4 w-4"/> إضافة دفعة
+                                </Button>
                             </div>
                             
                             <div className="grid md:grid-cols-2 gap-8 mb-8">
                                 <div className="grid gap-3">
-                                    <Label className="font-bold text-xs text-primary/70 uppercase tracking-widest">نوع العقد المالي</Label>
+                                    <Label className="font-bold text-xs opacity-70 uppercase tracking-widest">نوع العقد المالي</Label>
                                     <Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}>
                                         <SelectTrigger className="h-12 rounded-2xl border-2 bg-background font-bold"><SelectValue /></SelectTrigger>
                                         <SelectContent>
@@ -360,37 +389,34 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                                     </Select>
                                 </div>
                                 <div className="grid gap-3">
-                                    <Label className="font-bold text-xs text-primary/70 uppercase tracking-widest">إجمالي الميزانية (للنسب)</Label>
+                                    <Label className="font-bold text-xs opacity-70 uppercase tracking-widest">إجمالي الميزانية (للنسب)</Label>
                                     <Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="dir-ltr text-center h-12 font-black text-xl rounded-2xl bg-background border-2" />
                                 </div>
                             </div>
                             
                             <div className="space-y-3">
                                 {financials.milestones.map((m, i) => (
-                                    <div key={m.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-background rounded-[1.5rem] border-2 shadow-sm group hover:border-primary/30 transition-all">
+                                    <div key={m.id} className="grid grid-cols-12 gap-4 items-center p-4 bg-background rounded-[1.5rem] border-2 shadow-sm group transition-all">
                                         <div className="col-span-3">
-                                            <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="h-10 font-black text-sm border-none shadow-none focus-visible:ring-0 px-0" />
+                                            <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="h-10 font-black text-sm border-none shadow-none focus-visible:ring-0 px-0 bg-transparent" />
                                         </div>
                                         <div className="col-span-5">
-                                            <Select value={m.condition || '_NONE_'} onValueChange={v => updateMilestone(m.id, 'condition', v === '_NONE_' ? '' : v)}>
-                                                <SelectTrigger className={cn("h-10 border-none shadow-none focus-visible:ring-0 rounded-xl bg-muted/30 px-4 font-bold text-xs", !m.condition && "text-muted-foreground italic")}>
-                                                    <SelectValue placeholder="شرط الاستحقاق..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="_NONE_">بدون شرط (سداد يدوي)</SelectItem>
-                                                    {conditionOptions.map(stage => (
-                                                        <SelectItem key={stage.value} value={stage.value}>
-                                                            <div className="flex items-center gap-2">
-                                                                <Sparkles className="h-3 w-3 text-blue-500" />
-                                                                {stage.label}
-                                                            </div>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <InlineSearchList 
+                                                value={m.condition || ''}
+                                                onSelect={v => updateMilestone(m.id, 'condition', v)}
+                                                options={conditionOptions}
+                                                placeholder={loadingStages ? "جاري التحميل..." : "شرط استحقاق الدفعة..."}
+                                                disabled={loadingStages || (templateType === 'Execution' && !constructionTypeId)}
+                                                className="h-10 border-none shadow-none focus-visible:ring-0 rounded-xl bg-muted/30 px-4 font-bold text-xs"
+                                            />
                                         </div>
                                         <div className="col-span-3 flex items-center gap-3">
-                                            <Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="dir-ltr text-center h-10 font-black text-lg text-primary border-2 border-primary/10 rounded-xl bg-muted/10 w-24" />
+                                            <Input 
+                                                type="number" 
+                                                value={m.value} 
+                                                onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} 
+                                                className={cn("dir-ltr text-center h-10 font-black text-lg border-2 border-muted rounded-xl bg-muted/10 w-24", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} 
+                                            />
                                             <span className="text-[10px] font-black text-muted-foreground uppercase">{financials.type === 'fixed' ? 'KD' : '%'}</span>
                                         </div>
                                         <div className="col-span-1 flex justify-center">
@@ -403,11 +429,13 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
                             {financials.milestones.length > 0 && (
                                 <div className={cn(
                                     "flex justify-between items-center p-6 rounded-3xl mt-6 border-2 transition-all",
-                                    (financials.type === 'percentage' && totalMilestoneValue !== 100) ? "bg-red-50 border-red-200" : "bg-white border-primary/20 shadow-lg"
+                                    (financials.type === 'percentage' && totalMilestoneValue !== 100) ? "bg-red-50 border-red-200" : "bg-white shadow-lg",
+                                    (financials.type === 'percentage' && totalMilestoneValue === 100 && templateType === 'Consulting') ? "border-primary/20" : "",
+                                    (financials.type === 'percentage' && totalMilestoneValue === 100 && templateType === 'Execution') ? "border-amber-600/20" : ""
                                 )}>
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-black uppercase text-muted-foreground">إجمالي الدفعات الموزعة</span>
-                                        <p className={cn("text-3xl font-black font-mono", (financials.type === 'percentage' && totalMilestoneValue !== 100) ? "text-red-600" : "text-primary")}>
+                                        <p className={cn("text-3xl font-black font-mono", (financials.type === 'percentage' && totalMilestoneValue !== 100) ? "text-red-600" : (templateType === 'Consulting' ? "text-primary" : "text-amber-600"))}>
                                             {totalMilestoneValue} {financials.type === 'fixed' ? 'KD' : '%'}
                                         </p>
                                     </div>
@@ -424,13 +452,24 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
                     <section className="space-y-6 px-2">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-black text-lg flex items-center gap-2"><ShieldCheck className="text-primary h-5 w-5" /> الشروط والأحكام القانونية</h3>
-                            <Button size="sm" variant="outline" type="button" onClick={addTerm} className="rounded-xl gap-2 font-bold border-2 border-dashed border-primary/30 hover:border-primary"><PlusCircle className="h-4 w-4"/> إضافة شرط قانوني</Button>
+                            <h3 className="font-black text-lg flex items-center gap-2">
+                                <ShieldCheck className={cn("h-5 w-5", templateType === 'Consulting' ? "text-primary" : "text-amber-600")} /> 
+                                الشروط والأحكام القانونية
+                            </h3>
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                type="button" 
+                                onClick={addTerm} 
+                                className={cn("rounded-xl gap-2 font-bold border-2 border-dashed", templateType === 'Consulting' ? "border-primary/30 hover:border-primary text-primary" : "border-amber-600/30 hover:border-amber-600 text-amber-600")}
+                            >
+                                <PlusCircle className="h-4 w-4"/> إضافة مادة قانونية
+                            </Button>
                         </div>
                         <div className="space-y-4">
                             {termsAndConditions.map((term, index) => (
                                 <div key={term.id} className="flex items-start gap-4 p-4 bg-white rounded-2xl border-2 border-muted hover:border-primary/20 transition-all group shadow-sm">
-                                    <span className="pt-2 font-black text-muted-foreground font-mono text-lg">{index + 1}.</span>
+                                    <span className={cn("pt-2 font-black font-mono text-lg", templateType === 'Consulting' ? "text-primary" : "text-amber-600")}>{index + 1}.</span>
                                     <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={2} className="flex-grow border-none shadow-none focus-visible:ring-0 bg-transparent text-sm font-medium leading-relaxed resize-none" placeholder="اكتب نص المادة القانونية هنا..."/>
                                     <Button variant="ghost" size="icon" type="button" onClick={() => removeTerm(term.id)} className="h-9 w-9 text-destructive opacity-0 group-hover:opacity-100 transition-all rounded-full hover:bg-destructive/10"><Trash2 className="h-4 w-4"/></Button>
                                 </div>
@@ -441,7 +480,15 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
             </ScrollArea>
             <DialogFooter className="p-8 border-t bg-card flex-shrink-0">
               <Button variant="outline" type="button" onClick={onClose} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg hover:bg-muted">إلغاء</Button>
-              <Button type="button" onClick={handleSave} disabled={isSaving || (financials.type === 'percentage' && totalMilestoneValue !== 100)} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 transition-all min-w-[240px]">
+              <Button 
+                type="button" 
+                onClick={handleSave} 
+                disabled={isSaving || (financials.type === 'percentage' && totalMilestoneValue !== 100)} 
+                className={cn(
+                    "h-14 px-16 rounded-2xl font-black text-xl shadow-2xl transition-all min-w-[240px]",
+                    templateType === 'Consulting' ? "bg-primary shadow-primary/30" : "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
+                )}
+              >
                 {isSaving ? <Loader2 className="ml-3 h-6 w-6 animate-spin" /> : <Save className="ml-3 h-6 w-6" />}
                 {template ? 'حفظ التعديلات' : 'اعتماد النموذج'}
               </Button>
