@@ -9,6 +9,7 @@ import type { Appointment, Client, WorkStage, ClientTransaction, TransactionStag
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge'; // FIXED: Added missing import
 import { AlertCircle, ArrowRight, Calendar, User, Clock, Check, Save, Loader2, Workflow, Link2, Plus, ShieldCheck, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
