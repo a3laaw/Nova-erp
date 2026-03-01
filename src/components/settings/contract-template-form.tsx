@@ -31,7 +31,8 @@ import {
   Calculator,
   FileText,
   Briefcase,
-  Construction
+  Construction,
+  ShieldCheck
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -61,7 +62,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // النوع الآن محدد من البداية ولا يمكن تغييره داخل النموذج
   const [templateType] = useState<'Consulting' | 'Execution'>(template?.templateType || initialType);
   
   const [constructionTypeId, setConstructionTypeId] = useState('');
@@ -81,10 +81,8 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 1. جلب أنواع المقاولات المرجعية (Standard)
   const { data: constructionTypes, loading: typesLoading } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
   
-  // 2. جلب مراحل العمل للنوع المختار (في حال عقود التنفيذ)
   const [constructionStages, setConstructionStages] = useState<MultiSelectOption[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
 
