@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, Tag, ShieldCheck, History } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
@@ -108,6 +108,7 @@ export default function NewAdjustmentPage() {
         setLoadingStock(true);
         try {
             const balances: Record<string, number> = {};
+            // جلب الأرصدة من أذونات الاستلام
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('warehouseId', '==', warehouseId)));
             grnsSnap.forEach(doc => {
                 const data = doc.data();
@@ -116,6 +117,7 @@ export default function NewAdjustmentPage() {
                 });
             });
 
+            // تعديل الأرصدة بناءً على التسويات والصرف السابقة
             const adjsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments')));
             adjsSnap.forEach(doc => {
                 const data = doc.data() as InventoryAdjustment;
@@ -150,6 +152,7 @@ export default function NewAdjustmentPage() {
                 });
             });
 
+            // خصم المردودات السابقة لنفس المورد
             const returnsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
                 where('vendorId', '==', vId), 
                 where('type', '==', 'purchase_return')
@@ -190,6 +193,7 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
+        // الرقابة النهائية قبل الحفظ
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
