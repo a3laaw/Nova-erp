@@ -4,8 +4,8 @@
 import { useState, useMemo } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, orderBy, doc, writeBatch, getDocs } from 'firebase/firestore';
-import type { Payslip, Employee } from '@/lib/types';
+import { collection, query, where, orderBy, doc, writeBatch, getDocs, serverTimestamp, runTransaction } from 'firebase/firestore';
+import type { Payslip, Employee, Account } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -19,9 +19,9 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search } from 'lucide-react';
+import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search, Banknote } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +41,7 @@ import { Logo } from '../layout/logo';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Input } from '../ui/input';
+import { useAuth } from '@/context/auth-context';
 
 const statusColors: Record<Payslip['status'], string> = {
   draft: 'bg-yellow-100 text-yellow-800',
@@ -67,6 +68,7 @@ const payslipTypeTranslations: Record<string, string> = {
 
 export function PayslipsList() {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     const { branding } = useBranding();
@@ -112,8 +114,68 @@ export function PayslipsList() {
 
     }, [payslips, employees, searchQuery]);
 
+    // ✨ محرك إثبات الرواتب محاسبياً
     const handleConfirmAndPay = async () => {
-        toast({ title: 'قيد التنفيذ', description: 'سيتم تنفيذ هذه الميزة قريباً.' });
+        if (!firestore || !currentUser || sortedPayslips.length === 0) return;
+        
+        const draftPayslips = sortedPayslips.filter(p => p.status !== 'paid');
+        if (draftPayslips.length === 0) {
+            toast({ title: 'لا توجد مسودات', description: 'تم دفع كافة رواتب هذا الشهر مسبقاً.' });
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            const coaSnap = await getDocs(collection(firestore, 'chartOfAccounts'));
+            const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
+
+            const salaryExpenseAccount = allAccounts.find(a => a.code === '5201'); // مصروف الرواتب
+            const bankAccount = allAccounts.find(a => a.code === '110102'); // البنك
+
+            if (!salaryExpenseAccount || !bankAccount) throw new Error("حسابات الرواتب أو البنك غير موجودة في الشجرة.");
+
+            await runTransaction(firestore, async (transaction) => {
+                const currentYear = new Date().getFullYear();
+                const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
+                const counterSnap = await transaction.get(jeCounterRef);
+                const nextNumber = ((counterSnap.data()?.counts || {})[currentYear] || 0) + 1;
+                
+                const newJeRef = doc(collection(firestore, 'journalEntries'));
+                const jeNumber = `JV-PR-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+
+                const totalNetSalaries = draftPayslips.reduce((sum, p) => sum + p.netSalary, 0);
+
+                // 1. إنشاء قيد الرواتب المجمع
+                transaction.set(newJeRef, {
+                    entryNumber: jeNumber,
+                    date: serverTimestamp(),
+                    narration: `إثبات وصرف رواتب شهر ${month} / ${year} لعدد ${draftPayslips.length} موظف`,
+                    status: 'posted',
+                    totalDebit: totalNetSalaries,
+                    totalCredit: totalNetSalaries,
+                    lines: [
+                        { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: totalNetSalaries, credit: 0 },
+                        { accountId: bankAccount.id, accountName: bankAccount.name, debit: 0, credit: totalNetSalaries }
+                    ],
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUser.id
+                });
+
+                // 2. تحديث حالة مسيرات الرواتب
+                draftPayslips.forEach(p => {
+                    const pRef = doc(firestore, 'payroll', p.id!);
+                    transaction.update(pRef, { status: 'paid', paidAt: serverTimestamp() });
+                });
+
+                transaction.set(jeCounterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
+            });
+
+            toast({ title: 'نجاح الترحيل المالي', description: `تم صرف ${draftPayslips.length} راتب وتوليد القيد المحاسبي بنجاح.` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'خطأ في الترحيل', description: error.message });
+        } finally {
+            setIsProcessing(false);
+        }
     };
     
     const handleExcelExport = () => {
@@ -208,10 +270,10 @@ export function PayslipsList() {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                            <Button onClick={handlePrint} variant="outline" disabled={loading || sortedPayslips.length === 0}><Printer className="ml-2 h-4 w-4" /> طباعة</Button>
-                           <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0}><Download className="ml-2 h-4 w-4" /> تنزيل كـ Excel</Button>
-                           <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0}>
-                                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <CheckCircle className="ml-2 h-4 w-4" />}
-                                تأكيد ودفع
+                           <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0}><Download className="ml-2 h-4 w-4" /> Excel</Button>
+                           <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0} className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 font-bold gap-2">
+                                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Banknote className="ml-2 h-4 w-4" />}
+                                اعتماد وصرف الرواتب
                             </Button>
                         </div>
                     </div>
@@ -226,14 +288,14 @@ export function PayslipsList() {
                     </Alert>
                 )}
                 
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-hidden">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead>اسم الموظف</TableHead>
                                 <TableHead>نوع الكشف</TableHead>
-                                <TableHead className="text-left">إجمالي الاستحقاقات</TableHead>
-                                <TableHead className="text-left">إجمالي الاستقطاعات</TableHead>
+                                <TableHead className="text-left">الاستحقاقات</TableHead>
+                                <TableHead className="text-left">الاستقطاعات</TableHead>
                                 <TableHead className="text-left font-bold">صافي الراتب</TableHead>
                                 <TableHead>الحالة</TableHead>
                                 <TableHead className="no-print"><span className="sr-only">الإجراءات</span></TableHead>
@@ -241,7 +303,7 @@ export function PayslipsList() {
                         </TableHeader>
                         <TableBody>
                             {loading && Array.from({length: 5}).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-6 w-full"/></TableCell></TableRow>
+                                <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-14 w-full"/></TableCell></TableRow>
                             ))}
                             {!loading && sortedPayslips.map(payslip => {
                                 const totalEarnings = (payslip.earnings.basicSalary || 0) + (payslip.earnings.housingAllowance || 0) + (payslip.earnings.transportAllowance || 0) + (payslip.earnings.commission || 0);
@@ -270,7 +332,7 @@ export function PayslipsList() {
                                     <TableCell className="text-left font-mono text-destructive">{formatCurrency(totalDeductions)}</TableCell>
                                     <TableCell className="text-left font-mono font-bold text-base">{formatCurrency(payslip.netSalary)}</TableCell>
                                     <TableCell><Badge variant="outline" className={statusColors[payslip.status]}>{statusTranslations[payslip.status]}</Badge></TableCell>
-                                    <TableCell className="no-print">
+                                    <TableCell className="no-print text-center">
                                         <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                                             <Link href={`/dashboard/hr/payroll/${payslip.id}`}>
                                                 <Eye className="h-4 w-4" />
@@ -280,10 +342,10 @@ export function PayslipsList() {
                                 </TableRow>
                             )})}
                         </TableBody>
-                        <TableFooter>
-                            <TableRow className="font-bold text-base bg-muted">
-                                <TableCell colSpan={4}>الإجمالي</TableCell>
-                                <TableCell className="text-left font-mono">{formatCurrency(totals.netSalary)}</TableCell>
+                        <TableFooter className="bg-primary/5">
+                            <TableRow className="font-black text-xl h-20">
+                                <TableCell colSpan={4} className="text-right px-10">إجمالي الرواتب الصافية للفترة:</TableCell>
+                                <TableCell className="text-left font-mono text-primary">{formatCurrency(totals.netSalary)}</TableCell>
                                 <TableCell colSpan={2}></TableCell>
                             </TableRow>
                         </TableFooter>
@@ -293,4 +355,3 @@ export function PayslipsList() {
         </div>
     );
 }
-

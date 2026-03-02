@@ -4,8 +4,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, where } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject, BoqItem } from '@/lib/types';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, where, limit, addDoc } from 'firebase/firestore';
+import type { FieldVisit, ConstructionProject, BoqItem, Account } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -24,8 +24,8 @@ import {
     ClipboardCheck, 
     Building2, 
     AlertTriangle,
-    History,
-    TrendingUp
+    TrendingUp,
+    Sparkles
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -33,7 +33,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -99,11 +99,9 @@ export default function FieldVisitDetailPage() {
         );
     };
 
-    // --- المحرك الجوهري: إعادة حساب الإنجاز الموزون للمشروع ---
-    const triggerProgressReconciliation = async (projectId: string, boqId: string, itemId: string) => {
+    const triggerProgressReconciliation = async (projectId: string, boqId: string, itemId: string, batch: any) => {
         if (!firestore) return;
         
-        // 1. جلب كافة الزيارات المؤكدة لهذا البند تحديداً
         const confirmedVisitsQuery = query(
             collection(firestore, 'field_visits'),
             where('projectId', '==', projectId),
@@ -112,42 +110,32 @@ export default function FieldVisitDetailPage() {
         );
         const visitsSnap = await getDocs(confirmedVisitsQuery);
         
-        // حساب الإنجاز التراكمي للبند
-        const totalItemProgress = visitsSnap.docs.reduce((sum, d) => sum + (d.data().confirmationData?.progressAchieved || 0), 0);
+        const totalItemProgress = visitsSnap.docs.reduce((sum, d) => sum + (d.data().confirmationData?.progressAchieved || 0), 0) + (isSaving ? 0 : progressAchieved[0]);
         
-        const batch = writeBatch(firestore);
-
-        // 2. تحديث نسبة الإنجاز في بند المقايسة (BOQ Item)
         const boqItemRef = doc(firestore, `boqs/${boqId}/items`, itemId);
         batch.update(boqItemRef, { 
             progressPercentage: Math.min(100, totalItemProgress), 
             updatedAt: serverTimestamp() 
         });
 
-        // 3. جلب كافة بنود المقايسة (غير الرأسية) لإعادة حساب إنجاز المشروع الكلي
         const allItemsSnap = await getDocs(collection(firestore, `boqs/${boqId}/items`));
         const leafItems = allItemsSnap.docs
             .map(d => ({ id: d.id, ...d.data() } as BoqItem))
             .filter(i => !i.isHeader);
         
-        // المعالجة الموزونة: تعتمد على القيمة المالية لكل بند
         const totalProjectWeight = leafItems.reduce((sum, i) => sum + (i.quantity * i.sellingUnitPrice), 0);
         const totalCompletedWeight = leafItems.reduce((sum, i) => {
-            // نستخدم القيمة المحدثة للبند الحالي
             const progress = i.id === itemId ? Math.min(100, totalItemProgress) : (i.progressPercentage || 0);
             return sum + ((progress / 100) * (i.quantity * i.sellingUnitPrice));
         }, 0);
 
         const newTotalProgress = totalProjectWeight > 0 ? Math.round((totalCompletedWeight / totalProjectWeight) * 100) : 0;
 
-        // 4. تحديث سجل المشروع الرئيسي
         const projectRef = doc(firestore, 'projects', projectId);
         batch.update(projectRef, { 
             progressPercentage: newTotalProgress, 
             updatedAt: serverTimestamp() 
         });
-
-        await batch.commit();
     };
 
     const handleConfirmDone = async () => {
@@ -159,8 +147,10 @@ export default function FieldVisitDetailPage() {
 
         setIsSaving(true);
         try {
+            const batch = writeBatch(firestore);
+            
             // 1. تحديث حالة الزيارة
-            await updateDoc(visitRef!, {
+            batch.update(visitRef!, {
                 status: 'confirmed',
                 confirmationData: {
                     confirmedAt: serverTimestamp(),
@@ -171,19 +161,92 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // 2. تفعيل محرك إعادة الحساب لضمان دقة نسب الإنجاز
+            // 2. إعادة حساب الإنجاز
             const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
             if (projectSnap.exists() && visit.plannedStageId) {
                 const projectData = projectSnap.data() as ConstructionProject;
                 if (projectData.boqId) {
-                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, visit.plannedStageId);
+                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, visit.plannedStageId, batch);
+                }
+
+                // 3. ✨ الربط المالي الذكي: فحص شروط العقد لتوليد مستخلص تلقائي
+                if (projectData.linkedTransactionId) {
+                    const txRef = doc(firestore, `clients/${visit.clientId}/transactions/${projectData.linkedTransactionId}`);
+                    const txSnap = await getDoc(txRef);
+                    
+                    if (txSnap.exists()) {
+                        const txData = txSnap.data();
+                        const contractClauses = txData.contract?.clauses || [];
+                        const matchedClause = contractClauses.find((c: any) => c.condition === visit.plannedStageName && c.status === 'غير مستحقة');
+
+                        if (matchedClause) {
+                            // إنشاء مسودة مستخلص
+                            const currentYear = new Date().getFullYear();
+                            const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
+                            const appCounterDoc = await getDoc(appCounterRef);
+                            const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
+                            const appNumber = `AUTO-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
+
+                            const newAppRef = doc(collection(firestore, 'payment_applications'));
+                            const newJeRef = doc(collection(firestore, 'journalEntries'));
+
+                            batch.set(newAppRef, {
+                                applicationNumber: appNumber,
+                                date: serverTimestamp(),
+                                projectId: visit.projectId,
+                                clientId: visit.clientId,
+                                clientName: visit.clientName,
+                                projectName: visit.projectName,
+                                totalAmount: matchedClause.amount,
+                                status: 'draft',
+                                journalEntryId: newJeRef.id,
+                                items: [{ description: `إنجاز مرحلة: ${visit.plannedStageName}`, currentQuantity: 1, unitPrice: matchedClause.amount, totalAmount: matchedClause.amount }],
+                                createdAt: serverTimestamp(),
+                                createdBy: 'system-auto-workflow'
+                            });
+
+                            // إنشاء القيد المحاسبي المرتبط
+                            const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
+                            const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', visit.clientName), limit(1)));
+
+                            if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
+                                const revAcc = revenueAccountSnap.docs[0];
+                                const cliAcc = clientAccountSnap.docs[0];
+                                
+                                batch.set(newJeRef, {
+                                    entryNumber: `JE-${appNumber}`,
+                                    date: serverTimestamp(),
+                                    narration: `[توليد آلي] استحقاق دفعة إنجاز مرحلة: ${visit.plannedStageName} - مشروع: ${visit.projectName}`,
+                                    status: 'draft',
+                                    totalDebit: matchedClause.amount,
+                                    totalCredit: matchedClause.amount,
+                                    lines: [
+                                        { accountId: cliAcc.id, accountName: visit.clientName, debit: matchedClause.amount, credit: 0, auto_profit_center: visit.projectId },
+                                        { accountId: revAcc.id, accountName: revAcc.data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: visit.projectId }
+                                    ],
+                                    clientId: visit.clientId,
+                                    transactionId: visit.projectId,
+                                    createdAt: serverTimestamp(),
+                                    createdBy: 'system-auto-workflow'
+                                });
+                            }
+
+                            // تحديث حالة البند في العقد
+                            const updatedClauses = contractClauses.map((c: any) => c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c);
+                            batch.update(txRef, { 'contract.clauses': updatedClauses });
+                            batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
+                            
+                            toast({ title: 'أتمتة مالية', description: `تم إصدار مسودة مستخلص بقيمة ${formatCurrency(matchedClause.amount)} لإنجاز المرحلة.` });
+                        }
+                    }
                 }
             }
 
-            toast({ title: 'تم التوثيق', description: 'تم تحديث نسب الإنجاز التراكمية للمشروع بنجاح.' });
+            await batch.commit();
+            toast({ title: 'تم التوثيق', description: 'تم تحديث الإنجاز الميداني والربط المالي بنجاح.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التوثيق.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التوثيق المالي والميداني.' });
         } finally {
             setIsSaving(false);
         }
@@ -194,25 +257,25 @@ export default function FieldVisitDetailPage() {
 
         setIsSaving(true);
         try {
-            // 1. تحديث حالة الزيارة إلى ملغي
-            await updateDoc(visitRef!, {
+            const batch = writeBatch(firestore);
+            batch.update(visitRef!, {
                 status: 'cancelled',
                 cancellationReason,
                 cancelledAt: serverTimestamp(),
                 cancelledBy: currentUser.id,
-                'confirmationData.progressAchieved': 0 // تصفير الأثر في حال كانت مؤكدة سابقاً
+                'confirmationData.progressAchieved': 0 
             });
 
-            // 2. إعادة الحساب لطرح أي أثر سابق لهذه الزيارة من نسب الإنجاز
             const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
             if (projectSnap.exists() && visit.plannedStageId) {
                 const projectData = projectSnap.data() as ConstructionProject;
                 if (projectData.boqId) {
-                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, visit.plannedStageId);
+                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, visit.plannedStageId, batch);
                 }
             }
 
-            toast({ title: 'تم الإلغاء', description: 'تم طرح أثر الزيارة من نسب إنجاز المشروع بنجاح.' });
+            await batch.commit();
+            toast({ title: 'تم الإلغاء', description: 'تم إخراج الزيارة من الخطة النشطة وتصفير أثرها.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ' });
@@ -287,7 +350,10 @@ export default function FieldVisitDetailPage() {
                         {!isProcessed && (
                             <>
                                 <Slider value={progressAchieved} onValueChange={setProgressAchieved} max={100} step={5} className="py-4" />
-                                <p className="text-[10px] text-muted-foreground text-center italic">اسحب لتحديد ما تم إنجازه فعلياً من هذا البند خلال هذه الزيارة فقط.</p>
+                                <div className="flex items-center gap-2 justify-center p-2 bg-white rounded-xl border border-primary/10">
+                                    <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+                                    <p className="text-[10px] text-primary font-black uppercase">سيتم تحديث مديونية العميل آلياً في حال إكمال المرحلة.</p>
+                                </div>
                             </>
                         )}
                     </div>
