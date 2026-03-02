@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "CompanyBranding": {
@@ -31,6 +32,22 @@
         "isActive": { "type": "boolean" }
       },
       "required": ["username", "role", "companyId"]
+    },
+    "RecurringObligation": {
+      "title": "Recurring Obligation",
+      "description": "Automated weekly/monthly payments like rents, installments, and daily labor.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["rent", "installment", "vendor_debt", "daily_labor"] },
+        "amount": { "type": "number" },
+        "frequency": { "type": "string", "enum": ["weekly", "monthly"] },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "debitAccountId": { "type": "string" },
+        "creditAccountId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "paused", "completed"] }
+      },
+      "required": ["title", "type", "amount", "frequency", "dueDate"]
     }
   },
   "auth": {
@@ -40,6 +57,10 @@
     "/company_settings/{settingsId}": {
       "schema": { "$ref": "#/entities/CompanyBranding" },
       "description": "Stores company-wide settings and optional external hosting configurations."
+    },
+    "/recurring_obligations/{obligationId}": {
+      "schema": { "$ref": "#/entities/RecurringObligation" },
+      "description": "Stores automated financial recurring tasks."
     }
   }
 }

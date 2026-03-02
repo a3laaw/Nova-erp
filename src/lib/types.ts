@@ -13,6 +13,21 @@ export interface BaseEntity {
   updatedAt?: Timestamp | any;
 }
 
+export interface RecurringObligation extends BaseEntity {
+    title: string;
+    type: 'rent' | 'installment' | 'vendor_debt' | 'daily_labor';
+    amount: number;
+    frequency: 'weekly' | 'monthly';
+    dueDate: Timestamp | any;
+    lastGeneratedDate?: Timestamp | any;
+    debitAccountId: string;
+    debitAccountName: string;
+    creditAccountId: string;
+    creditAccountName: string;
+    status: 'active' | 'paused' | 'completed';
+    notes?: string;
+}
+
 export interface Client extends BaseEntity {
   fileId: string;               
   nameAr: string;               
@@ -126,6 +141,7 @@ export interface Employee extends BaseEntity {
     workStartTime?: string;
     workEndTime?: string;
     teamId?: string; 
+    dailyRate?: number;
 }
 
 export interface FieldVisit extends BaseEntity { 
