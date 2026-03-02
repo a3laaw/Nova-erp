@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, Tag } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, Tag, ShieldCheck, History } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
@@ -67,8 +67,12 @@ export default function NewAdjustmentPage() {
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    
+    // حالات الرقابة المخزنية والموردين
     const [stockBalances, setStockBalances] = useState<Record<string, number>>({});
+    const [vendorPurchaseBalances, setVendorPurchaseBalances] = useState<Record<string, number>>({});
     const [loadingStock, setLoadingStock] = useState(false);
+    const [loadingVendorBalances, setLoadingVendorBalances] = useState(false);
 
     const initialType = searchParams.get('type') as any;
 
@@ -91,17 +95,20 @@ export default function NewAdjustmentPage() {
     const watchedItems = useWatch({ control, name: "items" });
     const adjType = watch('type');
     const selectedWarehouseId = watch('warehouseId');
+    const selectedVendorId = watch('vendorId');
 
     const totalCost = useMemo(() =>
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
+    // 1. محرك فحص رصيد المخزن اللحظي (للتلف والصرف)
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
         try {
             const balances: Record<string, number> = {};
             
+            // حساب الداخل من المشتريات
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('warehouseId', '==', warehouseId)));
             grnsSnap.forEach(doc => {
                 const data = doc.data();
@@ -110,6 +117,7 @@ export default function NewAdjustmentPage() {
                 });
             });
 
+            // حساب الخارج/الداخل من التسويات والتحويلات
             const adjsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments')));
             adjsSnap.forEach(doc => {
                 const data = doc.data() as InventoryAdjustment;
@@ -130,9 +138,51 @@ export default function NewAdjustmentPage() {
         }
     }, [firestore]);
 
+    // 2. محرك الرقابة المتقاطعة للمورد (Vendor Purchase Guard)
+    // يحسب صافي ما اشتريناه من هذا المورد تحديداً لهذا الصنف
+    const fetchVendorPurchaseBalances = useCallback(async (vId: string) => {
+        if (!firestore || !vId) {
+            setVendorPurchaseBalances({});
+            return;
+        }
+        setLoadingVendorBalances(true);
+        try {
+            const balances: Record<string, number> = {};
+            
+            // جلب كل ما استلمناه من هذا المورد
+            const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('vendorId', '==', vId)));
+            grnsSnap.forEach(doc => {
+                doc.data().itemsReceived?.forEach((i: any) => {
+                    balances[i.internalItemId] = (balances[i.internalItemId] || 0) + i.quantityReceived;
+                });
+            });
+
+            // خصم ما أرجعناه له سابقاً
+            const returnsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
+                where('vendorId', '==', vId), 
+                where('type', '==', 'purchase_return')
+            ));
+            returnsSnap.forEach(doc => {
+                doc.data().items?.forEach((i: any) => {
+                    balances[i.itemId] = (balances[i.itemId] || 0) - i.quantity;
+                });
+            });
+
+            setVendorPurchaseBalances(balances);
+        } finally {
+            setLoadingVendorBalances(false);
+        }
+    }, [firestore]);
+
     useEffect(() => {
         if (selectedWarehouseId) fetchStockBalances(selectedWarehouseId);
     }, [selectedWarehouseId, fetchStockBalances]);
+
+    useEffect(() => {
+        if (adjType === 'purchase_return' && selectedVendorId) {
+            fetchVendorPurchaseBalances(selectedVendorId);
+        }
+    }, [adjType, selectedVendorId, fetchVendorPurchaseBalances]);
 
     useEffect(() => {
         if (!firestore) return;
@@ -149,18 +199,32 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
+        // --- الرقابة الصارمة ---
         const isOutbound = ['damage', 'theft', 'purchase_return'].includes(data.type);
-        if (isOutbound) {
-            for (const item of data.items) {
-                const currentStock = stockBalances[item.itemId] || 0;
-                if (item.quantity > currentStock) {
-                    toast({ 
-                        variant: 'destructive', 
-                        title: 'عجز في المخزون', 
-                        description: `لا يمكن صرف/إرجاع كمية (${item.quantity}) من صنف "${items.find(i => i.id === item.itemId)?.name}" لأن الرصيد المتوفر هو (${currentStock}) فقط.` 
-                    });
-                    return;
-                }
+        
+        for (const item of data.items) {
+            const currentStock = stockBalances[item.itemId] || 0;
+            const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
+            const itemName = items.find(i => i.id === item.itemId)?.name;
+
+            // 1. فحص توفر الكمية في المخزن
+            if (isOutbound && item.quantity > currentStock) {
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'عجز مخزني', 
+                    description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر في المستودع هو (${currentStock}) فقط.` 
+                });
+                return;
+            }
+
+            // 2. فحص الرقابة المتقاطعة للمورد (الأهم)
+            if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
+                toast({
+                    variant: 'destructive',
+                    title: 'تجاوز حد التوريد',
+                    description: `لا يمكن إرجاع كمية (${item.quantity}) للمورد "${vendors.find(v => v.id === data.vendorId)?.name}" لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.`
+                });
+                return;
             }
         }
 
@@ -196,7 +260,7 @@ export default function NewAdjustmentPage() {
         }
 
         if (!debitAccount || !creditAccount) {
-            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'لم يتم العثور على الحسابات المقابلة في الشجرة.' });
+            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'لم يتم العثور على الحسابات المقابلة في الشجرة لترحيل القيد.' });
             return;
         }
 
@@ -247,7 +311,7 @@ export default function NewAdjustmentPage() {
                         { accountId: creditAccount!.id!, accountName: creditAccount!.name, debit: 0, credit: totalCost },
                         ...(data.type === 'purchase_return' && data.recoveredDiscount ? [{
                             accountId: accounts.find(a => a.code === '4104')?.id || '', 
-                            accountName: 'خصم مكتسب',
+                            accountName: 'خصم مكتسب (مسترد)',
                             debit: 0,
                             credit: Number(data.recoveredDiscount)
                         }] : [])
@@ -259,10 +323,10 @@ export default function NewAdjustmentPage() {
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
 
-            toast({ title: 'نجاح', description: 'تمت العملية وتحديث الأرصدة والمخزون.' });
+            toast({ title: 'نجاح العملية', description: 'تمت المردودات وتحديث الأرصدة والقيود المحاسبية بدقة.' });
             router.push('/dashboard/warehouse/adjustments');
         } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام العملية.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام العملية الرقابية.' });
             setIsSaving(false);
             savingRef.current = false;
         }
@@ -271,7 +335,7 @@ export default function NewAdjustmentPage() {
     const isPurchaseReturn = adjType === 'purchase_return';
 
     return (
-        <Card className="max-w-4xl mx-auto rounded-[2rem] border-none shadow-xl" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <CardTitle className="flex items-center gap-3 text-2xl font-black">
@@ -279,7 +343,7 @@ export default function NewAdjustmentPage() {
                         {isPurchaseReturn ? 'مردود مشتريات للمورد' : 'إذن تسوية مخزنية'}
                     </CardTitle>
                     <CardDescription>
-                        {isPurchaseReturn ? 'إرجاع بضاعة للمورد وتخفيض مديونيته.' : 'تسجيل التوالف أو العجز المخزني مع الربط المحاسبي.'}
+                        {isPurchaseReturn ? 'إرجاع بضاعة للمورد مع رقابة صارمة على تاريخ التوريد.' : 'تسجيل التوالف أو العجز المخزني مع الربط المحاسبي.'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 p-8">
@@ -322,7 +386,7 @@ export default function NewAdjustmentPage() {
                             <div className="grid gap-2 animate-in fade-in zoom-in-95">
                                 <Label className="font-bold">المورد (المرتجع إليه) *</Label>
                                 <Controller name="vendorId" control={control} render={({ field }) => (
-                                    <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={vendorOptions} placeholder="ابحث عن مورد..." />
+                                    <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={vendorOptions} placeholder="ابحث عن مورد لفلترة مشترياته..." />
                                 )} />
                             </div>
                         )}
@@ -338,23 +402,31 @@ export default function NewAdjustmentPage() {
                         <div className="p-4 bg-green-50 border-2 border-green-100 rounded-2xl flex items-center gap-4">
                             <div className="p-2 bg-green-100 rounded-lg text-green-700"><Tag className="h-5 w-5"/></div>
                             <div className="flex-grow grid gap-1">
-                                <Label className="text-xs font-black text-green-800">عكس الخصم المكتسب (اختياري)</Label>
+                                <Label className="text-xs font-black text-green-800">عكس الخصم المكتسب (إن وجد)</Label>
                                 <Input type="number" step="0.001" {...register('recoveredDiscount')} placeholder="0.000" className="bg-white border-green-200" />
                             </div>
                         </div>
                     )}
 
                     <div className="space-y-4">
-                        <Label className="text-lg font-black flex items-center gap-2">
-                            <PackageSearch className="h-5 w-5 text-primary"/> الأصناف المرتجعة/المعدلة
-                        </Label>
+                        <div className="flex justify-between items-center px-2">
+                            <Label className="text-lg font-black flex items-center gap-2">
+                                <PackageSearch className="h-5 w-5 text-primary"/> الأصناف المرتجعة/المعدلة
+                            </Label>
+                            {isPurchaseReturn && (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-700 gap-1.5 px-3 py-1">
+                                    <ShieldCheck className="h-3 w-3" /> تم تفعيل الرقابة المتقاطعة للمورد
+                                </Badge>
+                            )}
+                        </div>
                         <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                             <Table>
                                 <TableHeader className="bg-muted/50">
                                     <TableRow className="h-14">
                                         <TableHead className="w-[60px]"></TableHead>
                                         <TableHead className="font-bold">الصنف</TableHead>
-                                        <TableHead className="w-32 text-center font-bold">الرصيد الحالي</TableHead>
+                                        <TableHead className="w-28 text-center font-bold">في المخزن</TableHead>
+                                        {isPurchaseReturn && <TableHead className="w-28 text-center font-bold text-blue-700">من المورد</TableHead>}
                                         <TableHead className="w-32 text-center font-bold bg-primary/5">الكمية</TableHead>
                                         <TableHead className="w-40 text-left px-6 font-bold">القيمة</TableHead>
                                     </TableRow>
@@ -363,10 +435,13 @@ export default function NewAdjustmentPage() {
                                     {fields.map((field, index) => {
                                         const item = watchedItems?.[index];
                                         const currentStock = stockBalances[item?.itemId || ''] || 0;
-                                        const isInsufficient = ['damage', 'theft', 'purchase_return'].includes(adjType) && (item?.quantity || 0) > currentStock;
+                                        const purchased = vendorPurchaseBalances[item?.itemId || ''] || 0;
+                                        
+                                        const isInsufficientStock = isOutbound && (item?.quantity || 0) > currentStock;
+                                        const isInsufficientVendor = isPurchaseReturn && (item?.quantity || 0) > purchased;
 
                                         return (
-                                            <TableRow key={field.id} className={cn("h-16 border-b last:border-0", isInsufficient && "bg-red-50")}>
+                                            <TableRow key={field.id} className={cn("h-16 border-b last:border-0", (isInsufficientStock || isInsufficientVendor) && "bg-red-50")}>
                                                 <TableCell className="text-center">
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive"><Trash2 className="h-4 w-4"/></Button>
                                                 </TableCell>
@@ -380,8 +455,13 @@ export default function NewAdjustmentPage() {
                                                     )} />
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className="font-mono font-bold text-muted-foreground">{currentStock}</span>}
+                                                    {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientStock ? "text-red-600" : "text-muted-foreground")}>{currentStock}</span>}
                                                 </TableCell>
+                                                {isPurchaseReturn && (
+                                                    <TableCell className="text-center">
+                                                        {loadingVendorBalances ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientVendor ? "text-red-600" : "text-blue-700")}>{purchased}</span>}
+                                                    </TableCell>
+                                                )}
                                                 <TableCell className="bg-primary/[0.02]">
                                                     <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="text-center font-black text-xl border-none focus-visible:ring-0" />
                                                 </TableCell>
@@ -393,20 +473,20 @@ export default function NewAdjustmentPage() {
                                 </TableBody>
                                 <TableFooter className="bg-primary/5 h-20">
                                     <TableRow>
-                                        <TableCell colSpan={4} className="text-right px-12 font-black text-xl">إجمالي قيمة المستند:</TableCell>
+                                        <TableCell colSpan={isPurchaseReturn ? 5 : 4} className="text-right px-12 font-black text-xl">إجمالي قيمة المستند:</TableCell>
                                         <TableCell className="text-left font-mono font-black text-2xl text-primary px-6">{formatCurrency(totalCost)}</TableCell>
                                     </TableRow>
                                 </TableFooter>
                             </Table>
                         </div>
                         <Button type="button" variant="outline" onClick={() => append({ itemId: '', quantity: 1, unitCost: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold hover:bg-primary/5 transition-all">
-                            <PlusCircle className="h-5 w-5 text-primary" /> إضافة صنف آخر
+                            <PlusCircle className="h-5 w-5 text-primary" /> إضافة صنف آخر للعملية
                         </Button>
                     </div>
                 </CardContent>
                 <CardFooter className="flex justify-end gap-4 p-8 border-t bg-muted/10">
                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loadingStock} className="h-12 px-16 rounded-xl font-black text-xl shadow-2xl shadow-primary/30">
+                    <Button type="submit" disabled={isSaving || loadingStock || loadingVendorBalances} className="h-12 px-16 rounded-xl font-black text-xl shadow-2xl shadow-primary/30">
                         {isSaving ? <Loader2 className="ml-3 h-6 w-6 animate-spin"/> : <Save className="ml-3 h-6 w-6"/>}
                         اعتماد العملية والترحيل
                     </Button>
