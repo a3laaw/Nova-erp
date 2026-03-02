@@ -64,7 +64,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
   const { data: employees = [], loading: engLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const { data: workTeams = [] } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
   
-  const [boqItemsMap, setBoqItemsMap] = React.useState<Map<string, {id: string, name: string}[]>>(new Map());
+  const [boqItemsMap, setBoqItemsMap] = React.useState<Map<string, {id: string, name: string, endDate: any}[]>>(new Map());
 
   const { control, register, handleSubmit, formState: { errors }, watch, setValue } = useForm<SpreadsheetValues>({
     resolver: zodResolver(spreadsheetSchema),
@@ -82,7 +82,14 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
     try {
         const q = query(collection(firestore!, `boqs/${boqId}/items`), orderBy('itemNumber'));
         const snap = await getDocs(q);
-        const stages = snap.docs.map(d => ({ id: d.id, name: `${d.data().itemNumber} - ${d.data().description}` })).filter(i => !i.name.includes('undefined'));
+        const stages = snap.docs.map(d => {
+            const data = d.data();
+            return { 
+                id: d.id, 
+                name: `${data.itemNumber} - ${data.description}`,
+                endDate: data.endDate || null
+            }
+        }).filter(i => !i.name.includes('undefined'));
         setBoqItemsMap(prev => new Map(prev).set(projectId, stages));
     } catch (e) { console.error(e); }
   };
@@ -116,6 +123,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 scheduledDate: Timestamp.fromDate(data.date),
                 plannedStageId: row.plannedStageId || '',
                 plannedStageName: stage?.name || 'زيارة متابعة',
+                phaseEndDate: stage?.endDate || null, // Link planned end date for deviation tracking
                 mainStageName: stage?.name.split(' - ')[1] || 'إشراف عام',
                 numFloors: row.numFloors || project.numFloors || 'سرداب + 3 أدوار',
                 details: row.details || '',

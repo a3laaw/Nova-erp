@@ -146,6 +146,7 @@ export interface FieldVisit extends BaseEntity {
     subStageName?: string;      
     visitCountInStage?: number; 
     phaseStartDate?: Timestamp | any; 
+    phaseEndDate?: Timestamp | any; // Added to check for deviations
     numFloors?: string;         
     engineerId?: string | null;
     engineerName?: string | null; 
@@ -162,6 +163,7 @@ export interface FieldVisit extends BaseEntity {
         notes: string;
         location?: { latitude: number, longitude: number, accuracy: number };
         isCompleted: boolean;
+        progressAchieved: number; // Percentage of the BOQ item completed in this visit
     };
     cancellationReason?: string;
     cancelledAt?: Timestamp | any;
@@ -192,7 +194,7 @@ export interface WorkStage extends BaseEntity { name: string; order?: number; st
 export interface ItemCategory extends BaseEntity { name: string; order?: number; parentCategoryId: string | null; activityTypeIds?: string[]; boqReferenceItemIds?: string[]; }
 export interface CompanyActivityType extends BaseEntity { name: string; }
 export interface Boq extends BaseEntity { boqNumber: string; name: string; status: string; totalValue: number; itemCount: number; clientId?: string | null; transactionId?: string | null; projectId?: string | null; }
-export interface BoqItem extends BaseEntity { itemNumber: string; description: string; quantity: number; sellingUnitPrice: number; level: number; isHeader: boolean; parentId: string | null; startDate?: Timestamp | any; endDate?: Timestamp | any; itemId?: string; notes?: string; }
+export interface BoqItem extends BaseEntity { itemNumber: string; description: string; quantity: number; sellingUnitPrice: number; level: number; isHeader: boolean; parentId: string | null; startDate?: Timestamp | any; endDate?: Timestamp | any; itemId?: string; notes?: string; progressPercentage?: number; }
 export interface BoqReferenceItem extends BaseEntity { name: string; unit?: string; isHeader?: boolean; parentBoqReferenceItemId?: string | null; subcontractorTypeIds?: string[]; activityTypeIds?: string[]; transactionTypeIds?: string[]; }
 export interface Subcontractor extends BaseEntity { name: string; type: string; specialization?: string; phone: string; mobile?: string; email?: string; address?: string; bankAccount?: any; isActive: boolean; blacklisted?: boolean; blacklistedReason?: string; performanceRating?: number; }
 export interface SubcontractorCertificate extends BaseEntity { certificateNumber: string; date: Timestamp | any; subcontractorId: string; subcontractorName: string; projectId: string; projectName?: string; amount: number; status: 'draft' | 'approved' | 'cancelled'; description: string; journalEntryId?: string; }

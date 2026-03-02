@@ -4,13 +4,14 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject } from '@/lib/types';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs } from 'firebase/firestore';
+import type { FieldVisit, ConstructionProject, BoqItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { 
     MapPin, 
     Loader2, 
@@ -25,16 +26,18 @@ import {
     Building2, 
     HardHat,
     AlertTriangle,
-    History
+    History,
+    TrendingUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import { Slider } from '@/components/ui/slider';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -49,7 +52,8 @@ import {
 /**
  * صفحة تفاصيل الزيارة الميدانية المطورة:
  * - تدعم نظام (تم / لم يتم) المباشر.
- * - في حالة "لم يتم": يطلب سبب الإلغاء ويخرج الزيارة من القائمة النشطة مع أرشفتها.
+ * - تربط الإنجاز الفعلي ببنود المقايسة وتاريخ الجدولة.
+ * - تقوم بتحديث نسبة إنجاز المشروع الإجمالية تلقائياً.
  */
 export default function FieldVisitDetailPage() {
     const params = useParams();
@@ -63,6 +67,7 @@ export default function FieldVisitDetailPage() {
     const [isCapturingLocation, setIsCapturingLocation] = useState(false);
     
     const [notes, setNotes] = useState('');
+    const [progressAchieved, setProgressAchieved] = useState([0]); // Percentage
     const [cancellationReason, setCancellationReason] = useState('');
     const [location, setLocation] = useState<{ latitude: number, longitude: number, accuracy: number } | null>(null);
     
@@ -75,6 +80,7 @@ export default function FieldVisitDetailPage() {
         if (visit?.confirmationData) {
             setNotes(visit.confirmationData.notes);
             setLocation(visit.confirmationData.location || null);
+            setProgressAchieved([visit.confirmationData.progressAchieved || 0]);
         }
         if (visit?.cancellationReason) {
             setCancellationReason(visit.cancellationReason);
@@ -117,22 +123,53 @@ export default function FieldVisitDetailPage() {
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
+            
+            // 1. تحديث سجل الزيارة
             batch.update(visitRef!, {
                 status: 'confirmed',
                 confirmationData: {
                     confirmedAt: serverTimestamp(),
                     notes,
                     location,
-                    isCompleted: true
+                    isCompleted: true,
+                    progressAchieved: progressAchieved[0]
                 }
             });
 
+            // 2. تحديث بند المقايسة المرتبط (WBS)
             const projectRef = doc(firestore, 'projects', visit.projectId);
+            const projectSnap = await getDoc(projectRef);
+            
+            if (projectSnap.exists() && visit.plannedStageId) {
+                const projectData = projectSnap.data() as ConstructionProject;
+                if (projectData.boqId) {
+                    const boqItemRef = doc(firestore, `boqs/${projectData.boqId}/items`, visit.plannedStageId);
+                    batch.update(boqItemRef, { progressPercentage: progressAchieved[0], updatedAt: serverTimestamp() });
+
+                    // 3. إعادة حساب نسبة إنجاز المشروع الإجمالية
+                    // ملاحظة: نقوم بهذا برمجياً كلقطة حالية لضمان الدقة
+                    const allBoqItemsSnap = await getDocs(collection(firestore, `boqs/${projectData.boqId}/items`));
+                    const leafItems = allBoqItemsSnap.docs
+                        .map(d => d.data() as BoqItem)
+                        .filter(i => !i.isHeader);
+                    
+                    const totalWeight = leafItems.reduce((sum, i) => sum + (i.quantity * i.sellingUnitPrice), 0);
+                    const completedWeight = leafItems.reduce((sum, i) => {
+                        const progress = i.id === visit.plannedStageId ? progressAchieved[0] : (i.progressPercentage || 0);
+                        return sum + ((progress / 100) * (i.quantity * i.sellingUnitPrice));
+                    }, 0);
+
+                    const newTotalProgress = totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0;
+                    batch.update(projectRef, { progressPercentage: newTotalProgress, updatedAt: serverTimestamp() });
+                }
+            }
+
+            // 4. توثيق الحدث في تايم لاين المشروع
             const timelineRef = collection(projectRef, 'timelineEvents');
             batch.set(doc(timelineRef), {
                 type: 'Visit',
                 title: `إنجاز موقع: ${visit.plannedStageName}`,
-                description: notes,
+                description: `${notes}\nنسبة الإنجاز المحققة لهذا البند: ${progressAchieved[0]}%`,
                 date: serverTimestamp(),
                 engineerName: visit.engineerName,
                 location: location,
@@ -140,9 +177,10 @@ export default function FieldVisitDetailPage() {
             });
 
             await batch.commit();
-            toast({ title: 'تم التوثيق', description: 'تم حفظ تفاصيل الإنجاز الميداني بنجاح.' });
+            toast({ title: 'تم التوثيق', description: 'تم تحديث نسب الإنجاز الميدانية والمحاسبية بنجاح.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
+            console.error(error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التوثيق.' });
         } finally {
             setIsSaving(false);
@@ -167,7 +205,7 @@ export default function FieldVisitDetailPage() {
             batch.set(doc(timelineRef), {
                 type: 'log',
                 title: 'زيارة غير مكتملة',
-                description: `لم يتم تنفيذ الزيارة المقررة لمرحلة (${visit.plannedStageName}). السبب: ${cancellationReason}`,
+                description: `تعثر العمل المخطط لمرحلة (${visit.plannedStageName}). السبب: ${cancellationReason}`,
                 date: serverTimestamp(),
                 engineerName: visit.engineerName,
                 createdAt: serverTimestamp()
@@ -188,7 +226,11 @@ export default function FieldVisitDetailPage() {
     if (!visit) return <div className="text-center p-20">الزيارة غير موجودة.</div>;
 
     const scheduledDate = toFirestoreDate(visit.scheduledDate);
+    const phaseEndDate = toFirestoreDate(visit.phaseEndDate);
     const isProcessed = visit.status !== 'planned';
+    
+    // التحقق من الانحراف الزمني (هل الزيارة بعد تاريخ انتهاء المرحلة المخطط؟)
+    const isDelayed = scheduledDate && phaseEndDate && scheduledDate > phaseEndDate;
 
     return (
         <div className="max-w-2xl mx-auto space-y-6 pb-20" dir="rtl">
@@ -196,15 +238,22 @@ export default function FieldVisitDetailPage() {
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2">
                     <ArrowRight className="h-4 w-4" /> العودة للخطة
                 </Button>
-                {visit.status === 'confirmed' ? (
-                    <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2 text-white">
-                        <CheckCircle2 className="h-4 w-4" /> زيارة تمت بنجاح
-                    </Badge>
-                ) : visit.status === 'cancelled' ? (
-                    <Badge className="bg-red-600 font-black px-4 py-1 rounded-full gap-2 text-white">
-                        <XCircle className="h-4 w-4" /> زيارة لم تتم (ملغاة)
-                    </Badge>
-                ) : null}
+                <div className="flex gap-2">
+                    {isDelayed && !isProcessed && (
+                        <Badge className="bg-red-100 text-red-700 border-red-200 font-black animate-pulse">
+                            <AlertTriangle className="h-3 w-3 ml-1" /> تأخير عن الموعد المخطط
+                        </Badge>
+                    )}
+                    {visit.status === 'confirmed' ? (
+                        <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2 text-white">
+                            <CheckCircle2 className="h-4 w-4" /> زيارة تمت بنجاح
+                        </Badge>
+                    ) : visit.status === 'cancelled' ? (
+                        <Badge className="bg-red-600 font-black px-4 py-1 rounded-full gap-2 text-white">
+                            <XCircle className="h-4 w-4" /> زيارة لم تتم (ملغاة)
+                        </Badge>
+                    ) : null}
+                </div>
             </div>
 
             <Card className="rounded-[2.5rem] shadow-lg border-none overflow-hidden bg-card">
@@ -237,6 +286,26 @@ export default function FieldVisitDetailPage() {
                     {!isProcessed ? (
                         <>
                             <Separator />
+                            
+                            {/* --- محرك الإنجاز الجديد --- */}
+                            <div className="space-y-6 p-6 bg-primary/5 rounded-[2rem] border-2 border-primary/10 shadow-inner">
+                                <div className="flex justify-between items-center">
+                                    <Label className="font-black text-lg text-primary flex items-center gap-2">
+                                        <TrendingUp className="h-5 w-5" />
+                                        تحديث نسبة إنجاز البند
+                                    </Label>
+                                    <span className="text-2xl font-black text-primary font-mono">{progressAchieved[0]}%</span>
+                                </div>
+                                <Slider 
+                                    value={progressAchieved} 
+                                    onValueChange={setProgressAchieved} 
+                                    max={100} 
+                                    step={5} 
+                                    className="py-4"
+                                />
+                                <p className="text-[10px] text-muted-foreground text-center italic">اسحب المؤشر لتحديد نسبة الإنجاز الفعلية الموثقة في الموقع لهذا البند.</p>
+                            </div>
+
                             <div className="space-y-4">
                                 <Label className="font-black text-lg flex items-center gap-2">
                                     <MapPin className="h-5 w-5 text-primary" />
@@ -273,12 +342,12 @@ export default function FieldVisitDetailPage() {
                             <div className="space-y-4">
                                 <Label className="font-black text-lg flex items-center gap-2">
                                     <ClipboardCheck className="h-5 w-5 text-primary" />
-                                    التقرير الفني (في حال الإنجاز)
+                                    التقرير الفني للإنجاز
                                 </Label>
                                 <Textarea 
                                     value={notes}
                                     onChange={e => setNotes(e.target.value)}
-                                    placeholder="ما هي الأعمال التي تم تنفيذها فعلياً؟"
+                                    placeholder="اشرح الأعمال التي تم تنفيذها أو أي ملاحظات فنية هامة..."
                                     rows={4}
                                     className="rounded-3xl border-2 p-4 text-base"
                                 />
@@ -288,25 +357,36 @@ export default function FieldVisitDetailPage() {
                         <div className="space-y-6">
                             <Separator />
                             {visit.status === 'confirmed' ? (
-                                <div className="space-y-4">
-                                    <Label className="font-black text-lg flex items-center gap-2 text-green-700">
-                                        <History className="h-5 w-5" /> سجل الإنجاز الموثق
-                                    </Label>
-                                    <div className="p-6 bg-green-50/50 border rounded-3xl">
-                                        <p className="text-sm leading-relaxed">{visit.confirmationData?.notes}</p>
-                                        {visit.confirmationData?.location && (
-                                            <p className="text-[10px] mt-4 font-mono text-muted-foreground">الموقع: {visit.confirmationData.location.latitude}, {visit.confirmationData.location.longitude}</p>
-                                        )}
+                                <div className="space-y-6">
+                                    <div className="p-6 bg-green-50/50 border border-green-100 rounded-3xl flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] font-black uppercase text-green-700">التقدم الموثق:</Label>
+                                            <p className="text-3xl font-black text-green-800 font-mono">{visit.confirmationData?.progressAchieved}%</p>
+                                        </div>
+                                        <div className="p-4 bg-green-600 text-white rounded-2xl shadow-lg">
+                                            <TrendingUp className="h-8 w-8" />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <Label className="font-black text-lg flex items-center gap-2 text-green-700">
+                                            <History className="h-5 w-5" /> التقرير الفني المعتمد
+                                        </Label>
+                                        <div className="p-6 bg-white border-2 border-green-50 rounded-3xl italic text-slate-700">
+                                            {visit.confirmationData?.notes}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
                                     <Label className="font-black text-lg flex items-center gap-2 text-red-700">
-                                        <AlertTriangle className="h-5 w-5" /> مبررات عدم الإنجاز
+                                        <AlertTriangle className="h-5 w-5" /> مبررات تعثر الإنجاز
                                     </Label>
-                                    <div className="p-6 bg-red-50/50 border border-red-100 rounded-3xl">
-                                        <p className="text-sm font-bold text-red-800">{visit.cancellationReason}</p>
-                                        <p className="text-[10px] mt-2 italic text-red-600">تم تسجيل الإلغاء بتاريخ: {toFirestoreDate(visit.cancelledAt) ? format(toFirestoreDate(visit.cancelledAt)!, 'PPp', { locale: ar }) : '-'}</p>
+                                    <div className="p-6 bg-red-50/50 border border-red-100 rounded-3xl shadow-inner">
+                                        <p className="text-sm font-bold text-red-800 leading-relaxed">{visit.cancellationReason}</p>
+                                        <p className="text-[10px] mt-4 italic text-red-600 flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            تم تسجيل الإلغاء بتاريخ: {toFirestoreDate(visit.cancelledAt) ? format(toFirestoreDate(visit.cancelledAt)!, 'PPp', { locale: ar }) : '-'}
+                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -341,15 +421,15 @@ export default function FieldVisitDetailPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-red-700">توثيق عدم الإنجاز</AlertDialogTitle>
                         <AlertDialogDescription className="text-base">
-                            سيتم اعتبار هذه الزيارة "ملغاة" وسيتم استبعادها من قائمة الأعمال النشطة. يرجى ذكر سبب عدم الإنجاز للتدقيق الإداري.
+                            سيتم استبعاد هذه الزيارة من قائمة الأعمال النشطة. يرجى ذكر سبب تعثر الإنجاز للتدقيق الإداري وتصحيح الجدول الزمني.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4">
-                        <Label className="font-bold mb-2 block">سبب الإلغاء / معوقات الموقع *</Label>
+                        <Label className="font-bold mb-2 block">مبررات التعثر / معوقات الموقع *</Label>
                         <Textarea 
                             value={cancellationReason}
                             onChange={e => setCancellationReason(e.target.value)}
-                            placeholder="مثال: الموقع مغلق، نقص في المواد الموردة، سوء حالة الطقس..."
+                            placeholder="مثال: نقص في توريد الأسمنت، عطل في مضخة الخرسانة، تعليمات من المالك بالإيقاف..."
                             className="rounded-xl border-2"
                             rows={3}
                         />

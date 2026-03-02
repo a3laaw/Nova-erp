@@ -17,7 +17,8 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, MapPin, HardHat, Users, Building2, User, Clock } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Eye, MapPin, HardHat, Users, Building2, User, Clock, TrendingUp, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -28,8 +29,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * مكون عرض يوميات المواقع (التصميم الفني الهندسي المكثف):
- * تم حذف حقل "نوع التوريد" لدمجه في العقد.
- * يعرض البيانات بشكل أفقي مدمج للمدير العام.
+ * يربط التقدم بالجدول الزمني المخطط.
  */
 export function FieldVisitsGrid() {
   const { firestore } = useFirebase();
@@ -58,17 +58,22 @@ export function FieldVisitsGrid() {
               <TableRow className="h-12 border-none">
                 <TableHead className="w-12 text-center text-white border-l border-slate-700 font-black">#</TableHead>
                 <TableHead className="w-64 text-right text-white border-l border-slate-700 font-black">العميل والمشروع</TableHead>
-                <TableHead className="w-40 text-center text-white border-l border-slate-700 font-black">بيانات العقار</TableHead>
+                <TableHead className="w-48 text-center text-white border-l border-slate-700 font-black">حالة الإنجاز والجدولة</TableHead>
                 <TableHead className="w-56 text-center text-white border-l border-slate-700 font-black">مرحلة العمل (WBS)</TableHead>
                 <TableHead className="w-48 text-center text-white border-l border-slate-700 font-black">فرق العمل المنفذة</TableHead>
-                <TableHead className="w-full text-right text-white border-l border-slate-700 font-black">الأعمال الجاري عليها</TableHead>
+                <TableHead className="w-full text-right text-white border-l border-slate-700 font-black">الأعمال الموثقة ميدانياً</TableHead>
                 <TableHead className="w-20 text-center text-white font-black">إجراء</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {visits.map((visit, index) => {
                 const scheduledDate = toFirestoreDate(visit.scheduledDate);
+                const phaseEndDate = toFirestoreDate(visit.phaseEndDate);
                 const isCancelled = visit.status === 'cancelled';
+                const isConfirmed = visit.status === 'confirmed';
+                
+                // حساب الانحراف الزمني
+                const isDelayed = scheduledDate && phaseEndDate && scheduledDate > phaseEndDate;
                 
                 return (
                   <TableRow key={visit.id} className={cn("h-48 group border-b border-slate-200 hover:bg-muted/5 transition-colors", isCancelled && "opacity-50 grayscale bg-red-50/10")}>
@@ -81,18 +86,38 @@ export function FieldVisitsGrid() {
                         </div>
                         <div className="space-y-1 bg-sky-50/50 p-3 rounded-xl border border-sky-100">
                             <p className="text-[10px] font-black text-sky-700 uppercase flex items-center gap-1">
-                                <Building2 className="h-3 w-3" /> عنوان الموقع:
+                                <Building2 className="h-3 w-3" /> المشروع:
                             </p>
-                            <p className="text-xs font-bold leading-relaxed">{visit.clientAddress || 'غير محدد'}</p>
+                            <p className="text-xs font-bold leading-relaxed">{visit.projectName}</p>
                         </div>
                     </TableCell>
 
                     <TableCell className="p-0 border-l align-top">
-                        <div className="p-4 flex flex-col justify-center h-full space-y-2">
-                            <span className="text-[9px] font-black text-muted-foreground block mb-1 uppercase">عدد الأدوار المعتمدة:</span>
-                            <p className="font-black text-primary text-base leading-tight">{visit.numFloors || 'سرداب + 3 أدوار'}</p>
+                        <div className="p-4 flex flex-col justify-center h-full space-y-4">
+                            <div className="space-y-1">
+                                <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground">
+                                    <span>نسبة الإنجاز</span>
+                                    <span>{isConfirmed ? (visit.confirmationData?.progressAchieved || 0) : 0}%</span>
+                                </div>
+                                <Progress value={isConfirmed ? visit.confirmationData?.progressAchieved : 0} className="h-2" />
+                            </div>
+                            
                             <Separator />
-                            <p className="text-[10px] text-muted-foreground italic font-medium">بيانات فنية من واقع العقد</p>
+                            
+                            <div className="space-y-2">
+                                <span className="text-[9px] font-black text-muted-foreground block uppercase">الحالة الزمنية:</span>
+                                {isDelayed ? (
+                                    <div className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-700 flex items-center gap-2">
+                                        <AlertTriangle className="h-3 w-3" />
+                                        <span className="text-[10px] font-bold">متأخر عن الجدول</span>
+                                    </div>
+                                ) : (
+                                    <div className="p-2 bg-green-50 border border-green-100 rounded-lg text-green-700 flex items-center gap-2">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        <span className="text-[10px] font-bold">ضمن الجدول الزمني</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </TableCell>
 
@@ -104,13 +129,15 @@ export function FieldVisitsGrid() {
                                 <span className="text-xs font-black text-orange-700">{visit.plannedStageName}</span>
                             </div>
                             <div className="flex justify-between items-center border-b border-dashed pb-2">
-                                <span className="text-[9px] font-bold text-muted-foreground">عدد الزيارات الحالية:</span>
-                                <Badge className="bg-orange-600 font-mono text-xs">{visit.visitCountInStage || '1'}</Badge>
+                                <span className="text-[9px] font-bold text-muted-foreground">التسليم المخطط:</span>
+                                <span className="text-[10px] font-bold font-mono">
+                                    {phaseEndDate ? format(phaseEndDate, 'dd/MM/yyyy') : 'غير محدد'}
+                                </span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="text-[9px] font-bold text-muted-foreground">تاريخ بداية البند:</span>
-                                <span className="text-[10px] font-bold font-mono">
-                                    {toFirestoreDate(visit.phaseStartDate) ? format(toFirestoreDate(visit.phaseStartDate)!, 'dd/MM/yyyy') : '-'}
+                                <span className="text-[9px] font-bold text-muted-foreground">تاريخ الزيارة:</span>
+                                <span className="text-[10px] font-bold font-mono text-primary">
+                                    {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : '-'}
                                 </span>
                             </div>
                         </div>
@@ -133,8 +160,8 @@ export function FieldVisitsGrid() {
                                                 <Users className="h-3 w-3" /> {teamName}
                                             </p>
                                             <div className="space-y-0.5 border-t pt-1">
-                                                {employees?.filter(e => e.teamId === visit.teamIds?.[i]).slice(0, 3).map(e => (
-                                                    <p key={e.id} className="text-[9px] font-medium text-slate-600">• {e.fullName}</p>
+                                                {employees?.filter(e => e.teamId === visit.teamIds?.[i]).slice(0, 2).map(e => (
+                                                    <p key={e.id} className="text-[9px] font-medium text-slate-600 truncate">• {e.fullName}</p>
                                                 ))}
                                             </div>
                                         </div>
@@ -146,16 +173,17 @@ export function FieldVisitsGrid() {
                     </TableCell>
 
                     <TableCell className="p-4 border-l align-top">
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Badge className="bg-slate-100 text-slate-800 border-none font-black text-[9px] uppercase px-3">يوميات الأعمال المطلوبة</Badge>
-                                <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : '-'}
-                                </span>
-                            </div>
-                            <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-slate-200 min-h-[100px]">
-                                <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{visit.details || visit.plannedStageName}</p>
+                        <div className="space-y-3 h-full">
+                            <Badge className={cn(
+                                "border-none font-black text-[9px] uppercase px-3",
+                                isConfirmed ? "bg-green-600 text-white" : "bg-slate-100 text-slate-800"
+                            )}>
+                                {isConfirmed ? 'تقرير الإنجاز الفعلي المعتمد' : 'يوميات الأعمال المطلوبة'}
+                            </Badge>
+                            <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-slate-200 h-[calc(100%-35px)] overflow-y-auto">
+                                <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">
+                                    {isConfirmed ? visit.confirmationData?.notes : (visit.details || 'بانتظار تنفيذ الأعمال...') }
+                                </p>
                             </div>
                         </div>
                     </TableCell>
