@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { where } from 'firebase/firestore';
-import type { ConstructionProject, PurchaseOrder, SubcontractorCertificate, CashReceipt } from '@/lib/types';
+import type { ConstructionProject, PurchaseOrder, SubcontractorCertificate, CashReceipt, JournalEntry } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Coins,
   ArrowUpRight,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  PackageCheck
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -51,30 +52,35 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
+/**
+ * تبويب التحليل المالي للمشروع:
+ * تم التحديث ليعتمد على أذونات الاستلام (GRNs) لحساب التكلفة الفعلية للمواد،
+ * لضمان الدقة في حال اختلف مبلغ الاستلام عن مبلغ أمر الشراء الأصلي.
+ */
 export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
   const { firestore } = useFirebase();
 
-  // 1. Fetch Materials Cost (Purchase Orders) - Simplified query
-  const poQuery = React.useMemo(() => [where('projectId', '==', project.id)], [project.id]);
-  const { data: pos, loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', poQuery);
+  // 1. جلب التكلفة الفعلية للمواد من أذونات الاستلام (GRN) المرتبطة بالمشروع
+  const grnQuery = React.useMemo(() => [where('projectId', '==', project.id)], [project.id]);
+  const { data: grns, loading: grnsLoading } = useSubscription<any>(firestore, 'grns', grnQuery);
 
-  // 2. Fetch Subcontractors Cost (Certificates)
+  // 2. جلب تكاليف مقاولي الباطن من شهادات الإنجاز
   const certQuery = React.useMemo(() => [where('projectId', '==', project.id)], [project.id]);
   const { data: certificates, loading: certsLoading } = useSubscription<SubcontractorCertificate>(firestore, 'subcontractor_certificates', certQuery);
 
-  // 3. Fetch Actual Income (Cash Receipts linked to project)
+  // 3. جلب الإيرادات المحصلة فعلياً من سندات القبض
   const receiptsQuery = React.useMemo(() => [where('projectId', '==', project.id)], [project.id]);
   const { data: receipts, loading: receiptsLoading } = useSubscription<CashReceipt>(firestore, 'cashReceipts', receiptsQuery);
 
-  const loading = posLoading || certsLoading || receiptsLoading;
+  const loading = grnsLoading || certsLoading || receiptsLoading;
 
   const stats = React.useMemo(() => {
     if (loading) return null;
 
-    // المواد الموردة (التي وصلت للموقع فعلياً)
-    const materialCost = pos
-        .filter(p => p.status === 'received' || p.status === 'partially_received')
-        .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    // حساب تكلفة المواد من واقع الاستلام الفعلي (وليس الطلب)
+    const materialCost = (grns || [])
+        .filter(g => g.status !== 'cancelled')
+        .reduce((sum, g) => sum + (g.totalValue || 0), 0);
         
     const laborCost = certificates.filter(c => c.status !== 'cancelled').reduce((sum, c) => sum + (c.amount || 0), 0);
     const totalCosts = materialCost + laborCost;
@@ -93,7 +99,7 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
     ];
 
     const costBreakdown = [
-        { name: 'المواد والتوريدات', value: materialCost, color: '#8b5cf6' },
+        { name: 'المواد المستلمة', value: materialCost, color: '#8b5cf6' },
         { name: 'مقاولين وأعمال', value: laborCost, color: '#f59e0b' },
         { name: 'الربح المتوقع', value: Math.max(0, grossProfit), color: '#10b981' }
     ].filter(d => d.value > 0);
@@ -110,13 +116,13 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
       budgetData,
       costBreakdown
     };
-  }, [project, pos, certificates, receipts, loading]);
+  }, [project, grns, certificates, receipts, loading]);
 
   if (loading) return <Skeleton className="h-96 w-full rounded-3xl" />;
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* Top Indicators */}
+      {/* المؤشرات المالية العلوية */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-none shadow-sm bg-blue-50/50 p-6 flex flex-col justify-between">
             <div className="flex justify-between items-start">
@@ -126,8 +132,8 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
             <div className="mt-2">
                 <p className="text-2xl font-black font-mono text-blue-900">{formatCurrency(stats?.totalCosts || 0)}</p>
                 <div className="flex gap-2 mt-1">
-                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">مواد: {formatCurrency(stats?.materialCost || 0)}</Badge>
-                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">عمالة: {formatCurrency(stats?.laborCost || 0)}</Badge>
+                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">مواد (استلام): {formatCurrency(stats?.materialCost || 0)}</Badge>
+                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">أعمال: {formatCurrency(stats?.laborCost || 0)}</Badge>
                 </div>
             </div>
         </Card>
@@ -171,14 +177,13 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
         </Card>
       </div>
 
-      {/* Charts Grid */}
+      {/* الرسوم البيانية */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Comparison Bar Chart */}
         <Card className="lg:col-span-2 rounded-3xl border-none shadow-sm overflow-hidden bg-white">
             <CardHeader className="border-b bg-muted/10">
                 <CardTitle className="text-lg font-black flex items-center gap-2">
                     <BarChart3 className="h-5 w-5 text-primary"/> 
-                    المقارنة المالية الشاملة
+                    المقارنة المالية (الواقع مقابل المخطط)
                 </CardTitle>
             </CardHeader>
             <CardContent className="h-[350px] p-6">
@@ -198,12 +203,11 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
             </CardContent>
         </Card>
 
-        {/* Cost Distribution Pie Chart */}
         <Card className="rounded-3xl border-none shadow-sm overflow-hidden bg-white">
             <CardHeader className="border-b bg-muted/10">
                 <CardTitle className="text-lg font-black flex items-center gap-2">
                     <PieIcon className="h-5 w-5 text-primary"/> 
-                    توزيع بنود التكلفة
+                    توزيع بنود التكلفة الفعلية
                 </CardTitle>
             </CardHeader>
             <CardContent className="h-[350px] p-6 flex flex-col items-center">
@@ -228,7 +232,7 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
                         </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase">الإجمالي</span>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase">التكلفة</span>
                         <span className="text-xl font-black text-primary font-mono">{formatCurrency(stats?.totalCosts || 0)}</span>
                     </div>
                 </div>
@@ -247,13 +251,12 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
         </Card>
       </div>
 
-      {/* Critical Alerts */}
       {stats && stats.totalCosts > stats.contractValue && (
-          <Alert variant="destructive" className="rounded-[2rem] border-2 border-red-500 bg-red-50 animate-bounce shadow-xl">
+          <Alert variant="destructive" className="rounded-[2rem] border-2 border-red-500 bg-red-50 shadow-xl">
               <AlertTriangle className="h-6 w-6" />
               <AlertTitle className="text-lg font-black">تحذير رقابي: تجاوز الميزانية!</AlertTitle>
               <AlertDescription className="font-bold">
-                  لقد تجاوزت التكاليف الفعلية المسجلة (مواد وأعمال) إجمالي قيمة العقد المعتمدة بمبلغ <span className="underline">{formatCurrency(Math.abs(stats.grossProfit))}</span>. يرجى مراجعة أوامر الشراء وشهادات الإنجاز فوراً.
+                  لقد تجاوزت التكاليف الفعلية المستلمة إجمالي قيمة العقد المعتمدة بمبلغ <span className="underline">{formatCurrency(Math.abs(stats.grossProfit))}</span>. يرجى مراجعة الاستلامات وفواتير الموردين.
               </AlertDescription>
           </Alert>
       )}
