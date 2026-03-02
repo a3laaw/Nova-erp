@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -10,7 +11,23 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2, CheckCircle2, Save, ArrowRight, Navigation, ShieldCheck, Clock, ClipboardCheck, Sparkles, Building2, HardHat } from 'lucide-react';
+import { 
+    MapPin, 
+    Loader2, 
+    CheckCircle2, 
+    XCircle, 
+    Save, 
+    ArrowRight, 
+    Navigation, 
+    ShieldCheck, 
+    Clock, 
+    ClipboardCheck, 
+    Sparkles, 
+    Building2, 
+    HardHat,
+    AlertTriangle,
+    History
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -19,10 +36,21 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /**
- * صفحة تفاصيل الزيارة الميدانية (ربط حصري بالمقاولات):
- * تقوم بتأكيد الإنجاز وتحديث مراحل المشروع التنفيذية (WBS) في سجل المشروع.
+ * صفحة تفاصيل الزيارة الميدانية المطورة:
+ * - تدعم نظام (تم / لم يتم) المباشر.
+ * - في حالة "لم يتم": يطلب سبب الإلغاء ويخرج الزيارة من القائمة النشطة مع أرشفتها.
  */
 export default function FieldVisitDetailPage() {
     const params = useParams();
@@ -34,8 +62,14 @@ export default function FieldVisitDetailPage() {
 
     const [isSaving, setIsSaving] = useState(false);
     const [isCapturingLocation, setIsCapturingLocation] = useState(false);
+    
+    // حالات النموذج
     const [notes, setNotes] = useState('');
+    const [cancellationReason, setCancellationReason] = useState('');
     const [location, setLocation] = useState<{ latitude: number, longitude: number, accuracy: number } | null>(null);
+    
+    // حالات الحوارات
+    const [isNotDoneAlertOpen, setIsNotDoneAlertOpen] = useState(false);
 
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
@@ -44,6 +78,9 @@ export default function FieldVisitDetailPage() {
         if (visit?.confirmationData) {
             setNotes(visit.confirmationData.notes);
             setLocation(visit.confirmationData.location || null);
+        }
+        if (visit?.cancellationReason) {
+            setCancellationReason(visit.cancellationReason);
         }
     }, [visit]);
 
@@ -73,10 +110,10 @@ export default function FieldVisitDetailPage() {
         );
     };
 
-    const handleConfirm = async () => {
+    const handleConfirmDone = async () => {
         if (!firestore || !visit || !currentUser) return;
         if (!notes.trim()) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى كتابة ملاحظاتك الميدانية قبل التأكيد.' });
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى كتابة التقرير الفني قبل التأكيد.' });
             return;
         }
 
@@ -84,7 +121,7 @@ export default function FieldVisitDetailPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. تحديث سجل الزيارة
+            // 1. تحديث سجل الزيارة إلى "تم"
             batch.update(visitRef!, {
                 status: 'confirmed',
                 confirmationData: {
@@ -95,46 +132,64 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // 2. تحديث سجل المشروع (ConstructionProject)
+            // 2. توثيق الحدث في المشروع
             const projectRef = doc(firestore, 'projects', visit.projectId);
-            const projectSnap = await getDoc(projectRef);
-            
-            if (projectSnap.exists()) {
-                const projectData = projectSnap.data() as ConstructionProject;
-                
-                // تحديث الحدث في تايم لاين المشروع
-                const timelineRef = collection(projectRef, 'timelineEvents');
-                batch.set(doc(timelineRef), {
-                    type: 'Visit',
-                    title: `إنجاز ميداني: ${visit.plannedStageName}`,
-                    description: notes,
-                    date: serverTimestamp(),
-                    engineerName: visit.engineerName,
-                    location: location,
-                    createdAt: serverTimestamp()
-                });
-
-                // إذا كان هناك معاملة مالية مرتبطة، يتم توثيق الإنجاز فيها أيضاً
-                if (projectData.linkedTransactionId) {
-                    const txRef = doc(firestore, `clients/${projectData.clientId}/transactions/${projectData.linkedTransactionId}`);
-                    batch.set(doc(collection(txRef, 'timelineEvents')), {
-                        type: 'log',
-                        content: `[إنجاز موقع] أكد المهندس ${visit.engineerName} إنجاز المرحلة: ${visit.plannedStageName}.\nالملاحظات: ${notes}`,
-                        userId: currentUser.id,
-                        userName: currentUser.fullName,
-                        createdAt: serverTimestamp(),
-                    });
-                }
-            }
+            const timelineRef = collection(projectRef, 'timelineEvents');
+            batch.set(doc(timelineRef), {
+                type: 'Visit',
+                title: `إنجاز موقع: ${visit.plannedStageName}`,
+                description: notes,
+                date: serverTimestamp(),
+                engineerName: visit.engineerName,
+                location: location,
+                createdAt: serverTimestamp()
+            });
 
             await batch.commit();
-            toast({ title: 'تم التأكيد', description: 'تم حفظ تفاصيل الإنجاز الميداني وتحديث سجلات المشروع.' });
+            toast({ title: 'تم التوثيق', description: 'تم حفظ تفاصيل الإنجاز الميداني بنجاح.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التأكيد.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التوثيق.' });
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleMarkNotDone = async () => {
+        if (!firestore || !visit || !currentUser || !cancellationReason.trim()) return;
+
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(firestore);
+            
+            // 1. تحديث سجل الزيارة إلى "ملغي"
+            batch.update(visitRef!, {
+                status: 'cancelled',
+                cancellationReason,
+                cancelledAt: serverTimestamp(),
+                cancelledBy: currentUser.id
+            });
+
+            // 2. توثيق سبب عدم الإنجاز في المشروع
+            const projectRef = doc(firestore, 'projects', visit.projectId);
+            const timelineRef = collection(projectRef, 'timelineEvents');
+            batch.set(doc(timelineRef), {
+                type: 'log',
+                title: 'زيارة غير مكتملة',
+                description: `لم يتم تنفيذ الزيارة المقررة لمرحلة (${visit.plannedStageName}). السبب: ${cancellationReason}`,
+                date: serverTimestamp(),
+                engineerName: visit.engineerName,
+                createdAt: serverTimestamp()
+            });
+
+            await batch.commit();
+            toast({ title: 'تم الإلغاء', description: 'تم أرشفة الزيارة كزيارة غير منفذة بنجاح.' });
+            router.push('/dashboard/construction/field-visits');
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل معالجة الطلب.' });
+        } finally {
+            setIsSaving(false);
+            setIsNotDoneAlertOpen(false);
         }
     };
 
@@ -142,7 +197,7 @@ export default function FieldVisitDetailPage() {
     if (!visit) return <div className="text-center p-20">الزيارة غير موجودة.</div>;
 
     const scheduledDate = toFirestoreDate(visit.scheduledDate);
-    const confirmedAt = toFirestoreDate(visit.confirmationData?.confirmedAt);
+    const isProcessed = visit.status !== 'planned';
 
     return (
         <div className="max-w-2xl mx-auto space-y-6 pb-20" dir="rtl">
@@ -150,11 +205,15 @@ export default function FieldVisitDetailPage() {
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2">
                     <ArrowRight className="h-4 w-4" /> العودة للخطة
                 </Button>
-                {visit.status === 'confirmed' && (
+                {visit.status === 'confirmed' ? (
                     <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2 text-white">
-                        <CheckCircle2 className="h-4 w-4" /> زيارة مؤكدة
+                        <CheckCircle2 className="h-4 w-4" /> زيارة تمت بنجاح
                     </Badge>
-                )}
+                ) : visit.status === 'cancelled' ? (
+                    <Badge className="bg-red-600 font-black px-4 py-1 rounded-full gap-2 text-white">
+                        <XCircle className="h-4 w-4" /> زيارة لم تتم (ملغاة)
+                    </Badge>
+                ) : null}
             </div>
 
             <Card className="rounded-[2.5rem] shadow-lg border-none overflow-hidden bg-card">
@@ -172,83 +231,151 @@ export default function FieldVisitDetailPage() {
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="p-8 space-y-6">
+                <CardContent className="p-8 space-y-8">
                     <div className="grid grid-cols-2 gap-6">
                         <div className="space-y-1">
                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">تاريخ الموعد</Label>
                             <p className="font-bold">{scheduledDate ? format(scheduledDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</p>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">بند المقايسة المستهدف</Label>
-                            <div className="flex items-center gap-2">
-                                <p className="font-black text-primary">{visit.plannedStageName}</p>
-                                <Sparkles className="h-3 w-3 text-blue-500 animate-pulse" />
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-4 pt-4 border-t">
-                        <Label className="font-black text-lg flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-primary" />
-                            إثبات التواجد (GPS)
-                        </Label>
-                        <div className={cn(
-                            "p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-all",
-                            location ? "bg-green-50 border-green-200" : "bg-muted/10 border-muted-foreground/20"
-                        )}>
-                            {location ? (
-                                <div className="text-center space-y-2">
-                                    <div className="p-3 bg-green-600 text-white rounded-full inline-block">
-                                        <ShieldCheck className="h-8 w-8" />
-                                    </div>
-                                    <p className="font-black text-green-800">تم التقاط الموقع بنجاح</p>
-                                    <Button variant="link" size="sm" asChild className="text-blue-600">
-                                        <a href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`} target="_blank" rel="noopener noreferrer">
-                                            فتح في خرائط جوجل <Navigation className="ml-1 h-3 w-3" />
-                                        </a>
-                                    </Button>
-                                </div>
-                            ) : (
-                                <>
-                                    <p className="text-sm text-muted-foreground text-center">يرجى الضغط لإثبات الحضور في موقع المشروع الإنشائي.</p>
-                                    <Button onClick={handleGetLocation} disabled={isCapturingLocation || visit.status === 'confirmed'} className="rounded-xl h-12 px-8 font-bold gap-2">
-                                        {isCapturingLocation ? <Loader2 className="animate-spin h-5 w-5" /> : <MapPin className="h-5 w-5" />}
-                                        التقاط إحداثيات الموقع
-                                    </Button>
-                                </>
-                            )}
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المستهدفة</Label>
+                            <p className="font-black text-primary">{visit.plannedStageName}</p>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <Label className="font-black text-lg flex items-center gap-2">
-                            <ClipboardCheck className="h-5 w-5 text-primary" />
-                            تقرير الأعمال المنفذة
-                        </Label>
-                        <Textarea 
-                            value={notes}
-                            onChange={e => setNotes(e.target.value)}
-                            placeholder="ما الذي تم إنجازه في بنود الـ BOQ اليوم؟"
-                            rows={5}
-                            className="rounded-3xl border-2 text-base p-4 resize-none"
-                            disabled={visit.status === 'confirmed'}
-                        />
-                    </div>
-                </CardContent>
-                <CardFooter className="p-8 bg-muted/10 border-t flex justify-center">
-                    {visit.status !== 'confirmed' ? (
-                        <Button onClick={handleConfirm} disabled={isSaving || !notes.trim()} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
-                            تأكيد الإنجاز وتحديث سجل المشروع
-                        </Button>
+                    {!isProcessed ? (
+                        <>
+                            <Separator />
+                            <div className="space-y-4">
+                                <Label className="font-black text-lg flex items-center gap-2">
+                                    <MapPin className="h-5 w-5 text-primary" />
+                                    إثبات التواجد (GPS)
+                                </Label>
+                                <div className={cn(
+                                    "p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-all",
+                                    location ? "bg-green-50 border-green-200" : "bg-muted/10 border-muted-foreground/20"
+                                )}>
+                                    {location ? (
+                                        <div className="text-center space-y-2">
+                                            <div className="p-3 bg-green-600 text-white rounded-full inline-block">
+                                                <ShieldCheck className="h-8 w-8" />
+                                            </div>
+                                            <p className="font-black text-green-800">تم التقاط الموقع بنجاح</p>
+                                            <Button variant="link" size="sm" asChild className="text-blue-600">
+                                                <a href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`} target="_blank" rel="noopener noreferrer">
+                                                    فتح في خرائط جوجل <Navigation className="ml-1 h-3 w-3" />
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm text-muted-foreground text-center">يرجى التقاط الموقع لتوثيق الحضور الفعلي في الموقع.</p>
+                                            <Button onClick={handleGetLocation} disabled={isCapturingLocation} className="rounded-xl h-12 px-8 font-bold gap-2">
+                                                {isCapturingLocation ? <Loader2 className="animate-spin h-5 w-5" /> : <MapPin className="h-5 w-5" />}
+                                                تأكيد الموقع الحالي
+                                            </Button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <Label className="font-black text-lg flex items-center gap-2">
+                                    <ClipboardCheck className="h-5 w-5 text-primary" />
+                                    التقرير الفني (في حال الإنجاز)
+                                </Label>
+                                <Textarea 
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                    placeholder="ما هي الأعمال التي تم تنفيذها فعلياً؟"
+                                    rows={4}
+                                    className="rounded-3xl border-2 p-4 text-base"
+                                />
+                            </div>
+                        </>
                     ) : (
-                        <div className="text-center space-y-1">
-                            <p className="font-bold text-muted-foreground">تم التوثيق بواسطة: {visit.engineerName}</p>
-                            <p className="text-xs text-muted-foreground italic">بتاريخ: {confirmedAt ? format(confirmedAt, 'PPp', { locale: ar }) : '-'}</p>
+                        <div className="space-y-6">
+                            <Separator />
+                            {visit.status === 'confirmed' ? (
+                                <div className="space-y-4">
+                                    <Label className="font-black text-lg flex items-center gap-2 text-green-700">
+                                        <History className="h-5 w-5" /> سجل الإنجاز الموثق
+                                    </Label>
+                                    <div className="p-6 bg-green-50/50 border rounded-3xl">
+                                        <p className="text-sm leading-relaxed">{visit.confirmationData?.notes}</p>
+                                        {visit.confirmationData?.location && (
+                                            <p className="text-[10px] mt-4 font-mono text-muted-foreground">الموقع: {visit.confirmationData.location.latitude}, {visit.confirmationData.location.longitude}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <Label className="font-black text-lg flex items-center gap-2 text-red-700">
+                                        <AlertTriangle className="h-5 w-5" /> مبررات عدم الإنجاز
+                                    </Label>
+                                    <div className="p-6 bg-red-50/50 border border-red-100 rounded-3xl">
+                                        <p className="text-sm font-bold text-red-800">{visit.cancellationReason}</p>
+                                        <p className="text-[10px] mt-2 italic text-red-600">تم تسجيل الإلغاء بتاريخ: {toFirestoreDate(visit.cancelledAt) ? format(toFirestoreDate(visit.cancelledAt)!, 'PPp', { locale: ar }) : '-'}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
-                </CardFooter>
+                </CardContent>
+                
+                {!isProcessed && (
+                    <CardFooter className="p-8 bg-muted/10 border-t flex flex-col sm:flex-row gap-4">
+                        <Button 
+                            onClick={handleConfirmDone} 
+                            disabled={isSaving || !notes.trim()} 
+                            className="flex-1 h-14 rounded-2xl font-black text-xl shadow-lg gap-2"
+                        >
+                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
+                            تم الإنجاز
+                        </Button>
+                        <Button 
+                            variant="outline"
+                            onClick={() => setIsNotDoneAlertOpen(true)} 
+                            disabled={isSaving} 
+                            className="flex-1 h-14 rounded-2xl font-black text-xl border-red-200 text-red-600 hover:bg-red-50 gap-2"
+                        >
+                            لم يتم الإنجاز
+                        </Button>
+                    </CardFooter>
+                )}
             </Card>
+
+            <AlertDialog open={isNotDoneAlertOpen} onOpenChange={setIsNotDoneAlertOpen}>
+                <AlertDialogContent dir="rtl" className="rounded-[2rem]">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl font-black text-red-700">توثيق عدم الإنجاز</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base">
+                            سيتم اعتبار هذه الزيارة "ملغاة" وسيتم استبعادها من قائمة الأعمال النشطة. يرجى ذكر سبب عدم الإنجاز للتدقيق الإداري.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4">
+                        <Label className="font-bold mb-2 block">سبب الإلغاء / معوقات الموقع *</Label>
+                        <Textarea 
+                            value={cancellationReason}
+                            onChange={e => setCancellationReason(e.target.value)}
+                            placeholder="مثال: الموقع مغلق، نقص في المواد الموردة، سوء حالة الطقس..."
+                            className="rounded-xl border-2"
+                            rows={3}
+                        />
+                    </div>
+                    <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel disabled={isSaving}>تراجع</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={handleMarkNotDone} 
+                            disabled={isSaving || !cancellationReason.trim()}
+                            className="bg-red-600 hover:bg-red-700 font-bold"
+                        >
+                            {isSaving ? <Loader2 className="animate-spin ml-2 h-4 w-4" /> : <XCircle className="ml-2 h-4 w-4" />}
+                            تأكيد الإلغاء
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

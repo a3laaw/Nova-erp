@@ -163,6 +163,8 @@ export interface FieldVisit extends BaseEntity {
         location?: { latitude: number, longitude: number, accuracy: number };
         isCompleted: boolean;
     };
+    cancellationReason?: string;
+    cancelledAt?: Timestamp | any;
     workStageUpdated?: boolean;
 }
 
