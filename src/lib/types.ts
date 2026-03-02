@@ -7,7 +7,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export interface BaseEntity {
   id?: string;
-  companyId: string;           
+  companyId?: string;           
   createdAt: Timestamp | any;
   createdBy: string;
   updatedAt?: Timestamp | any;
@@ -165,6 +165,7 @@ export interface FieldVisit extends BaseEntity {
     };
     cancellationReason?: string;
     cancelledAt?: Timestamp | any;
+    cancelledBy?: string;
     workStageUpdated?: boolean;
 }
 

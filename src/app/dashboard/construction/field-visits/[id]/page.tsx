@@ -22,7 +22,6 @@ import {
     ShieldCheck, 
     Clock, 
     ClipboardCheck, 
-    Sparkles, 
     Building2, 
     HardHat,
     AlertTriangle,
@@ -63,12 +62,10 @@ export default function FieldVisitDetailPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isCapturingLocation, setIsCapturingLocation] = useState(false);
     
-    // حالات النموذج
     const [notes, setNotes] = useState('');
     const [cancellationReason, setCancellationReason] = useState('');
     const [location, setLocation] = useState<{ latitude: number, longitude: number, accuracy: number } | null>(null);
     
-    // حالات الحوارات
     const [isNotDoneAlertOpen, setIsNotDoneAlertOpen] = useState(false);
 
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
@@ -120,8 +117,6 @@ export default function FieldVisitDetailPage() {
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
-            
-            // 1. تحديث سجل الزيارة إلى "تم"
             batch.update(visitRef!, {
                 status: 'confirmed',
                 confirmationData: {
@@ -132,7 +127,6 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // 2. توثيق الحدث في المشروع
             const projectRef = doc(firestore, 'projects', visit.projectId);
             const timelineRef = collection(projectRef, 'timelineEvents');
             batch.set(doc(timelineRef), {
@@ -161,8 +155,6 @@ export default function FieldVisitDetailPage() {
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
-            
-            // 1. تحديث سجل الزيارة إلى "ملغي"
             batch.update(visitRef!, {
                 status: 'cancelled',
                 cancellationReason,
@@ -170,7 +162,6 @@ export default function FieldVisitDetailPage() {
                 cancelledBy: currentUser.id
             });
 
-            // 2. توثيق سبب عدم الإنجاز في المشروع
             const projectRef = doc(firestore, 'projects', visit.projectId);
             const timelineRef = collection(projectRef, 'timelineEvents');
             batch.set(doc(timelineRef), {
@@ -226,8 +217,8 @@ export default function FieldVisitDetailPage() {
                                 مشروع: {visit.projectName}
                             </CardDescription>
                         </div>
-                        <div className="p-3 bg-background rounded-2xl border shadow-inner">
-                            <Clock className="h-6 w-6 text-muted-foreground" />
+                        <div className="p-3 bg-background rounded-2xl border shadow-inner text-muted-foreground">
+                            <Clock className="h-6 w-6" />
                         </div>
                     </div>
                 </CardHeader>

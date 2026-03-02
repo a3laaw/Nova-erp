@@ -24,10 +24,12 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { Separator } from '@/components/ui/separator';
 
 /**
- * مكون عرض يوميات المواقع (التصميم الفني الهندسي):
+ * مكون عرض يوميات المواقع (التصميم الفني الهندسي المكثف):
  * تم حذف حقل "نوع التوريد" لدمجه في العقد.
+ * يعرض البيانات بشكل أفقي مدمج للمدير العام.
  */
 export function FieldVisitsGrid() {
   const { firestore } = useFirebase();
@@ -66,14 +68,17 @@ export function FieldVisitsGrid() {
             <TableBody>
               {visits.map((visit, index) => {
                 const scheduledDate = toFirestoreDate(visit.scheduledDate);
+                const isCancelled = visit.status === 'cancelled';
                 
                 return (
-                  <TableRow key={visit.id} className="h-48 group border-b border-slate-200 hover:bg-muted/5 transition-colors">
+                  <TableRow key={visit.id} className={cn("h-48 group border-b border-slate-200 hover:bg-muted/5 transition-colors", isCancelled && "opacity-50 grayscale bg-red-50/10")}>
                     <TableCell className="text-center font-black bg-slate-50 border-l border-slate-200">{index + 1}</TableCell>
                     
-                    {/* عمود العميل والمشروع */}
                     <TableCell className="p-4 border-l align-top space-y-3">
-                        <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName}</p>
+                        <div className="flex justify-between items-start">
+                            <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName}</p>
+                            {isCancelled && <Badge variant="destructive" className="text-[8px] px-2 py-0">ملغي</Badge>}
+                        </div>
                         <div className="space-y-1 bg-sky-50/50 p-3 rounded-xl border border-sky-100">
                             <p className="text-[10px] font-black text-sky-700 uppercase flex items-center gap-1">
                                 <Building2 className="h-3 w-3" /> عنوان الموقع:
@@ -82,7 +87,6 @@ export function FieldVisitsGrid() {
                         </div>
                     </TableCell>
 
-                    {/* عمود بيانات العقار */}
                     <TableCell className="p-0 border-l align-top">
                         <div className="p-4 flex flex-col justify-center h-full space-y-2">
                             <span className="text-[9px] font-black text-muted-foreground block mb-1 uppercase">عدد الأدوار المعتمدة:</span>
@@ -92,7 +96,6 @@ export function FieldVisitsGrid() {
                         </div>
                     </TableCell>
 
-                    {/* عمود مرحلة العمل (WBS) */}
                     <TableCell className="p-0 border-l align-top">
                         <div className="bg-orange-500 text-white p-2 text-center text-xs font-black">المرحلة التنفيذية</div>
                         <div className="p-3 space-y-3">
@@ -113,7 +116,6 @@ export function FieldVisitsGrid() {
                         </div>
                     </TableCell>
 
-                    {/* عمود فرق العمل المنفذة */}
                     <TableCell className="p-0 border-l align-top">
                         <div className="bg-emerald-600 text-white p-2 text-center text-xs font-black">فرق العمل / الموارد</div>
                         <div className="p-2 h-[calc(100%-32px)] overflow-y-auto bg-emerald-50/20">
@@ -143,7 +145,6 @@ export function FieldVisitsGrid() {
                         </div>
                     </TableCell>
 
-                    {/* عمود الأعمال الجاري عليها */}
                     <TableCell className="p-4 border-l align-top">
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">

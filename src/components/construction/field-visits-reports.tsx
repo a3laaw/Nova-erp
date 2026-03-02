@@ -10,9 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
-  FileBarChart, Search, Printer, ArrowRight, Calendar, Users, 
-  Target, CheckCircle2, Clock, Filter, HardHat, Building2,
-  FileSearch, Loader2
+  FileBarChart, Printer, ArrowRight, Calendar,
+  CheckCircle2, Clock, FileSearch, Loader2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
@@ -24,11 +23,15 @@ import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-selec
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 
+/**
+ * تقرير الأداء الميداني (المعيار الرقابي المثبت):
+ * - يعمل بنظام "التوليد بطلب" (On-Demand) لضمان ثبات القراءات.
+ * - فلاتر بحث متعددة (Multi-Select) للمشاريع والفرق والمراحل.
+ */
 export function FieldVisitsReports() {
   const { firestore } = useFirebase();
   const router = useRouter();
 
-  // فلاتر الحالة (تتحكم فيما سيظهر عند الضغط على زر التوليد)
   const [dateFrom, setDateFrom] = React.useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = React.useState<Date | undefined>(() => endOfMonth(new Date()));
   const [selectedProjectIds, setSelectedProjectIds] = React.useState<string[]>([]);
@@ -36,7 +39,6 @@ export function FieldVisitsReports() {
   const [selectedStageNames, setSelectedStageNames] = React.useState<string[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  // حالة نتائج التقرير المثبتة (Stable Report Results)
   const [reportResults, setReportResults] = React.useState<FieldVisit[] | null>(null);
   const [isGenerating, setIsGenerating] = React.useState(false);
 
@@ -57,11 +59,8 @@ export function FieldVisitsReports() {
     return Array.from(stages).sort().map(s => ({ value: s, label: s }));
   }, [visits]);
 
-  // محرك إنشاء التقرير بطلب (On-Demand)
   const handleGenerateReport = () => {
     setIsGenerating(true);
-    
-    // محاكاة تأخير بسيط لإعطاء انطباع بالمعالجة
     setTimeout(() => {
         const filtered = visits.filter(visit => {
             const visitDate = toFirestoreDate(visit.scheduledDate);
@@ -85,20 +84,19 @@ export function FieldVisitsReports() {
   };
 
   const stats = React.useMemo(() => {
-    if (!reportResults) return { total: 0, confirmed: 0, planned: 0, successRate: 0 };
+    if (!reportResults) return { total: 0, confirmed: 0, cancelled: 0, successRate: 0 };
     const total = reportResults.length;
     const confirmed = reportResults.filter(v => v.status === 'confirmed').length;
-    const planned = total - confirmed;
+    const cancelled = reportResults.filter(v => v.status === 'cancelled').length;
     const successRate = total > 0 ? (confirmed / total) * 100 : 0;
 
-    return { total, confirmed, planned, successRate };
+    return { total, confirmed, cancelled, successRate };
   }, [reportResults]);
 
   if (visitsLoading) return <div className="space-y-6"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-96 w-full rounded-2xl"/></div>;
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* Header - No Print */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 no-print">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
@@ -117,7 +115,6 @@ export function FieldVisitsReports() {
         </Button>
       </div>
 
-      {/* Filters Section - No Print */}
       <Card className="rounded-[2rem] border-none shadow-sm bg-muted/30 no-print">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -174,7 +171,6 @@ export function FieldVisitsReports() {
 
       {reportResults ? (
         <div className="animate-in fade-in zoom-in-95 duration-500 space-y-6">
-            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="rounded-2xl border-none shadow-sm p-6 bg-primary text-primary-foreground">
                 <Label className="text-[10px] font-black uppercase opacity-80 block mb-1">إجمالي الزيارات</Label>
@@ -192,19 +188,19 @@ export function FieldVisitsReports() {
                 </div>
                 </Card>
 
-                <Card className="rounded-2xl border-none shadow-sm p-6 bg-blue-50">
-                <Label className="text-[10px] font-black uppercase text-blue-700 block mb-1">الزيارات المجدولة</Label>
+                <Card className="rounded-2xl border-none shadow-sm p-6 bg-red-50">
+                <Label className="text-[10px] font-black uppercase text-red-700 block mb-1">زيارات لم تتم</Label>
                 <div className="flex justify-between items-end">
-                    <p className="text-4xl font-black font-mono text-blue-700">{stats.planned}</p>
-                    <Clock className="h-8 w-8 text-blue-200" />
+                    <p className="text-4xl font-black font-mono text-red-700">{stats.cancelled}</p>
+                    <XCircle className="h-8 w-8 text-red-200" />
                 </div>
                 </Card>
 
                 <Card className="rounded-2xl border-none shadow-sm p-6 bg-white">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">معدل الإنجاز</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">معدل الإنجاز الميداني</Label>
                 <div className="flex justify-between items-end">
                     <p className="text-4xl font-black font-mono text-primary">{stats.successRate.toFixed(0)}%</p>
-                    <Target className="h-8 w-8 text-muted-foreground opacity-10" />
+                    <Clock className="h-8 w-8 text-muted-foreground opacity-10" />
                 </div>
                 </Card>
             </div>
@@ -214,7 +210,7 @@ export function FieldVisitsReports() {
                 <div className="flex justify-between items-center">
                     <div>
                         <CardTitle className="text-xl font-black">سجل الحركة الميدانية التفصيلي</CardTitle>
-                        <CardDescription>عرض النتائج المثبتة للفترة من {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : ''} إلى {dateTo ? format(dateTo, 'dd/MM/yyyy') : ''}.</CardDescription>
+                        <CardDescription>عرض النتائج المثبتة للفترة المختارة.</CardDescription>
                     </div>
                     <Badge variant="secondary" className="font-bold px-4 h-7 rounded-full">
                         {reportResults.length} سجل متاح
@@ -264,11 +260,11 @@ export function FieldVisitsReports() {
                             </div>
                             </TableCell>
                             <TableCell>
-                            <Badge variant={visit.status === 'confirmed' ? 'default' : 'outline'} className={cn(
+                            <Badge variant={visit.status === 'confirmed' ? 'default' : visit.status === 'cancelled' ? 'destructive' : 'outline'} className={cn(
                                 "font-black text-[9px] px-3",
-                                visit.status === 'confirmed' ? "bg-green-600" : "text-blue-600 border-blue-200"
+                                visit.status === 'confirmed' ? "bg-green-600" : visit.status === 'cancelled' ? "bg-red-600" : "text-blue-600 border-blue-200"
                             )}>
-                                {visit.status === 'confirmed' ? 'تمت الزيارة' : 'مجدولة'}
+                                {visit.status === 'confirmed' ? 'تمت الزيارة' : visit.status === 'cancelled' ? 'لم تتم (ملغاة)' : 'مجدولة'}
                             </Badge>
                             </TableCell>
                             <TableCell className="text-left px-8 text-xs font-bold text-muted-foreground">
@@ -281,8 +277,8 @@ export function FieldVisitsReports() {
                 </Table>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-4 justify-between border-t text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                <span>Nova ERP - Field Logistics Stable Reporting</span>
-                <span>Generated At: {format(new Date(), 'PPpp', { locale: ar })}</span>
+                <span>Nova ERP - Stable Field Performance System</span>
+                <span>تاريخ التوليد: {format(new Date(), 'PPpp', { locale: ar })}</span>
                 </CardFooter>
             </Card>
         </div>
@@ -291,7 +287,7 @@ export function FieldVisitsReports() {
             <div className="p-6 bg-muted rounded-full mb-4">
                 <FileBarChart className="h-16 w-16 text-muted-foreground" />
             </div>
-            <p className="text-xl font-black text-muted-foreground">اضبط الفلاتر في الأعلى واضغط على "إنشاء التقرير" للمتابعة.</p>
+            <p className="text-xl font-black text-muted-foreground">اضبط الفلاتر في الأعلى واضغط على "إنشاء التقرير" لعرض النتائج المثبتة.</p>
         </div>
       )}
     </div>
