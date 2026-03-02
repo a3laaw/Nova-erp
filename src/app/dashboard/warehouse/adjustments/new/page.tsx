@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
@@ -28,6 +29,7 @@ import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const lineSchema = z.object({
   itemId: z.string().min(1, "الصنف مطلوب."),
@@ -68,6 +70,7 @@ export default function NewAdjustmentPage() {
     const savingRef = useRef(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
     
+    // أرصدة المخزن والمورد (الرقابة المتقاطعة)
     const [stockBalances, setStockBalances] = useState<Record<string, number>>({});
     const [vendorPurchaseBalances, setVendorPurchaseBalances] = useState<Record<string, number>>({});
     const [loadingStock, setLoadingStock] = useState(false);
@@ -96,19 +99,19 @@ export default function NewAdjustmentPage() {
     const selectedWarehouseId = watch('warehouseId');
     const selectedVendorId = watch('vendorId');
 
-    // تحديد ما إذا كانت العملية تتضمن خروج بضاعة للتحقق من الرصيد
+    // تحديد ما إذا كانت العملية تتضمن خروج بضاعة للتحقق من الرصيد (مهم جداً للرقابة)
     const isOutbound = useMemo(() => ['damage', 'theft', 'purchase_return'].includes(adjType), [adjType]);
 
     const totalCost = useMemo(() =>
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
+    // محرك فحص الرصيد الفعلي في "الرف"
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
         try {
             const balances: Record<string, number> = {};
-            // جلب الأرصدة من أذونات الاستلام
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('warehouseId', '==', warehouseId)));
             grnsSnap.forEach(doc => {
                 const data = doc.data();
@@ -117,7 +120,6 @@ export default function NewAdjustmentPage() {
                 });
             });
 
-            // تعديل الأرصدة بناءً على التسويات والصرف السابقة
             const adjsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments')));
             adjsSnap.forEach(doc => {
                 const data = doc.data() as InventoryAdjustment;
@@ -137,6 +139,7 @@ export default function NewAdjustmentPage() {
         }
     }, [firestore]);
 
+    // محرك فحص رصيد المورد (الرقابة المتقاطعة - المستودع الافتراضي للمورد)
     const fetchVendorPurchaseBalances = useCallback(async (vId: string) => {
         if (!firestore || !vId) {
             setVendorPurchaseBalances({});
@@ -152,7 +155,6 @@ export default function NewAdjustmentPage() {
                 });
             });
 
-            // خصم المردودات السابقة لنفس المورد
             const returnsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
                 where('vendorId', '==', vId), 
                 where('type', '==', 'purchase_return')
@@ -193,7 +195,7 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // الرقابة النهائية قبل الحفظ
+        // الرقابة الصارمة قبل الحفظ النهائي
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
