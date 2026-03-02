@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "CompanyBranding": {
@@ -11,44 +10,27 @@
         "phone": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "logo_url": { "type": "string", "format": "uri" },
-        "system_background_url": { "type": "string", "format": "uri" }
+        "system_background_url": { "type": "string", "format": "uri" },
+        "external_config": { 
+            "type": "object",
+            "description": "Optional dynamic Firebase configuration for companies with their own hosting."
+        }
       },
       "required": ["company_name"]
     },
     "UserProfile": {
       "title": "User Profile",
-      "description": "Represents a user's login account.",
+      "description": "Represents a user's login account, now linked to a specific company.",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "username": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Secretary", "Accountant", "Engineer", "HR"] },
         "employeeId": { "type": "string" },
+        "companyId": { "type": "string", "description": "The unique ID of the company this user belongs to." },
         "isActive": { "type": "boolean" }
-      }
-    },
-    "ConstructionType": {
-        "title": "Construction Type",
-        "description": "Top-level categorization for construction projects (e.g., Skeleton, Turnkey).",
-        "type": "object",
-        "properties": {
-            "name": { "type": "string" },
-            "order": { "type": "number" }
-        },
-        "required": ["name"]
-    },
-    "ConstructionWorkStage": {
-      "title": "Construction Work Stage",
-      "description": "A recursive work stage node for a specific construction type.",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "parentId": { "type": "string" },
-        "order": { "type": "number" },
-        "activityTypeIds": { "type": "array", "items": { "type": "string" } }
       },
-      "required": ["name"]
+      "required": ["username", "role", "companyId"]
     }
   },
   "auth": {
@@ -57,15 +39,7 @@
   "firestore": {
     "/company_settings/{settingsId}": {
       "schema": { "$ref": "#/entities/CompanyBranding" },
-      "description": "Stores company-wide settings."
-    },
-    "/construction_types/{typeId}": {
-        "schema": { "$ref": "#/entities/ConstructionType" },
-        "description": "The standard list of construction project categories."
-    },
-    "/construction_types/{typeId}/stages/{stageId}": {
-      "schema": { "$ref": "#/entities/ConstructionWorkStage" },
-      "description": "Recursive work stages tree for a specific construction type."
+      "description": "Stores company-wide settings and optional external hosting configurations."
     }
   }
 }
