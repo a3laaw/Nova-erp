@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck, Trash2, PlusCircle, AlertCircle } from 'lucide-react';
+import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck, Trash2, PlusCircle, AlertCircle, Building2, Target } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, serverTimestamp, orderBy, where, Timestamp, getDoc } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
@@ -28,6 +28,7 @@ import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 
 const lineSchema = z.object({
   itemId: z.string().min(1, "الصنف مطلوب."),
@@ -38,7 +39,9 @@ const lineSchema = z.object({
 const adjSchema = z.object({
   date: z.date({ required_error: 'التاريخ مطلوب.' }),
   type: z.enum(['damage', 'theft', 'opening_balance', 'purchase_return', 'sales_return', 'other']),
-  warehouseId: z.string().min(1, "المستودع مطلوب."),
+  isDirectReturn: z.boolean().default(false), // هل المردود مباشر من المشروع (بدون مخزن)؟
+  warehouseId: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
   notes: z.string().min(1, "يجب ذكر سبب العملية."),
   clientId: z.string().optional().nullable(),
   vendorId: z.string().optional().nullable(),
@@ -83,13 +86,14 @@ export default function NewAdjustmentPage() {
     const { data: warehouses = [], loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
     const { data: vendors = [] } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
-    const { data: categories = [] } = useSubscription<any>(firestore, 'itemCategories');
+    const { data: projects = [] } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
     
     const { register, handleSubmit, control, formState: { errors }, watch, setValue } = useForm<AdjFormValues>({
         resolver: zodResolver(adjSchema),
         defaultValues: {
             date: new Date(),
             type: initialType || 'damage',
+            isDirectReturn: false,
             items: [{ itemId: '', quantity: 1, unitCost: 0 }],
             recoveredDiscount: 0,
         }
@@ -98,9 +102,11 @@ export default function NewAdjustmentPage() {
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
     const watchedItems = useWatch({ control, name: "items" });
     const adjType = watch('type');
+    const isDirectReturn = watch('isDirectReturn');
     const selectedWarehouseId = watch('warehouseId');
     const selectedVendorId = watch('vendorId');
     const selectedClientId = watch('clientId');
+    const selectedProjectId = watch('projectId');
 
     const isOutbound = useMemo(() => ['damage', 'theft', 'purchase_return', 'material_issue'].includes(adjType), [adjType]);
 
@@ -207,8 +213,8 @@ export default function NewAdjustmentPage() {
     }, [firestore]);
 
     useEffect(() => {
-        if (selectedWarehouseId) fetchStockBalances(selectedWarehouseId);
-    }, [selectedWarehouseId, fetchStockBalances]);
+        if (selectedWarehouseId && !isDirectReturn) fetchStockBalances(selectedWarehouseId);
+    }, [selectedWarehouseId, fetchStockBalances, isDirectReturn]);
 
     useEffect(() => {
         if (adjType === 'purchase_return' && selectedVendorId) {
@@ -229,30 +235,33 @@ export default function NewAdjustmentPage() {
     const warehouseOptions = useMemo(() => warehouses.map(w => ({ value: w.id!, label: w.name })), [warehouses]);
     const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
     const vendorOptions = useMemo(() => vendors.map(v => ({ value: v.id!, label: v.name })), [vendors]);
+    const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: p.projectName })), [projects]);
 
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // التحقق النهائي من الأرصدة والقيود الرقابية الثلاثة قبل الحفظ
-        for (const item of data.items) {
-            const currentStock = stockBalances[item.itemId] || 0;
-            const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
-            const soldToClient = clientSalesBalances[item.itemId] || 0;
-            const itemName = items.find(i => i.id === item.itemId)?.name;
+        // التحقق النهائي من الأرصدة والقيود الرقابية الثلاثة قبل الحفظ (فقط للحركات المخزنية)
+        if (!data.isDirectReturn) {
+            for (const item of data.items) {
+                const currentStock = stockBalances[item.itemId] || 0;
+                const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
+                const soldToClient = clientSalesBalances[item.itemId] || 0;
+                const itemName = items.find(i => i.id === item.itemId)?.name;
 
-            if (isOutbound && item.quantity > currentStock) {
-                toast({ variant: 'destructive', title: 'عجز مخزني حاد', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر في الرف هو (${currentStock}) فقط.` });
-                return;
-            }
+                if (isOutbound && item.quantity > currentStock) {
+                    toast({ variant: 'destructive', title: 'عجز مخزني حاد', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر في الرف هو (${currentStock}) فقط.` });
+                    return;
+                }
 
-            if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
-                toast({ variant: 'destructive', title: 'تجاوز حد المورد', description: `لا يمكن إرجاع (${item.quantity}) للمورد لأن إجمالي ما اشتريته منه هو (${purchasedFromVendor}) فقط.` });
-                return;
-            }
+                if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
+                    toast({ variant: 'destructive', title: 'تجاوز حد المورد', description: `لا يمكن إرجاع (${item.quantity}) للمورد لأن إجمالي ما اشتريته منه هو (${purchasedFromVendor}) فقط.` });
+                    return;
+                }
 
-            if (data.type === 'sales_return' && data.clientId && item.quantity > soldToClient) {
-                toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن قبول مرتجع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) في سجلاته.` });
-                return;
+                if (data.type === 'sales_return' && data.clientId && item.quantity > soldToClient) {
+                    toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن قبول مرتجع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) في سجلاته.` });
+                    return;
+                }
             }
         }
 
@@ -295,6 +304,8 @@ export default function NewAdjustmentPage() {
 
                 // منطق القيد المحاسبي المتكامل والربط مع الحسابات الفرعية
                 const inventoryAccount = accounts.find(a => a.code === '1104');
+                const projectExpenseAccount = accounts.find(a => a.code === '5104') || accounts.find(a => a.code === '51');
+                
                 let debitAccount: Account | undefined;
                 let creditAccount: Account | undefined;
                 let narration = '';
@@ -307,8 +318,12 @@ export default function NewAdjustmentPage() {
                 } else if (data.type === 'purchase_return') {
                     const vendor = vendors.find(v => v.id === data.vendorId);
                     debitAccount = accounts.find(a => a.name === vendor?.name && a.parentCode === '2101');
-                    creditAccount = inventoryAccount;
-                    narration = `مردود مشتريات للمورد: ${vendor?.name} - ${data.notes}`;
+                    // إذا كان المردود مباشراً من المشروع، يتم الائتمان لحساب مصاريف المشروع بدلاً من المخزون
+                    creditAccount = data.isDirectReturn ? projectExpenseAccount : inventoryAccount;
+                    narration = `مردود مشتريات للمورد: ${vendor?.name} ${data.isDirectReturn ? '(مباشر من المشروع)' : '(من المخزن)'} - ${data.notes}`;
+                    if (data.isDirectReturn && data.projectId) {
+                        autoTags = { transactionId: data.projectId, auto_profit_center: data.projectId };
+                    }
                 } else if (data.type === 'sales_return') {
                     const client = clients.find(c => c.id === data.clientId);
                     debitAccount = inventoryAccount;
@@ -330,7 +345,7 @@ export default function NewAdjustmentPage() {
                         totalCredit: totalAdjustment,
                         lines: [
                             { accountId: debitAccount.id!, accountName: debitAccount.name, debit: totalAdjustment, credit: 0, ...autoTags },
-                            { accountId: creditAccount.id!, accountName: creditAccount.name, debit: 0, credit: totalValue },
+                            { accountId: creditAccount.id!, accountName: creditAccount.name, debit: 0, credit: totalValue, ...autoTags },
                             ...(data.type === 'purchase_return' && discount > 0 ? [{
                                 accountId: accounts.find(a => a.code === '4104')?.id || '', 
                                 accountName: 'خصم مكتسب (مسترد)',
@@ -346,7 +361,7 @@ export default function NewAdjustmentPage() {
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
 
-            toast({ title: 'نجاح العملية والربط المالي', description: 'تم تحديث المخزون والأرصدة المحاسبية للمورد/العميل بدقة.' });
+            toast({ title: 'نجاح العملية والربط المالي', description: 'تم تحديث الحسابات وتكلفة المشروع بدقة.' });
             router.push('/dashboard/warehouse/reports');
         } catch (error) {
             console.error(error);
@@ -364,7 +379,7 @@ export default function NewAdjustmentPage() {
                         <RotateCcw className="text-primary h-8 w-8"/> 
                         {adjType === 'purchase_return' ? 'مردود مشتريات للمورد' : adjType === 'sales_return' ? 'مردود مبيعات من عميل' : 'إذن تسوية مخزنية'}
                     </CardTitle>
-                    <CardDescription>إدارة المردودات والتسويات مع تفعيل نظام "الدروع الرقابية" للأرصدة التاريخية والربط المالي.</CardDescription>
+                    <CardDescription>إدارة المردودات والتسويات مع تفعيل نظام "الدروع الرقابية" للأرصدة التاريخية والربط المالي المباشر للمشاريع.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 p-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
@@ -385,13 +400,38 @@ export default function NewAdjustmentPage() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="grid gap-2">
-                            <Label className="font-bold">المستودع المتأثر *</Label>
-                            <Controller name="warehouseId" control={control} render={({ field }) => (
-                                <InlineSearchList value={field.value} onSelect={field.onChange} options={warehouseOptions} placeholder="اختر المستودع..." />
-                            )} />
+                    {adjType === 'purchase_return' && (
+                        <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-center justify-between animate-in slide-in-from-top-2">
+                            <div className="space-y-0.5">
+                                <Label className="text-blue-900 font-black">مردود مباشر من المشروع (بدون مخزن)؟</Label>
+                                <p className="text-[10px] text-blue-700 font-medium">فعل هذا الخيار إذا كنت تريد تخفيض تكلفة المشروع مباشرة دون الحاجة لوجود مستودعات.</p>
+                            </div>
+                            <Controller
+                                name="isDirectReturn"
+                                control={control}
+                                render={({ field }) => (
+                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                )}
+                            />
                         </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {!isDirectReturn ? (
+                            <div className="grid gap-2">
+                                <Label className="font-bold">المستودع المتأثر *</Label>
+                                <Controller name="warehouseId" control={control} render={({ field }) => (
+                                    <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={warehouseOptions} placeholder="اختر المستودع..." />
+                                )} />
+                            </div>
+                        ) : (
+                            <div className="grid gap-2">
+                                <Label className="font-bold flex items-center gap-2 text-primary"><Target className="h-4 w-4"/> المشروع المرتجع منه *</Label>
+                                <Controller name="projectId" control={control} render={({ field }) => (
+                                    <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." />
+                                )} />
+                            </div>
+                        )}
                         
                         {adjType === 'sales_return' && (
                             <div className="grid gap-2 animate-in fade-in zoom-in-95">
@@ -424,7 +464,7 @@ export default function NewAdjustmentPage() {
                                 <PackageSearch className="h-5 w-5 text-primary"/> الأصناف المرتجعة/المعدلة
                             </Label>
                             <div className="flex gap-2">
-                                {adjType === 'purchase_return' && <Badge variant="secondary" className="bg-blue-100 text-blue-700">رقابة المورد نشطة</Badge>}
+                                {adjType === 'purchase_return' && <Badge variant="secondary" className="bg-blue-100 text-blue-700">{isDirectReturn ? 'رقابة المشروع نشطة' : 'رقابة المورد نشطة'}</Badge>}
                                 {adjType === 'sales_return' && <Badge variant="secondary" className="bg-purple-100 text-purple-700">رقابة مبيعات العميل نشطة</Badge>}
                             </div>
                         </div>
@@ -434,7 +474,7 @@ export default function NewAdjustmentPage() {
                                     <TableRow className="h-14">
                                         <TableHead className="w-[60px]"></TableHead>
                                         <TableHead className="font-bold">الصنف</TableHead>
-                                        <TableHead className="w-28 text-center font-bold">المخزن</TableHead>
+                                        {!isDirectReturn && <TableHead className="w-28 text-center font-bold">المخزن</TableHead>}
                                         {adjType === 'purchase_return' && <TableHead className="w-28 text-center font-bold text-blue-700">من المورد</TableHead>}
                                         {adjType === 'sales_return' && <TableHead className="w-28 text-center font-bold text-purple-700">اشترى العميل</TableHead>}
                                         <TableHead className="w-32 text-center font-bold bg-primary/5">الكمية</TableHead>
@@ -448,7 +488,7 @@ export default function NewAdjustmentPage() {
                                         const purchased = vendorPurchaseBalances[item?.itemId || ''] || 0;
                                         const sold = clientSalesBalances[item?.itemId || ''] || 0;
                                         
-                                        const isInsufficientStock = isOutbound && (item?.quantity || 0) > curStock;
+                                        const isInsufficientStock = !isDirectReturn && isOutbound && (item?.quantity || 0) > curStock;
                                         const isInsufficientVendor = adjType === 'purchase_return' && (item?.quantity || 0) > purchased;
                                         const isInsufficientClient = adjType === 'sales_return' && (item?.quantity || 0) > sold;
 
@@ -457,7 +497,7 @@ export default function NewAdjustmentPage() {
                                         return (
                                             <TableRow key={field.id} className={cn("h-16 border-b last:border-0", hasError && "bg-red-50")}>
                                                 <TableCell className="text-center">
-                                                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Controller name={`items.${index}.itemId`} control={control} render={({ field: itemField }) => (
@@ -465,12 +505,14 @@ export default function NewAdjustmentPage() {
                                                             itemField.onChange(val);
                                                             const i = items.find(it => it.id === val);
                                                             if (i) setValue(`items.${index}.unitCost`, i.costPrice || 0);
-                                                        }} options={itemOptions} placeholder="اختر الصنف..." className="border-none shadow-none text-lg font-bold" />
+                                                        }} options={itemOptions} placeholder="اختر الصنف..." className="border-none shadow-none text-lg font-bold bg-transparent" />
                                                     )} />
                                                 </TableCell>
-                                                <TableCell className="text-center">
-                                                    {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientStock ? "text-red-600" : "text-muted-foreground")}>{curStock}</span>}
-                                                </TableCell>
+                                                {!isDirectReturn && (
+                                                    <TableCell className="text-center">
+                                                        {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientStock ? "text-red-600" : "text-muted-foreground")}>{curStock}</span>}
+                                                    </TableCell>
+                                                )}
                                                 {adjType === 'purchase_return' && (
                                                     <TableCell className="text-center">
                                                         {loadingVendorBalances ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientVendor ? "text-red-600" : "text-blue-700")}>{purchased}</span>}
@@ -492,7 +534,7 @@ export default function NewAdjustmentPage() {
                                 </TableBody>
                                 <TableFooter className="bg-primary/5 h-20">
                                     <TableRow>
-                                        <TableCell colSpan={adjType === 'purchase_return' || adjType === 'sales_return' ? 5 : 4} className="text-right px-12 font-black text-xl">إجمالي قيمة المستند:</TableCell>
+                                        <TableCell colSpan={adjType === 'purchase_return' || adjType === 'sales_return' ? (isDirectReturn ? 4 : 5) : 4} className="text-right px-12 font-black text-xl">إجمالي قيمة المستند:</TableCell>
                                         <TableCell className="text-left font-mono font-black text-2xl text-primary px-6">{formatCurrency(totalCost)}</TableCell>
                                     </TableRow>
                                 </TableFooter>
