@@ -71,8 +71,7 @@ export interface ConstructionProject extends BaseEntity {
     constructionTypeName?: string;
     subcontractorId?: string;    
     subcontractorName?: string;
-    numFloors?: string; // مثال: سرداب + 3 أدوار
-    materialType?: string; // مثال: مع مواد / بدون مواد
+    numFloors?: string; 
 }
 
 export interface JournalEntry extends BaseEntity { 
@@ -143,12 +142,11 @@ export interface FieldVisit extends BaseEntity {
     status: 'planned' | 'confirmed' | 'cancelled'; 
     plannedStageId: string;     
     plannedStageName: string;   
-    mainStageName?: string;     // المرحلة الرئيسية (مثل: تركيب الإضاءة)
-    subStageName?: string;      // المرحلة الفرعية
-    visitCountInStage?: number; // عدد زيارات المرحلة الرئيسية
-    phaseStartDate?: Timestamp | any; // تاريخ بداية المرحلة
-    numFloors?: string;         // عدد الأدوار
-    materialType?: string;      // نوع المواد
+    mainStageName?: string;     
+    subStageName?: string;      
+    visitCountInStage?: number; 
+    phaseStartDate?: Timestamp | any; 
+    numFloors?: string;         
     engineerId?: string | null;
     engineerName?: string | null; 
     details?: string;           

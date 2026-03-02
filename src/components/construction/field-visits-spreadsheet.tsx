@@ -29,20 +29,12 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Loader2, Save, PlusCircle, Trash2, Table as TableIcon, Target, Users, HardHat, Building2 } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DateInput } from '@/components/ui/date-input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cleanFirestoreData, generateStableId } from '@/lib/utils';
-import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 const rowSchema = z.object({
   uid: z.string(),
@@ -52,7 +44,6 @@ const rowSchema = z.object({
   details: z.string().optional(),
   teamIds: z.array(z.string()).default([]),
   numFloors: z.string().optional(),
-  materialType: z.string().optional(),
   requiredPayment: z.string().optional(),
 });
 
@@ -79,7 +70,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
     resolver: zodResolver(spreadsheetSchema),
     defaultValues: {
       date: new Date(),
-      rows: [{ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], numFloors: '', materialType: 'بدون مواد', requiredPayment: '' }],
+      rows: [{ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], numFloors: '', requiredPayment: '' }],
     },
   });
 
@@ -127,7 +118,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 plannedStageName: stage?.name || 'زيارة متابعة',
                 mainStageName: stage?.name.split(' - ')[1] || 'إشراف عام',
                 numFloors: row.numFloors || project.numFloors || 'سرداب + 3 أدوار',
-                materialType: row.materialType || project.materialType || 'بدون مواد',
                 details: row.details || '',
                 teamIds: row.teamIds,
                 teamNames: selectedTeams.map(t => t.name),
@@ -178,7 +168,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
         <CardContent className="p-0">
           <ScrollArea className="w-full">
-            <div className="min-w-[2000px]">
+            <div className="min-w-[1800px]">
               <Table className="border-collapse table-fixed w-full">
                 <TableHeader className="bg-muted/50 sticky top-0 z-20">
                   <TableRow className="h-14 border-b-2">
@@ -186,7 +176,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                     <TableHead className="w-16 text-center font-black">إجراء</TableHead>
                     <TableHead className="w-80 font-black text-right border-l"><Target className="h-4 w-4 inline ml-1 text-primary"/> المشروع</TableHead>
                     <TableHead className="w-48 font-black text-right border-l">بيانات العقار (أدوار)</TableHead>
-                    <TableHead className="w-48 font-black text-right border-l">نوع التوريد</TableHead>
                     <TableHead className="w-64 font-black text-right border-l">بند المقايسة (WBS)</TableHead>
                     <TableHead className="w-80 font-black text-right border-l">فرق العمل الميدانية</TableHead>
                     <TableHead className="w-64 font-black text-right border-l">المقاول المشرف</TableHead>
@@ -223,7 +212,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                                                 if (p.mainEngineerId) setValue(`rows.${index}.engineerId`, p.mainEngineerId);
                                                 if (p.boqId) fetchProjectStages(v, p.boqId);
                                                 if (p.numFloors) setValue(`rows.${index}.numFloors`, p.numFloors);
-                                                if (p.materialType) setValue(`rows.${index}.materialType`, p.materialType);
                                             }
                                         }}
                                         options={projectOptions}
@@ -236,24 +224,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
                         <TableCell className="border-l p-1">
                             <Input {...register(`rows.${index}.numFloors`)} className="border-none shadow-none text-xs h-12 bg-transparent" placeholder="أدوار العقار..."/>
-                        </TableCell>
-
-                        <TableCell className="border-l p-1">
-                            <Controller
-                                control={control}
-                                name={`rows.${index}.materialType`}
-                                render={({ field: f }) => (
-                                    <Select value={f.value} onValueChange={f.onChange}>
-                                        <SelectTrigger className="border-none shadow-none bg-transparent h-12 text-xs font-bold">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="بدون مواد">بدون مواد</SelectItem>
-                                            <SelectItem value="مع مواد">مع مواد</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            />
                         </TableCell>
 
                         <TableCell className="border-l p-1">
@@ -329,7 +299,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
           </ScrollArea>
 
           <div className="flex justify-center p-8 bg-muted/10 border-t">
-            <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], numFloors: '', materialType: 'بدون مواد', requiredPayment: '' })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
+            <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], numFloors: '', requiredPayment: '' })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
                 <PlusCircle className="h-5 w-5 text-primary" />
                 إضافة سطر مشروع جديد
             </Button>
