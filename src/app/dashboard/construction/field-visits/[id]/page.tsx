@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, writeBatch, collection, addDoc, getDoc, query, where, limit, getDocs } from 'firebase/firestore';
-import type { FieldVisit, ClientTransaction, Account, PaymentApplication } from '@/lib/types';
+import type { FieldVisit, ConstructionProject, BoqItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,10 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
 import { cn, formatCurrency } from '@/lib/utils';
 
+/**
+ * صفحة تفاصيل الزيارة الميدانية (ربط حصري بالمقاولات):
+ * تقوم بتأكيد الإنجاز وتحديث مراحل المشروع التنفيذية (WBS) في سجل المشروع.
+ */
 export default function FieldVisitDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -80,7 +84,7 @@ export default function FieldVisitDetailPage() {
         try {
             const batch = writeBatch(firestore);
             
-            // 1. Update the visit record
+            // 1. تحديث سجل الزيارة
             batch.update(visitRef!, {
                 status: 'confirmed',
                 confirmationData: {
@@ -91,119 +95,40 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // 2. Update the work stage in the actual project/transaction
-            const txRef = doc(firestore, `clients/${visit.clientId}/transactions/${visit.transactionId}`);
-            const txSnap = await getDoc(txRef);
+            // 2. تحديث سجل المشروع (ConstructionProject)
+            const projectRef = doc(firestore, 'projects', visit.projectId);
+            const projectSnap = await getDoc(projectRef);
             
-            if (txSnap.exists()) {
-                const txData = txSnap.data() as ClientTransaction;
-                const currentStages = [...(txData.stages || [])];
-                const stageIndex = currentStages.findIndex(s => s.stageId === visit.plannedStageId);
+            if (projectSnap.exists()) {
+                const projectData = projectSnap.data() as ConstructionProject;
                 
-                if (stageIndex !== -1) {
-                    currentStages[stageIndex].status = 'completed';
-                    (currentStages[stageIndex] as any).endDate = new Date();
-                    batch.update(txRef, { stages: currentStages });
-                }
-
-                // --- أتمتة المستخلصات: التحقق من وجود دفعة مرتبطة بهذه المرحلة ---
-                if (txData.contract?.clauses) {
-                    const matchedClause = txData.contract.clauses.find(c => c.condition === visit.plannedStageName && c.status === 'غير مستحقة');
-                    
-                    if (matchedClause) {
-                        const currentYear = new Date().getFullYear();
-                        const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
-                        const appCounterDoc = await getDoc(appCounterRef);
-                        const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                        const appNumber = `AUTO-APP-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
-
-                        const newAppRef = doc(collection(firestore, 'payment_applications'));
-                        const newJeRef = doc(collection(firestore, 'journalEntries'));
-
-                        // إنشاء مستند المستخلص آلياً
-                        const appData = {
-                            applicationNumber: appNumber,
-                            date: serverTimestamp(),
-                            projectId: visit.transactionId,
-                            clientId: visit.clientId,
-                            clientName: visit.clientName,
-                            projectName: txData.transactionType,
-                            items: [{
-                                boqItemId: visit.plannedStageId,
-                                description: `استحقاق دفعة: ${visit.plannedStageName}`,
-                                unit: 'مرحلة',
-                                unitPrice: matchedClause.amount,
-                                previousQuantity: 0,
-                                currentQuantity: 1,
-                                totalQuantity: 1,
-                                totalAmount: matchedClause.amount
-                            }],
-                            totalAmount: matchedClause.amount,
-                            status: 'draft',
-                            journalEntryId: newJeRef.id,
-                            createdAt: serverTimestamp(),
-                            createdBy: 'system-auto-visit',
-                        };
-                        batch.set(newAppRef, appData);
-                        batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
-
-                        // إنشاء القيد المالي المرتبط (مسودة مراجعة)
-                        const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
-                        const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', visit.clientName), limit(1)));
-
-                        if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
-                            const revenueAcc = revenueAccountSnap.docs[0];
-                            const clientAcc = clientAccountSnap.docs[0];
-                            
-                            const jeData = {
-                                entryNumber: `JE-${appNumber}`,
-                                date: serverTimestamp(),
-                                narration: `[أتمتة زيارة] استحقاق دفعة إكمال مرحلة: ${visit.plannedStageName}`,
-                                status: 'draft',
-                                totalDebit: matchedClause.amount,
-                                totalCredit: matchedClause.amount,
-                                lines: [
-                                    { accountId: clientAcc.id, accountName: visit.clientName, debit: matchedClause.amount, credit: 0, auto_profit_center: visit.transactionId },
-                                    { accountId: revenueAcc.id, accountName: revenueAcc.data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: visit.transactionId }
-                                ],
-                                clientId: visit.clientId,
-                                transactionId: visit.transactionId,
-                                createdAt: serverTimestamp(),
-                                createdBy: 'system-auto-visit',
-                            };
-                            batch.set(newJeRef, jeData);
-                        }
-
-                        // تحديث حالة بند العقد
-                        const updatedClauses = txData.contract.clauses.map(c => 
-                            c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c
-                        );
-                        batch.update(txRef, { 'contract.clauses': updatedClauses });
-
-                        // تسجيل في التايم لاين
-                        batch.set(doc(collection(txRef, 'timelineEvents')), {
-                            type: 'comment',
-                            content: `**[أتمتة ذكية]** تم إكمال المرحلة ميدانياً. قام النظام بإصدار **مسودة مستخلص** برقم ${appNumber} بقيمة ${formatCurrency(matchedClause.amount)} بانتظار مراجعة المحاسب.`,
-                            userId: 'system',
-                            userName: 'نظام Nova الذكي',
-                            createdAt: serverTimestamp(),
-                        });
-                    }
-                }
-
-                // 3. Log basic activity to transaction timeline
-                batch.set(doc(collection(txRef, 'timelineEvents')), {
-                    type: 'log',
-                    content: `[إنجاز ميداني] تم إكمال مرحلة "${visit.plannedStageName}" خلال زيارة المهندس ${visit.engineerName}.\nملاحظات: ${notes}`,
-                    userId: currentUser.id,
-                    userName: currentUser.fullName,
-                    userAvatar: currentUser.avatarUrl,
-                    createdAt: serverTimestamp(),
+                // تحديث الحدث في تايم لاين المشروع
+                const timelineRef = collection(projectRef, 'timelineEvents');
+                batch.set(doc(timelineRef), {
+                    type: 'Visit',
+                    title: `إنجاز ميداني: ${visit.plannedStageName}`,
+                    description: notes,
+                    date: serverTimestamp(),
+                    engineerName: visit.engineerName,
+                    location: location,
+                    createdAt: serverTimestamp()
                 });
+
+                // إذا كان هناك معاملة مالية مرتبطة، يتم توثيق الإنجاز فيها أيضاً
+                if (projectData.linkedTransactionId) {
+                    const txRef = doc(firestore, `clients/${projectData.clientId}/transactions/${projectData.linkedTransactionId}`);
+                    batch.set(doc(collection(txRef, 'timelineEvents')), {
+                        type: 'log',
+                        content: `[إنجاز موقع] أكد المهندس ${visit.engineerName} إنجاز المرحلة: ${visit.plannedStageName}.\nالملاحظات: ${notes}`,
+                        userId: currentUser.id,
+                        userName: currentUser.fullName,
+                        createdAt: serverTimestamp(),
+                    });
+                }
             }
 
             await batch.commit();
-            toast({ title: 'تم التأكيد', description: 'تم حفظ تفاصيل الزيارة وتحديث حالة المشروع والمطالبات المالية.' });
+            toast({ title: 'تم التأكيد', description: 'تم حفظ تفاصيل الإنجاز الميداني وتحديث سجلات المشروع.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
             console.error(error);
@@ -227,7 +152,7 @@ export default function FieldVisitDetailPage() {
                 </Button>
                 {visit.status === 'confirmed' && (
                     <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2 text-white">
-                        <CheckCircle2 className="h-4 w-4" /> مكتملة ومؤكدة
+                        <CheckCircle2 className="h-4 w-4" /> زيارة مؤكدة
                     </Badge>
                 )}
             </div>
@@ -237,7 +162,10 @@ export default function FieldVisitDetailPage() {
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
                             <CardTitle className="text-2xl font-black">{visit.clientName}</CardTitle>
-                            <CardDescription className="font-bold text-primary">{visit.transactionType}</CardDescription>
+                            <CardDescription className="font-bold text-primary flex items-center gap-2">
+                                <Building2 className="h-4 w-4" />
+                                مشروع: {visit.projectName}
+                            </CardDescription>
                         </div>
                         <div className="p-3 bg-background rounded-2xl border shadow-inner">
                             <Clock className="h-6 w-6 text-muted-foreground" />
@@ -251,20 +179,18 @@ export default function FieldVisitDetailPage() {
                             <p className="font-bold">{scheduledDate ? format(scheduledDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</p>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المستهدفة</Label>
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">بند المقايسة المستهدف</Label>
                             <div className="flex items-center gap-2">
                                 <p className="font-black text-primary">{visit.plannedStageName}</p>
-                                <Sparkles className="h-3 w-3 text-blue-500 animate-pulse" title="مرتبطة بمطالبة مالية" />
+                                <Sparkles className="h-3 w-3 text-blue-500 animate-pulse" />
                             </div>
                         </div>
                     </div>
                     
-                    <Separator />
-
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t">
                         <Label className="font-black text-lg flex items-center gap-2">
                             <MapPin className="h-5 w-5 text-primary" />
-                            تحديد الموقع (GPS Check-in)
+                            إثبات التواجد (GPS)
                         </Label>
                         <div className={cn(
                             "p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-all",
@@ -276,7 +202,6 @@ export default function FieldVisitDetailPage() {
                                         <ShieldCheck className="h-8 w-8" />
                                     </div>
                                     <p className="font-black text-green-800">تم التقاط الموقع بنجاح</p>
-                                    <p className="text-[10px] text-green-600 font-mono">LAT: {location.latitude.toFixed(4)}, LNG: {location.longitude.toFixed(4)}</p>
                                     <Button variant="link" size="sm" asChild className="text-blue-600">
                                         <a href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`} target="_blank" rel="noopener noreferrer">
                                             فتح في خرائط جوجل <Navigation className="ml-1 h-3 w-3" />
@@ -285,10 +210,10 @@ export default function FieldVisitDetailPage() {
                                 </div>
                             ) : (
                                 <>
-                                    <p className="text-sm text-muted-foreground text-center">يرجى الضغط على الزر أدناه لإثبات حضورك في موقع العميل.</p>
-                                    <Button onClick={handleGetLocation} disabled={isCapturingLocation || visit.status === 'confirmed'} className="rounded-xl h-12 px-8 font-bold gap-2 shadow-lg shadow-primary/20">
+                                    <p className="text-sm text-muted-foreground text-center">يرجى الضغط لإثبات الحضور في موقع المشروع الإنشائي.</p>
+                                    <Button onClick={handleGetLocation} disabled={isCapturingLocation || visit.status === 'confirmed'} className="rounded-xl h-12 px-8 font-bold gap-2">
                                         {isCapturingLocation ? <Loader2 className="animate-spin h-5 w-5" /> : <MapPin className="h-5 w-5" />}
-                                        التقاط موقع الموقع الحالي
+                                        التقاط إحداثيات الموقع
                                     </Button>
                                 </>
                             )}
@@ -298,12 +223,12 @@ export default function FieldVisitDetailPage() {
                     <div className="space-y-4">
                         <Label className="font-black text-lg flex items-center gap-2">
                             <ClipboardCheck className="h-5 w-5 text-primary" />
-                            نتائج الزيارة والملاحظات الفنية
+                            تقرير الأعمال المنفذة
                         </Label>
                         <Textarea 
                             value={notes}
                             onChange={e => setNotes(e.target.value)}
-                            placeholder="ما الذي تم إنجازه؟ هل هناك أي عوائق في الموقع؟"
+                            placeholder="ما الذي تم إنجازه في بنود الـ BOQ اليوم؟"
                             rows={5}
                             className="rounded-3xl border-2 text-base p-4 resize-none"
                             disabled={visit.status === 'confirmed'}
@@ -314,11 +239,11 @@ export default function FieldVisitDetailPage() {
                     {visit.status !== 'confirmed' ? (
                         <Button onClick={handleConfirm} disabled={isSaving || !notes.trim()} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3">
                             {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
-                            تأكيد الإنجاز وإغلاق الزيارة
+                            تأكيد الإنجاز وتحديث سجل المشروع
                         </Button>
                     ) : (
                         <div className="text-center space-y-1">
-                            <p className="font-bold text-muted-foreground">تم التأكيد بواسطة المهندس: {visit.engineerName}</p>
+                            <p className="font-bold text-muted-foreground">تم التوثيق بواسطة: {visit.engineerName}</p>
                             <p className="text-xs text-muted-foreground italic">بتاريخ: {confirmedAt ? format(confirmedAt, 'PPp', { locale: ar }) : '-'}</p>
                         </div>
                     )}

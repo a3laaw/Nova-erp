@@ -1,6 +1,7 @@
+
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم تحديثه لدعم نظام تعدد الشركات (Multi-Tenancy) والزيارات الميدانية المتقدمة بنظام الجداول.
+ * تم تحديثه لربط الزيارات الميدانية حصرياً بالمشاريع الإنشائية لضمان دقة الرقابة.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -59,6 +60,26 @@ export interface ClientTransaction extends BaseEntity {
     };
     stages?: TransactionStage[]; 
     boqId?: string;             
+}
+
+/**
+ * مشروع مقاولات (ConstructionProject): يمثل الموقع التنفيذي الفعلي.
+ */
+export interface ConstructionProject extends BaseEntity {
+    projectId: string;          // الكود الداخلي للمشروع
+    projectName: string;
+    clientId: string;
+    clientName?: string;
+    projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
+    contractValue: number;
+    startDate: Timestamp | any;
+    endDate: Timestamp | any;
+    status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى';
+    mainEngineerId: string;
+    mainEngineerName?: string;
+    progressPercentage: number;
+    boqId?: string;             // ربط مع جدول الكميات المسعر
+    linkedTransactionId?: string; // ربط مع المعاملة المالية الأصلية
 }
 
 /**
@@ -167,33 +188,35 @@ export interface UserProfile {
 }
 
 /**
- * الزيارات الميدانية المحدثة (Field Visits with Spreadsheet support).
- * تدعم العرض الأفقي الموسع لمتابعة العمليات اللوجستية والمالية.
+ * الزيارات الميدانية المحدثة (Field Visits - Construction Only).
+ * مرتبطة حصرياً بمشاريع المقاولات وتتبع بنود الـ BOQ.
  */
 export interface FieldVisit extends BaseEntity { 
+    projectId: string;          // الربط الحصري بالمشروع الإنشائي
+    projectName: string;
+    clientId: string;
     clientName: string; 
-    clientId?: string;
-    clientAddress?: string;     // عنوان المشروع التفصيلي
-    contractNumber?: string;    // رقم العقد المرجعي
-    phaseNumber?: string;       // رقم المرحلة الحالية
-    mainStageName?: string;     // المرحلة الرئيسية للـ WBS
-    subStageName?: string;      // المرحلة الفرعية للـ WBS
+    clientAddress?: string;     
+    contractNumber?: string;    
+    phaseNumber?: string;       
+    mainStageName?: string;     
+    subStageName?: string;      
     transactionId: string;
     transactionType: string; 
     scheduledDate: Timestamp | any; 
     status: string; 
-    plannedStageId: string; 
-    plannedStageName: string;   // المرحلة التفصيلية المستهدفة
+    plannedStageId: string;     // معرف بند الـ BOQ المستهدف
+    plannedStageName: string;   
     engineerId: string;
     engineerName: string; 
-    details?: string;           // تفاصيل العمل الفني
-    requiredPayment?: string;   // الدفعة المطلوبة (مثلاً: الخامسة)
-    lastPayment?: string;       // آخر دفعة تم تحصيلها
-    team1?: string;             // فريق العمل الأول
-    team2?: string;             // فريق العمل الثاني
-    team3?: string;             // فريق العمل الثالث
+    details?: string;           
+    requiredPayment?: string;   
+    lastPayment?: string;       
+    team1?: string;             
+    team2?: string;             
+    team3?: string;             
     subcontractorId?: string;
-    subcontractorName?: string; // اسم مقاول الباطن المنفذ
+    subcontractorName?: string; 
     confirmationData?: {
         confirmedAt: Timestamp | any;
         notes: string;
