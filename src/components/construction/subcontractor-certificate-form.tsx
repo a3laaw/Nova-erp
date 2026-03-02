@@ -1,8 +1,10 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   Card,
   CardContent,
@@ -25,7 +27,7 @@ import {
   Calculator
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp, collectionGroup } from 'firebase/firestore';
 import type { Subcontractor, ConstructionProject, Account, Employee, Department, ClientTransaction } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
@@ -58,9 +60,15 @@ export function SubcontractorCertificateForm() {
     const [transactions, setTransactions] = useState<any[]>([]);
     useEffect(() => {
         if (!firestore) return;
-        getDocs(query(collectionGroup(firestore, 'transactions'), where('status', '==', 'in-progress'))).then(snap => {
-            setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        
+        // جلب المعاملات وفلترتها برمجياً لتجنب خطأ الـ Index في الـ collectionGroup
+        getDocs(collectionGroup(firestore, 'transactions')).then(snap => {
+            const txs = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter((t: any) => t.status === 'in-progress' || t.status === 'new');
+            setTransactions(txs);
         });
+
         getDocs(query(collection(firestore, 'chartOfAccounts'))).then(snap => {
             setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
         });

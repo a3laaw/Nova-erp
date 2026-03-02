@@ -18,10 +18,9 @@ import { Loader2, Save, PlusCircle, Trash2, Table as TableIcon, Calendar, Users,
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, generateStableId } from '@/lib/utils';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-
-const generateStableId = () => Math.random().toString(36).substring(2, 9);
+import { format } from 'date-fns';
 
 const rowSchema = z.object({
   uid: z.string(),
@@ -65,23 +64,33 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
   const { fields, append, remove } = useFieldArray({ control, name: 'rows' });
   const watchedRows = useWatch({ control, name: 'rows' });
 
-  // جلب كافة المعاملات لربطها بالأسطر
+  // جلب كافة المعاملات لربطها بالأسطر - تم إزالة الفلترة من السيرفر لتجنب خطأ الـ Index
   React.useEffect(() => {
     if (!firestore) return;
     const fetchTxs = async () => {
         setLoadingTxs(true);
         try {
             const [txSnap, clientSnap] = await Promise.all([
-                getDocs(query(collectionGroup(firestore, 'transactions'), where('status', '==', 'in-progress'))),
+                getDocs(collectionGroup(firestore, 'transactions')),
                 getDocs(collection(firestore, 'clients'))
             ]);
             const clientMap = new Map(clientSnap.docs.map(d => [d.id, d.data().nameAr]));
-            const txs = txSnap.docs.map(d => ({ 
-                id: d.id, 
-                ...d.data(), 
-                clientName: clientMap.get(d.data().clientId) || 'عميل غير معروف' 
-            } as ClientTransaction & { clientName: string }));
+            const txs = txSnap.docs
+                .map(d => {
+                    const data = d.data();
+                    const pathParts = d.ref.path.split('/');
+                    const clientIdFromPath = pathParts[pathParts.length - 3];
+                    return { 
+                        id: d.id, 
+                        ...data, 
+                        clientId: clientIdFromPath,
+                        clientName: clientMap.get(clientIdFromPath) || 'عميل غير معروف' 
+                    } as ClientTransaction & { clientName: string };
+                })
+                .filter(t => t.status === 'in-progress' || t.status === 'new'); // فلترة برمجية لتجنب خطأ الفهارس
             setAllTransactions(txs);
+        } catch (e) {
+            console.error("Error fetching transactions for spreadsheet:", e);
         } finally {
             setLoadingTxs(false);
         }
@@ -140,10 +149,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
         await batch.commit();
 
-        // إرسال الإشعارات
         for (const n of notificationsToCreate) {
             const userId = await findUserIdByEmployeeId(firestore, n.engineerId);
-            if (userId) createNotification(firestore, { ...n, userId });
+            if (userId) createNotification(firestore, { ...n, userId, link: n.link || '#' });
         }
 
         toast({ title: 'تم حفظ الخطة', description: `تمت جدولة ${data.rows.length} زيارة ميدانية بنجاح.` });
