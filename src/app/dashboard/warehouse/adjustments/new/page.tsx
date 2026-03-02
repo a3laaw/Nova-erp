@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -97,7 +97,7 @@ export default function NewAdjustmentPage() {
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
-    // محرك فحص المخزن اللحظي
+    // محرك فحص المخزن اللحظي - مصلح
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
@@ -153,7 +153,7 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // 🟢 الرقابة الصارمة: التحقق من كفاية المخزن قبل السماح بالحفظ
+        // الرقابة الصارمة: التحقق من كفاية المخزن
         const isOutbound = ['damage', 'theft', 'purchase_return'].includes(data.type);
         if (isOutbound) {
             for (const item of data.items) {
