@@ -1,20 +1,24 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { query, orderBy, where } from 'firebase/firestore';
+import { query, orderBy } from 'firebase/firestore';
 import type { FieldVisit } from '@/lib/types';
-import { format, isToday, isFuture, isPast } from 'date-fns';
+import { format, isToday, isFuture } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Calendar, User, ArrowRight, CheckCircle2, Clock } from 'lucide-react';
+import { MapPin, Calendar, User, ArrowRight, HardHat, Users, Coins, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
+/**
+ * مكون نظام البطاقات المطور:
+ * تم تحديثه ليشمل كافة البيانات اللوجستية (الفرق والمقاول) لضمان اتساق البيانات مع العرض الأفقي،
+ * مع تصميم عمودي مثالي لمستخدمي الموبايل في المواقع.
+ */
 export function FieldVisitsList() {
   const { firestore } = useFirebase();
 
@@ -26,7 +30,13 @@ export function FieldVisitsList() {
     return date ? format(date, 'eeee, dd MMMM', { locale: ar }) : '-';
   };
 
-  if (loading) return <div className="space-y-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-32 w-full" /></div>;
+  if (loading) return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-64 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-3xl" />
+    </div>
+  );
 
   if (visits.length === 0) {
     return (
@@ -41,53 +51,72 @@ export function FieldVisitsList() {
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {visits.map((visit) => {
         const date = toFirestoreDate(visit.scheduledDate);
-        const isUpcoming = date && isFuture(date);
         const isVisitToday = date && isToday(date);
 
         return (
           <Card key={visit.id} className={cn(
-            "overflow-hidden border-2 transition-all hover:shadow-lg rounded-3xl",
+            "overflow-hidden border-2 transition-all hover:shadow-xl rounded-[2rem] group",
             visit.status === 'confirmed' ? "border-green-100 bg-green-50/10" : 
             isVisitToday ? "border-primary/20 bg-primary/5 shadow-md" : "border-muted"
           )}>
             <CardContent className="p-6 space-y-4">
               <div className="flex justify-between items-start">
-                <div className="p-2 bg-background rounded-xl border shadow-sm">
-                  <MapPin className={cn("h-5 w-5", visit.status === 'confirmed' ? "text-green-600" : "text-primary")} />
+                <div className="flex flex-col">
+                    <Badge variant={visit.status === 'confirmed' ? 'default' : 'outline'} className={cn(
+                        "rounded-full font-black text-[9px] uppercase px-3 w-fit mb-2",
+                        visit.status === 'confirmed' && "bg-green-600",
+                        isVisitToday && visit.status === 'planned' && "bg-primary text-white"
+                    )}>
+                    {visit.status === 'confirmed' ? 'تمت الزيارة' : isVisitToday ? 'زيارة اليوم' : 'مخطط لها'}
+                    </Badge>
+                    <h3 className="text-xl font-black leading-tight text-foreground group-hover:text-primary transition-colors">{visit.clientName}</h3>
+                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.transactionType}</p>
                 </div>
-                <Badge variant={visit.status === 'confirmed' ? 'default' : 'outline'} className={cn(
-                    "rounded-full font-black text-[10px] uppercase px-3",
-                    visit.status === 'confirmed' && "bg-green-600",
-                    isVisitToday && visit.status === 'planned' && "bg-primary text-white"
-                )}>
-                  {visit.status === 'confirmed' ? 'تمت الزيارة' : isVisitToday ? 'اليوم' : 'مخطط لها'}
-                </Badge>
-              </div>
-
-              <div className="space-y-1">
-                <h3 className="text-lg font-black leading-tight">{visit.clientName}</h3>
-                <p className="text-xs text-muted-foreground font-bold">{visit.transactionType}</p>
+                <div className="p-3 bg-background rounded-2xl border shadow-sm shrink-0">
+                  <MapPin className={cn("h-6 w-6", visit.status === 'confirmed' ? "text-green-600" : "text-primary")} />
+                </div>
               </div>
 
               <div className="pt-2 space-y-3">
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-3 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">{formatDate(visit.scheduledDate)}</span>
+                  <span className="font-bold">{formatDate(visit.scheduledDate)}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                
+                <div className="flex items-center gap-3 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">المهندس: {visit.engineerName}</span>
+                  <span className="font-medium text-xs">المهندس: {visit.engineerName}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm bg-muted/50 p-2 rounded-lg border border-dashed">
-                  <Clock className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-bold text-primary">المهمة: {visit.plannedStageName}</span>
+
+                {/* تفاصيل الفرق اللوجستية - تظهر الآن في البطاقة أيضاً */}
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                    <div className="p-2 bg-muted/50 rounded-xl border flex items-center gap-2">
+                        <Users className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] font-bold truncate">الفرق: {visit.team1 || visit.team2 || visit.team3 ? 'مخصصة' : '-'}</span>
+                    </div>
+                    <div className="p-2 bg-muted/50 rounded-xl border flex items-center gap-2">
+                        <HardHat className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-[10px] font-bold truncate">{visit.subcontractorName || 'بدون مقاول'}</span>
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-background rounded-xl border-2 border-dashed border-primary/10">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-black text-primary">{visit.plannedStageName}</span>
+                  </div>
+                  {visit.requiredPayment && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px] gap-1 font-black">
+                        <Coins className="h-3 w-3" /> {visit.requiredPayment}
+                      </Badge>
+                  )}
                 </div>
               </div>
 
-              <Button asChild className="w-full h-11 rounded-xl font-bold mt-2" variant={visit.status === 'confirmed' ? 'secondary' : 'default'}>
+              <Button asChild className="w-full h-12 rounded-2xl font-black text-base mt-2 shadow-lg group-hover:shadow-primary/20 transition-all" variant={visit.status === 'confirmed' ? 'secondary' : 'default'}>
                 <Link href={`/dashboard/construction/field-visits/${visit.id}`}>
-                  {visit.status === 'confirmed' ? 'عرض تفاصيل الإنجاز' : 'فتح وتأكيد الزيارة'}
-                  <ArrowRight className="mr-2 h-4 w-4" />
+                  {visit.status === 'confirmed' ? 'عرض تفاصيل الإنجاز' : 'تأكيد إنجاز الموقع'}
+                  <ArrowRight className="mr-2 h-5 w-5" />
                 </Link>
               </Button>
             </CardContent>
