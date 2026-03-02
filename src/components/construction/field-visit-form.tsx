@@ -22,9 +22,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * نموذج جدولة زيارة موقع (المحرك المطور):
- * - يدعم فرق العمل الديناميكية عبر Multi-Select.
- * - يعرض الفرق المختارة في جدول أفقي للمعاينة.
- * - المهندس اختيار (اختياري) لدعم الزيارات الجماعية أو غير المشرف عليها.
+ * - تم تحديث منطق جلب الـ BOQ ليطابق نظام الجدولة الجماعية (Spreadsheet Logic).
  */
 export function FieldVisitForm() {
     const { firestore } = useFirebase();
@@ -45,29 +43,50 @@ export function FieldVisitForm() {
     const { data: engineers = [], loading: engineersLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     const { data: allTeams = [], loading: teamsLoading } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
     
-    const [boqItems, setBoqItems] = useState<BoqItem[]>([]);
+    const [boqItems, setBoqItems] = useState<{id: string, name: string, endDate: any}[]>([]);
     const [isLoadingBoq, setIsLoadingBoq] = useState(false);
 
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const isSubcontracted = !!selectedProject?.subcontractorId;
 
+    // ✨ استخدام نفس منطق الجدولة الجماعية (Spreadsheet Logic) لجلب البنود
     useEffect(() => {
         if (selectedProject) {
             setSelectedEngineerId(selectedProject.mainEngineerId || '');
+            
             if (selectedProject.boqId) {
                 setIsLoadingBoq(true);
-                const fetchBoq = async () => {
-                    const q = query(collection(firestore!, `boqs/${selectedProject.boqId}/items`), orderBy('itemNumber'));
-                    const snap = await getDocs(q);
-                    setBoqItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem)).filter(i => !i.isHeader));
-                    setIsLoadingBoq(false);
+                const fetchBoqData = async () => {
+                    try {
+                        const q = query(collection(firestore!, `boqs/${selectedProject.boqId}/items`), orderBy('itemNumber'));
+                        const snap = await getDocs(q);
+                        const stages = snap.docs.map(d => {
+                            const data = d.data();
+                            return { 
+                                id: d.id, 
+                                name: `${data.itemNumber} - ${data.description}`,
+                                endDate: data.endDate || null,
+                                isHeader: data.isHeader || false
+                            }
+                        }).filter(i => !i.isHeader && !i.name.includes('undefined'));
+                        
+                        setBoqItems(stages);
+                    } catch (e) {
+                        console.error("Error fetching BOQ stages:", e);
+                    } finally {
+                        setIsLoadingBoq(false);
+                    }
                 };
-                fetchBoq();
+                fetchBoqData();
+            } else {
+                setBoqItems([]);
+                setIsLoadingBoq(false);
             }
         } else {
             setSelectedEngineerId('');
             setBoqItems([]);
             setSelectedTeamIds([]);
+            setIsLoadingBoq(false);
         }
     }, [selectedProject, firestore]);
 
@@ -77,7 +96,13 @@ export function FieldVisitForm() {
     })), [projects]);
 
     const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
-    const stageOptions = useMemo(() => boqItems.map(i => ({ value: i.id!, label: `${i.itemNumber} - ${i.description}` })), [boqItems]);
+    
+    // ربط الخيارات بالأسماء المعالجة (Spreadsheet Style)
+    const stageOptions = useMemo(() => boqItems.map(i => ({ 
+        value: i.id, 
+        label: i.name 
+    })), [boqItems]);
+
     const teamOptions = useMemo(() => allTeams.map(t => ({ value: t.id!, label: t.name })), [allTeams]);
 
     const selectedTeamsData = useMemo(() => allTeams.filter(t => selectedTeamIds.includes(t.id!)), [allTeams, selectedTeamIds]);
@@ -105,7 +130,8 @@ export function FieldVisitForm() {
                 engineerName: eng?.fullName || 'إشراف عام / فريق فني',
                 scheduledDate: scheduledDate || new Date(),
                 plannedStageId: plannedStageId,
-                plannedStageName: stage?.description || 'زيارة متابعة عامة',
+                plannedStageName: stage?.name || 'زيارة متابعة عامة',
+                phaseEndDate: stage?.endDate || null,
                 teamIds: isSubcontracted ? [] : selectedTeamIds,
                 teamNames: isSubcontracted ? [] : selectedTeamsData.map(t => t.name), 
                 subcontractorId: selectedProject?.subcontractorId || null,
@@ -156,7 +182,7 @@ export function FieldVisitForm() {
                                 value={plannedStageId}
                                 onSelect={setPlannedStageId}
                                 options={stageOptions}
-                                placeholder={isLoadingBoq ? "جاري تحميل البنود..." : "اختر بنداً من الـ BOQ..."}
+                                placeholder={isLoadingBoq ? "جاري تحميل البنود..." : selectedProjectId ? "اختر بنداً من الـ BOQ..." : "اختر مشروعاً أولاً"}
                                 disabled={!selectedProjectId || isLoadingBoq}
                             />
                         </div>
