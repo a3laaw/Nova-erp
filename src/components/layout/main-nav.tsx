@@ -143,7 +143,7 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/warehouse/sales-deliveries', label: 'فواتير المبيعات / التسليم', icon: Receipt },
-        { href: '/dashboard/warehouse/adjustments?type=sales_return', label: 'مردود مبيعات (مرتجع)', icon: RotateCcw },
+        { href: '/dashboard/warehouse/adjustments/new?type=sales_return', label: 'مردود مبيعات (مرتجع)', icon: RotateCcw },
         { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
       ]
     },
@@ -157,7 +157,7 @@ const navItems = {
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
-        { href: '/dashboard/warehouse/adjustments?type=purchase_return', label: 'مردود مشتريات للمورد', icon: RotateCcw },
+        { href: '/dashboard/warehouse/adjustments/new?type=purchase_return', label: 'مردود مشتريات للمورد', icon: RotateCcw },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: BankIcon },
       ]
