@@ -1,14 +1,10 @@
 
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم تحديثه لربط الزيارات الميدانية حصرياً بالمشاريع الإنشائية ودعم الفرق الديناميكية.
  */
 
 import { Timestamp } from 'firebase/firestore';
 
-/**
- * الكيان الأساسي (BaseEntity): يضمن وجود معرف الشركة في كل مستند.
- */
 export interface BaseEntity {
   id?: string;
   companyId: string;           
@@ -17,9 +13,6 @@ export interface BaseEntity {
   updatedAt?: Timestamp | any;
 }
 
-/**
- * العميل (Client): يمثل الملف الرئيسي للعميل.
- */
 export interface Client extends BaseEntity {
   fileId: string;               
   nameAr: string;               
@@ -39,9 +32,6 @@ export interface Client extends BaseEntity {
   isActive: boolean;            
 }
 
-/**
- * المعاملة (Transaction): تمثل خدمة أو مشروع للعميل.
- */
 export interface ClientTransaction extends BaseEntity {
     transactionNumber?: string; 
     clientId: string;           
@@ -62,9 +52,6 @@ export interface ClientTransaction extends BaseEntity {
     boqId?: string;             
 }
 
-/**
- * مشروع مقاولات (ConstructionProject): يمثل الموقع التنفيذي الفعلي.
- */
 export interface ConstructionProject extends BaseEntity {
     projectId: string;          
     projectName: string;
@@ -80,14 +67,12 @@ export interface ConstructionProject extends BaseEntity {
     progressPercentage: number;
     boqId?: string;             
     linkedTransactionId?: string; 
-    constructionTypeId?: string; // ربط بنوع المقاولات (هيكل أسود، صحي، الخ)
-    subcontractorId?: string;    // في حال كان مسنداً لمقاول باطن
+    constructionTypeId?: string; 
+    constructionTypeName?: string;
+    subcontractorId?: string;    
     subcontractorName?: string;
 }
 
-/**
- * القيد المحاسبي (Journal Entry).
- */
 export interface JournalEntry extends BaseEntity { 
     entryNumber: string;        
     date: Timestamp | any;            
@@ -114,9 +99,6 @@ export interface JournalEntryLine {
     auto_dept_id?: string;      
 }
 
-/**
- * الموظف (Employee).
- */
 export interface Employee extends BaseEntity {
     employeeNumber: string;     
     fullName: string;           
@@ -143,58 +125,9 @@ export interface Employee extends BaseEntity {
     emergencyLeaveUsed?: number;
     workStartTime?: string;
     workEndTime?: string;
-    teamId?: string; // الفريق الحالي للموظف
-    pieceRateMode?: 'salary_with_target' | 'per_piece';
-    targetDescription?: number;
-    pieceRate?: number;
-    dailyRate?: number;
+    teamId?: string; 
 }
 
-export interface ContractClause {
-    id: string;
-    name: string;
-    amount: number;
-    status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة';
-    condition?: string;         
-    percentage?: number;        
-}
-
-export interface TransactionStage {
-    stageId: string;            
-    name: string;               
-    status: 'pending' | 'in-progress' | 'completed' | 'skipped';
-    startDate?: Timestamp | any;      
-    endDate?: Timestamp | any;        
-    modificationCount?: number; 
-}
-
-export interface ContractScopeItem { id: string; title: string; description: string; }
-export interface ContractTerm { id: string; text: string; }
-
-/**
- * المستخدم (UserProfile).
- */
-export interface UserProfile {
-  id?: string;
-  uid: string;
-  username: string;
-  email: string;
-  role: 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
-  employeeId: string;
-  companyId: string;            
-  isActive: boolean;
-  createdAt: Timestamp | any;
-  activatedAt?: Timestamp | any;
-  createdBy: string;
-  fullName?: string;
-  avatarUrl?: string;
-  jobTitle?: string;
-}
-
-/**
- * الزيارات الميدانية المحدثة (Field Visits - Construction Only).
- * تدعم الفرق الديناميكية وتعدد القوالب التنفيذية.
- */
 export interface FieldVisit extends BaseEntity { 
     projectId: string;          
     projectName: string;
@@ -205,7 +138,7 @@ export interface FieldVisit extends BaseEntity {
     transactionId: string;
     transactionType: string; 
     scheduledDate: Timestamp | any; 
-    status: string; 
+    status: 'planned' | 'confirmed' | 'cancelled'; 
     plannedStageId: string;     
     plannedStageName: string;   
     engineerId?: string | null;
@@ -213,11 +146,11 @@ export interface FieldVisit extends BaseEntity {
     details?: string;           
     requiredPayment?: string;   
     lastPayment?: string;       
-    teamIds: string[];          // معرفات الفرق المختارة (ديناميكي)
-    teamNames: string[];        // أسماء الفرق (Snapshot للتاريخ)
-    subcontractorId?: string;
-    subcontractorName?: string; 
-    layoutType?: string;        // نوع التصميم (هيكل أسود، صحي، كهرباء)
+    teamIds: string[];          
+    teamNames: string[];        
+    subcontractorId?: string | null;
+    subcontractorName?: string | null; 
+    layoutType?: string;        
     confirmationData?: {
         confirmedAt: Timestamp | any;
         notes: string;
@@ -270,3 +203,8 @@ export interface ConstructionWorkStage extends BaseEntity { name: string; order:
 export interface DailySiteReport extends BaseEntity { projectId: string; date: Timestamp | any; engineerId: string; engineerName: string; workCompleted: string; workersCount: number; encounteredIssues?: string; weatherStatus?: string; photoUrls: string[]; }
 export interface Company extends BaseEntity { name: string; nameEn?: string; phone?: string; email?: string; address?: string; crNumber?: string; activityType?: string; parentCompanyId?: string; }
 export interface PaymentMethod { id: string; name: string; type: 'fixed' | 'percentage'; value: number; expenseAccountId: string; expenseAccountName: string; }
+export interface ContractClause { id: string; name: string; amount: number; status: 'مدفوعة' | 'مستحقة' | 'غير مستحقة'; condition?: string; percentage?: number; }
+export interface TransactionStage { stageId: string; name: string; status: 'pending' | 'in-progress' | 'completed' | 'skipped'; startDate?: Timestamp | any; endDate?: Timestamp | any; modificationCount?: number; }
+export interface ContractScopeItem { id: string; title: string; description: string; }
+export interface ContractTerm { id: string; text: string; }
+export interface UserProfile { id?: string; uid: string; username: string; email: string; role: 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR'; employeeId: string; companyId: string; isActive: boolean; createdAt: Timestamp | any; activatedAt?: Timestamp | any; createdBy: string; fullName?: string; avatarUrl?: string; jobTitle?: string; }

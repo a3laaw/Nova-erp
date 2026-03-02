@@ -31,7 +31,6 @@ export function FieldVisitsReports() {
   const { firestore } = useFirebase();
   const router = useRouter();
 
-  // الفلاتر
   const [dateFrom, setDateFrom] = React.useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = React.useState<Date | undefined>(() => endOfMonth(new Date()));
   const [selectedClientId, setSelectedClientId] = React.useState('all');
@@ -39,12 +38,10 @@ export function FieldVisitsReports() {
   const [selectedStageName, setSelectedStageName] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  // جلب البيانات
   const { data: visits, loading: visitsLoading } = useSubscription<FieldVisit>(firestore, 'field_visits', [orderBy('scheduledDate', 'desc')]);
   const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
   const { data: teams = [] } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
 
-  // معالجة الفلترة
   const filteredData = React.useMemo(() => {
     if (!visits) return [];
 
@@ -64,7 +61,6 @@ export function FieldVisitsReports() {
     });
   }, [visits, dateFrom, dateTo, selectedClientId, selectedTeamId, selectedStageName, searchQuery]);
 
-  // الإحصائيات
   const stats = React.useMemo(() => {
     const total = filteredData.length;
     const confirmed = filteredData.filter(v => v.status === 'confirmed').length;
@@ -79,7 +75,6 @@ export function FieldVisitsReports() {
     return { total, confirmed, planned, successRate, chartData };
   }, [filteredData]);
 
-  // استخراج أسماء المراحل الفريدة للفلترة
   const uniqueStages = React.useMemo(() => {
     const stages = new Set(visits.map(v => v.plannedStageName).filter(Boolean));
     return Array.from(stages).sort();
@@ -89,7 +84,6 @@ export function FieldVisitsReports() {
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* Header - No Print */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 no-print">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
@@ -108,7 +102,6 @@ export function FieldVisitsReports() {
         </Button>
       </div>
 
-      {/* Filters Area - No Print */}
       <Card className="rounded-[2rem] border-none shadow-sm bg-muted/30 no-print">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -156,7 +149,6 @@ export function FieldVisitsReports() {
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-none shadow-sm p-6 bg-primary text-primary-foreground">
           <Label className="text-[10px] font-black uppercase opacity-80 block mb-1">إجمالي الزيارات</Label>
@@ -191,53 +183,6 @@ export function FieldVisitsReports() {
         </Card>
       </div>
 
-      {/* Charts & Visuals */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="bg-muted/10 border-b">
-            <CardTitle className="text-lg font-black flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              توزيع الزيارات حسب الحالة
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="h-80 pt-6">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                <XAxis dataKey="name" fontSize={12} fontWeight="bold" />
-                <YAxis fontSize={10} />
-                <Tooltip contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                <Bar dataKey="value" radius={[10, 10, 0, 0]} barSize={60} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[2rem] border-none shadow-sm bg-white overflow-hidden">
-          <CardHeader className="bg-muted/10 border-b">
-            <CardTitle className="text-lg font-black">ملخص الحالة</CardTitle>
-          </CardHeader>
-          <CardContent className="h-80 flex flex-col items-center justify-center p-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={stats.chartData}
-                  cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}
-                  dataKey="value"
-                >
-                  {stats.chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" height={36}/>
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed List Table */}
       <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-card">
         <CardHeader className="bg-muted/10 border-b pb-6">
           <CardTitle className="text-xl font-black">سجل الزيارات التفصيلي</CardTitle>
