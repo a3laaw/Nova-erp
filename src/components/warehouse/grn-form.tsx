@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2, AlertTriangle, Info, UserPlus, ShieldCheck, Tag, Truck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit, writeBatch } from 'firebase/firestore';
-import type { PurchaseOrder, Account, Warehouse, Item, Vendor } from '@/lib/types';
+import type { PurchaseOrder, Account, Warehouse, Item, Vendor, Employee, Department } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -54,6 +54,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const router = useRouter();
 
     const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
     const [loadingPoStatus, setLoadingPoStatus] = useState(false);
     
     const [isProspectiveVendor, setIsProspectiveVendor] = useState(false);
@@ -67,6 +68,8 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     ]);
     const { data: registeredVendors = [], loading: vendorsLoading } = useSubscription<Vendor>(firestore, 'vendors');
     const { data: warehouses = [], loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
+    const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees');
+    const { data: departments = [] } = useSubscription<Department>(firestore, 'departments');
 
     const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<GrnFormValues>({
         resolver: zodResolver(grnSchema),
@@ -157,7 +160,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     }, [watchedItems, currentDiscount, currentDelivery]);
 
     const handleRegisterVendor = async () => {
-        if (!selectedPo || !firestore) return;
+        if (!selectedPo || !firestore || savingRef.current) return;
         
         const phoneTrimmed = vendorData.phone.trim();
         if (!phoneTrimmed) {
@@ -165,6 +168,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             return;
         }
 
+        savingRef.current = true;
         setIsSaving(true);
         try {
             const vendorsRef = collection(firestore, 'vendors');
@@ -178,6 +182,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     description: 'رقم الهاتف هذا مسجل بالفعل لمورد آخر في النظام.' 
                 });
                 setIsSaving(false);
+                savingRef.current = false;
                 return;
             }
 
@@ -203,17 +208,40 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل المورد.' });
         } finally {
             setIsSaving(false);
+            savingRef.current = false;
         }
     };
 
     const onSubmit = async (data: GrnFormValues) => {
         if (!firestore || !currentUser || !selectedPo) return;
+        if (savingRef.current) return;
 
+        savingRef.current = true;
         setIsSaving(true);
         try {
             const accountsRef = collection(firestore, 'chartOfAccounts');
             const coaSnap = await getDocs(query(accountsRef));
             const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
+
+            // جلب بيانات المشروع لربط التكاليف
+            let projectInfo: any = null;
+            let autoTags = {};
+            if (selectedPo.projectId) {
+                const projSnap = await getDoc(doc(firestore, 'projects', selectedPo.projectId));
+                if (projSnap.exists()) {
+                    projectInfo = projSnap.data();
+                    const engineer = employees.find(e => e.id === projectInfo.mainEngineerId);
+                    const department = departments.find(d => d.name === engineer?.department);
+                    
+                    autoTags = {
+                        clientId: projectInfo.clientId,
+                        transactionId: selectedPo.projectId,
+                        auto_profit_center: selectedPo.projectId,
+                        auto_resource_id: projectInfo.mainEngineerId,
+                        ...(department && { auto_dept_id: department.id }),
+                    };
+                }
+            }
 
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
@@ -265,6 +293,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.set(newGrnRef, cleanFirestoreData({
                     grnNumber, 
                     purchaseOrderId: data.purchaseOrderId, 
+                    projectId: selectedPo.projectId || null,
                     warehouseId: data.warehouseId,
                     date: data.date, 
                     itemsReceived: processedItems,
@@ -281,14 +310,16 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.set(newJournalEntryRef, cleanFirestoreData({
                     entryNumber: `JE-${grnNumber}`, 
                     date: data.date,
-                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} (تعديل يدوي للكميات والخصوم)`,
+                    narration: `استلام بضاعة #${grnNumber} من ${selectedPo.vendorName} - لـ مشروع: ${projectInfo?.projectName || 'مخزن عام'}`,
                     status: 'posted', 
                     totalDebit: totalValue, 
                     totalCredit: totalValue,
                     lines: [
-                        { accountId: inventoryAcc!.id!, accountName: inventoryAcc!.name, debit: totalValue, credit: 0 },
-                        { accountId: vendorAcc.id!, accountName: vendorAcc.name, debit: 0, credit: totalValue }
+                        { accountId: inventoryAcc!.id!, accountName: inventoryAcc!.name, debit: totalValue, credit: 0, ...autoTags },
+                        { accountId: vendorAcc.id!, accountName: vendorAcc.name, debit: 0, credit: totalValue, ...autoTags }
                     ],
+                    clientId: projectInfo?.clientId || null,
+                    transactionId: selectedPo.projectId || null,
                     createdAt: serverTimestamp(), 
                     createdBy: currentUser.id,
                 }));
@@ -299,13 +330,13 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.update(doc(firestore, 'purchaseOrders', data.purchaseOrderId), { status: isFullyReceived ? 'received' : 'partially_received' });
             });
 
-            toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية بنظام التكلفة المعدلة.' });
+            toast({ title: 'تم الاستلام بنجاح', description: 'تم تحديث المخزون والشجرة المحاسبية وربط التكلفة بالمشروع.' });
             router.push('/dashboard/warehouse/grns');
         } catch (error: any) {
             console.error("GRN Transaction Error:", error);
             toast({ variant: 'destructive', title: 'خطأ تقني', description: error.message || 'فشل حفظ إذن الاستلام.' });
-        } finally {
             setIsSaving(false);
+            savingRef.current = false;
         }
     };
 

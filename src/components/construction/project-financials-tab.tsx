@@ -54,7 +54,7 @@ const CustomTooltip = ({ active, payload }: any) => {
 export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
   const { firestore } = useFirebase();
 
-  // 1. Fetch Materials Cost (Purchase Orders)
+  // 1. Fetch Materials Cost (Purchase Orders) - Simplified query
   const poQuery = React.useMemo(() => [where('projectId', '==', project.id)], [project.id]);
   const { data: pos, loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', poQuery);
 
@@ -71,7 +71,11 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
   const stats = React.useMemo(() => {
     if (loading) return null;
 
-    const materialCost = pos.filter(p => p.status !== 'cancelled').reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    // المواد الموردة (التي وصلت للموقع فعلياً)
+    const materialCost = pos
+        .filter(p => p.status === 'received' || p.status === 'partially_received')
+        .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+        
     const laborCost = certificates.filter(c => c.status !== 'cancelled').reduce((sum, c) => sum + (c.amount || 0), 0);
     const totalCosts = materialCost + laborCost;
     

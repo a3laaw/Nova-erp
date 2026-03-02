@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { where, orderBy } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import type { ConstructionProject, PurchaseOrder } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import {
   ExternalLink, 
   PackageCheck, 
   Clock,
-  AlertCircle
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -57,8 +57,7 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
   const poQuery = React.useMemo(() => {
     if (!firestore || !project.id) return null;
     return [
-        where('projectId', '==', project.id),
-        orderBy('createdAt', 'desc')
+        where('projectId', '==', project.id)
     ];
   }, [firestore, project.id]);
 
@@ -68,9 +67,18 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
     poQuery || []
   );
 
-  const totalProcurement = React.useMemo(() => {
-    return (pos || []).filter(p => p.status !== 'cancelled').reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  // الفرز محلياً لضمان السرعة وعدم الاعتماد على الـ Index المعقد
+  const sortedPos = React.useMemo(() => {
+      return [...pos].sort((a, b) => {
+          const dateA = toFirestoreDate(a.createdAt)?.getTime() || 0;
+          const dateB = toFirestoreDate(b.createdAt)?.getTime() || 0;
+          return dateB - dateA;
+      });
   }, [pos]);
+
+  const totalProcurement = React.useMemo(() => {
+    return sortedPos.filter(p => p.status !== 'cancelled').reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+  }, [sortedPos]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
@@ -113,7 +121,7 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pos.length === 0 ? (
+            {sortedPos.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="h-48 text-center">
                   <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -123,7 +131,7 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
                 </TableCell>
               </TableRow>
             ) : (
-              pos.map((po) => (
+              sortedPos.map((po) => (
                 <TableRow key={po.id} className="group hover:bg-muted/30 transition-colors">
                   <TableCell className="font-mono font-bold text-primary">{po.poNumber}</TableCell>
                   <TableCell className="font-medium">{po.vendorName}</TableCell>
@@ -153,14 +161,14 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
             <Clock className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-800 font-bold">طلبات قيد التوريد</AlertTitle>
             <AlertDescription className="text-blue-700 text-xs">
-                يوجد عدد {pos.filter(p => p.status === 'approved' || p.status === 'partially_received').length} طلبات بانتظار وصول المواد للموقع.
+                يوجد عدد {sortedPos.filter(p => p.status === 'approved' || p.status === 'partially_received').length} طلبات بانتظار وصول المواد للموقع.
             </AlertDescription>
         </Alert>
         <Alert className="bg-green-50/50 border-green-200">
             <PackageCheck className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-800 font-bold">المواد المستلمة</AlertTitle>
             <AlertDescription className="text-green-700 text-xs">
-                بمجرد استلام المواد، يتم تحديث التكلفة الفعلية في جدول الكميات (BOQ) تلقائياً.
+                بمجرد استلام المواد، يتم تحديث التكلفة الفعلية وربطها بالمشروع محاسبياً آلياً.
             </AlertDescription>
         </Alert>
       </div>
