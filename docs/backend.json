@@ -21,21 +21,21 @@
     },
     "UserProfile": {
       "title": "User Profile",
-      "description": "Represents a user's login account, now linked to a specific company.",
+      "description": "Represents a user's login account, linked to a specific company.",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "username": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Secretary", "Accountant", "Engineer", "HR"] },
         "employeeId": { "type": "string" },
-        "companyId": { "type": "string", "description": "The unique ID of the company this user belongs to." },
+        "companyId": { "type": "string" },
         "isActive": { "type": "boolean" }
       },
       "required": ["username", "role", "companyId"]
     },
     "RecurringObligation": {
       "title": "Recurring Obligation",
-      "description": "Automated weekly/monthly payments like rents, installments, and daily labor.",
+      "description": "Automated financial tasks for rents, labor, and installments with frequency logic.",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
@@ -56,11 +56,11 @@
   "firestore": {
     "/company_settings/{settingsId}": {
       "schema": { "$ref": "#/entities/CompanyBranding" },
-      "description": "Stores company-wide settings and optional external hosting configurations."
+      "description": "Stores company-wide settings."
     },
     "/recurring_obligations/{obligationId}": {
       "schema": { "$ref": "#/entities/RecurringObligation" },
-      "description": "Stores automated financial recurring tasks."
+      "description": "Stores automated recurring financial tasks."
     }
   }
 }
