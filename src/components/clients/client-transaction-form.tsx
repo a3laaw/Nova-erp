@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -15,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, orderBy, runTransaction } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
@@ -31,6 +32,10 @@ interface ClientTransactionFormProps {
   fromAppointmentId?: string | null;
 }
 
+/**
+ * نموذج إضافة معاملة جديدة:
+ * تم تحديثه بنظام الحماية ضد الحفظ المزدوج والتفاعل اللحظي.
+ */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -46,7 +51,10 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const [transactionTypeName, setTransactionTypeName] = useState('');
     const [description, setDescription] = useState('');
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
+    
+    // نظام الحماية
     const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
 
     useEffect(() => {
         if (!firestore || !isOpen) return;
@@ -66,8 +74,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                 setWorkStages(stagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as WorkStage)));
 
             } catch (error) {
-                console.error(error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
+                console.error("Reference data error:", error);
             } finally {
                 setEngineersLoading(false);
                 setTypesLoading(false);
@@ -75,7 +82,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         };
 
         fetchReferenceData();
-    }, [firestore, isOpen, toast]);
+    }, [firestore, isOpen]);
 
     const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.name, label: t.name })), [transactionTypes]);
     const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
@@ -84,9 +91,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         e.preventDefault();
         if (!firestore || !currentUser || !transactionTypeName) return;
 
+        // منع الحفظ المزدوج
+        if (savingRef.current) return;
+        savingRef.current = true;
         setIsSaving(true);
+
         try {
-            // جلب بيانات العميل مسبقاً قبل البدء بالـ Batch لضمان السرعة والتحديث اللحظي
             const clientRef = doc(firestore, 'clients', clientId);
             const clientSnap = await getDoc(clientRef);
             if (!clientSnap.exists()) throw new Error("Client not found");
@@ -95,7 +105,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const selectedType = transactionTypes.find(t => t.name === transactionTypeName);
             const departmentIds = selectedType?.departmentIds || [];
 
-            // تجهيز مراحل العمل
             const initialStages = workStages
                 .filter(stage => departmentIds.includes((stage as any).parent?.path.split('/')[1]))
                 .map(stageData => ({
@@ -113,10 +122,8 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             
             const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
             
-            // 1. تحديث عداد العميل
             batch.update(clientRef, { transactionCounter: newCounter });
 
-            // 2. إنشاء المعاملة
             const newTransactionData = {
                 transactionNumber, clientId, transactionType: transactionTypeName,
                 description, status: 'new', createdAt: serverTimestamp(),
@@ -126,19 +133,16 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             };
             batch.set(newTransactionRef, cleanFirestoreData(newTransactionData));
 
-            // 3. تحديث الموعد المرتبط إن وجد
             if (fromAppointmentId) {
                 batch.update(doc(firestore, 'appointments', fromAppointmentId), { transactionId: newTransactionRef.id });
             }
 
-            // 4. توثيق العمليات
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
                 type: 'log', content: `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`,
                 userId: currentUser.id, userName: currentUser.fullName, createdAt: serverTimestamp(),
             });
 
-            // تنفيذ الحفظ اللحظي (Batch is faster and optimistic)
             await batch.commit();
             
             toast({ title: 'نجاح', description: 'تم إنشاء المعاملة بنجاح.' });
@@ -146,15 +150,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             router.refresh();
 
         } catch (error) {
-            console.error(error);
+            console.error("Save transaction error:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في إضافة المعاملة.' });
-        } finally {
             setIsSaving(false);
+            savingRef.current = false;
         }
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) { onClose(); } }}>
             <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
@@ -164,20 +168,20 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
                     <div className="grid gap-4 py-6">
                         <div className="grid gap-2">
                             <Label>نوع المعاملة *</Label>
-                            <InlineSearchList value={transactionTypeName} onSelect={setTransactionTypeName} options={transactionTypeOptions} placeholder="اختر نوع المعاملة..." />
+                            <InlineSearchList value={transactionTypeName} onSelect={setTransactionTypeName} options={transactionTypeOptions} placeholder="اختر نوع المعاملة..." disabled={isSaving} />
                         </div>
                         <div className="grid gap-2">
                             <Label>إسناد لمهندس</Label>
-                            <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder="اختر مهندسًا..." />
+                            <InlineSearchList value={assignedEngineerId} onSelect={setAssignedEngineerId} options={engineerOptions} placeholder="اختر مهندسًا..." disabled={isSaving} />
                         </div>
                         <div className="grid gap-2">
                             <Label>الوصف</Label>
-                            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="تفاصيل إضافية..." />
+                            <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="تفاصيل إضافية..." disabled={isSaving} />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-                        <Button type="submit" disabled={isSaving}>
+                        <Button type="submit" disabled={isSaving || !transactionTypeName}>
                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
                             حفظ المعاملة
                         </Button>

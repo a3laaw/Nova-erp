@@ -71,8 +71,6 @@ const itemSchema = z.object({
   ),
 });
 
-type PoFormValues = z.infer<typeof poSchema>;
-
 const poSchema = z.object({
   orderDate: z.date({ required_error: 'التاريخ مطلوب.' }),
   vendorId: z.string().min(1, 'المورد مطلوب.'),
@@ -81,6 +79,8 @@ const poSchema = z.object({
   paymentTerms: z.string().optional(),
   notes: z.string().optional(),
 });
+
+type PoFormValues = z.infer<typeof poSchema>;
 
 const generateStableId = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -91,6 +91,10 @@ const generateStableId = () => {
   return id;
 };
 
+/**
+ * صفحة إنشاء أمر شراء جديد:
+ * تم تحديثها بنظام الحماية ضد الحفظ المزدوج (Double Save Guard) عبر useRef و useState.
+ */
 export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,6 +105,8 @@ export default function NewPurchaseOrderPage() {
   const [poNumber, setPoNumber] = useState('جاري التوليد...');
   const [poNumberLoaded, setPoNumberLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // نظام الحماية البرمجي لمنع التكرار
   const savingRef = useRef(false);
 
   // السجلات المرجعية
@@ -198,6 +204,8 @@ export default function NewPurchaseOrderPage() {
 
   const onSubmit = async (data: PoFormValues) => {
     if (!firestore || !currentUser) return;
+    
+    // منع الحفظ المزدوج (Double Click Prevention)
     if (savingRef.current) return;
     savingRef.current = true;
     setIsSaving(true);
@@ -244,11 +252,14 @@ export default function NewPurchaseOrderPage() {
       });
 
       toast({ title: 'نجاح', description: 'تم إنشاء أمر الشراء بنجاح.' });
+      
+      // التوجيه الفوري بعد نجاح العملية
       router.push('/dashboard/purchasing/purchase-orders');
     } catch (error) {
       console.error('Error creating PO:', error);
       toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنشاء أمر الشراء.' });
-    } finally {
+      
+      // إعادة تفعيل الأزرار في حال الفشل
       setIsSaving(false);
       savingRef.current = false;
     }
@@ -295,7 +306,7 @@ export default function NewPurchaseOrderPage() {
                     onSelect={field.onChange}
                     options={vendorOptions}
                     placeholder={vendorsLoading ? 'جاري تحميل الموردين...' : 'ابحث عن مورد...'}
-                    disabled={vendorsLoading}
+                    disabled={vendorsLoading || isSaving}
                     className="h-11 rounded-xl border-2"
                   />
                 )}
@@ -310,7 +321,7 @@ export default function NewPurchaseOrderPage() {
               <Controller
                 name="orderDate"
                 control={control}
-                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-11 rounded-xl" />}
+                render={({ field }) => <DateInput value={field.value} onChange={field.onChange} disabled={isSaving} className="h-11 rounded-xl" />}
               />
               {errors.orderDate && <p className="text-xs text-destructive font-bold">{errors.orderDate.message}</p>}
             </div>
@@ -332,7 +343,7 @@ export default function NewPurchaseOrderPage() {
                     onSelect={field.onChange} 
                     options={projectOptions}
                     placeholder={projectsLoading ? "جاري تحميل المشاريع..." : "اختر المشروع لتحميل التكاليف عليه (اختياري)..."}
-                    disabled={projectsLoading}
+                    disabled={projectsLoading || isSaving}
                     className="bg-background border-primary/20 h-12 text-lg rounded-2xl"
                   />
                 )}
@@ -375,7 +386,7 @@ export default function NewPurchaseOrderPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => remove(index)}
-                            disabled={fields.length <= 1}
+                            disabled={fields.length <= 1 || isSaving}
                             className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-full"
                           >
                             <Trash2 className="h-5 w-5" />
@@ -400,7 +411,7 @@ export default function NewPurchaseOrderPage() {
                                 }}
                                 options={itemOptions}
                                 placeholder={itemsLoading ? "جاري التحميل..." : "اختر مادة من المخزون..."}
-                                disabled={itemsLoading}
+                                disabled={itemsLoading || isSaving}
                                 className="border-none shadow-none focus-visible:ring-0 text-lg font-bold bg-transparent"
                               />
                             )}
@@ -416,6 +427,7 @@ export default function NewPurchaseOrderPage() {
                             type="number"
                             step="any"
                             {...register(`items.${index}.quantity`)}
+                            disabled={isSaving}
                             className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 text-xl font-black font-mono"
                           />
                         </TableCell>
@@ -424,6 +436,7 @@ export default function NewPurchaseOrderPage() {
                             type="number"
                             step="0.001"
                             {...register(`items.${index}.unitPrice`)}
+                            disabled={isSaving}
                             className="dir-ltr text-center border-none shadow-none focus-visible:ring-0 text-xl font-black font-mono text-primary"
                           />
                         </TableCell>
@@ -450,7 +463,8 @@ export default function NewPurchaseOrderPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => append({ uid: generateStableId(), internalItemId: '', description: '', quantity: 1, unitPrice: 0 })}
+                onClick={() => append({ uid: generateId(), internalItemId: '', description: '', quantity: 1, unitPrice: 0 })}
+                disabled={isSaving}
                 className="h-14 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold transition-all gap-2 group"
               >
                 <PlusCircle className="h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
@@ -466,6 +480,7 @@ export default function NewPurchaseOrderPage() {
               <Label className="font-bold text-sm text-foreground/70">شروط الدفع</Label>
               <Input
                 {...register('paymentTerms')}
+                disabled={isSaving}
                 placeholder="مثال: دفع كاش، آجل 30 يوم، دفعة مقدمة 50%..."
                 className="h-11 rounded-xl border-2"
               />
@@ -474,6 +489,7 @@ export default function NewPurchaseOrderPage() {
               <Label className="font-bold text-sm text-foreground/70">ملاحظات إضافية للمورد</Label>
               <Textarea
                 {...register('notes')}
+                disabled={isSaving}
                 placeholder="أدخل أي تعليمات خاصة بالتوريد أو ملاحظات..."
                 className="rounded-xl border-2 resize-none"
                 rows={3}

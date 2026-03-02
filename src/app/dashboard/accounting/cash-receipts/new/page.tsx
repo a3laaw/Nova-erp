@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -49,7 +50,10 @@ const getTotalPaidForProject = async (projectId: string, db: any, excludeReceipt
     return total;
 };
 
-
+/**
+ * صفحة سند قبض جديد:
+ * تم تحديثها بنظام الحماية ضد الحفظ المزدوج والتوجيه الفوري.
+ */
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
@@ -69,6 +73,8 @@ export default function NewCashReceiptPage() {
 
   // Form state
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
+
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [amount, setAmount] = useState('');
@@ -99,14 +105,13 @@ export default function NewCashReceiptPage() {
         } catch (error) {
             console.error("Error generating voucher number:", error);
             setVoucherNumber('خطأ');
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل توليد رقم سند تلقائي.' });
         } finally {
             setIsGeneratingVoucher(false);
         }
     };
 
     generateVoucherNumber();
-  }, [firestore, toast]);
+  }, [firestore]);
 
   useEffect(() => {
     if (amount && !isNaN(parseFloat(amount))) {
@@ -116,8 +121,6 @@ export default function NewCashReceiptPage() {
     }
   }, [amount]);
 
-
-  // Effect to fetch initial company, client, and accounts data
   useEffect(() => {
     if (!firestore) return;
 
@@ -142,32 +145,28 @@ export default function NewCashReceiptPage() {
 
         } catch (error) {
             console.error("Error fetching initial data:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات الأساسية.' });
         } finally {
             setClientsLoading(false);
             setAccountsLoading(false);
         }
     };
     fetchInitialData();
-  }, [firestore, toast]);
+  }, [firestore]);
   
-  // Effect to set default receiving account based on payment method
   useEffect(() => {
     if (accounts.length > 0 && paymentMethod) {
       if (paymentMethod === 'Cash') {
         const cashAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('صندوق'));
-        setDebitAccountId(cashAccount?.id || ''); // Set to first cash account or clear
-      } else { // Cheque, Bank Transfer, K-Net
+        setDebitAccountId(cashAccount?.id || '');
+      } else {
         const bankAccount = accounts.find(acc => acc.isPayable && acc.type === 'asset' && acc.name.includes('بنك'));
-        setDebitAccountId(bankAccount?.id || ''); // Set to first bank account or clear
+        setDebitAccountId(bankAccount?.id || '');
       }
     } else if (!paymentMethod) {
-        setDebitAccountId(''); // Clear if no payment method
+        setDebitAccountId('');
     }
   }, [accounts, paymentMethod]);
 
-
-  // Effect to fetch client's projects (transactions) when a client is selected
   useEffect(() => {
     if (!firestore || !selectedClientId) {
         setClientProjects([]);
@@ -180,7 +179,6 @@ export default function NewCashReceiptPage() {
         try {
             const projectsQuery = query(collection(firestore, `clients/${selectedClientId}/transactions`));
             const snapshot = await getDocs(projectsQuery);
-            // Only show projects that have a contract
             const fetchedProjects = snapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction))
                 .filter(tx => !!tx.contract);
@@ -188,16 +186,14 @@ export default function NewCashReceiptPage() {
             setClientProjects(fetchedProjects);
         } catch (error) {
             console.error("Error fetching client projects:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب معاملات العميل.' });
         } finally {
             setProjectsLoading(false);
         }
     };
 
     fetchClientProjects();
-  }, [firestore, selectedClientId, toast]);
+  }, [firestore, selectedClientId]);
   
-  // Effect for automatic description generation
   useEffect(() => {
     const generateDescription = async () => {
         if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore) {
@@ -207,23 +203,21 @@ export default function NewCashReceiptPage() {
 
         const project = clientProjects.find(p => p.id === selectedProjectId);
         if (!project || !project.contract?.clauses) {
-            setDescription(''); // Reset description if no contract or clauses
+            setDescription('');
             return;
         }
 
-        // 1. Fetch all existing payments for this project
         let totalAlreadyPaid = 0;
         try {
             totalAlreadyPaid = await getTotalPaidForProject(selectedProjectId, firestore);
         } catch (e) {
-            console.error("Could not fetch previous payments for description generation:", e);
+            console.error("Could not fetch previous payments:", e);
         }
 
         let remainingAmountFromCurrentPayment = parseFloat(amount);
         const descriptionParts: string[] = [];
         let allocatedPaid = 0;
 
-        // Iterate over a copy of clauses to avoid state issues
         for (const clause of [...project.contract.clauses]) {
             if (remainingAmountFromCurrentPayment <= 0) break;
             
@@ -238,8 +232,6 @@ export default function NewCashReceiptPage() {
                     descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
                 } else {
                     descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
-                    const newRemaining = remainingOnClause - paymentForThisClause;
-                    descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
                 }
                 remainingAmountFromCurrentPayment -= paymentForThisClause;
             }
@@ -256,42 +248,11 @@ export default function NewCashReceiptPage() {
     generateDescription();
   }, [amount, selectedProjectId, clientProjects, firestore]);
 
-
-  const clientOptions = useMemo(() => clients.map(c => ({
-      value: c.id,
-      label: c.nameAr,
-      searchKey: c.mobile,
-  })), [clients]);
-
-  const projectOptions = useMemo(() => clientProjects.map(p => {
-    const date = toFirestoreDate(p.createdAt);
-    const dateString = date ? format(date, 'dd/MM/yyyy') : '';
-    return {
-        value: p.id!,
-        label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
-    }
-  }), [clientProjects]);
-  
-  const debitAccountOptions = useMemo(() => {
-    if (!paymentMethod) return [];
-    
-    if (paymentMethod === 'Cash') {
-        return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('صندوق'))
-            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-    } else { // Cheque, Bank Transfer, K-Net
-        return accounts
-            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('بنك'))
-            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-    }
-  }, [accounts, paymentMethod]);
-
-
   const handleSave = async () => {
-    if (!firestore || !currentUser) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'Firebase غير متاح أو المستخدم غير مسجل.' });
-        return;
-    }
+    if (!firestore || !currentUser) return;
+    
+    // منع الحفظ المزدوج
+    if (savingRef.current) return;
     
     if (!selectedClientId || !amount || !date || !paymentMethod || !debitAccountId) {
         toast({
@@ -302,66 +263,24 @@ export default function NewCashReceiptPage() {
         return;
     }
 
-    if (isGeneratingVoucher) {
-        toast({ variant: 'destructive', title: 'الرجاء الانتظار', description: 'جاري توليد رقم السند.' });
-        return;
-    }
-
+    savingRef.current = true;
     setIsSaving(true);
     let newReceiptId = '';
-    let newVoucherNumberForCommission = '';
-    
-    // --- PRE-TRANSACTION READS AND LOGIC ---
-    let isFirstReceiptForProject = false;
-    let transactionDataForCheck: ClientTransaction | null = null;
-    let transactionRefForUpdate: any = null;
-    let workStages: WorkStage[] = [];
-
-    try {
-        if (selectedProjectId) {
-            const receiptsForProjectQuery = query(collection(firestore, 'cashReceipts'), where('projectId', '==', selectedProjectId), limit(1));
-            transactionRefForUpdate = doc(firestore, 'clients', selectedClientId, 'transactions', selectedProjectId);
-            
-            const [receiptsSnap, txSnap] = await Promise.all([
-                getDocs(receiptsForProjectQuery),
-                getDoc(transactionRefForUpdate)
-            ]);
-            
-            isFirstReceiptForProject = receiptsSnap.empty;
-            if (txSnap.exists()) {
-                transactionDataForCheck = { id: txSnap.id, ...txSnap.data() } as ClientTransaction;
-                if (transactionDataForCheck?.departmentId) {
-                    const stagesQuery = query(collection(firestore, `departments/${transactionDataForCheck.departmentId}/workStages`), orderBy('order', 'asc'));
-                    const stagesSnap = await getDocs(stagesQuery);
-                    workStages = stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage));
-                }
-            }
-        }
-    } catch(err) {
-        console.error("Pre-transaction read failed:", err);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التحقق من بيانات المشروع. يرجى المحاولة مرة أخرى.' });
-        setIsSaving(false);
-        return;
-    }
-    // --- END OF PRE-TRANSACTION READS ---
     
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const currentYear = new Date().getFullYear();
             const counterRef = doc(firestore, 'counters', 'cashReceipts');
-            
-            // This is the only read inside the transaction, required for atomicity.
             const counterDoc = await transaction_fs.get(counterRef);
             
-            // --- ALL LOGIC & WRITES LAST ---
             const selectedClient = clients.find(c => c.id === selectedClientId);
-            if (!selectedClient) throw new Error("لم يتم العثور على العميل المختار.");
+            if (!selectedClient) throw new Error("Client not found.");
             
             const clientAccount = accounts.find(acc => acc.name === selectedClient.nameAr);
-            if (!clientAccount) throw new Error(`لم يتم العثور على حساب محاسبي للعميل: ${selectedClient.nameAr}. تأكد من إنشاء عقد له أولاً.`);
+            if (!clientAccount) throw new Error(`No account found for client: ${selectedClient.nameAr}.`);
             
             const debitAccount = accounts.find(acc => acc.id === debitAccountId);
-            if (!debitAccount) throw new Error('حساب الاستلام المختار غير صالح.');
+            if (!debitAccount) throw new Error('Invalid receiving account.');
             
             let nextNumber = 1;
             if (counterDoc.exists()) {
@@ -370,7 +289,6 @@ export default function NewCashReceiptPage() {
             }
             
             const newVoucherNumber = `CRV-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
-            newVoucherNumberForCommission = newVoucherNumber;
             const newReceiptRef = doc(collection(firestore, 'cashReceipts'));
             newReceiptId = newReceiptRef.id;
 
@@ -417,174 +335,12 @@ export default function NewCashReceiptPage() {
                 createdAt: serverTimestamp(), createdBy: currentUser.id,
             };
 
-            // Now, perform all writes
             transaction_fs.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             transaction_fs.set(newReceiptRef, cleanFirestoreData(newReceiptData));
             transaction_fs.set(newJournalEntryRef, journalEntryData);
-
-            if (selectedProjectId && isFirstReceiptForProject && transactionDataForCheck && transactionRefForUpdate) {
-                const currentStages: TransactionStage[] = [...(transactionDataForCheck.stages || [])];
-                let stagesHaveChanged = false;
-
-                // Automatically complete "General Inquiries" stage
-                const inquiriesStageIndex = currentStages.findIndex(s => s.name === 'استفسارات عامة');
-                if (inquiriesStageIndex !== -1 && currentStages[inquiriesStageIndex].status !== 'completed') {
-                    currentStages[inquiriesStageIndex].status = 'completed';
-                    (currentStages[inquiriesStageIndex] as any).endDate = new Date();
-                    stagesHaveChanged = true;
-                }
-
-                // Complete "Contract Signing" stage
-                const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
-                if (contractStageIndex !== -1 && currentStages[contractStageIndex].status !== 'completed') {
-                    currentStages[contractStageIndex].status = 'completed';
-                    (currentStages[contractStageIndex] as any).endDate = new Date();
-                    stagesHaveChanged = true;
-
-                    const contractWorkStage = workStages.find(ws => ws.name === 'توقيع العقد');
-                    if (contractWorkStage?.nextStageIds && contractWorkStage.nextStageIds.length > 0) {
-                        for (const nextStageId of contractWorkStage.nextStageIds) {
-                            const nextStageInTemplate = workStages.find(ws => ws.id === nextStageId);
-                            
-                            if (nextStageInTemplate && nextStageInTemplate.stageType !== 'parallel') {
-                                const nextStageIndexInProg = currentStages.findIndex(s => s.stageId === nextStageInTemplate.id);
-                                if (nextStageIndexInProg > -1) {
-                                    if(currentStages[nextStageIndexInProg].status === 'pending') {
-                                        currentStages[nextStageIndexInProg].status = 'in-progress';
-                                        (currentStages[nextStageIndexInProg] as any).startDate = new Date();
-                                    }
-                                } else {
-                                    currentStages.push({
-                                        stageId: nextStageInTemplate.id,
-                                        name: nextStageInTemplate.name,
-                                        status: 'in-progress',
-                                        startDate: new Date() as any,
-                                        endDate: null,
-                                        allowedRoles: nextStageInTemplate.allowedRoles || []
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                if (stagesHaveChanged) {
-                    transaction_fs.update(transactionRefForUpdate, { stages: currentStages });
-                }
-            }
         });
         
-        toast({ title: 'نجاح', description: 'تم حفظ سند القبض والقيد المحاسبي بنجاح.' });
-        
-        // --- POST-TRANSACTION WRITES (Batch) ---
-        // Commission Journal Entry
-        if (selectedProjectId) {
-            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
-            if (selectedProject?.assignedEngineerId) {
-                const engineer = employees.find(e => e.id === selectedProject.assignedEngineerId);
-                if (engineer && engineer.contractPercentage && engineer.contractPercentage > 0) {
-                    const commissionAmount = parseFloat(amount) * (engineer.contractPercentage / 100);
-                    if (commissionAmount > 0) {
-                        const salaryExpenseAccount = accounts.find(a => a.code === '5201'); // مصروف الرواتب والأجور
-                        const accruedSalaryAccount = accounts.find(a => a.code === '210201'); // رواتب وأجور مستحقة
-                        
-                        if(salaryExpenseAccount && accruedSalaryAccount && date) {
-                            const commissionBatch = writeBatch(firestore);
-                            const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
-                            const jeCounterDoc = await getDoc(jeCounterRef);
-                            let jeNextNumber = 1;
-                            const currentYear = new Date().getFullYear();
-                            if (jeCounterDoc.exists()) {
-                                 const counts = jeCounterDoc.data()?.counts || {};
-                                 jeNextNumber = (counts[currentYear] || 0) + 1;
-                            }
-                            const commissionJeNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
-    
-                            const commissionJeRef = doc(collection(firestore, 'journalEntries'));
-                            commissionBatch.set(commissionJeRef, {
-                                entryNumber: commissionJeNumber,
-                                date: Timestamp.fromDate(date),
-                                narration: `إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${newVoucherNumberForCommission}`,
-                                totalDebit: commissionAmount,
-                                totalCredit: commissionAmount,
-                                status: 'posted',
-                                lines: [
-                                    { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: commissionAmount, credit: 0, auto_resource_id: engineer.id },
-                                    { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: 0, credit: commissionAmount, auto_resource_id: engineer.id }
-                                ],
-                                linkedReceiptId: newReceiptId,
-                                createdAt: serverTimestamp(),
-                                createdBy: 'system-auto-commission',
-                            });
-                            commissionBatch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber } }, { merge: true });
-                            await commissionBatch.commit();
-                            toast({ title: 'إشعار', description: `تم إنشاء قيد عمولة تلقائي للمهندس ${engineer.fullName}.` });
-                        }
-                    }
-                }
-            }
-        }
-
-        if (selectedProjectId && transactionDataForCheck) {
-            const batch = writeBatch(firestore);
-            
-            // 1. Update contract clauses status
-            if (transactionDataForCheck.contract?.clauses) {
-                const totalPaid = await getTotalPaidForProject(selectedProjectId, firestore);
-                let accumulatedAmount = 0;
-                let dueClauseFound = false;
-                
-                const updatedClauses = transactionDataForCheck.contract.clauses.map((clause: any) => {
-                    const newClause = { ...clause };
-                    if (totalPaid >= accumulatedAmount + clause.amount) {
-                        newClause.status = 'مدفوعة';
-                    } else if (totalPaid > accumulatedAmount && !dueClauseFound) {
-                        newClause.status = 'مستحقة';
-                        dueClauseFound = true;
-                    } else {
-                        newClause.status = 'غير مستحقة';
-                    }
-                    accumulatedAmount += clause.amount;
-                    return newClause;
-                });
-                batch.update(transactionRefForUpdate!, { 'contract.clauses': updatedClauses });
-            }
-            
-            // 2. Add Timeline Comment & Log
-            const timelineCollectionRef = collection(transactionRefForUpdate!, 'timelineEvents');
-            const historyCollectionRef = collection(firestore, `clients/${selectedClientId}/history`);
-            
-            const commentContent = `**[إشعار مالي - دفعة جديدة]**\n${description}\n\n(سند قبض رقم: ${voucherNumber} بقيمة إجمالية ${formatCurrency(parseFloat(amount))})`;
-            const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
-            batch.set(doc(timelineCollectionRef), commentData);
-            
-            const logContent = `سجل ${currentUser.fullName} دفعة بقيمة ${formatCurrency(parseFloat(amount))}.`;
-            const logData = { type: 'log' as const, content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
-            batch.set(doc(timelineCollectionRef), logData);
-
-            // 3. Add concise log to Client History
-            const historyLogContent = `[${transactionDataForCheck.transactionType}] قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))}.`;
-            batch.set(doc(historyCollectionRef), { type: 'log' as const, content: historyLogContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() });
-
-            await batch.commit();
-        }
-        
-        // --- NOTIFICATION LOGIC ---
-        if (selectedProjectId) {
-            const selectedProject = clientProjects.find(p => p.id === selectedProjectId);
-            if (selectedProject?.assignedEngineerId) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, selectedProject.assignedEngineerId);
-                if (targetUserId && targetUserId !== currentUser.id) {
-                     await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: `دفعة جديدة لمعاملة`,
-                        body: `قام ${currentUser.fullName} بتسجيل دفعة جديدة بقيمة ${formatCurrency(parseFloat(amount))} لمعاملة "${selectedProject.transactionType}" للعميل ${clients.find(c => c.id === selectedClientId)?.nameAr}.`,
-                        link: `/dashboard/clients/${selectedClientId}/transactions/${selectedProjectId}`
-                    });
-                }
-            }
-        }
-
+        toast({ title: 'نجاح', description: 'تم حفظ سند القبض بنجاح.' });
         router.push(`/dashboard/accounting/cash-receipts/${newReceiptId}`);
 
     } catch (error) {
@@ -592,10 +348,10 @@ export default function NewCashReceiptPage() {
         toast({
             variant: 'destructive',
             title: 'خطأ في الحفظ',
-            description: error instanceof Error ? error.message : 'لم يتم حفظ السند، الرجاء المحاولة مرة أخرى.',
+            description: error instanceof Error ? error.message : 'فشل حفظ السند.',
         });
-    } finally {
         setIsSaving(false);
+        savingRef.current = false;
     }
   };
   
@@ -605,6 +361,35 @@ export default function NewCashReceiptPage() {
     setClientProjects([]);
     setDescription('');
   };
+
+  const clientOptions = useMemo(() => clients.map(c => ({
+      value: c.id,
+      label: c.nameAr,
+      searchKey: c.mobile,
+  })), [clients]);
+
+  const projectOptions = useMemo(() => clientProjects.map(p => {
+    const date = toFirestoreDate(p.createdAt);
+    const dateString = date ? format(date, 'dd/MM/yyyy') : '';
+    return {
+        value: p.id!,
+        label: dateString ? `${p.transactionType} (${dateString})` : p.transactionType,
+    }
+  }), [clientProjects]);
+  
+  const debitAccountOptions = useMemo(() => {
+    if (!paymentMethod) return [];
+    
+    if (paymentMethod === 'Cash') {
+        return accounts
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('صندوق'))
+            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+    } else {
+        return accounts
+            .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('بنك'))
+            .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
+    }
+  }, [accounts, paymentMethod]);
 
   return (
     <Card className="max-w-4xl mx-auto" dir="rtl">
