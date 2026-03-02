@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
@@ -23,7 +22,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -97,14 +96,12 @@ export default function NewAdjustmentPage() {
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
-    // محرك فحص المخزن اللحظي - مصلح
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
         try {
             const balances: Record<string, number> = {};
             
-            // 1. الوارد (GRNs)
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('warehouseId', '==', warehouseId)));
             grnsSnap.forEach(doc => {
                 const data = doc.data();
@@ -113,7 +110,6 @@ export default function NewAdjustmentPage() {
                 });
             });
 
-            // 2. الحركة (Adjustments / Transfers / Issues)
             const adjsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments')));
             adjsSnap.forEach(doc => {
                 const data = doc.data() as InventoryAdjustment;
@@ -153,7 +149,6 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // الرقابة الصارمة: التحقق من كفاية المخزن
         const isOutbound = ['damage', 'theft', 'purchase_return'].includes(data.type);
         if (isOutbound) {
             for (const item of data.items) {
@@ -251,7 +246,7 @@ export default function NewAdjustmentPage() {
                         { accountId: debitAccount!.id!, accountName: debitAccount!.name, debit: totalWithDiscount, credit: 0 },
                         { accountId: creditAccount!.id!, accountName: creditAccount!.name, debit: 0, credit: totalCost },
                         ...(data.type === 'purchase_return' && data.recoveredDiscount ? [{
-                            accountId: accounts.find(a => a.code === '4104')?.id || '', // خصم مكتسب
+                            accountId: accounts.find(a => a.code === '4104')?.id || '', 
                             accountName: 'خصم مكتسب',
                             debit: 0,
                             credit: Number(data.recoveredDiscount)
