@@ -2,6 +2,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -9,12 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
     Briefcase,
     Users,
     CircleDollarSign,
     TrendingUp,
-    LayoutGrid
+    LayoutGrid,
+    PlusCircle
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -59,7 +62,7 @@ export default function DashboardPage() {
 
         <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
             <div className="grid gap-4 md:grid-cols-2 xl:col-span-3">
-                <Card className="border-none shadow-sm bg-gradient-to-br from-white to-blue-50/50">
+                <Card className="border-none shadow-sm bg-gradient-to-br from-white to-blue-50/50 rounded-3xl">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
                             إجمالي التدفقات الداخلة
@@ -78,7 +81,7 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-gradient-to-br from-white to-orange-50/50">
+                <Card className="border-none shadow-sm bg-gradient-to-br from-white to-orange-50/50 rounded-3xl">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
                             المواقع النشطة (قيد التنفيذ)
@@ -97,7 +100,7 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm">
+                <Card className="border-none shadow-sm rounded-3xl">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">قاعدة بيانات العملاء</CardTitle>
                         <Users className="h-5 w-5 text-muted-foreground opacity-50" />
@@ -114,10 +117,9 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-primary text-primary-foreground">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Card className="border-none shadow-sm bg-primary text-primary-foreground rounded-3xl">
+                    <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-bold opacity-80">كشف يوميات المواقع</CardTitle>
-                        <LayoutGrid className="h-5 w-5 opacity-50" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-sm font-bold leading-relaxed mb-4">
