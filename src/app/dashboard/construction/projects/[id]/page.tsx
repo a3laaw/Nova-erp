@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, DollarSign, User, Percent, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle, Coins, Clock3 } from 'lucide-react';
+import { ArrowRight, Building, Calendar, User, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle, Coins, Clock3, ShieldCheck, Package } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -25,6 +25,7 @@ import { DailyReportsList } from '@/components/construction/daily-reports-list';
 import { DailyReportForm } from '@/components/construction/daily-report-form';
 import { ProjectApplicationsTab } from '@/components/construction/project-applications-tab';
 import { ProjectScheduleTab } from '@/components/construction/project-schedule-tab';
+import { Separator } from '@/components/ui/separator';
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -32,6 +33,13 @@ const statusColors: Record<string, string> = {
     'مكتمل': 'bg-green-100 text-green-800',
     'معلق': 'bg-gray-100 text-gray-800',
     'ملغى': 'bg-red-100 text-red-800',
+};
+
+const categoryLabels: Record<string, string> = {
+    'Private (Subsidized)': 'سكن خاص (مدعوم)',
+    'Private (Non-Subsidized)': 'سكن خاص (تجاري)',
+    'Commercial': 'تجاري / استثماري',
+    'Government': 'مشروع حكومي',
 };
 
 export default function ProjectDetailPage() {
@@ -55,83 +63,69 @@ export default function ProjectDetailPage() {
     
     const formatDate = (date: any) => {
         const d = toFirestoreDate(date);
-        if (!d) return '-';
-        return format(d, 'PPP', { locale: ar });
+        return d ? format(d, 'PPP', { locale: ar }) : '-';
     };
 
-    const daysRemaining = useMemo(() => {
-        if (!project?.endDate) return null;
-        const endDate = toFirestoreDate(project.endDate);
-        if (!endDate || !project || project.status !== 'قيد التنفيذ') return null;
-        try {
-            return formatDistanceToNow(endDate, { addSuffix: true, locale: ar });
-        } catch { return null; }
-    }, [project]);
+    if (loading) return <div className="space-y-4 p-6"><Skeleton className="h-48 w-full" /><Skeleton className="h-64 w-full" /></div>;
+    if (!project) return <div className="text-center p-20 text-muted-foreground">لم يتم العثور على المشروع.</div>;
 
-    if (loading) {
-        return (
-            <div className="space-y-4 max-w-6xl mx-auto p-6" dir="rtl">
-                <Skeleton className="h-48 w-full rounded-xl" />
-                <Skeleton className="h-64 w-full rounded-xl" />
-            </div>
-        );
-    }
-    
-    if (!project) {
-        return <div className="text-center p-20 text-muted-foreground">لم يتم العثور على المشروع.</div>;
-    }
-    
     return (
         <div className="space-y-6 max-w-6xl mx-auto p-4 sm:p-6" dir="rtl">
-            <Card className="rounded-2xl border-none shadow-sm bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
-                <CardHeader>
+            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-card">
+                <CardHeader className="bg-muted/10 pb-8">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                         <div className="space-y-2">
                             <div className="flex items-center gap-3">
-                                <CardTitle className="text-3xl font-black text-foreground">
-                                    {project.projectName}
-                                </CardTitle>
+                                <CardTitle className="text-3xl font-black">{project.projectName}</CardTitle>
                                 <Badge className={cn("text-xs px-3", statusColors[project.status])}>{project.status}</Badge>
+                                <Badge variant="outline" className="border-primary text-primary font-bold">{categoryLabels[project.projectCategory] || project.projectCategory}</Badge>
                             </div>
                             <CardDescription className="text-base font-medium flex items-center gap-2">
-                                <Building className="h-4 w-4 text-muted-foreground"/>
-                                مشروع {project.projectType} للعميل: 
-                                <Link href={`/dashboard/clients/${project.clientId}`} className="text-primary hover:underline font-bold">
-                                    {client?.nameAr || '...'}
-                                </Link>
+                                للعميل: <Link href={`/dashboard/clients/${project.clientId}`} className="text-primary hover:underline font-bold">{client?.nameAr || '...'}</Link>
                             </CardDescription>
                         </div>
                          <Button variant="ghost" onClick={() => router.back()} className="gap-2 group">
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1"/> 
-                            العودة للمشاريع
+                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1"/> العودة للمشاريع
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-4 bg-white/50 dark:bg-muted/20 rounded-xl border">
-                        <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المهندس المسؤول</Label>
-                            <p className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> {engineer?.fullName || '...'}</p>
+                <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-end">
+                                <Label className="font-black text-xs text-muted-foreground uppercase tracking-widest">نسبة الإنجاز الإجمالية</Label>
+                                <span className="font-mono text-xl font-black text-primary">{project.progressPercentage}%</span>
+                            </div>
+                            <Progress value={project.progressPercentage} className="h-3" />
+                            <div className="grid grid-cols-2 gap-4 text-sm font-medium pt-4">
+                                <div className="space-y-1"><p className="text-[10px] text-muted-foreground uppercase">المهندس المسؤول</p><p className="font-bold flex items-center gap-2"><User className="h-3 w-3 text-primary"/> {engineer?.fullName || '...'}</p></div>
+                                <div className="space-y-1"><p className="text-[10px] text-muted-foreground uppercase">تاريخ البدء</p><p className="font-bold flex items-center gap-2"><Calendar className="h-3 w-3"/> {formatDate(project.startDate)}</p></div>
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">تاريخ البدء</Label>
-                            <p className="font-bold flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground"/> {formatDate(project.startDate)}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">التسليم المتوقع</Label>
-                            <p className="font-bold flex items-center gap-2"><Calendar className="h-4 w-4 text-muted-foreground"/> {formatDate(project.endDate)}</p>
-                        </div>
-                         <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">الوقت المتبقي</Label>
-                            <p className="font-bold text-primary flex items-center gap-2">{daysRemaining || '---'}</p>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-end">
-                            <Label className="font-bold">إجمالي نسبة الإنجاز</Label>
-                            <span className="font-mono text-xl font-black text-primary">{project.progressPercentage}%</span>
-                        </div>
-                        <Progress value={project.progressPercentage} className="h-3" />
+
+                        {/* --- محرك تتبع حصص المدعوم (Quota Tracker) --- */}
+                        {project.projectCategory === 'Private (Subsidized)' && (
+                            <div className="p-6 bg-primary/5 rounded-3xl border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
+                                <h3 className="font-black text-primary flex items-center gap-2">
+                                    <ShieldCheck className="h-5 w-5" /> رصيد التموين الإنشائي
+                                </h3>
+                                <div className="space-y-3">
+                                    {project.subsidyQuotas?.map(q => {
+                                        const progress = (q.receivedQuantity / q.allocatedQuantity) * 100;
+                                        return (
+                                            <div key={q.itemId} className="space-y-1">
+                                                <div className="flex justify-between text-[10px] font-bold">
+                                                    <span className="flex items-center gap-1"><Package className="h-3 w-3"/> {q.itemName}</span>
+                                                    <span>{q.receivedQuantity} / {q.allocatedQuantity}</span>
+                                                </div>
+                                                <Progress value={progress} className="h-1.5" />
+                                            </div>
+                                        );
+                                    })}
+                                    {(!project.subsidyQuotas || project.subsidyQuotas.length === 0) && <p className="text-xs text-muted-foreground italic">لم يتم إدخال أرصدة المدعوم بعد.</p>}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -146,61 +140,20 @@ export default function ProjectDetailPage() {
                     <TabsTrigger value="procurement" className="gap-2 py-3 rounded-lg"><ShoppingCart className="h-4 w-4"/> المشتريات</TabsTrigger>
                     <TabsTrigger value="subcontracts" className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
                 </TabsList>
-                
-                <TabsContent value="financials">
-                    <ProjectFinancialsTab project={project} />
-                </TabsContent>
-
-                <TabsContent value="schedule">
-                    <ProjectScheduleTab project={project} />
-                </TabsContent>
-
-                <TabsContent value="applications">
-                    <ProjectApplicationsTab project={project} />
-                </TabsContent>
-
+                <TabsContent value="financials"><ProjectFinancialsTab project={project} /></TabsContent>
+                <TabsContent value="schedule"><ProjectScheduleTab project={project} /></TabsContent>
+                <TabsContent value="applications"><ProjectApplicationsTab project={project} /></TabsContent>
                 <TabsContent value="reports" className="space-y-6">
                     <div className="flex justify-between items-center bg-muted/30 p-6 rounded-2xl border">
-                        <div className="space-y-1">
-                            <CardTitle className="text-xl font-black">سجل تقارير الموقع اليومية</CardTitle>
-                            <CardDescription>التوثيق الفني والصوري الميداني للمشروع.</CardDescription>
-                        </div>
-                        <Button onClick={() => setIsReporting(true)} disabled={isReporting} className="h-11 px-6 rounded-xl font-bold gap-2">
-                            <PlusCircle className="h-5 w-5" />
-                            إرسال تقرير يومي
-                        </Button>
+                        <div><CardTitle className="text-xl font-black">سجل تقارير الموقع اليومية</CardTitle><CardDescription>التوثيق الفني والصوري الميداني.</CardDescription></div>
+                        <Button onClick={() => setIsReporting(true)} disabled={isReporting} className="h-11 px-6 rounded-xl font-bold gap-2"><PlusCircle className="h-5 w-5" /> إرسال تقرير يومي</Button>
                     </div>
-
-                    {isReporting && (
-                        <DailyReportForm 
-                            projectId={project.id!} 
-                            onSuccess={() => setIsReporting(false)} 
-                            onCancel={() => setIsReporting(false)} 
-                        />
-                    )}
-
+                    {isReporting && <DailyReportForm projectId={project.id!} onSuccess={() => setIsReporting(false)} onCancel={() => setIsReporting(false)} />}
                     <DailyReportsList projectId={project.id!} />
                 </TabsContent>
-
-                <TabsContent value="boq">
-                    <ProjectBoqTab project={project} client={client} />
-                </TabsContent>
-
-                <TabsContent value="procurement">
-                    <ProjectProcurementTab project={project} />
-                </TabsContent>
-
-                <TabsContent value="subcontracts">
-                    <div className="text-center p-12 border-2 border-dashed rounded-3xl bg-muted/10">
-                        <h3 className="text-xl font-bold">إدارة مقاولي الباطن</h3>
-                        <p className="text-muted-foreground mt-2 mb-6">يمكنك إصدار شهادات إنجاز أعمال للمقاولين وتحميل تكلفتها على المشروع.</p>
-                        <Button asChild>
-                            <Link href={`/dashboard/construction/subcontractors/certificates/new?projectId=${project.id}`}>
-                                إصدار شهادة إنجاز جديدة
-                            </Link>
-                        </Button>
-                    </div>
-                </TabsContent>
+                <TabsContent value="boq"><ProjectBoqTab project={project} client={client} /></TabsContent>
+                <TabsContent value="procurement"><ProjectProcurementTab project={project} /></TabsContent>
+                <TabsContent value="subcontracts"><div className="p-12 text-center border-2 border-dashed rounded-3xl bg-muted/10">إدارة مقاولي الباطن وشهادات الإنجاز.</div></TabsContent>
             </Tabs>
         </div>
     );

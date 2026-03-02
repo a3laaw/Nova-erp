@@ -1,66 +1,35 @@
 
 {
   "entities": {
-    "CompanyBranding": {
-      "title": "Company Branding",
-      "description": "Stores the company's branding information for letterheads and general UI.",
+    "SubsidyQuota": {
+      "title": "Subsidy Quota",
+      "description": "Tracks material quotas provided by the government for private housing projects.",
       "type": "object",
       "properties": {
-        "company_name": { "type": "string" },
-        "address": { "type": "string" },
-        "phone": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "logo_url": { "type": "string", "format": "uri" },
-        "system_background_url": { "type": "string", "format": "uri" },
-        "external_config": { 
-            "type": "object",
-            "description": "Optional dynamic Firebase configuration for companies with their own hosting."
-        }
-      },
-      "required": ["company_name"]
+        "itemId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "allocatedQuantity": { "type": "number" },
+        "receivedQuantity": { "type": "number" },
+        "consumedQuantity": { "type": "number" },
+        "unitPrice": { "type": "number", "description": "Market price for evaluation" }
+      }
     },
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Represents a user's login account, linked to a specific company.",
+    "ConstructionProject": {
+      "title": "Construction Project",
+      "description": "Main project entity, now with subsidy support.",
       "type": "object",
       "properties": {
-        "uid": { "type": "string" },
-        "username": { "type": "string" },
-        "role": { "type": "string", "enum": ["Admin", "Secretary", "Accountant", "Engineer", "HR"] },
-        "employeeId": { "type": "string" },
-        "companyId": { "type": "string" },
-        "isActive": { "type": "boolean" }
-      },
-      "required": ["username", "role", "companyId"]
-    },
-    "RecurringObligation": {
-      "title": "Recurring Obligation",
-      "description": "Automated financial tasks for rents, labor, and installments with frequency logic.",
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "type": { "type": "string", "enum": ["rent", "installment", "vendor_debt", "daily_labor"] },
-        "amount": { "type": "number" },
-        "frequency": { "type": "string", "enum": ["weekly", "monthly"] },
-        "dueDate": { "type": "string", "format": "date-time" },
-        "debitAccountId": { "type": "string" },
-        "creditAccountId": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "paused", "completed"] }
-      },
-      "required": ["title", "type", "amount", "frequency", "dueDate"]
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "projectCategory": { "type": "string", "enum": ["Private (Subsidized)", "Private (Non-Subsidized)", "Commercial", "Government"] },
+        "subsidyQuotas": { "type": "array", "items": { "$ref": "#/entities/SubsidyQuota" } }
+      }
     }
   },
-  "auth": {
-    "providers": ["anonymous"]
-  },
   "firestore": {
-    "/company_settings/{settingsId}": {
-      "schema": { "$ref": "#/entities/CompanyBranding" },
-      "description": "Stores company-wide settings."
-    },
-    "/recurring_obligations/{obligationId}": {
-      "schema": { "$ref": "#/entities/RecurringObligation" },
-      "description": "Stores automated recurring financial tasks."
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/ConstructionProject" },
+      "description": "Stores all construction projects and their subsidy data."
     }
   }
 }
