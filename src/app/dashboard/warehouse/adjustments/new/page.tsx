@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, History, User } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, History, User, Tag, Truck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
@@ -29,6 +29,7 @@ import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
 
 const lineSchema = z.object({
@@ -181,7 +182,6 @@ export default function NewAdjustmentPage() {
         setLoadingClientBalances(true);
         try {
             const balances: Record<string, number> = {};
-            // المبيعات في نظامنا هي inventoryAdjustments من نوع material_issue
             const salesSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
                 where('clientId', '==', cId),
                 where('type', '==', 'material_issue')
@@ -193,7 +193,6 @@ export default function NewAdjustmentPage() {
                 });
             });
 
-            // خصم المرتجعات السابقة للعميل نفسه
             const returnsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
                 where('clientId', '==', cId), 
                 where('type', '==', 'sales_return')
@@ -236,26 +235,22 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // 🛡️ فحص الرقابة النهائية قبل الحفظ
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
             const soldToClient = clientSalesBalances[item.itemId] || 0;
             const itemName = items.find(i => i.id === item.itemId)?.name;
 
-            // حماية رصيد المخزن (للخارج)
             if (isOutbound && item.quantity > currentStock) {
                 toast({ variant: 'destructive', title: 'عجز مخزني', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر هو (${currentStock}) فقط.` });
                 return;
             }
 
-            // حماية المورد (للمرتجع)
             if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
                 toast({ variant: 'destructive', title: 'تجاوز حد التوريد', description: `لا يمكن إرجاع (${item.quantity}) للمورد لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.` });
                 return;
             }
 
-            // حماية المبيعات (لمردود المبيعات)
             if (data.type === 'sales_return' && data.clientId && item.quantity > soldToClient) {
                 toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن استرجاع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) من هذا الصنف.` });
                 return;
