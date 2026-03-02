@@ -1,6 +1,6 @@
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم تحديثه لدعم نظام تعدد الشركات (Multi-Tenancy).
+ * تم تحديثه لدعم نظام تعدد الشركات (Multi-Tenancy) والزيارات الميدانية المتقدمة.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -151,13 +151,46 @@ export interface UserProfile {
   jobTitle?: string;
 }
 
-// ساير الكيانات (Warehouses, Items, etc) تتبع نفس نمط BaseEntity
+// الزيارات الميدانية المحدثة (Field Visits with Spreadsheet support)
+export interface FieldVisit extends BaseEntity { 
+    clientName: string; 
+    clientId?: string;
+    clientAddress?: string;
+    contractNumber?: string;
+    phaseNumber?: string;
+    mainStageName?: string;
+    subStageName?: string;
+    transactionId: string;
+    transactionType: string; 
+    scheduledDate: Timestamp | any; 
+    status: string; 
+    plannedStageId: string; 
+    plannedStageName: string; 
+    engineerId: string;
+    engineerName: string; 
+    // تفاصيل الجدول الأفقي
+    details?: string;
+    requiredPayment?: string;
+    lastPayment?: string;
+    team1?: string;
+    team2?: string;
+    team3?: string;
+    subcontractorId?: string;
+    subcontractorName?: string;
+    confirmationData?: {
+        confirmedAt: Timestamp | any;
+        notes: string;
+        location?: { latitude: number, longitude: number, accuracy: number };
+        isCompleted: boolean;
+    };
+    workStageUpdated?: boolean;
+}
+
 export interface Warehouse extends BaseEntity { name: string; location?: string; isDefault?: boolean; projectId?: string | null; }
 export interface Item extends BaseEntity { name: string; sku: string; categoryId: string; unitOfMeasure: string; costPrice?: number; sellingPrice?: number; inventoryTracked?: boolean; }
 export interface RequestForQuotation extends BaseEntity { rfqNumber: string; date: Timestamp | any; status: string; vendorIds: string[]; items: any[]; }
 export interface PurchaseOrder extends BaseEntity { poNumber: string; orderDate: Timestamp | any; vendorId: string; vendorName: string; totalAmount: number; status: string; items: any[]; }
 export interface PaymentApplication extends BaseEntity { applicationNumber: string; date: Timestamp | any; projectId: string; totalAmount: number; status: string; items: any[]; }
-export interface FieldVisit extends BaseEntity { clientName: string; transactionType: string; scheduledDate: Timestamp | any; status: string; plannedStageName: string; engineerName: string; }
 export interface Vendor extends BaseEntity { name: string; phone: string; contactPerson?: string; }
 export interface Account extends BaseEntity { code: string; name: string; type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; level: number; parentCode: string | null; isPayable: boolean; statement: 'Balance Sheet' | 'Income Statement'; balanceType: 'Debit' | 'Credit'; }
 export interface Department extends BaseEntity { name: string; order?: number; activityTypes?: string[]; }
