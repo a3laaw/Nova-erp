@@ -154,6 +154,7 @@ const navItems = {
       roles: ['Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
+        { href: '/dashboard/purchasing/direct-invoice', label: 'فاتورة مشتريات مباشرة', icon: ShoppingBag },
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
@@ -243,7 +244,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-200">
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {item.icon && <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-inherit")} strokeWidth={2.5} />}
+            {item.icon && <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground")} strokeWidth={2.5} />}
             <span className="group-data-[state=collapsed]:hidden">{item.label}</span>
           </Link>
         </SidebarMenuButton>
@@ -317,7 +318,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <CollapsibleTrigger asChild>
             <SidebarMenuButton as="button" isActive={isActive} className="h-10 w-full justify-between pr-2 transition-all duration-200">
               <div className='flex items-center gap-2'>
-                <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-inherit")} strokeWidth={2.5} />
+                <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground")} strokeWidth={2.5} />
                 <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-bold" : "font-medium")}>{item.label}</span>
               </div>
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />

@@ -1,16 +1,24 @@
+
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, Truck, BarChart3, ShoppingCart, TrendingUp, FileText as RfqIcon, History } from 'lucide-react';
+import { Package, Truck, BarChart3, ShoppingCart, TrendingUp, FileText as RfqIcon, History, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const purchasingFeatures = [
     {
+        title: 'فاتورة مشتريات مباشرة',
+        description: 'تسجيل مشتريات فورية وتحميلها على المشروع (للمؤسسات الصغيرة).',
+        href: '/dashboard/purchasing/direct-invoice',
+        icon: ShoppingBag,
+        color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
+    },
+    {
         title: 'أوامر الشراء',
-        description: 'إنشاء وتتبع أوامر الشراء للموردين.',
+        description: 'إنشاء وتتبع أوامر الشراء الرسمية للموردين.',
         href: '/dashboard/purchasing/purchase-orders',
         icon: ShoppingCart,
-        color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-teal-300'
+        color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
     },
     {
         title: 'طلبات التسعير (RFQ)',
@@ -27,25 +35,11 @@ const purchasingFeatures = [
         color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
     },
     {
-        title: 'الأصناف',
-        description: 'إدارة وتصنيف جميع أصناف المخزون والخدمات.',
-        href: '/dashboard/warehouse/items',
-        icon: Package,
-        color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
-    },
-    {
         title: 'الموردون',
         description: 'إدارة قائمة الشركات الموردة وبيانات الاتصال.',
         href: '/dashboard/purchasing/vendors',
         icon: Users,
         color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
-    },
-    {
-        title: 'تقارير المشتريات',
-        description: 'تحليل المشتريات والمصاريف خلال الفترات المختلفة.',
-        href: '/dashboard/warehouse/reports',
-        icon: BarChart3,
-        color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300'
     },
 ];
 
@@ -56,7 +50,7 @@ export default function PurchasingDashboardPage() {
     <Card dir="rtl">
         <CardHeader>
             <CardTitle>لوحة معلومات المخازن والمشتريات</CardTitle>
-            <CardDescription>نظرة عامة على إدارة المخزون وعمليات الشراء والتحليل المالي.</CardDescription>
+            <CardDescription>إدارة المخزون، التوريدات، وصرف المواد للمشاريع (مراكز التكلفة).</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {purchasingFeatures.map((feature) => {
