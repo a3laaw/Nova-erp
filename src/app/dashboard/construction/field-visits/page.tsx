@@ -9,8 +9,12 @@ import { FieldVisitsList } from '@/components/construction/field-visits-list';
 import { FieldVisitsGrid } from '@/components/construction/field-visits-grid';
 import { cn } from '@/lib/utils';
 
+/**
+ * صفحة خطة الزيارات الميدانية:
+ * تدعم العرض المزدوج (بطاقات أو جدول أفقي متكامل) لتسهيل الرقابة والإدخال.
+ */
 export default function FieldVisitsPage() {
-    const [viewMode, setViewMode] = useState<'cards' | 'grid'>('grid'); // Default to grid as per user request
+    const [viewMode, setViewMode] = useState<'cards' | 'grid'>('grid');
 
     return (
         <div className="space-y-6" dir="rtl">
@@ -22,7 +26,7 @@ export default function FieldVisitsPage() {
                                 <MapPin className="text-primary h-8 w-8" />
                                 خطة الزيارات الميدانية
                             </CardTitle>
-                            <CardDescription className="text-base">إدارة وجدولة وتأكيد الزيارات الميدانية للمهندسين في مواقع المشاريع.</CardDescription>
+                            <CardDescription className="text-base">إدارة وجدولة وتأكيد الزيارات الميدانية للمهندسين في مواقع المشاريع بنظام الجدولة الأفقية.</CardDescription>
                         </div>
                         <div className="flex items-center gap-3">
                             {/* Toggle View Mode */}
@@ -34,7 +38,7 @@ export default function FieldVisitsPage() {
                                     className={cn("rounded-xl font-bold gap-2", viewMode === 'grid' && "bg-white shadow-sm text-primary")}
                                 >
                                     <LayoutGrid className="h-4 w-4" />
-                                    عرض أفقي
+                                    العرض الأفقي
                                 </Button>
                                 <Button 
                                     variant="ghost" 
@@ -43,7 +47,7 @@ export default function FieldVisitsPage() {
                                     className={cn("rounded-xl font-bold gap-2", viewMode === 'cards' && "bg-white shadow-sm text-primary")}
                                 >
                                     <LayoutList className="h-4 w-4" />
-                                    بطاقات
+                                    نظام البطاقات
                                 </Button>
                             </div>
 
@@ -61,7 +65,7 @@ export default function FieldVisitsPage() {
             <div className="space-y-4">
                 <div className="flex items-center gap-2 px-2">
                     <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                    <h3 className="font-black text-lg">الجدول التنفيذي للزيارات</h3>
+                    <h3 className="font-black text-lg">الخطة التنفيذية للمواقع</h3>
                 </div>
                 
                 {viewMode === 'grid' ? <FieldVisitsGrid /> : <FieldVisitsList />}
