@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Eye, MapPin, HardHat, Users, Building2, User, Clock, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Eye, MapPin, HardHat, Users, Building2, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -29,7 +29,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * مكون عرض يوميات المواقع (التصميم الفني الهندسي المكثف):
- * يربط التقدم بالجدول الزمني المخطط.
+ * يربط التقدم بالجدول الزمني المخطط ويكشف الانحرافات الزمنية.
  */
 export function FieldVisitsGrid() {
   const { firestore } = useFirebase();
@@ -72,7 +72,7 @@ export function FieldVisitsGrid() {
                 const isCancelled = visit.status === 'cancelled';
                 const isConfirmed = visit.status === 'confirmed';
                 
-                // حساب الانحراف الزمني
+                // حساب الانحراف الزمني: إذا كان تاريخ الزيارة الفعلي بعد تاريخ انتهاء المرحلة المخطط
                 const isDelayed = scheduledDate && phaseEndDate && scheduledDate > phaseEndDate;
                 
                 return (
@@ -109,7 +109,7 @@ export function FieldVisitsGrid() {
                                 {isDelayed ? (
                                     <div className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-700 flex items-center gap-2">
                                         <AlertTriangle className="h-3 w-3" />
-                                        <span className="text-[10px] font-bold">متأخر عن الجدول</span>
+                                        <span className="text-[10px] font-bold">تأخير عن الجدول</span>
                                     </div>
                                 ) : (
                                     <div className="p-2 bg-green-50 border border-green-100 rounded-lg text-green-700 flex items-center gap-2">
