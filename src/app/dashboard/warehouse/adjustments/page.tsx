@@ -2,15 +2,15 @@
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Ban, Loader2, MoreHorizontal, Eye, Trash2, RotateCcw, AlertCircle, ShoppingCart, ArrowUpFromLine } from 'lucide-react';
+import { PlusCircle, Ban, Loader2, MoreHorizontal, Eye, Trash2, RotateCcw, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useFirebase, useSubscription } from '@/firebase';
 import { where, orderBy, doc, deleteDoc } from 'firebase/firestore';
-import type { InventoryAdjustment } from '@/lib/types';
+import type { InventoryAdjustment, JournalEntry } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const typeTranslations: Record<string, string> = {
     damage: 'تلف مواد',
@@ -36,12 +37,15 @@ export default function AdjustmentsPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [activeTab, setActiveTab] = useState('all');
     
-    // تم تعديل الاستعلام ليشمل كافة الأنواع لمنع التعليق (Spinner) وضمان ظهور المردودات
+    // استعلام شامل لضمان ظهور كافة الحركات (مردودات وتسويات)
     const adjQuery = useMemo(() => [
         orderBy('date', 'desc')
     ], []);
     
     const { data: allAdjustments, loading, error } = useSubscription<InventoryAdjustment>(firestore, 'inventoryAdjustments', adjQuery);
+
+    const { data: journalEntries } = useSubscription<JournalEntry>(firestore, 'journalEntries');
+    const existingJeIds = useMemo(() => new Set(journalEntries.map(d => d.id)), [journalEntries]);
 
     const filteredAdjustments = useMemo(() => {
         if (activeTab === 'all') return allAdjustments;
@@ -74,7 +78,7 @@ export default function AdjustmentsPage() {
                                 <RotateCcw className="text-primary" />
                                 سجل العمليات المخزنية الاستثنائية
                             </CardTitle>
-                            <CardDescription>متابعة المردودات، التوالف، والعجز المخزني لضمان دقة الأرصدة.</CardDescription>
+                            <CardDescription>متابعة المردودات، التوالف، والعجز المخزني لضمان دقة الأرصدة والربط المالي.</CardDescription>
                         </div>
                         <div className="flex gap-2">
                             <Button asChild variant="outline" size="sm" className="rounded-xl border-primary text-primary hover:bg-primary/5">
@@ -99,7 +103,7 @@ export default function AdjustmentsPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>خطأ في جلب البيانات</AlertTitle>
                     <AlertDescription>
-                        حدثت مشكلة أثناء الاتصال بقاعدة البيانات. قد يكون السبب نقص في الفهارس (Indexes) أو ضعف في الشبكة.
+                        حدثت مشكلة أثناء الاتصال بقاعدة البيانات. يرجى التأكد من استقرار الشبكة.
                     </AlertDescription>
                 </Alert>
             )}
@@ -107,7 +111,7 @@ export default function AdjustmentsPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-2xl h-12">
                     <TabsTrigger value="all" className="rounded-xl font-bold">الكل ({allAdjustments.length})</TabsTrigger>
-                    <TabsTrigger value="returns" className="rounded-xl font-bold">المردودات (مشتريات/مبيعات)</TabsTrigger>
+                    <TabsTrigger value="returns" className="rounded-xl font-bold">المردودات</TabsTrigger>
                     <TabsTrigger value="losses" className="rounded-xl font-bold">الخسائر (تلف/فقد)</TabsTrigger>
                 </TabsList>
 
@@ -129,7 +133,7 @@ export default function AdjustmentsPage() {
                                     <TableCell colSpan={6} className="h-48 text-center">
                                         <div className="flex flex-col items-center gap-3">
                                             <Loader2 className="animate-spin h-10 w-10 text-primary" />
-                                            <p className="text-sm font-bold text-muted-foreground">جاري فحص وتحديث الأرصدة...</p>
+                                            <p className="text-sm font-bold text-muted-foreground">جاري فحص وتحديث السجلات...</p>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -146,12 +150,26 @@ export default function AdjustmentsPage() {
                                 filteredAdjustments.map(adj => {
                                     const isReturn = adj.type.includes('return');
                                     const isLoss = ['damage', 'theft'].includes(adj.type);
+                                    const hasIntegrityError = !adj.journalEntryId || !existingJeIds.has(adj.journalEntryId);
+
                                     return (
-                                        <TableRow key={adj.id} className="hover:bg-muted/30 transition-colors">
+                                        <TableRow key={adj.id} className={cn("hover:bg-muted/30 transition-colors", hasIntegrityError && "bg-red-50/30")}>
                                             <TableCell className="px-6 font-mono font-bold text-primary">
-                                                <Link href={`/dashboard/warehouse/adjustments/${adj.id}`} className="hover:underline">
-                                                    {adj.adjustmentNumber}
-                                                </Link>
+                                                <div className="flex items-center gap-2">
+                                                    {hasIntegrityError && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <AlertCircle className="h-4 w-4 text-red-600" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent><p>خلل مالي: لا يوجد قيد مرتبط.</p></TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
+                                                    <Link href={`/dashboard/warehouse/adjustments/${adj.id}`} className="hover:underline">
+                                                        {adj.adjustmentNumber}
+                                                    </Link>
+                                                </div>
                                             </TableCell>
                                             <TableCell className="text-sm font-medium">{toFirestoreDate(adj.date) ? format(toFirestoreDate(adj.date)!, 'dd/MM/yyyy') : '-'}</TableCell>
                                             <TableCell>
