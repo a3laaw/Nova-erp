@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { query, orderBy, collection, getDocs, where } from 'firebase/firestore';
+import { orderBy } from 'firebase/firestore';
 import type { FieldVisit, Employee } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,9 +16,9 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, MapPin, HardHat, CalendarCheck, Coins, Users, Building2, User } from 'lucide-react';
+import { Eye, MapPin, HardHat, Users, Building2, User, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { format } from 'date-fns';
@@ -53,14 +52,14 @@ export function FieldVisitsGrid() {
         <div className="min-w-[1800px]">
           <Table className="border-collapse table-fixed w-full">
             <TableHeader className="bg-slate-900 text-white sticky top-0 z-30">
-              <TableRow className="h-12">
-                <TableHead className="w-12 text-center text-white border-l border-slate-700">#</TableHead>
-                <TableHead className="w-64 text-right text-white border-l border-slate-700">العميل والمشروع</TableHead>
-                <TableHead className="w-48 text-center text-white border-l border-slate-700">بيانات العقار</TableHead>
-                <TableHead className="w-56 text-center text-white border-l border-slate-700">مرحلة العمل (WBS)</TableHead>
-                <TableHead className="w-48 text-center text-white border-l border-slate-700">فرق العمل المنفذة</TableHead>
-                <TableHead className="w-full text-right text-white border-l border-slate-700">الأعمال الجاري عليها</TableHead>
-                <TableHead className="w-20 text-center text-white">إجراء</TableHead>
+              <TableRow className="h-12 border-none">
+                <TableHead className="w-12 text-center text-white border-l border-slate-700 font-black">#</TableHead>
+                <TableHead className="w-64 text-right text-white border-l border-slate-700 font-black">العميل والمشروع</TableHead>
+                <TableHead className="w-48 text-center text-white border-l border-slate-700 font-black">بيانات العقار (أدوار)</TableHead>
+                <TableHead className="w-56 text-center text-white border-l border-slate-700 font-black">مرحلة العمل (WBS)</TableHead>
+                <TableHead className="w-48 text-center text-white border-l border-slate-700 font-black">فرق العمل المنفذة</TableHead>
+                <TableHead className="w-full text-right text-white border-l border-slate-700 font-black">الأعمال الجاري عليها</TableHead>
+                <TableHead className="w-20 text-center text-white font-black">إجراء</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -68,14 +67,16 @@ export function FieldVisitsGrid() {
                 const scheduledDate = toFirestoreDate(visit.scheduledDate);
                 
                 return (
-                  <TableRow key={visit.id} className="h-48 group border-b border-slate-200">
+                  <TableRow key={visit.id} className="h-48 group border-b border-slate-200 hover:bg-muted/5 transition-colors">
                     <TableCell className="text-center font-black bg-slate-50 border-l border-slate-200">{index + 1}</TableCell>
                     
                     {/* عمود العميل والمشروع */}
                     <TableCell className="p-4 border-l align-top space-y-3">
                         <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName}</p>
                         <div className="space-y-1 bg-sky-50/50 p-3 rounded-xl border border-sky-100">
-                            <p className="text-[10px] font-black text-sky-700 uppercase">عنوان الموقع:</p>
+                            <p className="text-[10px] font-black text-sky-700 uppercase flex items-center gap-1">
+                                <Building2 className="h-3 w-3" /> عنوان الموقع:
+                            </p>
                             <p className="text-xs font-bold leading-relaxed">{visit.clientAddress || 'غير محدد'}</p>
                         </div>
                     </TableCell>
@@ -135,7 +136,6 @@ export function FieldVisitsGrid() {
                                                 <Users className="h-3 w-3" /> {teamName}
                                             </p>
                                             <div className="space-y-0.5 border-t pt-1">
-                                                {/* عرض أسماء العمال من الفريق (مثال تجريبي) */}
                                                 {employees?.filter(e => e.teamId === visit.teamIds?.[i]).slice(0, 3).map(e => (
                                                     <p key={e.id} className="text-[9px] font-medium text-slate-600">• {e.fullName}</p>
                                                 ))}
@@ -153,7 +153,10 @@ export function FieldVisitsGrid() {
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <Badge className="bg-slate-100 text-slate-800 border-none font-black text-[9px] uppercase px-3">الأعمال الجاري عليها</Badge>
-                                <span className="text-[10px] font-bold text-muted-foreground">{scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : '-'}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : '-'}
+                                </span>
                             </div>
                             <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-slate-200 min-h-[100px]">
                                 <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{visit.details || visit.plannedStageName}</p>
@@ -168,8 +171,9 @@ export function FieldVisitsGrid() {
                             </Link>
                         </Button>
                     </TableCell>
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

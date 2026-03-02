@@ -1,24 +1,24 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, addDoc, getDoc, query, where, limit, getDocs } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject, BoqItem } from '@/lib/types';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc } from 'firebase/firestore';
+import type { FieldVisit, ConstructionProject } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Loader2, CheckCircle2, Save, ArrowRight, Navigation, ShieldCheck, Clock, ClipboardCheck, Sparkles } from 'lucide-react';
+import { MapPin, Loader2, CheckCircle2, Save, ArrowRight, Navigation, ShieldCheck, Clock, ClipboardCheck, Sparkles, Building2, HardHat } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة تفاصيل الزيارة الميدانية (ربط حصري بالمقاولات):
