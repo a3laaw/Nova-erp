@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck } from 'lucide-react';
+import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck, Trash2, PlusCircle } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
