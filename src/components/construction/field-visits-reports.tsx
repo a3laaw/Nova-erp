@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { query, orderBy, where } from 'firebase/firestore';
-import type { FieldVisit, Client, WorkTeam } from '@/lib/types';
+import type { FieldVisit, ConstructionProject, WorkTeam } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,20 +30,20 @@ export function FieldVisitsReports() {
   const [dateFrom, setDateFrom] = React.useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = React.useState<Date | undefined>(() => endOfMonth(new Date()));
   
-  // تحويل الفلاتر إلى مصفوفات لدعم الاختيار المتعدد
-  const [selectedClientIds, setSelectedClientIds] = React.useState<string[]>([]);
+  // فلاتر البحث المتعدد
+  const [selectedProjectIds, setSelectedProjectIds] = React.useState<string[]>([]);
   const [selectedTeamIds, setSelectedTeamIds] = React.useState<string[]>([]);
   const [selectedStageNames, setSelectedStageNames] = React.useState<string[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const { data: visits, loading: visitsLoading } = useSubscription<FieldVisit>(firestore, 'field_visits', [orderBy('scheduledDate', 'desc')]);
-  const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
+  const { data: projects = [] } = useSubscription<ConstructionProject>(firestore, 'projects', [orderBy('projectName')]);
   const { data: teams = [] } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
 
   // تحويل البيانات لخيارات MultiSelect
-  const clientOptions: MultiSelectOption[] = React.useMemo(() => 
-    clients.map(c => ({ value: c.id!, label: c.nameAr })), 
-  [clients]);
+  const projectOptions: MultiSelectOption[] = React.useMemo(() => 
+    projects.map(p => ({ value: p.id!, label: p.projectName })), 
+  [projects]);
 
   const teamOptions: MultiSelectOption[] = React.useMemo(() => 
     teams.map(t => ({ value: t.id!, label: t.name })), 
@@ -63,8 +63,7 @@ export function FieldVisitsReports() {
 
       const matchesDate = !dateFrom || !dateTo || isWithinInterval(visitDate, { start: dateFrom, end: dateTo });
       
-      // منطق الفلترة المتعددة: إذا كانت المصفوفة فارغة يعرض الكل، وإذا كان بها عناصر يفحص الوجود
-      const matchesClient = selectedClientIds.length === 0 || selectedClientIds.includes(visit.clientId);
+      const matchesProject = selectedProjectIds.length === 0 || selectedProjectIds.includes(visit.projectId);
       const matchesTeam = selectedTeamIds.length === 0 || visit.teamIds?.some(id => selectedTeamIds.includes(id));
       const matchesStage = selectedStageNames.length === 0 || selectedStageNames.includes(visit.plannedStageName);
       
@@ -72,9 +71,9 @@ export function FieldVisitsReports() {
         visit.projectName.toLowerCase().includes(searchQuery.toLowerCase()) || 
         visit.clientName.toLowerCase().includes(searchQuery.toLowerCase());
 
-      return matchesDate && matchesClient && matchesTeam && matchesStage && matchesSearch;
+      return matchesDate && matchesProject && matchesTeam && matchesStage && matchesSearch;
     });
-  }, [visits, dateFrom, dateTo, selectedClientIds, selectedTeamIds, selectedStageNames, searchQuery]);
+  }, [visits, dateFrom, dateTo, selectedProjectIds, selectedTeamIds, selectedStageNames, searchQuery]);
 
   const stats = React.useMemo(() => {
     const total = filteredData.length;
@@ -100,7 +99,7 @@ export function FieldVisitsReports() {
               <FileBarChart className="text-primary h-7 w-7" />
               تقارير الأداء الميداني واللوجستيات
             </CardTitle>
-            <CardDescription>تحليل شامل للزيارات الميدانية، إنجاز الفرق، ومتابعة مشاريع المقاولات.</CardDescription>
+            <CardDescription>تحليل شامل للزيارات الميدانية الموزعة على المشاريع وفرق التنفيذ.</CardDescription>
           </div>
         </div>
         <Button onClick={() => window.print()} className="gap-2 font-bold rounded-xl shadow-lg">
@@ -121,12 +120,12 @@ export function FieldVisitsReports() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-black text-primary mr-1">العملاء (بحث واختيار متعدد)</Label>
+              <Label className="text-xs font-black text-primary mr-1">المشاريع (بحث واختيار متعدد)</Label>
               <MultiSelect 
-                options={clientOptions}
-                selected={selectedClientIds}
-                onChange={setSelectedClientIds}
-                placeholder="اختر عميلاً أو أكثر..."
+                options={projectOptions}
+                selected={selectedProjectIds}
+                onChange={setSelectedProjectIds}
+                placeholder="اختر مشروعاً أو أكثر..."
                 className="bg-background"
               />
             </div>
@@ -191,13 +190,12 @@ export function FieldVisitsReports() {
         </Card>
       </div>
 
-      {/* Detailed Table Report - The standard shape for non-daily reports */}
       <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-card">
         <CardHeader className="bg-muted/10 border-b pb-6 px-8">
           <div className="flex justify-between items-center">
             <div>
                 <CardTitle className="text-xl font-black">سجل الحركة الميدانية التفصيلي</CardTitle>
-                <CardDescription>عرض جدول لجميع الزيارات بناءً على المعايير المختارة أعلاه.</CardDescription>
+                <CardDescription>عرض جدول لجميع الزيارات بناءً على المشاريع والمعايير المختارة.</CardDescription>
             </div>
             <Badge variant="secondary" className="font-bold px-4 h-7 rounded-full">
                 {filteredData.length} سجل متاح
