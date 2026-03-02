@@ -4,8 +4,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, where, limit, addDoc } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject, BoqItem, Account } from '@/lib/types';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import type { FieldVisit, ConstructionProject, BoqItem } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -46,6 +46,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 export default function FieldVisitDetailPage() {
     const params = useParams();
@@ -62,11 +63,53 @@ export default function FieldVisitDetailPage() {
     const [progressAchieved, setProgressAchieved] = useState([0]); 
     const [cancellationReason, setCancellationReason] = useState('');
     const [location, setLocation] = useState<{ latitude: number, longitude: number, accuracy: number } | null>(null);
-    
     const [isNotDoneAlertOpen, setIsNotDoneAlertOpen] = useState(false);
+
+    const [boqItems, setBoqItems] = useState<{id: string, name: string}[]>([]);
+    const [selectedStageId, setSelectedStageId] = useState('');
+    const [isLoadingStages, setIsLoadingStages] = useState(false);
 
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
+
+    // ✨ محرك جلب بنود المقايسة للتأكيد (مطابق للجدولة السريعة)
+    useEffect(() => {
+        if (!visit || !firestore) return;
+
+        const fetchStages = async () => {
+            setIsLoadingStages(true);
+            try {
+                const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
+                if (projectSnap.exists()) {
+                    const projectData = projectSnap.data() as ConstructionProject;
+                    if (projectData.boqId) {
+                        const q = query(collection(firestore, `boqs/${projectData.boqId}/items`), orderBy('itemNumber'));
+                        const snap = await getDocs(q);
+                        const stages = snap.docs.map(d => {
+                            const data = d.data();
+                            return { 
+                                id: d.id, 
+                                name: `${data.itemNumber} - ${data.description}`,
+                                isHeader: data.isHeader || false
+                            }
+                        }).filter(i => !i.isHeader && i.name);
+                        setBoqItems(stages);
+                        
+                        // تعيين المرحلة المخطط لها كافتراضية
+                        if (visit.plannedStageId) {
+                            setSelectedStageId(visit.plannedStageId);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error fetching BOQ stages for confirmation:", e);
+            } finally {
+                setIsLoadingStages(false);
+            }
+        };
+
+        fetchStages();
+    }, [visit, firestore]);
 
     useEffect(() => {
         if (visit?.confirmationData) {
@@ -110,7 +153,7 @@ export default function FieldVisitDetailPage() {
         );
         const visitsSnap = await getDocs(confirmedVisitsQuery);
         
-        const totalItemProgress = visitsSnap.docs.reduce((sum, d) => sum + (d.data().confirmationData?.progressAchieved || 0), 0) + (isSaving ? 0 : progressAchieved[0]);
+        const totalItemProgress = visitsSnap.docs.reduce((sum, d) => sum + (d.data().confirmationData?.progressAchieved || 0), 0) + progressAchieved[0];
         
         const boqItemRef = doc(firestore, `boqs/${boqId}/items`, itemId);
         batch.update(boqItemRef, { 
@@ -148,10 +191,13 @@ export default function FieldVisitDetailPage() {
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
+            const actualStage = boqItems.find(s => s.id === selectedStageId);
             
             // 1. تحديث حالة الزيارة
             batch.update(visitRef!, {
                 status: 'confirmed',
+                plannedStageId: selectedStageId, // تحديث المرحلة إذا تم تغييرها في الموقع
+                plannedStageName: actualStage?.name || visit.plannedStageName,
                 confirmationData: {
                     confirmedAt: serverTimestamp(),
                     notes,
@@ -163,13 +209,13 @@ export default function FieldVisitDetailPage() {
 
             // 2. إعادة حساب الإنجاز
             const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
-            if (projectSnap.exists() && visit.plannedStageId) {
+            if (projectSnap.exists() && selectedStageId) {
                 const projectData = projectSnap.data() as ConstructionProject;
                 if (projectData.boqId) {
-                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, visit.plannedStageId, batch);
+                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, selectedStageId, batch);
                 }
 
-                // 3. ✨ الربط المالي الذكي: فحص شروط العقد لتوليد مستخلص تلقائي
+                // 3. الربط المالي الذكي
                 if (projectData.linkedTransactionId) {
                     const txRef = doc(firestore, `clients/${visit.clientId}/transactions/${projectData.linkedTransactionId}`);
                     const txSnap = await getDoc(txRef);
@@ -177,10 +223,9 @@ export default function FieldVisitDetailPage() {
                     if (txSnap.exists()) {
                         const txData = txSnap.data();
                         const contractClauses = txData.contract?.clauses || [];
-                        const matchedClause = contractClauses.find((c: any) => c.condition === visit.plannedStageName && c.status === 'غير مستحقة');
+                        const matchedClause = contractClauses.find((c: any) => c.condition === (actualStage?.name || visit.plannedStageName) && c.status === 'غير مستحقة');
 
                         if (matchedClause) {
-                            // إنشاء مسودة مستخلص
                             const currentYear = new Date().getFullYear();
                             const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
                             const appCounterDoc = await getDoc(appCounterRef);
@@ -191,52 +236,32 @@ export default function FieldVisitDetailPage() {
                             const newJeRef = doc(collection(firestore, 'journalEntries'));
 
                             batch.set(newAppRef, {
-                                applicationNumber: appNumber,
-                                date: serverTimestamp(),
-                                projectId: visit.projectId,
-                                clientId: visit.clientId,
-                                clientName: visit.clientName,
-                                projectName: visit.projectName,
-                                totalAmount: matchedClause.amount,
-                                status: 'draft',
-                                journalEntryId: newJeRef.id,
-                                items: [{ description: `إنجاز مرحلة: ${visit.plannedStageName}`, currentQuantity: 1, unitPrice: matchedClause.amount, totalAmount: matchedClause.amount }],
-                                createdAt: serverTimestamp(),
-                                createdBy: 'system-auto-workflow'
+                                applicationNumber: appNumber, date: serverTimestamp(), projectId: visit.projectId,
+                                clientId: visit.clientId, clientName: visit.clientName, projectName: visit.projectName,
+                                totalAmount: matchedClause.amount, status: 'draft', journalEntryId: newJeRef.id,
+                                items: [{ description: `إنجاز مرحلة: ${actualStage?.name || visit.plannedStageName}`, currentQuantity: 1, unitPrice: matchedClause.amount, totalAmount: matchedClause.amount }],
+                                createdAt: serverTimestamp(), createdBy: 'system-auto-workflow'
                             });
 
-                            // إنشاء القيد المحاسبي المرتبط
                             const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
                             const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', visit.clientName), limit(1)));
 
                             if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
-                                const revAcc = revenueAccountSnap.docs[0];
-                                const cliAcc = clientAccountSnap.docs[0];
-                                
                                 batch.set(newJeRef, {
-                                    entryNumber: `JE-${appNumber}`,
-                                    date: serverTimestamp(),
-                                    narration: `[توليد آلي] استحقاق دفعة إنجاز مرحلة: ${visit.plannedStageName} - مشروع: ${visit.projectName}`,
-                                    status: 'draft',
-                                    totalDebit: matchedClause.amount,
-                                    totalCredit: matchedClause.amount,
+                                    entryNumber: `JE-${appNumber}`, date: serverTimestamp(),
+                                    narration: `[توليد آلي] استحقاق دفعة إنجاز مرحلة: ${actualStage?.name || visit.plannedStageName} - مشروع: ${visit.projectName}`,
+                                    status: 'draft', totalDebit: matchedClause.amount, totalCredit: matchedClause.amount,
                                     lines: [
-                                        { accountId: cliAcc.id, accountName: visit.clientName, debit: matchedClause.amount, credit: 0, auto_profit_center: visit.projectId },
-                                        { accountId: revAcc.id, accountName: revAcc.data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: visit.projectId }
+                                        { accountId: clientAccountSnap.docs[0].id, accountName: visit.clientName, debit: matchedClause.amount, credit: 0, auto_profit_center: visit.projectId },
+                                        { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: visit.projectId }
                                     ],
-                                    clientId: visit.clientId,
-                                    transactionId: visit.projectId,
-                                    createdAt: serverTimestamp(),
-                                    createdBy: 'system-auto-workflow'
+                                    clientId: visit.clientId, transactionId: visit.projectId, createdAt: serverTimestamp(), createdBy: 'system-auto-workflow'
                                 });
                             }
 
-                            // تحديث حالة البند في العقد
                             const updatedClauses = contractClauses.map((c: any) => c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c);
                             batch.update(txRef, { 'contract.clauses': updatedClauses });
                             batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
-                            
-                            toast({ title: 'أتمتة مالية', description: `تم إصدار مسودة مستخلص بقيمة ${formatCurrency(matchedClause.amount)} لإنجاز المرحلة.` });
                         }
                     }
                 }
@@ -332,8 +357,19 @@ export default function FieldVisitDetailPage() {
                             <p className="font-bold">{scheduledDate ? format(scheduledDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</p>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المستهدفة</Label>
-                            <p className="font-black text-primary">{visit.plannedStageName}</p>
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المنفذة (من المقايسة)</Label>
+                            {isProcessed ? (
+                                <p className="font-black text-primary">{visit.plannedStageName}</p>
+                            ) : (
+                                <InlineSearchList 
+                                    value={selectedStageId}
+                                    onSelect={setSelectedStageId}
+                                    options={boqItems.map(i => ({ value: i.id, label: i.name }))}
+                                    placeholder={isLoadingStages ? "جاري التحميل..." : "اختر المرحلة..."}
+                                    disabled={isLoadingStages}
+                                    className="mt-1"
+                                />
+                            )}
                         </div>
                     </div>
 
