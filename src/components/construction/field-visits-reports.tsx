@@ -4,15 +4,11 @@
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { query, orderBy, where } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject, Client, WorkTeam } from '@/lib/types';
+import type { FieldVisit, Client, WorkTeam } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie, Legend
-} from 'recharts';
 import { 
   FileBarChart, Search, Printer, ArrowRight, Calendar, Users, 
   Target, CheckCircle2, Clock, Filter, HardHat, Building2 
@@ -23,8 +19,8 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, formatCurrency } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useRouter } from 'next/navigation';
 
 export function FieldVisitsReports() {
@@ -33,14 +29,30 @@ export function FieldVisitsReports() {
 
   const [dateFrom, setDateFrom] = React.useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = React.useState<Date | undefined>(() => endOfMonth(new Date()));
-  const [selectedClientId, setSelectedClientId] = React.useState('all');
-  const [selectedTeamId, setSelectedTeamId] = React.useState('all');
-  const [selectedStageName, setSelectedStageName] = React.useState('all');
+  
+  // تحويل الفلاتر إلى مصفوفات لدعم الاختيار المتعدد
+  const [selectedClientIds, setSelectedClientIds] = React.useState<string[]>([]);
+  const [selectedTeamIds, setSelectedTeamIds] = React.useState<string[]>([]);
+  const [selectedStageNames, setSelectedStageNames] = React.useState<string[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
 
   const { data: visits, loading: visitsLoading } = useSubscription<FieldVisit>(firestore, 'field_visits', [orderBy('scheduledDate', 'desc')]);
   const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
   const { data: teams = [] } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
+
+  // تحويل البيانات لخيارات MultiSelect
+  const clientOptions: MultiSelectOption[] = React.useMemo(() => 
+    clients.map(c => ({ value: c.id!, label: c.nameAr })), 
+  [clients]);
+
+  const teamOptions: MultiSelectOption[] = React.useMemo(() => 
+    teams.map(t => ({ value: t.id!, label: t.name })), 
+  [teams]);
+
+  const stageOptions: MultiSelectOption[] = React.useMemo(() => {
+    const stages = new Set(visits.map(v => v.plannedStageName).filter(Boolean));
+    return Array.from(stages).sort().map(s => ({ value: s, label: s }));
+  }, [visits]);
 
   const filteredData = React.useMemo(() => {
     if (!visits) return [];
@@ -50,16 +62,19 @@ export function FieldVisitsReports() {
       if (!visitDate) return false;
 
       const matchesDate = !dateFrom || !dateTo || isWithinInterval(visitDate, { start: dateFrom, end: dateTo });
-      const matchesClient = selectedClientId === 'all' || visit.clientId === selectedClientId;
-      const matchesTeam = selectedTeamId === 'all' || visit.teamIds?.includes(selectedTeamId);
-      const matchesStage = selectedStageName === 'all' || visit.plannedStageName === selectedStageName;
+      
+      // منطق الفلترة المتعددة: إذا كانت المصفوفة فارغة يعرض الكل، وإذا كان بها عناصر يفحص الوجود
+      const matchesClient = selectedClientIds.length === 0 || selectedClientIds.includes(visit.clientId);
+      const matchesTeam = selectedTeamIds.length === 0 || visit.teamIds?.some(id => selectedTeamIds.includes(id));
+      const matchesStage = selectedStageNames.length === 0 || selectedStageNames.includes(visit.plannedStageName);
+      
       const matchesSearch = !searchQuery || 
         visit.projectName.toLowerCase().includes(searchQuery.toLowerCase()) || 
         visit.clientName.toLowerCase().includes(searchQuery.toLowerCase());
 
       return matchesDate && matchesClient && matchesTeam && matchesStage && matchesSearch;
     });
-  }, [visits, dateFrom, dateTo, selectedClientId, selectedTeamId, selectedStageName, searchQuery]);
+  }, [visits, dateFrom, dateTo, selectedClientIds, selectedTeamIds, selectedStageNames, searchQuery]);
 
   const stats = React.useMemo(() => {
     const total = filteredData.length;
@@ -67,23 +82,14 @@ export function FieldVisitsReports() {
     const planned = total - confirmed;
     const successRate = total > 0 ? (confirmed / total) * 100 : 0;
 
-    const chartData = [
-      { name: 'مؤكدة (منفذة)', value: confirmed, fill: '#10b981' },
-      { name: 'مجدولة (قادمة)', value: planned, fill: '#3b82f6' }
-    ];
-
-    return { total, confirmed, planned, successRate, chartData };
+    return { total, confirmed, planned, successRate };
   }, [filteredData]);
-
-  const uniqueStages = React.useMemo(() => {
-    const stages = new Set(visits.map(v => v.plannedStageName).filter(Boolean));
-    return Array.from(stages).sort();
-  }, [visits]);
 
   if (visitsLoading) return <div className="space-y-6"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-96 w-full rounded-2xl"/></div>;
 
   return (
     <div className="space-y-6" dir="rtl">
+      {/* Header - No Print */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 no-print">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="rounded-full">
@@ -102,56 +108,58 @@ export function FieldVisitsReports() {
         </Button>
       </div>
 
+      {/* Filters Section - No Print */}
       <Card className="rounded-[2rem] border-none shadow-sm bg-muted/30 no-print">
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-2">
-              <Label className="text-xs font-bold mr-1">الفترة الزمنية</Label>
+              <Label className="text-xs font-black text-primary mr-1">الفترة الزمنية</Label>
               <div className="flex gap-2">
-                <Input type="date" value={dateFrom ? format(dateFrom, 'yyyy-MM-dd') : ''} onChange={e => setDateFrom(e.target.value ? new Date(e.target.value) : undefined)} className="h-9 text-xs rounded-xl" />
-                <Input type="date" value={dateTo ? format(dateTo, 'yyyy-MM-dd') : ''} onChange={e => setDateTo(e.target.value ? new Date(e.target.value) : undefined)} className="h-9 text-xs rounded-xl" />
+                <Input type="date" value={dateFrom ? format(dateFrom, 'yyyy-MM-dd') : ''} onChange={e => setDateFrom(e.target.value ? new Date(e.target.value) : undefined)} className="h-10 text-xs rounded-xl bg-background border-2" />
+                <Input type="date" value={dateTo ? format(dateTo, 'yyyy-MM-dd') : ''} onChange={e => setDateTo(e.target.value ? new Date(e.target.value) : undefined)} className="h-10 text-xs rounded-xl bg-background border-2" />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold mr-1">العميل</Label>
-              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-                <SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">كل العملاء</SelectItem>
-                  {clients.map(c => <SelectItem key={c.id} value={c.id!}>{c.nameAr}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-black text-primary mr-1">العملاء (بحث واختيار متعدد)</Label>
+              <MultiSelect 
+                options={clientOptions}
+                selected={selectedClientIds}
+                onChange={setSelectedClientIds}
+                placeholder="اختر عميلاً أو أكثر..."
+                className="bg-background"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold mr-1">فريق العمل</Label>
-              <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
-                <SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">كل الفرق</SelectItem>
-                  {teams.map(t => <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-black text-primary mr-1">فرق العمل الفنية</Label>
+              <MultiSelect 
+                options={teamOptions}
+                selected={selectedTeamIds}
+                onChange={setSelectedTeamIds}
+                placeholder="اختر الفرق..."
+                className="bg-background"
+              />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold mr-1">مرحلة العمل (WBS)</Label>
-              <Select value={selectedStageName} onValueChange={setSelectedStageName}>
-                <SelectTrigger className="h-9 rounded-xl bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">كل المراحل</SelectItem>
-                  {uniqueStages.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-black text-primary mr-1">مراحل الـ WBS</Label>
+              <MultiSelect 
+                options={stageOptions}
+                selected={selectedStageNames}
+                onChange={setSelectedStageNames}
+                placeholder="اختر المراحل..."
+                className="bg-background"
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-none shadow-sm p-6 bg-primary text-primary-foreground">
-          <Label className="text-[10px] font-black uppercase opacity-80 block mb-1">إجمالي الزيارات</Label>
+          <Label className="text-[10px] font-black uppercase opacity-80 block mb-1">إجمالي الزيارات المفلترة</Label>
           <div className="flex justify-between items-end">
             <p className="text-4xl font-black font-mono">{stats.total}</p>
             <Calendar className="h-8 w-8 opacity-20" />
@@ -183,34 +191,45 @@ export function FieldVisitsReports() {
         </Card>
       </div>
 
-      <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-card">
-        <CardHeader className="bg-muted/10 border-b pb-6">
-          <CardTitle className="text-xl font-black">سجل الزيارات التفصيلي</CardTitle>
-          <CardDescription>قائمة بالزيارات المفلترة مع تفاصيل الإنجاز والموقع.</CardDescription>
+      {/* Detailed Table Report - The standard shape for non-daily reports */}
+      <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-card">
+        <CardHeader className="bg-muted/10 border-b pb-6 px-8">
+          <div className="flex justify-between items-center">
+            <div>
+                <CardTitle className="text-xl font-black">سجل الحركة الميدانية التفصيلي</CardTitle>
+                <CardDescription>عرض جدول لجميع الزيارات بناءً على المعايير المختارة أعلاه.</CardDescription>
+            </div>
+            <Badge variant="secondary" className="font-bold px-4 h-7 rounded-full">
+                {filteredData.length} سجل متاح
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead className="px-6">تاريخ الزيارة</TableHead>
-                <TableHead>المشروع / العميل</TableHead>
-                <TableHead>المرحلة (WBS)</TableHead>
-                <TableHead>الفرق المنفذة</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead className="text-left px-6">المسؤول</TableHead>
+              <TableRow className="h-12">
+                <TableHead className="px-8 font-black text-slate-900">تاريخ الزيارة</TableHead>
+                <TableHead className="font-black text-slate-900">المشروع / العميل</TableHead>
+                <TableHead className="font-black text-slate-900">المرحلة (WBS)</TableHead>
+                <TableHead className="font-black text-slate-900">فرق العمل المنفذة</TableHead>
+                <TableHead className="font-black text-slate-900">الحالة</TableHead>
+                <TableHead className="text-left px-8 font-black text-slate-900">المهندس المسؤول</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">
-                    لا توجد بيانات تطابق الفلاتر المختارة.
+                  <TableCell colSpan={6} className="h-64 text-center text-muted-foreground italic">
+                    <div className="flex flex-col items-center gap-3 opacity-30">
+                        <Filter className="h-12 w-12" />
+                        <p className="text-lg font-bold">لا توجد بيانات تطابق الفلاتر المختارة حالياً.</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredData.map((visit) => (
-                  <TableRow key={visit.id} className="hover:bg-muted/30 transition-colors">
-                    <TableCell className="px-6 font-bold text-xs">
+                  <TableRow key={visit.id} className="h-16 hover:bg-muted/30 transition-colors border-b last:border-0">
+                    <TableCell className="px-8 font-bold text-xs">
                       {toFirestoreDate(visit.scheduledDate) ? format(toFirestoreDate(visit.scheduledDate)!, 'dd/MM/yyyy', { locale: ar }) : '-'}
                     </TableCell>
                     <TableCell>
@@ -218,27 +237,27 @@ export function FieldVisitsReports() {
                       <p className="text-[10px] text-muted-foreground font-bold">{visit.clientName}</p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px] border-blue-100">
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px] border-blue-100 font-bold">
                         {visit.plannedStageName}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
                         {visit.teamNames?.length ? visit.teamNames.map((t, i) => (
-                          <Badge key={i} variant="secondary" className="text-[8px] h-4">{t}</Badge>
+                          <Badge key={i} variant="secondary" className="text-[8px] h-4 font-black">{t}</Badge>
                         )) : <span className="text-[10px] italic text-muted-foreground">-</span>}
-                        {visit.subcontractorName && <Badge className="bg-orange-100 text-orange-700 text-[8px] h-4 border-none">{visit.subcontractorName}</Badge>}
+                        {visit.subcontractorName && <Badge className="bg-orange-100 text-orange-700 text-[8px] h-4 border-none font-black">{visit.subcontractorName}</Badge>}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={visit.status === 'confirmed' ? 'default' : 'outline'} className={cn(
-                        "font-black text-[9px]",
+                        "font-black text-[9px] px-3",
                         visit.status === 'confirmed' ? "bg-green-600" : "text-blue-600 border-blue-200"
                       )}>
-                        {visit.status === 'confirmed' ? 'منفذة' : 'مخططة'}
+                        {visit.status === 'confirmed' ? 'تمت الزيارة' : 'مجدولة'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-left px-6 text-xs font-bold text-muted-foreground">
+                    <TableCell className="text-left px-8 text-xs font-bold text-muted-foreground">
                       {visit.engineerName || 'إشراف عام'}
                     </TableCell>
                   </TableRow>
@@ -247,9 +266,9 @@ export function FieldVisitsReports() {
             </TableBody>
           </Table>
         </CardContent>
-        <CardFooter className="bg-muted/10 p-4 justify-between border-t">
-          <p className="text-xs text-muted-foreground italic">تم عرض {filteredData.length} زيارة ميدانية بناءً على الفلترة الحالية.</p>
-          <p className="text-[10px] font-black uppercase text-muted-foreground">Nova ERP - Field Logistics System</p>
+        <CardFooter className="bg-muted/10 p-4 justify-between border-t text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+          <span>Nova ERP - Intelligence Field Logistics Reporting</span>
+          <span>Generated: {format(new Date(), 'PPpp', { locale: ar })}</span>
         </CardFooter>
       </Card>
     </div>
