@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MapPin, LayoutGrid, LayoutList, Table as TableIcon, Monitor, Smartphone } from 'lucide-react';
+import { PlusCircle, MapPin, Table as TableIcon, Monitor, Smartphone, FileBarChart } from 'lucide-react';
 import Link from 'next/link';
 import { FieldVisitsList } from '@/components/construction/field-visits-list';
 import { FieldVisitsGrid } from '@/components/construction/field-visits-grid';
@@ -16,6 +17,7 @@ import { cn } from '@/lib/utils';
  * 1. العرض الأفقي (Spreadsheet): للمدير في المكتب (تخطيط ولوجستيات).
  * 2. نظام البطاقات (Cards): للمهندس في الميدان (متوافق مع الجوال).
  * 3. إدخال سبريد شيت: للجدولة الجماعية السريعة.
+ * 4. التقارير التحليلية: لمتابعة أداء الفرق والعملاء.
  */
 export default function FieldVisitsPage() {
     const [viewMode, setViewMode] = useState<'cards' | 'grid' | 'spreadsheet'>('grid');
@@ -34,7 +36,6 @@ export default function FieldVisitsPage() {
                         </div>
                         
                         <div className="flex flex-wrap items-center justify-center gap-3">
-                            {/* مفتاح تبديل أنماط العرض المطور */}
                             <div className="flex bg-muted p-1 rounded-2xl border shadow-inner">
                                 <Button 
                                     variant="ghost" 
@@ -67,6 +68,13 @@ export default function FieldVisitsPage() {
                                     جدولة سريعة
                                 </Button>
                             </div>
+
+                            <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2 border-primary text-primary hover:bg-primary/5">
+                                <Link href="/dashboard/construction/field-visits/reports">
+                                    <FileBarChart className="h-5 w-5" />
+                                    التقارير التحليلية
+                                </Link>
+                            </Button>
 
                             <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-primary/20">
                                 <Link href="/dashboard/construction/field-visits/new">
