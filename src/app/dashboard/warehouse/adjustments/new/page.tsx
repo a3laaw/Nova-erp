@@ -68,7 +68,6 @@ export default function NewAdjustmentPage() {
     const savingRef = useRef(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
     
-    // حالات الرقابة المخزنية والموردين
     const [stockBalances, setStockBalances] = useState<Record<string, number>>({});
     const [vendorPurchaseBalances, setVendorPurchaseBalances] = useState<Record<string, number>>({});
     const [loadingStock, setLoadingStock] = useState(false);
@@ -97,18 +96,18 @@ export default function NewAdjustmentPage() {
     const selectedWarehouseId = watch('warehouseId');
     const selectedVendorId = watch('vendorId');
 
+    // تحديد ما إذا كانت العملية تتضمن خروج بضاعة للتحقق من الرصيد
+    const isOutbound = useMemo(() => ['damage', 'theft', 'purchase_return'].includes(adjType), [adjType]);
+
     const totalCost = useMemo(() =>
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
-    // 1. محرك فحص رصيد المخزن اللحظي (للتلف والصرف)
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
         try {
             const balances: Record<string, number> = {};
-            
-            // حساب الداخل من المشتريات
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('warehouseId', '==', warehouseId)));
             grnsSnap.forEach(doc => {
                 const data = doc.data();
@@ -117,7 +116,6 @@ export default function NewAdjustmentPage() {
                 });
             });
 
-            // حساب الخارج/الداخل من التسويات والتحويلات
             const adjsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments')));
             adjsSnap.forEach(doc => {
                 const data = doc.data() as InventoryAdjustment;
@@ -131,15 +129,12 @@ export default function NewAdjustmentPage() {
                     }
                 });
             });
-
             setStockBalances(balances);
         } finally {
             setLoadingStock(false);
         }
     }, [firestore]);
 
-    // 2. محرك الرقابة المتقاطعة للمورد (Vendor Purchase Guard)
-    // يحسب صافي ما اشتريناه من هذا المورد تحديداً لهذا الصنف
     const fetchVendorPurchaseBalances = useCallback(async (vId: string) => {
         if (!firestore || !vId) {
             setVendorPurchaseBalances({});
@@ -148,8 +143,6 @@ export default function NewAdjustmentPage() {
         setLoadingVendorBalances(true);
         try {
             const balances: Record<string, number> = {};
-            
-            // جلب كل ما استلمناه من هذا المورد
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('vendorId', '==', vId)));
             grnsSnap.forEach(doc => {
                 doc.data().itemsReceived?.forEach((i: any) => {
@@ -157,7 +150,6 @@ export default function NewAdjustmentPage() {
                 });
             });
 
-            // خصم ما أرجعناه له سابقاً
             const returnsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
                 where('vendorId', '==', vId), 
                 where('type', '==', 'purchase_return')
@@ -167,7 +159,6 @@ export default function NewAdjustmentPage() {
                     balances[i.itemId] = (balances[i.itemId] || 0) - i.quantity;
                 });
             });
-
             setVendorPurchaseBalances(balances);
         } finally {
             setLoadingVendorBalances(false);
@@ -199,31 +190,18 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // --- الرقابة الصارمة ---
-        const isOutbound = ['damage', 'theft', 'purchase_return'].includes(data.type);
-        
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
             const itemName = items.find(i => i.id === item.itemId)?.name;
 
-            // 1. فحص توفر الكمية في المخزن
             if (isOutbound && item.quantity > currentStock) {
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'عجز مخزني', 
-                    description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر في المستودع هو (${currentStock}) فقط.` 
-                });
+                toast({ variant: 'destructive', title: 'عجز مخزني', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر هو (${currentStock}) فقط.` });
                 return;
             }
 
-            // 2. فحص الرقابة المتقاطعة للمورد (الأهم)
             if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
-                toast({
-                    variant: 'destructive',
-                    title: 'تجاوز حد التوريد',
-                    description: `لا يمكن إرجاع كمية (${item.quantity}) للمورد "${vendors.find(v => v.id === data.vendorId)?.name}" لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.`
-                });
+                toast({ variant: 'destructive', title: 'تجاوز حد التوريد', description: `لا يمكن إرجاع كمية (${item.quantity}) للمورد لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.` });
                 return;
             }
         }
@@ -260,7 +238,7 @@ export default function NewAdjustmentPage() {
         }
 
         if (!debitAccount || !creditAccount) {
-            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'لم يتم العثور على الحسابات المقابلة في الشجرة لترحيل القيد.' });
+            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'لم يتم العثور على الحسابات المقابلة لترحيل القيد.' });
             return;
         }
 
@@ -326,7 +304,7 @@ export default function NewAdjustmentPage() {
             toast({ title: 'نجاح العملية', description: 'تمت المردودات وتحديث الأرصدة والقيود المحاسبية بدقة.' });
             router.push('/dashboard/warehouse/adjustments');
         } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام العملية الرقابية.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام العملية.' });
             setIsSaving(false);
             savingRef.current = false;
         }
@@ -343,7 +321,7 @@ export default function NewAdjustmentPage() {
                         {isPurchaseReturn ? 'مردود مشتريات للمورد' : 'إذن تسوية مخزنية'}
                     </CardTitle>
                     <CardDescription>
-                        {isPurchaseReturn ? 'إرجاع بضاعة للمورد مع رقابة صارمة على تاريخ التوريد.' : 'تسجيل التوالف أو العجز المخزني مع الربط المحاسبي.'}
+                        {isPurchaseReturn ? 'إرجاع بضاعة للمورد مع رقابة صارمة على المتاح لديه.' : 'تسجيل التوالف أو العجز المخزني مع الربط المحاسبي.'}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 p-8">
@@ -386,7 +364,7 @@ export default function NewAdjustmentPage() {
                             <div className="grid gap-2 animate-in fade-in zoom-in-95">
                                 <Label className="font-bold">المورد (المرتجع إليه) *</Label>
                                 <Controller name="vendorId" control={control} render={({ field }) => (
-                                    <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={vendorOptions} placeholder="ابحث عن مورد لفلترة مشترياته..." />
+                                    <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={vendorOptions} placeholder="ابحث عن مورد..." />
                                 )} />
                             </div>
                         )}
@@ -398,16 +376,6 @@ export default function NewAdjustmentPage() {
                         {errors.notes && <p className="text-xs text-destructive font-bold">{errors.notes.message}</p>}
                     </div>
 
-                    {isPurchaseReturn && (
-                        <div className="p-4 bg-green-50 border-2 border-green-100 rounded-2xl flex items-center gap-4">
-                            <div className="p-2 bg-green-100 rounded-lg text-green-700"><Tag className="h-5 w-5"/></div>
-                            <div className="flex-grow grid gap-1">
-                                <Label className="text-xs font-black text-green-800">عكس الخصم المكتسب (إن وجد)</Label>
-                                <Input type="number" step="0.001" {...register('recoveredDiscount')} placeholder="0.000" className="bg-white border-green-200" />
-                            </div>
-                        </div>
-                    )}
-
                     <div className="space-y-4">
                         <div className="flex justify-between items-center px-2">
                             <Label className="text-lg font-black flex items-center gap-2">
@@ -415,7 +383,7 @@ export default function NewAdjustmentPage() {
                             </Label>
                             {isPurchaseReturn && (
                                 <Badge variant="secondary" className="bg-blue-100 text-blue-700 gap-1.5 px-3 py-1">
-                                    <ShieldCheck className="h-3 w-3" /> تم تفعيل الرقابة المتقاطعة للمورد
+                                    <ShieldCheck className="h-3 w-3" /> تم تفعيل الرقابة المتقاطعة
                                 </Badge>
                             )}
                         </div>
@@ -480,7 +448,7 @@ export default function NewAdjustmentPage() {
                             </Table>
                         </div>
                         <Button type="button" variant="outline" onClick={() => append({ itemId: '', quantity: 1, unitCost: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold hover:bg-primary/5 transition-all">
-                            <PlusCircle className="h-5 w-5 text-primary" /> إضافة صنف آخر للعملية
+                            <PlusCircle className="h-5 w-5 text-primary" /> إضافة صنف آخر
                         </Button>
                     </div>
                 </CardContent>
