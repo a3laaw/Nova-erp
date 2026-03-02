@@ -12,6 +12,7 @@ import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, PlusCircle, Trash2, Table as TableIcon, Calendar, Users, Target, HardHat } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -63,7 +64,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
   const { fields, append, remove } = useFieldArray({ control, name: 'rows' });
   const watchedRows = useWatch({ control, name: 'rows' });
-  const selectedDate = watch('date');
 
   // جلب كافة المعاملات لربطها بالأسطر
   React.useEffect(() => {
@@ -115,12 +115,12 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 scheduledDate: Timestamp.fromDate(data.date),
                 plannedStageId: row.plannedStageId || '',
                 plannedStageName: stage?.name || 'زيارة متابعة عامة',
-                details: row.details,
-                team1: row.team1,
-                team2: row.team2,
-                team3: row.team3,
-                subcontractorName: row.subcontractorName,
-                requiredPayment: row.requiredPayment,
+                details: row.details || '',
+                team1: row.team1 || '',
+                team2: row.team2 || '',
+                team3: row.team3 || '',
+                subcontractorName: row.subcontractorName || '',
+                requiredPayment: row.requiredPayment || '',
                 status: 'planned',
                 createdAt: serverTimestamp(),
                 createdBy: currentUser.id,
@@ -149,9 +149,10 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
         toast({ title: 'تم حفظ الخطة', description: `تمت جدولة ${data.rows.length} زيارة ميدانية بنجاح.` });
         onSaveSuccess();
     } catch (e) {
+        console.error(e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ خطة الزيارات.' });
     } finally {
-        setIsSaving(true);
+        setIsSaving(false);
     }
   };
 
