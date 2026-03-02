@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -46,6 +45,7 @@ export function DirectInvoiceForm() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
@@ -62,6 +62,7 @@ export function DirectInvoiceForm() {
         defaultValues: {
             date: new Date(),
             paymentStatus: 'unpaid',
+            projectId: searchParams.get('projectId') || '',
             items: [{ description: '', quantity: 1, unitPrice: 0 }],
         }
     });
@@ -217,6 +218,7 @@ export function DirectInvoiceForm() {
                                 options={projectOptions}
                                 placeholder={projectsLoading ? "تحميل..." : "حمل التكلفة على مشروع..."}
                                 className="h-12 rounded-2xl border-2"
+                                disabled={!!searchParams.get('projectId')}
                             />
                         )}
                     />

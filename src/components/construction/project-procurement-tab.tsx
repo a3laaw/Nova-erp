@@ -13,7 +13,8 @@ import {
   ExternalLink, 
   PackageCheck, 
   Clock,
-  AlertCircle
+  AlertCircle,
+  ShoppingBag
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -53,7 +54,7 @@ const statusTranslations: Record<string, string> = {
 export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
   const { firestore } = useFirebase();
 
-  // 1. جلب أوامر الشراء
+  // 1. جلب أوامر الشراء والمشتريات المباشرة
   const poQuery = React.useMemo(() => {
     if (!firestore || !project.id) return null;
     return [where('projectId', '==', project.id)];
@@ -84,25 +85,32 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <div className="flex justify-between items-center bg-muted/30 p-6 rounded-2xl border">
+      <div className="flex flex-col lg:flex-row justify-between items-center bg-muted/30 p-6 rounded-2xl border gap-6">
         <div className="space-y-1">
-          <CardTitle className="text-xl font-black">توريدات المشروع</CardTitle>
-          <CardDescription>متابعة أوامر الشراء وحالة التوريد الفعلية للمخزن.</CardDescription>
+          <CardTitle className="text-xl font-black">توريدات ومشتريات المشروع</CardTitle>
+          <CardDescription>متابعة التكاليف المباشرة وأوامر الشراء المرتبطة بالمشروع.</CardDescription>
         </div>
-        <div className="flex items-center gap-8">
+        <div className="flex flex-wrap items-center gap-6">
             <div className="text-left">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">المخطط (PO)</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">إجمالي المشتريات المعتمدة</p>
                 <p className="text-xl font-bold font-mono">{formatCurrency(totalOrdered)}</p>
             </div>
             <div className="text-left border-r pr-8 border-primary/10">
-                <p className="text-[10px] uppercase font-black text-primary">المستلم (GRN)</p>
+                <p className="text-[10px] uppercase font-black text-primary">المستلم والمصروف فعلياً</p>
                 <p className="text-2xl font-black text-primary font-mono">{formatCurrency(totalReceived)}</p>
             </div>
-            <Button asChild className="h-11 px-6 rounded-xl font-bold gap-2">
-                <Link href={`/dashboard/purchasing/new?projectId=${project.id}`}>
-                    <PlusCircle className="h-5 w-5" /> أمر شراء جديد
-                </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+                <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2 border-purple-600 text-purple-700 hover:bg-purple-50">
+                    <Link href={`/dashboard/purchasing/direct-invoice?projectId=${project.id}`}>
+                        <ShoppingBag className="h-5 w-5" /> فاتورة مباشرة
+                    </Link>
+                </Button>
+                <Button asChild className="h-11 px-6 rounded-xl font-bold gap-2 shadow-lg shadow-primary/20">
+                    <Link href={`/dashboard/purchasing/new?projectId=${project.id}`}>
+                        <PlusCircle className="h-5 w-5" /> أمر شراء رسمي
+                    </Link>
+                </Button>
+            </div>
         </div>
       </div>
 
@@ -110,53 +118,62 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead>رقم الطلب</TableHead>
+              <TableHead>رقم المستند</TableHead>
               <TableHead>المورد</TableHead>
+              <TableHead>النوع</TableHead>
               <TableHead className="text-left">قيمة الطلب</TableHead>
-              <TableHead className="text-left bg-primary/5 text-primary">المستلم فعلياً</TableHead>
+              <TableHead className="text-left bg-primary/5 text-primary">المستلم/المصروف</TableHead>
               <TableHead>الحالة</TableHead>
               <TableHead className="w-[80px] text-center">عرض</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {augmentedPos.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">لا توجد طلبات شراء بعد.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">لا توجد طلبات شراء أو فواتير مباشرة لهذا المشروع.</TableCell></TableRow>
             ) : (
-              augmentedPos.map((po) => (
-                <TableRow key={po.id} className="group hover:bg-muted/30">
-                  <TableCell className="font-mono font-bold text-primary">{po.poNumber}</TableCell>
-                  <TableCell className="font-medium">{po.vendorName}</TableCell>
-                  <TableCell className="text-left font-mono">{formatCurrency(po.totalAmount)}</TableCell>
-                  <TableCell className="text-left font-mono font-black text-primary bg-primary/[0.02] border-r">
-                      {formatCurrency(po.actualReceivedTotal || 0)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn("px-2", statusColors[po.status])}>
-                      {statusTranslations[po.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/dashboard/purchasing/purchase-orders/${po.id}`}><ExternalLink className="h-4 w-4" /></Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+              augmentedPos.map((po) => {
+                const isDirect = (po as any).type === 'direct_invoice';
+                return (
+                  <TableRow key={po.id} className="group hover:bg-muted/30">
+                    <TableCell className="font-mono font-bold text-primary">{po.poNumber}</TableCell>
+                    <TableCell className="font-medium">{po.vendorName}</TableCell>
+                    <TableCell>
+                        <Badge variant="secondary" className={cn("text-[10px]", isDirect ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-blue-50 text-blue-700 border-blue-100")}>
+                            {isDirect ? 'فاتورة مباشرة' : 'أمر شراء'}
+                        </Badge>
+                    </TableCell>
+                    <TableCell className="text-left font-mono">{formatCurrency(po.totalAmount)}</TableCell>
+                    <TableCell className="text-left font-mono font-black text-primary bg-primary/[0.02] border-r">
+                        {isDirect ? formatCurrency(po.totalAmount) : formatCurrency(po.actualReceivedTotal || 0)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn("px-2 font-bold text-[10px]", statusColors[po.status])}>
+                        {statusTranslations[po.status]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/dashboard/purchasing/purchase-orders/${po.id}`}><ExternalLink className="h-4 w-4" /></Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Alert className="bg-blue-50/50 border-blue-200">
+        <Alert className="bg-blue-50/50 border-blue-200 rounded-2xl">
             <Clock className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-800 font-bold">إدارة التوريدات</AlertTitle>
-            <AlertDescription className="text-blue-700 text-xs">يتم احتساب التكلفة الفعلية للمشروع بناءً على مبالغ الاستلام النهائية (GRN).</AlertDescription>
+            <AlertDescription className="text-blue-700 text-xs">يتم احتساب التكلفة الفعلية للمشروع بناءً على مبالغ الاستلام النهائية (GRN) أو الفواتير المباشرة.</AlertDescription>
         </Alert>
-        <Alert className="bg-green-50/50 border-green-200">
-            <PackageCheck className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-800 font-bold">الأثر المالي</AlertTitle>
-            <AlertDescription className="text-green-700 text-xs">عند الاستلام، يتم إثبات مديونية المورد وتحميل التكلفة فوراً على ميزانية المشروع.</AlertDescription>
+        <Alert className="bg-purple-50/50 border-purple-200 rounded-2xl">
+            <ShoppingBag className="h-4 w-4 text-purple-600" />
+            <AlertTitle className="text-purple-800 font-bold">المشتريات المباشرة</AlertTitle>
+            <AlertDescription className="text-purple-700 text-xs">تُستخدم الفاتورة المباشرة لتسجيل المصاريف الطارئة والمشتريات التي تتم يدوياً دون الحاجة لمستودع.</AlertDescription>
         </Alert>
       </div>
     </div>
