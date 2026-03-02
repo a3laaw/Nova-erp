@@ -17,9 +17,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck, Trash2, PlusCircle } from 'lucide-react';
+import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck, Trash2, PlusCircle, AlertCircle } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, serverTimestamp, orderBy, where, Timestamp, getDoc } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
@@ -83,6 +83,7 @@ export default function NewAdjustmentPage() {
     const { data: warehouses = [], loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
     const { data: vendors = [] } = useSubscription<Vendor>(firestore, 'vendors', [orderBy('name')]);
+    const { data: categories = [] } = useSubscription<any>(firestore, 'itemCategories');
     
     const { register, handleSubmit, control, formState: { errors }, watch, setValue } = useForm<AdjFormValues>({
         resolver: zodResolver(adjSchema),
@@ -101,7 +102,7 @@ export default function NewAdjustmentPage() {
     const selectedVendorId = watch('vendorId');
     const selectedClientId = watch('clientId');
 
-    const isOutbound = useMemo(() => ['damage', 'theft', 'purchase_return'].includes(adjType), [adjType]);
+    const isOutbound = useMemo(() => ['damage', 'theft', 'purchase_return', 'material_issue'].includes(adjType), [adjType]);
 
     const totalCost = useMemo(() =>
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
@@ -232,7 +233,7 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // التحقق النهائي من الأرصدة قبل الحفظ
+        // التحقق النهائي من الأرصدة والقيود الرقابية الثلاثة قبل الحفظ
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
@@ -240,17 +241,17 @@ export default function NewAdjustmentPage() {
             const itemName = items.find(i => i.id === item.itemId)?.name;
 
             if (isOutbound && item.quantity > currentStock) {
-                toast({ variant: 'destructive', title: 'عجز مخزني', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر هو (${currentStock}) فقط.` });
+                toast({ variant: 'destructive', title: 'عجز مخزني حاد', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر في الرف هو (${currentStock}) فقط.` });
                 return;
             }
 
             if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
-                toast({ variant: 'destructive', title: 'تجاوز حد التوريد', description: `لا يمكن إرجاع (${item.quantity}) للمورد لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.` });
+                toast({ variant: 'destructive', title: 'تجاوز حد المورد', description: `لا يمكن إرجاع (${item.quantity}) للمورد لأن إجمالي ما اشتريته منه هو (${purchasedFromVendor}) فقط.` });
                 return;
             }
 
             if (data.type === 'sales_return' && data.clientId && item.quantity > soldToClient) {
-                toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن استرجاع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) من هذا الصنف.` });
+                toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن قبول مرتجع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) في سجلاته.` });
                 return;
             }
         }
@@ -263,7 +264,9 @@ export default function NewAdjustmentPage() {
                 const counterRef = doc(firestore, 'counters', 'inventoryAdjustments');
                 const counterDoc = await transaction.get(counterRef);
                 const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                const adjNumber = data.type === 'purchase_return' ? `RET-${currentYear}-${String(nextNumber).padStart(4, '0')}` : data.type === 'sales_return' ? `SRET-${currentYear}-${String(nextNumber).padStart(4, '0')}` : `ADJ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+                
+                const prefix = data.type === 'purchase_return' ? 'RET' : data.type === 'sales_return' ? 'SRET' : 'ADJ';
+                const adjNumber = `${prefix}-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
                 
                 const newAdjRef = doc(collection(firestore, 'inventoryAdjustments'));
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
@@ -279,6 +282,8 @@ export default function NewAdjustmentPage() {
                     };
                 });
 
+                const totalValue = processedItems.reduce((sum, i) => sum + i.totalCost, 0);
+
                 transaction.set(newAdjRef, cleanFirestoreData({
                     adjustmentNumber: adjNumber,
                     ...data,
@@ -288,16 +293,17 @@ export default function NewAdjustmentPage() {
                     createdBy: currentUser.id,
                 }));
 
-                // منطق القيد المحاسبي المولد
+                // منطق القيد المحاسبي المتكامل والربط مع الحسابات الفرعية
                 const inventoryAccount = accounts.find(a => a.code === '1104');
                 let debitAccount: Account | undefined;
                 let creditAccount: Account | undefined;
                 let narration = '';
+                let autoTags = {};
 
                 if (data.type === 'damage' || data.type === 'theft') {
-                    debitAccount = accounts.find(a => a.code === '5211'); 
+                    debitAccount = accounts.find(a => a.code === '5211'); // خسائر توالف
                     creditAccount = inventoryAccount;
-                    narration = `تسوية مخزنية (${typeTranslations[data.type]}) - ${data.notes}`;
+                    narration = `إثبات خسارة تسوية مخزنية (${typeTranslations[data.type]}) - ${data.notes}`;
                 } else if (data.type === 'purchase_return') {
                     const vendor = vendors.find(v => v.id === data.vendorId);
                     debitAccount = accounts.find(a => a.name === vendor?.name && a.parentCode === '2101');
@@ -308,25 +314,28 @@ export default function NewAdjustmentPage() {
                     debitAccount = inventoryAccount;
                     creditAccount = accounts.find(a => a.name === client?.nameAr && a.parentCode === '1102');
                     narration = `مردود مبيعات من العميل: ${client?.nameAr} - ${data.notes}`;
+                    autoTags = { clientId: data.clientId };
                 }
 
                 if (debitAccount && creditAccount) {
-                    const totalWithDiscount = totalCost + (Number(data.recoveredDiscount) || 0);
+                    const discount = Number(data.recoveredDiscount) || 0;
+                    const totalAdjustment = totalValue + discount;
+
                     transaction.set(newJournalEntryRef, cleanFirestoreData({
                         entryNumber: `JE-${adjNumber}`,
                         date: data.date,
                         narration,
                         status: 'posted',
-                        totalDebit: totalWithDiscount,
-                        totalCredit: totalWithDiscount,
+                        totalDebit: totalAdjustment,
+                        totalCredit: totalAdjustment,
                         lines: [
-                            { accountId: debitAccount.id!, accountName: debitAccount.name, debit: totalWithDiscount, credit: 0 },
-                            { accountId: creditAccount.id!, accountName: creditAccount.name, debit: 0, credit: totalCost },
-                            ...(data.type === 'purchase_return' && data.recoveredDiscount ? [{
+                            { accountId: debitAccount.id!, accountName: debitAccount.name, debit: totalAdjustment, credit: 0, ...autoTags },
+                            { accountId: creditAccount.id!, accountName: creditAccount.name, debit: 0, credit: totalValue },
+                            ...(data.type === 'purchase_return' && discount > 0 ? [{
                                 accountId: accounts.find(a => a.code === '4104')?.id || '', 
                                 accountName: 'خصم مكتسب (مسترد)',
                                 debit: 0,
-                                credit: Number(data.recoveredDiscount)
+                                credit: discount
                             }] : [])
                         ],
                         createdAt: serverTimestamp(),
@@ -337,11 +346,11 @@ export default function NewAdjustmentPage() {
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
 
-            toast({ title: 'نجاح العملية', description: 'تمت المردودات وتحديث الأرصدة والقيود المحاسبية بدقة.' });
+            toast({ title: 'نجاح العملية والربط المالي', description: 'تم تحديث المخزون والأرصدة المحاسبية للمورد/العميل بدقة.' });
             router.push('/dashboard/warehouse/reports');
         } catch (error) {
             console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام العملية.' });
+            toast({ variant: 'destructive', title: 'خطأ في الربط', description: 'فشل إتمام العملية المالية.' });
             setIsSaving(false);
             savingRef.current = false;
         }
@@ -355,12 +364,12 @@ export default function NewAdjustmentPage() {
                         <RotateCcw className="text-primary h-8 w-8"/> 
                         {adjType === 'purchase_return' ? 'مردود مشتريات للمورد' : adjType === 'sales_return' ? 'مردود مبيعات من عميل' : 'إذن تسوية مخزنية'}
                     </CardTitle>
-                    <CardDescription>إدارة المردودات والتسويات مع تفعيل نظام "الدروع الرقابية" للأرصدة التاريخية.</CardDescription>
+                    <CardDescription>إدارة المردودات والتسويات مع تفعيل نظام "الدروع الرقابية" للأرصدة التاريخية والربط المالي.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 p-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
                         <div className="grid gap-2">
-                            <Label className="font-bold">نوع العملية المخزنية *</Label>
+                            <Label className="font-bold">نوع العملية *</Label>
                             <Controller name="type" control={control} render={({ field }) => (
                                 <Select value={field.value} onValueChange={field.onChange} disabled={!!initialType}>
                                     <SelectTrigger className="h-11 rounded-xl border-2"><SelectValue /></SelectTrigger>
@@ -425,7 +434,7 @@ export default function NewAdjustmentPage() {
                                     <TableRow className="h-14">
                                         <TableHead className="w-[60px]"></TableHead>
                                         <TableHead className="font-bold">الصنف</TableHead>
-                                        <TableHead className="w-28 text-center font-bold">في المخزن</TableHead>
+                                        <TableHead className="w-28 text-center font-bold">المخزن</TableHead>
                                         {adjType === 'purchase_return' && <TableHead className="w-28 text-center font-bold text-blue-700">من المورد</TableHead>}
                                         {adjType === 'sales_return' && <TableHead className="w-28 text-center font-bold text-purple-700">اشترى العميل</TableHead>}
                                         <TableHead className="w-32 text-center font-bold bg-primary/5">الكمية</TableHead>
@@ -498,7 +507,7 @@ export default function NewAdjustmentPage() {
                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
                     <Button type="submit" disabled={isSaving || loadingStock || loadingVendorBalances || loadingClientBalances} className="h-12 px-16 rounded-xl font-black text-xl shadow-2xl shadow-primary/30">
                         {isSaving ? <Loader2 className="ml-3 h-6 w-6 animate-spin"/> : <Save className="ml-3 h-6 w-6"/>}
-                        اعتماد العملية والترحيل
+                        اعتماد وحفظ القيد المالي
                     </Button>
                 </CardFooter>
             </form>
