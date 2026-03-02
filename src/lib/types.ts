@@ -67,7 +67,6 @@ export interface ConstructionProject extends BaseEntity {
     progressPercentage: number;
     boqId?: string;             
     linkedTransactionId?: string; 
-    constructionTypeId?: string; 
     constructionTypeName?: string;
     subcontractorId?: string;    
     subcontractorName?: string;
@@ -142,33 +141,26 @@ export interface FieldVisit extends BaseEntity {
     status: 'planned' | 'confirmed' | 'cancelled'; 
     plannedStageId: string;     
     plannedStageName: string;   
-    mainStageName?: string;     
-    subStageName?: string;      
-    visitCountInStage?: number; 
-    phaseStartDate?: Timestamp | any; 
-    phaseEndDate?: Timestamp | any; // Added to check for deviations
+    phaseEndDate?: Timestamp | any; 
     numFloors?: string;         
     engineerId?: string | null;
     engineerName?: string | null; 
     details?: string;           
     requiredPayment?: string;   
-    lastPayment?: string;       
     teamIds: string[];          
     teamNames: string[];        
     subcontractorId?: string | null;
     subcontractorName?: string | null; 
-    layoutType?: string;        
     confirmationData?: {
         confirmedAt: Timestamp | any;
         notes: string;
         location?: { latitude: number, longitude: number, accuracy: number };
         isCompleted: boolean;
-        progressAchieved: number; // Percentage of the BOQ item completed in this visit
+        progressAchieved: number; 
     };
     cancellationReason?: string;
     cancelledAt?: Timestamp | any;
     cancelledBy?: string;
-    workStageUpdated?: boolean;
 }
 
 export interface WorkTeam extends BaseEntity {
@@ -187,8 +179,6 @@ export interface Vendor extends BaseEntity { name: string; phone: string; contac
 export interface Account extends BaseEntity { code: string; name: string; type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; level: number; parentCode: string | null; isPayable: boolean; statement: 'Balance Sheet' | 'Income Statement'; balanceType: 'Debit' | 'Credit'; }
 export interface Department extends BaseEntity { name: string; order?: number; activityTypes?: string[]; }
 export interface Job extends BaseEntity { name: string; order?: number; }
-export interface Governorate extends BaseEntity { name: string; order?: number; }
-export interface Area extends BaseEntity { name: string; order?: number; governorateId: string; }
 export interface TransactionType extends BaseEntity { name: string; order?: number; departmentIds?: string[]; activityType?: string; }
 export interface WorkStage extends BaseEntity { name: string; order?: number; stageType: 'sequential' | 'parallel'; trackingType: 'duration' | 'occurrence' | 'none'; allowedRoles?: string[]; expectedDurationDays?: number | null; maxOccurrences?: number | null; allowManualCompletion?: boolean; enableModificationTracking?: boolean; nextStageIds?: string[]; allowedDuringStages?: string[]; }
 export interface ItemCategory extends BaseEntity { name: string; order?: number; parentCategoryId: string | null; activityTypeIds?: string[]; boqReferenceItemIds?: string[]; }
