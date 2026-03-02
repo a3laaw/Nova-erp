@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -16,7 +17,7 @@ import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore
 import type { Account, JournalEntry } from '@/lib/types';
 import { format, endOfYear } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Scale, AlertCircle } from 'lucide-react';
+import { Loader2, Printer, Scale, AlertCircle, FileSearch } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
@@ -50,235 +51,166 @@ const AccountRow = ({ name, balance, className }: { name: string, balance: numbe
     </div>
 );
 
-
 export default function BalanceSheetPage() {
     const { firestore } = useFirebase();
     const { branding, loading: brandingLoading } = useBranding();
-    const [loading, setLoading] = useState(true);
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
     
-    const [asOfDate, setAsOfDate] = useState<Date | undefined>(endOfYear(new Date()));
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [reportData, setReportData] = useState<BalanceSheetData | null>(null);
+    const [asOfDate, setAsOfDate] = useState<Date | undefined>(() => endOfYear(new Date()));
 
-    // Fetch accounts once
-    useEffect(() => {
-        if (!firestore) return;
-        const fetchAccountsData = async () => {
-            try {
-                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
-            } catch (error) {
-                console.error("Error fetching accounts:", error);
-            }
-        };
-        fetchAccountsData();
-    }, [firestore]);
-
-    // Fetch entries when date changes
-    useEffect(() => {
+    const handleGenerate = async () => {
         if (!firestore || !asOfDate) return;
-        const fetchEntries = async () => {
-            setLoading(true);
-            try {
-                const endDate = new Date(asOfDate);
-                endDate.setHours(23, 59, 59, 999);
-
-                const entriesQuery = query(
+        setIsGenerating(true);
+        
+        try {
+            const [accountsSnap, entriesSnap] = await Promise.all([
+                getDocs(query(collection(firestore, 'chartOfAccounts'))),
+                getDocs(query(
                     collection(firestore, 'journalEntries'), 
-                    where('date', '<=', Timestamp.fromDate(endDate))
-                );
-                const entriesSnap = await getDocs(entriesQuery);
-                const postedEntries = entriesSnap.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry))
-                    .filter(entry => entry.status === 'posted');
-                setJournalEntries(postedEntries);
-            } catch (error) {
-                console.error("Error fetching journal entries:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchEntries();
-    }, [firestore, asOfDate]);
+                    where('date', '<=', Timestamp.fromDate(asOfDate)),
+                    where('status', '==', 'posted')
+                ))
+            ]);
 
-    const balanceSheetData = useMemo((): BalanceSheetData | null => {
-        if (loading || !asOfDate || accounts.length === 0) return null;
+            const accounts = accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
+            const journalEntries = entriesSnap.docs.map(doc => doc.data() as JournalEntry);
 
-        const endDate = asOfDate;
+            const accountBalances = new Map<string, number>();
+            let netIncome = 0;
 
-        const accountBalances = new Map<string, number>();
-
-        journalEntries
-            .forEach(entry => {
+            journalEntries.forEach(entry => {
                 entry.lines.forEach(line => {
                     const acc = accounts.find(a => a.id === line.accountId);
                     if (!acc) return;
                     
                     const currentBalance = accountBalances.get(line.accountId) || 0;
-                    let balanceChange = 0;
+                    let balanceChange = (acc.type === 'asset' || acc.type === 'expense')
+                        ? (line.debit || 0) - (line.credit || 0)
+                        : (line.credit || 0) - (line.debit || 0);
                     
-                    if (acc.type === 'asset' || acc.type === 'expense') {
-                        balanceChange = (line.debit || 0) - (line.credit || 0);
-                    } else { // Liability, Equity, Income
-                        balanceChange = (line.credit || 0) - (line.debit || 0);
-                    }
                     accountBalances.set(line.accountId, currentBalance + balanceChange);
+                    
+                    if (acc.type === 'income') netIncome += balanceChange;
+                    if (acc.type === 'expense') netIncome -= balanceChange;
                 });
             });
 
-        const data: BalanceSheetData = {
-            assets: { current: [], nonCurrent: [], totalCurrent: 0, totalNonCurrent: 0, total: 0 },
-            liabilitiesAndEquity: { currentLiabilities: [], nonCurrentLiabilities: [], equity: [], totalCurrentLiabilities: 0, totalNonCurrentLiabilities: 0, totalEquity: 0, total: 0 },
-            isBalanced: false,
-        };
-        
-        let netIncome = 0;
-        
-        accountBalances.forEach((balance, accountId) => {
-            const acc = accounts.find(a => a.id === accountId)!;
-            // Assumes all income/expense accounts contribute to the period's net income.
-            // A more complex implementation might filter by date again, but this is sufficient for balance sheet.
-            if (acc.type === 'income') netIncome += balance;
-            if (acc.type === 'expense') netIncome -= balance;
-        });
-        
-        accounts.forEach(acc => {
-            const balance = accountBalances.get(acc.id!) || 0;
-            if (balance === 0 && acc.type !== 'equity') return;
-
-            const item = { name: acc.name, balance };
+            const data: BalanceSheetData = {
+                assets: { current: [], nonCurrent: [], totalCurrent: 0, totalNonCurrent: 0, total: 0 },
+                liabilitiesAndEquity: { currentLiabilities: [], nonCurrentLiabilities: [], equity: [], totalCurrentLiabilities: 0, totalNonCurrentLiabilities: 0, totalEquity: 0, total: 0 },
+                isBalanced: false,
+            };
             
-            if (acc.code.startsWith('11')) { data.assets.current.push(item); data.assets.totalCurrent += balance; }
-            else if (acc.code.startsWith('1')) { data.assets.nonCurrent.push(item); data.assets.totalNonCurrent += balance; }
-            else if (acc.code.startsWith('21')) { data.liabilitiesAndEquity.currentLiabilities.push(item); data.liabilitiesAndEquity.totalCurrentLiabilities += balance; }
-            else if (acc.code.startsWith('2')) { data.liabilitiesAndEquity.nonCurrentLiabilities.push(item); data.liabilitiesAndEquity.totalNonCurrentLiabilities += balance; }
-            else if (acc.code.startsWith('3')) {
-                if (acc.name.includes('أرباح')) {
-                     item.balance += netIncome;
-                }
-                data.liabilitiesAndEquity.equity.push(item); 
-                data.liabilitiesAndEquity.totalEquity += item.balance;
-            }
-        });
-        
-        data.assets.total = data.assets.totalCurrent + data.assets.totalNonCurrent;
-        data.liabilitiesAndEquity.total = data.liabilitiesAndEquity.totalCurrentLiabilities + data.liabilitiesAndEquity.totalNonCurrentLiabilities + data.liabilitiesAndEquity.totalEquity;
+            accounts.forEach(acc => {
+                let balance = accountBalances.get(acc.id!) || 0;
+                if (balance === 0 && acc.type !== 'equity') return;
 
-        data.isBalanced = Math.abs(data.assets.total - data.liabilitiesAndEquity.total) < 0.01;
+                if (acc.name.includes('أرباح')) balance += netIncome;
 
-        return data;
+                const item = { name: acc.name, balance };
+                if (acc.code.startsWith('11')) { data.assets.current.push(item); data.assets.totalCurrent += balance; }
+                else if (acc.code.startsWith('1')) { data.assets.nonCurrent.push(item); data.assets.totalNonCurrent += balance; }
+                else if (acc.code.startsWith('21')) { data.liabilitiesAndEquity.currentLiabilities.push(item); data.liabilitiesAndEquity.totalCurrentLiabilities += balance; }
+                else if (acc.code.startsWith('2')) { data.liabilitiesAndEquity.nonCurrentLiabilities.push(item); data.liabilitiesAndEquity.totalNonCurrentLiabilities += balance; }
+                else if (acc.code.startsWith('3')) { data.liabilitiesAndEquity.equity.push(item); data.liabilitiesAndEquity.totalEquity += balance; }
+            });
+            
+            data.assets.total = data.assets.totalCurrent + data.assets.totalNonCurrent;
+            data.liabilitiesAndEquity.total = data.liabilitiesAndEquity.totalCurrentLiabilities + data.liabilitiesAndEquity.totalNonCurrentLiabilities + data.liabilitiesAndEquity.totalEquity;
+            data.isBalanced = Math.abs(data.assets.total - data.liabilitiesAndEquity.total) < 0.01;
 
-    }, [loading, accounts, journalEntries, asOfDate]);
+            setReportData(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
 
     const handlePrint = () => window.print();
-    const isLoading = loading || brandingLoading;
-
-    const renderSection = (title: string, items: { name: string; balance: number }[], total: number) => (
-        <div className="space-y-1">
-            <h4 className="font-bold border-b pb-1 mb-2">{title}</h4>
-            {items.map(item => <AccountRow key={item.name} name={item.name} balance={item.balance} />)}
-            <Separator className="my-2" />
-            <AccountRow name={`إجمالي ${title}`} balance={total} className="font-bold bg-muted/50 p-2 rounded-md" />
-        </div>
-    );
-    
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-            <Card className="mb-4 no-print">
+            <Card className="mb-4 no-print rounded-2xl border-none shadow-sm">
                  <CardHeader>
-                    <CardTitle>قائمة المركز المالي (الميزانية العمومية)</CardTitle>
-                    <CardDescription>عرض الأصول والالتزامات وحقوق الملكية للشركة في لحظة زمنية معينة.</CardDescription>
+                    <CardTitle className="text-xl font-black">المركز المالي (نتائج ثابتة للمراجعة)</CardTitle>
+                    <CardDescription>عرض الأصول والالتزامات وحقوق الملكية. يتطلب الضغط على إنشاء لتحديث القراءة.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <div className="grid gap-2 max-w-xs">
-                        <Label htmlFor="asOfDate">حتى تاريخ</Label>
+                <CardContent className="flex flex-col md:flex-row gap-4 items-end">
+                    <div className="grid gap-2">
+                        <Label className="font-bold">حتى تاريخ</Label>
                         <DateInput value={asOfDate} onChange={setAsOfDate} />
                      </div>
+                     <Button onClick={handleGenerate} disabled={isGenerating} className="h-10 px-8 rounded-xl font-bold gap-2">
+                        {isGenerating ? <Loader2 className="animate-spin h-4 w-4"/> : <FileSearch className="h-4 w-4" />}
+                        توليد المركز المالي
+                     </Button>
                 </CardContent>
             </Card>
 
-            {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
+            {brandingLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin h-8 w-8 mx-auto" /></CardContent></Card>}
 
-            {!isLoading && balanceSheetData && (
+            {!brandingLoading && reportData ? (
                  <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
-                    <div id="printable-area" className="printable-content">
-                        {branding?.letterhead_image_url && (
-                            <img 
-                                src={branding.letterhead_image_url} 
-                                alt="Letterhead"
-                                className="w-full h-auto"
-                            />
-                        )}
-                        <div className="p-8 md:p-12">
-                            {!branding?.letterhead_image_url && (
-                                <CardHeader className="p-0">
-                                    <div className="flex justify-between items-start pb-4">
-                                        <div className="text-left flex-shrink-0">
-                                            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
-                                            <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
-                                            <p className="font-mono text-sm mt-2 text-muted-foreground">تاريخ التقرير: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                        <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                            <div>
-                                                <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                                <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                                <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                            )}
-                             <div className="mt-6 text-sm text-center">
-                                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">قائمة المركز المالي</h2>
-                                <p className="font-semibold text-gray-700 dark:text-gray-300">Balance Sheet</p>
-                                <p><span className="font-semibold w-24 inline-block">كما في:</span> {asOfDate ? format(asOfDate, 'dd/MM/yyyy') : ''}</p>
+                    <div id="printable-area" className="p-8 md:p-12">
+                        <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800">
+                            <div className="text-left">
+                                <h2 className="text-2xl font-bold">قائمة المركز المالي</h2>
+                                <p className="text-lg font-semibold">Balance Sheet</p>
+                                <p className="font-mono text-sm mt-2">كما في: {asOfDate ? format(asOfDate, 'dd/MM/yyyy') : ''}</p>
                             </div>
-                            <CardContent className="px-0 pt-6 space-y-6">
-                                {!balanceSheetData.isBalanced && (
-                                    <Alert variant="destructive">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertTitle>الميزانية غير متوازنة!</AlertTitle>
-                                        <AlertDescription>
-                                            إجمالي الأصول ({formatCurrency(balanceSheetData.assets.total)}) لا يساوي إجمالي الالتزامات وحقوق الملكية ({formatCurrency(balanceSheetData.liabilitiesAndEquity.total)}).
-                                            الرجاء مراجعة القيود المحاسبية.
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-                                <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
-                                    {/* Assets Column */}
-                                    <div className="space-y-6">
-                                        {renderSection("الأصول المتداولة", balanceSheetData.assets.current, balanceSheetData.assets.totalCurrent)}
-                                        {renderSection("الأصول غير المتداولة", balanceSheetData.assets.nonCurrent, balanceSheetData.assets.totalNonCurrent)}
-                                        <div className="flex justify-between items-center text-lg p-2 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                            <span>مجموع الأصول</span>
-                                            <span className="font-mono">{formatCurrency(balanceSheetData.assets.total)}</span>
-                                        </div>
-                                    </div>
-                                    {/* Liabilities & Equity Column */}
-                                    <div className="space-y-6">
-                                        {renderSection("الالتزامات المتداولة", balanceSheetData.liabilitiesAndEquity.currentLiabilities, balanceSheetData.liabilitiesAndEquity.totalCurrentLiabilities)}
-                                        {renderSection("الالتزامات غير المتداولة", balanceSheetData.liabilitiesAndEquity.nonCurrentLiabilities, balanceSheetData.liabilitiesAndEquity.totalNonCurrentLiabilities)}
-                                        {renderSection("حقوق الملكية", balanceSheetData.liabilitiesAndEquity.equity, balanceSheetData.liabilitiesAndEquity.totalEquity)}
-                                        <div className="flex justify-between items-center text-lg p-2 font-extrabold bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                                            <span>مجموع الالتزامات وحقوق الملكية</span>
-                                            <span className="font-mono">{formatCurrency(balanceSheetData.liabilitiesAndEquity.total)}</span>
-                                        </div>
+                            <div className="flex items-center gap-4">
+                                <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                <div>
+                                    <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                                    <p className="text-xs text-muted-foreground">{branding?.address}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <CardContent className="px-0 pt-6 space-y-6">
+                            {!reportData.isBalanced && (
+                                <Alert variant="destructive" className="rounded-xl border-2">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>الميزانية غير متوازنة!</AlertTitle>
+                                    <AlertDescription>يوجد فرق بين الأصول والالتزامات. يرجى مراجعة القيود.</AlertDescription>
+                                </Alert>
+                            )}
+                            <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
+                                <div className="space-y-6">
+                                    <h4 className="font-bold border-b pb-1">الأصول المتداولة</h4>
+                                    {reportData.assets.current.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                    <AccountRow name="إجمالي الأصول المتداولة" balance={reportData.assets.totalCurrent} className="font-bold bg-muted/30 p-2 rounded" />
+                                    <h4 className="font-bold border-b pb-1 mt-4">الأصول غير المتداولة</h4>
+                                    {reportData.assets.nonCurrent.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                    <div className="flex justify-between items-center text-lg p-2 font-black bg-blue-50 border border-blue-200 rounded-lg">
+                                        <span>مجموع الأصول</span>
+                                        <span className="font-mono">{formatCurrency(reportData.assets.total)}</span>
                                     </div>
                                 </div>
-                            </CardContent>
-                            <CardFooter className="p-0 pt-8 flex justify-end items-center no-print">
-                                <Button onClick={handlePrint}>
-                                    <Printer className="ml-2 h-4 w-4" />
-                                    طباعة / تصدير PDF
-                                </Button>
-                            </CardFooter>
-                        </div>
+                                <div className="space-y-6">
+                                    <h4 className="font-bold border-b pb-1">الالتزامات</h4>
+                                    {reportData.liabilitiesAndEquity.currentLiabilities.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                    <h4 className="font-bold border-b pb-1 mt-4">حقوق الملكية</h4>
+                                    {reportData.liabilitiesAndEquity.equity.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                    <div className="flex justify-between items-center text-lg p-2 font-black bg-blue-50 border border-blue-200 rounded-lg">
+                                        <span>المجموع الإجمالي</span>
+                                        <span className="font-mono">{formatCurrency(reportData.liabilitiesAndEquity.total)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="p-0 pt-8 flex justify-end no-print">
+                            <Button onClick={handlePrint} variant="outline"><Printer className="ml-2 h-4 w-4" /> طباعة</Button>
+                        </CardFooter>
                     </div>
                  </div>
+            ) : (
+                <div className="h-96 flex flex-col items-center justify-center border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-40 no-print">
+                    <Scale className="h-16 w-16 mb-4 text-muted-foreground" />
+                    <p className="text-xl font-black text-muted-foreground">اختر التاريخ واضغط على زر "توليد المركز المالي" لعرض البيانات المثبتة.</p>
+                </div>
             )}
         </div>
     );
 }
-    
