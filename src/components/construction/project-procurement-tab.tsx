@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { where, orderBy } from 'firebase/firestore';
-import type { ConstructionProject, PurchaseOrder, GoodsReceiptNote } from '@/lib/types';
+import type { ConstructionProject, PurchaseOrder } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -51,10 +50,6 @@ const statusTranslations: Record<string, string> = {
     cancelled: 'ملغي',
 };
 
-/**
- * تبويب مشتريات المشروع:
- * يعرض أوامر الشراء وحالة توريدها الفعلية (Ordered vs Received).
- */
 export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
   const { firestore } = useFirebase();
 
@@ -66,7 +61,7 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
 
   const { data: pos, loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', poQuery || []);
 
-  // 2. جلب كافة أذونات الاستلام المرتبطة بالمشروع للمقارنة
+  // 2. جلب أذونات الاستلام للمقارنة
   const grnQuery = React.useMemo(() => {
     if (!firestore || !project.id) return null;
     return [where('projectId', '==', project.id)];
@@ -74,34 +69,16 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
 
   const { data: grns, loading: grnsLoading } = useSubscription<any>(firestore, 'grns', grnQuery || []);
 
-  // ربط مبالغ الاستلام الفعلي بكل أمر شراء
   const augmentedPos = React.useMemo(() => {
       return [...pos].map(po => {
           const poGrns = grns.filter(g => g.purchaseOrderId === po.id && g.status !== 'cancelled');
           const actualReceivedTotal = poGrns.reduce((sum, g) => sum + (g.totalValue || 0), 0);
-          return {
-              ...po,
-              actualReceivedTotal
-          };
-      }).sort((a, b) => {
-          const dateA = toFirestoreDate(a.createdAt)?.getTime() || 0;
-          const dateB = toFirestoreDate(b.createdAt)?.getTime() || 0;
-          return dateB - dateA;
+          return { ...po, actualReceivedTotal };
       });
   }, [pos, grns]);
 
-  const totalProcurementOrdered = React.useMemo(() => {
-    return augmentedPos.filter(p => p.status !== 'cancelled').reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-  }, [augmentedPos]);
-
-  const totalProcurementReceived = React.useMemo(() => {
-    return grns.filter(g => g.status !== 'cancelled').reduce((sum, g) => sum + (g.totalValue || 0), 0);
-  }, [grns]);
-
-  const formatDate = (dateValue: any) => {
-    const date = toFirestoreDate(dateValue);
-    return date ? format(date, 'dd/MM/yyyy') : '-';
-  };
+  const totalOrdered = React.useMemo(() => augmentedPos.filter(p => p.status !== 'cancelled').reduce((sum, p) => sum + (p.totalAmount || 0), 0), [augmentedPos]);
+  const totalReceived = React.useMemo(() => grns.filter(g => g.status !== 'cancelled').reduce((sum, g) => sum + (g.totalValue || 0), 0), [grns]);
 
   if (posLoading || grnsLoading) return <Skeleton className="h-64 w-full rounded-2xl" />;
 
@@ -109,22 +86,21 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
     <div className="space-y-6" dir="rtl">
       <div className="flex justify-between items-center bg-muted/30 p-6 rounded-2xl border">
         <div className="space-y-1">
-          <CardTitle className="text-xl font-black">مشتريات وتوريدات المشروع</CardTitle>
-          <CardDescription>متابعة أوامر التوريد ومقارنة المخطط بالاستلام الفعلي.</CardDescription>
+          <CardTitle className="text-xl font-black">توريدات المشروع</CardTitle>
+          <CardDescription>متابعة أوامر الشراء وحالة التوريد الفعلية للمخزن.</CardDescription>
         </div>
         <div className="flex items-center gap-8">
             <div className="text-left">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">المطلوب (PO)</p>
-                <p className="text-xl font-bold font-mono">{formatCurrency(totalProcurementOrdered)}</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground">المخطط (PO)</p>
+                <p className="text-xl font-bold font-mono">{formatCurrency(totalOrdered)}</p>
             </div>
             <div className="text-left border-r pr-8 border-primary/10">
-                <p className="text-[10px] uppercase font-black text-primary mb-1">المستلم الفعلي (GRN)</p>
-                <p className="text-2xl font-black text-primary font-mono">{formatCurrency(totalProcurementReceived)}</p>
+                <p className="text-[10px] uppercase font-black text-primary">المستلم (GRN)</p>
+                <p className="text-2xl font-black text-primary font-mono">{formatCurrency(totalReceived)}</p>
             </div>
             <Button asChild className="h-11 px-6 rounded-xl font-bold gap-2">
-                <Link href={`/dashboard/purchasing/new?projectId=${project.id}&clientName=${encodeURIComponent(project.clientName || '')}`}>
-                    <PlusCircle className="h-5 w-5" />
-                    أمر شراء جديد
+                <Link href={`/dashboard/purchasing/new?projectId=${project.id}`}>
+                    <PlusCircle className="h-5 w-5" /> أمر شراء جديد
                 </Link>
             </Button>
         </div>
@@ -136,7 +112,6 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
             <TableRow>
               <TableHead>رقم الطلب</TableHead>
               <TableHead>المورد</TableHead>
-              <TableHead>تاريخ الطلب</TableHead>
               <TableHead className="text-left">قيمة الطلب</TableHead>
               <TableHead className="text-left bg-primary/5 text-primary">المستلم فعلياً</TableHead>
               <TableHead>الحالة</TableHead>
@@ -145,48 +120,28 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
           </TableHeader>
           <TableBody>
             {augmentedPos.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-48 text-center">
-                  <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                    <ShoppingCart className="h-10 w-10 opacity-20" />
-                    <p>لا توجد طلبات شراء مسجلة لهذا المشروع بعد.</p>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">لا توجد طلبات شراء بعد.</TableCell></TableRow>
             ) : (
-              augmentedPos.map((po) => {
-                const hasDiscrepancy = po.status === 'received' && Math.abs(po.totalAmount - po.actualReceivedTotal) > 0.01;
-                return (
-                  <TableRow key={po.id} className={cn("group transition-colors", hasDiscrepancy && "bg-amber-50/30")}>
-                    <TableCell className="font-mono font-bold text-primary">{po.poNumber}</TableCell>
-                    <TableCell className="font-medium">{po.vendorName}</TableCell>
-                    <TableCell>{formatDate(po.orderDate)}</TableCell>
-                    <TableCell className="text-left font-mono">{formatCurrency(po.totalAmount)}</TableCell>
-                    <TableCell className="text-left font-mono font-black text-primary bg-primary/[0.02] border-r">
-                        <div className="flex flex-col items-end">
-                            {formatCurrency(po.actualReceivedTotal)}
-                            {hasDiscrepancy && (
-                                <span className="text-[8px] text-amber-600 flex items-center gap-1 font-black">
-                                    <AlertCircle className="h-2 w-2"/> فرق توريد
-                                </span>
-                            )}
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn("px-2", statusColors[po.status])}>
-                        {statusTranslations[po.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                          <Link href={`/dashboard/purchasing/purchase-orders/${po.id}`}>
-                              <ExternalLink className="h-4 w-4" />
-                          </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              augmentedPos.map((po) => (
+                <TableRow key={po.id} className="group hover:bg-muted/30">
+                  <TableCell className="font-mono font-bold text-primary">{po.poNumber}</TableCell>
+                  <TableCell className="font-medium">{po.vendorName}</TableCell>
+                  <TableCell className="text-left font-mono">{formatCurrency(po.totalAmount)}</TableCell>
+                  <TableCell className="text-left font-mono font-black text-primary bg-primary/[0.02] border-r">
+                      {formatCurrency(po.actualReceivedTotal || 0)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn("px-2", statusColors[po.status])}>
+                      {statusTranslations[po.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/dashboard/purchasing/purchase-orders/${po.id}`}><ExternalLink className="h-4 w-4" /></Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -196,16 +151,12 @@ export function ProjectProcurementTab({ project }: ProjectProcurementTabProps) {
         <Alert className="bg-blue-50/50 border-blue-200">
             <Clock className="h-4 w-4 text-blue-600" />
             <AlertTitle className="text-blue-800 font-bold">إدارة التوريدات</AlertTitle>
-            <AlertDescription className="text-blue-700 text-xs">
-                يقوم النظام بمقارنة مبالغ أوامر الشراء مع مبالغ الاستلام الفعلي. التكلفة التي تراها في "التكاليف" هي صافي مبالغ الاستلام المعتمدة (GRNs).
-            </AlertDescription>
+            <AlertDescription className="text-blue-700 text-xs">يتم احتساب التكلفة الفعلية للمشروع بناءً على مبالغ الاستلام النهائية (GRN).</AlertDescription>
         </Alert>
         <Alert className="bg-green-50/50 border-green-200">
             <PackageCheck className="h-4 w-4 text-green-600" />
-            <AlertTitle className="text-green-800 font-bold">الأثر المالي للاستلام</AlertTitle>
-            <AlertDescription className="text-green-700 text-xs">
-                بمجرد استلام المواد، يتم إصدار قيد استحقاق للمورد وزيادة قيمة المخزون، مع تحميل التكلفة الصافية على هذا المشروع كمركز تكلفة.
-            </AlertDescription>
+            <AlertTitle className="text-green-800 font-bold">الأثر المالي</AlertTitle>
+            <AlertDescription className="text-green-700 text-xs">عند الاستلام، يتم إثبات مديونية المورد وتحميل التكلفة فوراً على ميزانية المشروع.</AlertDescription>
         </Alert>
       </div>
     </div>

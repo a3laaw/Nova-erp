@@ -1,22 +1,19 @@
-
 'use client';
 
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { where } from 'firebase/firestore';
-import type { ConstructionProject, PurchaseOrder, SubcontractorCertificate, CashReceipt, JournalEntry } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { ConstructionProject, SubcontractorCertificate, CashReceipt } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart3, 
   TrendingUp, 
   TrendingDown, 
-  Wallet,
   AlertTriangle,
   Coins,
   ArrowUpRight,
-  PieChart as PieIcon,
-  PackageCheck
+  PieChart as PieIcon
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -31,10 +28,10 @@ import {
     ResponsiveContainer, 
     Cell,
     PieChart,
-    Pie,
-    Legend
+    Pie
 } from 'recharts';
 import { Label } from '../ui/label';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface ProjectFinancialsTabProps {
   project: ConstructionProject;
@@ -52,15 +49,10 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-/**
- * تبويب التحليل المالي للمشروع:
- * تم التحديث ليعتمد على أذونات الاستلام (GRNs) لحساب التكلفة الفعلية للمواد،
- * لضمان الدقة في حال اختلف مبلغ الاستلام عن مبلغ أمر الشراء الأصلي.
- */
 export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
   const { firestore } = useFirebase();
 
-  // 1. جلب التكلفة الفعلية للمواد من أذونات الاستلام (GRN) المرتبطة بالمشروع
+  // 1. جلب التكلفة الفعلية للمواد من أذونات الاستلام (GRN) لضمان الدقة
   const grnQuery = React.useMemo(() => [where('projectId', '==', project.id)], [project.id]);
   const { data: grns, loading: grnsLoading } = useSubscription<any>(firestore, 'grns', grnQuery);
 
@@ -77,15 +69,15 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
   const stats = React.useMemo(() => {
     if (loading) return null;
 
-    // حساب تكلفة المواد من واقع الاستلام الفعلي (وليس الطلب)
+    // حساب تكلفة المواد من واقع الاستلام الفعلي
     const materialCost = (grns || [])
         .filter(g => g.status !== 'cancelled')
         .reduce((sum, g) => sum + (g.totalValue || 0), 0);
         
-    const laborCost = certificates.filter(c => c.status !== 'cancelled').reduce((sum, c) => sum + (c.amount || 0), 0);
+    const laborCost = (certificates || []).filter(c => c.status !== 'cancelled').reduce((sum, c) => sum + (c.amount || 0), 0);
     const totalCosts = materialCost + laborCost;
     
-    const collectedIncome = receipts.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const collectedIncome = (receipts || []).reduce((sum, r) => sum + (r.amount || 0), 0);
     const contractValue = project.contractValue || 0;
     
     const grossProfit = contractValue - totalCosts;
@@ -105,16 +97,9 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
     ].filter(d => d.value > 0);
 
     return {
-      materialCost,
-      laborCost,
-      totalCosts,
-      collectedIncome,
-      contractValue,
-      grossProfit,
-      profitMargin,
-      collectionRate,
-      budgetData,
-      costBreakdown
+      materialCost, laborCost, totalCosts, collectedIncome,
+      contractValue, grossProfit, profitMargin, collectionRate,
+      budgetData, costBreakdown
     };
   }, [project, grns, certificates, receipts, loading]);
 
@@ -122,7 +107,6 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
 
   return (
     <div className="space-y-6" dir="rtl">
-      {/* المؤشرات المالية العلوية */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="rounded-2xl border-none shadow-sm bg-blue-50/50 p-6 flex flex-col justify-between">
             <div className="flex justify-between items-start">
@@ -132,7 +116,7 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
             <div className="mt-2">
                 <p className="text-2xl font-black font-mono text-blue-900">{formatCurrency(stats?.totalCosts || 0)}</p>
                 <div className="flex gap-2 mt-1">
-                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">مواد (استلام): {formatCurrency(stats?.materialCost || 0)}</Badge>
+                    <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">مواد: {formatCurrency(stats?.materialCost || 0)}</Badge>
                     <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white border-blue-100">أعمال: {formatCurrency(stats?.laborCost || 0)}</Badge>
                 </div>
             </div>
@@ -167,23 +151,20 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
 
         <Card className="rounded-2xl border-none shadow-sm p-6 bg-slate-50 flex flex-col justify-between">
             <div className="flex justify-between items-start">
-                <Label className="text-[10px] font-black text-muted-foreground uppercase">قيمة العقد الإجمالية</Label>
+                <Label className="text-[10px] font-black text-muted-foreground uppercase">قيمة العقد</Label>
                 <ArrowUpRight className="h-4 w-4 text-slate-400" />
             </div>
             <div className="mt-2">
                 <p className="text-2xl font-black font-mono text-slate-900">{formatCurrency(stats?.contractValue || 0)}</p>
-                <p className="text-[10px] text-muted-foreground mt-1">الميزانية المرصودة للمشروع</p>
             </div>
         </Card>
       </div>
 
-      {/* الرسوم البيانية */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 rounded-3xl border-none shadow-sm overflow-hidden bg-white">
             <CardHeader className="border-b bg-muted/10">
                 <CardTitle className="text-lg font-black flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-primary"/> 
-                    المقارنة المالية (الواقع مقابل المخطط)
+                    <BarChart3 className="h-5 w-5 text-primary"/> المقارنة المالية
                 </CardTitle>
             </CardHeader>
             <CardContent className="h-[350px] p-6">
@@ -205,10 +186,7 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
 
         <Card className="rounded-3xl border-none shadow-sm overflow-hidden bg-white">
             <CardHeader className="border-b bg-muted/10">
-                <CardTitle className="text-lg font-black flex items-center gap-2">
-                    <PieIcon className="h-5 w-5 text-primary"/> 
-                    توزيع بنود التكلفة الفعلية
-                </CardTitle>
+                <CardTitle className="text-lg font-black flex items-center gap-2"><PieIcon className="h-5 w-5 text-primary"/> توزيع التكلفة</CardTitle>
             </CardHeader>
             <CardContent className="h-[350px] p-6 flex flex-col items-center">
                 <div className="flex-1 w-full relative">
@@ -216,13 +194,8 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
                         <PieChart>
                             <Pie
                                 data={stats?.costBreakdown}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={70}
-                                outerRadius={100}
-                                paddingAngle={8}
-                                dataKey="value"
-                                stroke="none"
+                                cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={8}
+                                dataKey="value" stroke="none"
                             >
                                 {stats?.costBreakdown.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -236,17 +209,6 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
                         <span className="text-xl font-black text-primary font-mono">{formatCurrency(stats?.totalCosts || 0)}</span>
                     </div>
                 </div>
-                <div className="w-full space-y-3 mt-4">
-                    {stats?.costBreakdown.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-[11px] bg-muted/30 p-2 rounded-xl border border-muted-foreground/5">
-                            <div className="flex items-center gap-2">
-                                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                                <span className="font-bold">{item.name}</span>
-                            </div>
-                            <span className="font-black font-mono">{formatCurrency(item.value)}</span>
-                        </div>
-                    ))}
-                </div>
             </CardContent>
         </Card>
       </div>
@@ -254,9 +216,9 @@ export function ProjectFinancialsTab({ project }: ProjectFinancialsTabProps) {
       {stats && stats.totalCosts > stats.contractValue && (
           <Alert variant="destructive" className="rounded-[2rem] border-2 border-red-500 bg-red-50 shadow-xl">
               <AlertTriangle className="h-6 w-6" />
-              <AlertTitle className="text-lg font-black">تحذير رقابي: تجاوز الميزانية!</AlertTitle>
+              <AlertTitle className="text-lg font-black">تحذير: تجاوز الميزانية!</AlertTitle>
               <AlertDescription className="font-bold">
-                  لقد تجاوزت التكاليف الفعلية المستلمة إجمالي قيمة العقد المعتمدة بمبلغ <span className="underline">{formatCurrency(Math.abs(stats.grossProfit))}</span>. يرجى مراجعة الاستلامات وفواتير الموردين.
+                  لقد تجاوزت التكاليف الفعلية إجمالي قيمة العقد المعتمدة بمبلغ <span className="underline">{formatCurrency(Math.abs(stats.grossProfit))}</span>.
               </AlertDescription>
           </Alert>
       )}

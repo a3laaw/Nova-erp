@@ -17,10 +17,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, History, User, Tag, Truck } from 'lucide-react';
+import { Loader2, Save, X, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, User, Truck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
@@ -28,9 +27,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { toFirestoreDate } from '@/services/date-converter';
 
 const lineSchema = z.object({
   itemId: z.string().min(1, "الصنف مطلوب."),
@@ -71,7 +68,7 @@ export default function NewAdjustmentPage() {
     const savingRef = useRef(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
     
-    // محركات الأرصدة والرقابة (The Triple Shield)
+    // محركات الأرصدة والرقابة الثلاثية
     const [stockBalances, setStockBalances] = useState<Record<string, number>>({});
     const [vendorPurchaseBalances, setVendorPurchaseBalances] = useState<Record<string, number>>({});
     const [clientSalesBalances, setClientSalesBalances] = useState<Record<string, number>>({});
@@ -110,7 +107,7 @@ export default function NewAdjustmentPage() {
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
-    // 🛡️ الدرع 1: فحص الرصيد الفعلي في "الرف" (Stock Shield)
+    // 🛡️ الدرع 1: فحص الرصيد الفعلي في المستودع
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
@@ -142,7 +139,7 @@ export default function NewAdjustmentPage() {
         }
     }, [firestore]);
 
-    // 🛡️ الدرع 2: فحص رصيد المورد (Vendor Purchase History Shield)
+    // 🛡️ الدرع 2: فحص رصيد المورد
     const fetchVendorPurchaseBalances = useCallback(async (vId: string) => {
         if (!firestore || !vId) {
             setVendorPurchaseBalances({});
@@ -173,7 +170,7 @@ export default function NewAdjustmentPage() {
         }
     }, [firestore]);
 
-    // 🛡️ الدرع 3: فحص رصيد مبيعات العميل (Client Sales History Shield)
+    // 🛡️ الدرع 3: فحص رصيد مبيعات العميل
     const fetchClientSalesBalances = useCallback(async (cId: string) => {
         if (!firestore || !cId) {
             setClientSalesBalances({});
@@ -235,6 +232,7 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
+        // التحقق النهائي من الأرصدة قبل الحفظ
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
@@ -255,42 +253,6 @@ export default function NewAdjustmentPage() {
                 toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن استرجاع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) من هذا الصنف.` });
                 return;
             }
-        }
-
-        const inventoryAccount = accounts.find(a => a.code === '1104');
-        let debitAccount: Account | undefined;
-        let creditAccount: Account | undefined;
-        let narration = '';
-
-        switch(data.type) {
-            case 'damage':
-            case 'theft':
-                debitAccount = accounts.find(a => a.code === '5211'); 
-                creditAccount = inventoryAccount;
-                narration = `تسوية مخزنية (${typeTranslations[data.type]}) - ${data.notes}`;
-                break;
-            case 'purchase_return':
-                const vendor = vendors.find(v => v.id === data.vendorId);
-                debitAccount = accounts.find(a => a.name === vendor?.name && a.parentCode === '2101');
-                creditAccount = inventoryAccount;
-                narration = `مردود مشتريات للمورد: ${vendor?.name} - ${data.notes}`;
-                break;
-            case 'sales_return':
-                const client = clients.find(c => c.id === data.clientId);
-                debitAccount = inventoryAccount;
-                creditAccount = accounts.find(a => a.name === client?.nameAr && a.parentCode === '1102');
-                narration = `مردود مبيعات من العميل: ${client?.nameAr} - ${data.notes}`;
-                break;
-            case 'opening_balance':
-                debitAccount = inventoryAccount;
-                creditAccount = accounts.find(a => a.code === '34');
-                narration = `إثبات رصيد افتتاحي - ${data.notes}`;
-                break;
-        }
-
-        if (!debitAccount || !creditAccount) {
-            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'لم يتم العثور على الحسابات المقابلة لترحيل القيد.' });
-            return;
         }
 
         savingRef.current = true;
@@ -326,28 +288,51 @@ export default function NewAdjustmentPage() {
                     createdBy: currentUser.id,
                 }));
 
-                const totalWithDiscount = totalCost + (Number(data.recoveredDiscount) || 0);
+                // منطق القيد المحاسبي المولد
+                const inventoryAccount = accounts.find(a => a.code === '1104');
+                let debitAccount: Account | undefined;
+                let creditAccount: Account | undefined;
+                let narration = '';
 
-                transaction.set(newJournalEntryRef, cleanFirestoreData({
-                    entryNumber: `JE-${adjNumber}`,
-                    date: data.date,
-                    narration,
-                    status: 'posted',
-                    totalDebit: totalWithDiscount,
-                    totalCredit: totalWithDiscount,
-                    lines: [
-                        { accountId: debitAccount!.id!, accountName: debitAccount!.name, debit: totalWithDiscount, credit: 0 },
-                        { accountId: creditAccount!.id!, accountName: creditAccount!.name, debit: 0, credit: totalCost },
-                        ...(data.type === 'purchase_return' && data.recoveredDiscount ? [{
-                            accountId: accounts.find(a => a.code === '4104')?.id || '', 
-                            accountName: 'خصم مكتسب (مسترد)',
-                            debit: 0,
-                            credit: Number(data.recoveredDiscount)
-                        }] : [])
-                    ],
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser.id,
-                }));
+                if (data.type === 'damage' || data.type === 'theft') {
+                    debitAccount = accounts.find(a => a.code === '5211'); 
+                    creditAccount = inventoryAccount;
+                    narration = `تسوية مخزنية (${typeTranslations[data.type]}) - ${data.notes}`;
+                } else if (data.type === 'purchase_return') {
+                    const vendor = vendors.find(v => v.id === data.vendorId);
+                    debitAccount = accounts.find(a => a.name === vendor?.name && a.parentCode === '2101');
+                    creditAccount = inventoryAccount;
+                    narration = `مردود مشتريات للمورد: ${vendor?.name} - ${data.notes}`;
+                } else if (data.type === 'sales_return') {
+                    const client = clients.find(c => c.id === data.clientId);
+                    debitAccount = inventoryAccount;
+                    creditAccount = accounts.find(a => a.name === client?.nameAr && a.parentCode === '1102');
+                    narration = `مردود مبيعات من العميل: ${client?.nameAr} - ${data.notes}`;
+                }
+
+                if (debitAccount && creditAccount) {
+                    const totalWithDiscount = totalCost + (Number(data.recoveredDiscount) || 0);
+                    transaction.set(newJournalEntryRef, cleanFirestoreData({
+                        entryNumber: `JE-${adjNumber}`,
+                        date: data.date,
+                        narration,
+                        status: 'posted',
+                        totalDebit: totalWithDiscount,
+                        totalCredit: totalWithDiscount,
+                        lines: [
+                            { accountId: debitAccount.id!, accountName: debitAccount.name, debit: totalWithDiscount, credit: 0 },
+                            { accountId: creditAccount.id!, accountName: creditAccount.name, debit: 0, credit: totalCost },
+                            ...(data.type === 'purchase_return' && data.recoveredDiscount ? [{
+                                accountId: accounts.find(a => a.code === '4104')?.id || '', 
+                                accountName: 'خصم مكتسب (مسترد)',
+                                debit: 0,
+                                credit: Number(data.recoveredDiscount)
+                            }] : [])
+                        ],
+                        createdAt: serverTimestamp(),
+                        createdBy: currentUser.id,
+                    }));
+                }
 
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
