@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Eye, MapPin, HardHat, Users, Building2, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Eye, MapPin, HardHat, Users, Building2, Clock, AlertTriangle, CheckCircle2, Scale, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -72,7 +72,6 @@ export function FieldVisitsGrid() {
                 const isCancelled = visit.status === 'cancelled';
                 const isConfirmed = visit.status === 'confirmed';
                 
-                // حساب الانحراف الزمني: إذا كان تاريخ الزيارة الفعلي بعد تاريخ انتهاء المرحلة المخطط
                 const isDelayed = scheduledDate && phaseEndDate && scheduledDate > phaseEndDate;
                 
                 return (
@@ -90,6 +89,11 @@ export function FieldVisitsGrid() {
                             </p>
                             <p className="text-xs font-bold leading-relaxed">{visit.projectName}</p>
                         </div>
+                        {visit.numFloors && (
+                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
+                                <Scale className="h-3 w-3" /> {visit.numFloors}
+                            </div>
+                        )}
                     </TableCell>
 
                     <TableCell className="p-0 border-l align-top">

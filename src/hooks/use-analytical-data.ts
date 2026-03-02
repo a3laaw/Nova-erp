@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, getDocs, query, collectionGroup } from 'firebase/firestore';
-import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account, Appointment } from '@/lib/types';
+import type { JournalEntry, Client, ClientTransaction, Employee, Department, Account, Appointment, ConstructionProject, RequestForQuotation, PurchaseOrder } from '@/lib/types';
 import { useToast } from './use-toast';
 
 interface AnalyticalData {
@@ -14,11 +15,14 @@ interface AnalyticalData {
     departments: Department[];
     accounts: Account[];
     appointments: Appointment[];
+    projects: ConstructionProject[];
+    rfqs: RequestForQuotation[];
+    purchaseOrders: PurchaseOrder[];
 }
 
 /**
- * خطاف (Hook) لجلب لقطة شاملة من البيانات للتقارير التحليلية.
- * تم تعديله ليعمل بشكل مباشر بدون الحاجة لنظام التخزين المؤقت الذكي لضمان استقرار البناء.
+ * خطاف (Hook) لجلب لقطة شاملة من البيانات للتقارير ولوحة التحكم.
+ * تم تحديثه ليشمل المشاريع وأوامر الشراء لدعم الإحصائيات الحقيقية.
  */
 export function useAnalyticalData() {
   const { firestore } = useFirebase();
@@ -43,7 +47,10 @@ export function useAnalyticalData() {
               employeesSnap,
               departmentsSnap,
               accountsSnap,
-              appointmentsSnap
+              appointmentsSnap,
+              projectsSnap,
+              rfqsSnap,
+              posSnap
             ] = await Promise.all([
               getDocs(query(collection(firestore, 'journalEntries'))),
               getDocs(query(collection(firestore, 'clients'))),
@@ -52,6 +59,9 @@ export function useAnalyticalData() {
               getDocs(query(collection(firestore, 'departments'))),
               getDocs(query(collection(firestore, 'chartOfAccounts'))),
               getDocs(query(collection(firestore, 'appointments'))),
+              getDocs(query(collection(firestore, 'projects'))),
+              getDocs(query(collection(firestore, 'rfqs'))),
+              getDocs(query(collection(firestore, 'purchaseOrders'))),
             ]);
             
             const transactions = transactionsSnap.docs.map(doc => {
@@ -68,6 +78,9 @@ export function useAnalyticalData() {
               departments: departmentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)),
               accounts: accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)),
               appointments: appointmentsSnap.docs.map(doc => ({id: doc.id, ...doc.data()} as Appointment)),
+              projects: projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConstructionProject)),
+              rfqs: rfqsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as RequestForQuotation)),
+              purchaseOrders: posSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PurchaseOrder)),
             });
         } catch (err: any) {
             console.error("Error fetching analytical data:", err);
@@ -89,6 +102,9 @@ export function useAnalyticalData() {
     departments: data?.departments || [],
     accounts: data?.accounts || [],
     appointments: data?.appointments || [],
+    projects: data?.projects || [],
+    rfqs: data?.rfqs || [],
+    purchaseOrders: data?.purchaseOrders || [],
     loading, 
     error 
   };
