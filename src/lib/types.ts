@@ -1,7 +1,7 @@
 
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم تحديثه لربط الزيارات الميدانية حصرياً بالمشاريع الإنشائية لضمان دقة الرقابة.
+ * تم تحديثه لربط الزيارات الميدانية حصرياً بالمشاريع الإنشائية ودعم الفرق الديناميكية.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -11,7 +11,7 @@ import { Timestamp } from 'firebase/firestore';
  */
 export interface BaseEntity {
   id?: string;
-  companyId: string;           // المعرف الفريد للشركة المالكة للبيان
+  companyId: string;           
   createdAt: Timestamp | any;
   createdBy: string;
   updatedAt?: Timestamp | any;
@@ -21,7 +21,7 @@ export interface BaseEntity {
  * العميل (Client): يمثل الملف الرئيسي للعميل.
  */
 export interface Client extends BaseEntity {
-  fileId: string;               // رقم الملف (مثال: 1/2024)
+  fileId: string;               
   nameAr: string;               
   nameEn?: string;              
   mobile: string;               
@@ -66,7 +66,7 @@ export interface ClientTransaction extends BaseEntity {
  * مشروع مقاولات (ConstructionProject): يمثل الموقع التنفيذي الفعلي.
  */
 export interface ConstructionProject extends BaseEntity {
-    projectId: string;          // الكود الداخلي للمشروع
+    projectId: string;          
     projectName: string;
     clientId: string;
     clientName?: string;
@@ -78,8 +78,11 @@ export interface ConstructionProject extends BaseEntity {
     mainEngineerId: string;
     mainEngineerName?: string;
     progressPercentage: number;
-    boqId?: string;             // ربط مع جدول الكميات المسعر
-    linkedTransactionId?: string; // ربط مع المعاملة المالية الأصلية
+    boqId?: string;             
+    linkedTransactionId?: string; 
+    constructionTypeId?: string; // ربط بنوع المقاولات (هيكل أسود، صحي، الخ)
+    subcontractorId?: string;    // في حال كان مسنداً لمقاول باطن
+    subcontractorName?: string;
 }
 
 /**
@@ -140,6 +143,7 @@ export interface Employee extends BaseEntity {
     emergencyLeaveUsed?: number;
     workStartTime?: string;
     workEndTime?: string;
+    teamId?: string; // الفريق الحالي للموظف
     pieceRateMode?: 'salary_with_target' | 'per_piece';
     targetDescription?: number;
     pieceRate?: number;
@@ -177,7 +181,7 @@ export interface UserProfile {
   email: string;
   role: 'Admin' | 'Engineer' | 'Accountant' | 'Secretary' | 'HR';
   employeeId: string;
-  companyId: string;            // الشركة التي ينتمي إليها المستخدم
+  companyId: string;            
   isActive: boolean;
   createdAt: Timestamp | any;
   activatedAt?: Timestamp | any;
@@ -189,34 +193,31 @@ export interface UserProfile {
 
 /**
  * الزيارات الميدانية المحدثة (Field Visits - Construction Only).
- * مرتبطة حصرياً بمشاريع المقاولات وتتبع بنود الـ BOQ.
+ * تدعم الفرق الديناميكية وتعدد القوالب التنفيذية.
  */
 export interface FieldVisit extends BaseEntity { 
-    projectId: string;          // الربط الحصري بالمشروع الإنشائي
+    projectId: string;          
     projectName: string;
     clientId: string;
     clientName: string; 
     clientAddress?: string;     
     contractNumber?: string;    
-    phaseNumber?: string;       
-    mainStageName?: string;     
-    subStageName?: string;      
     transactionId: string;
     transactionType: string; 
     scheduledDate: Timestamp | any; 
     status: string; 
-    plannedStageId: string;     // معرف بند الـ BOQ المستهدف
+    plannedStageId: string;     
     plannedStageName: string;   
     engineerId: string;
     engineerName: string; 
     details?: string;           
     requiredPayment?: string;   
     lastPayment?: string;       
-    team1?: string;             
-    team2?: string;             
-    team3?: string;             
+    teamIds: string[];          // معرفات الفرق المختارة (ديناميكي)
+    teamNames: string[];        // أسماء الفرق (Snapshot للتاريخ)
     subcontractorId?: string;
     subcontractorName?: string; 
+    layoutType?: string;        // نوع التصميم (هيكل أسود، صحي، كهرباء)
     confirmationData?: {
         confirmedAt: Timestamp | any;
         notes: string;
@@ -224,6 +225,13 @@ export interface FieldVisit extends BaseEntity {
         isCompleted: boolean;
     };
     workStageUpdated?: boolean;
+}
+
+export interface WorkTeam extends BaseEntity {
+    name: string;
+    leaderId?: string;
+    leaderName?: string;
+    memberCount: number;
 }
 
 export interface Warehouse extends BaseEntity { name: string; location?: string; isDefault?: boolean; projectId?: string | null; companyId?: string | null; }
@@ -249,7 +257,7 @@ export interface SubcontractorCertificate extends BaseEntity { certificateNumber
 export interface Payslip extends BaseEntity { employeeId: string; employeeName: string; month: number; year: number; netSalary: number; status: 'draft' | 'processed' | 'paid'; type: 'Monthly' | 'Leave'; earnings: any; deductions: any; notes?: string; leaveRequestId?: string; salaryPaymentType?: string; }
 export interface MonthlyAttendance extends BaseEntity { employeeId: string; month: number; year: number; records: any[]; summary: any; }
 export interface Notification extends BaseEntity { userId: string; title: string; body: string; link?: string; isRead: boolean; }
-export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'ResidencyUpdate'; field: string; oldValue: any; newValue: any; effectiveDate: Timestamp | any; changedBy: string; notes?: string; }
+export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'ResidencyUpdate' | 'TeamChange'; field: string; oldValue: any; newValue: any; effectiveDate: Timestamp | any; changedBy: string; notes?: string; }
 export interface LetterOfCredit extends BaseEntity { lcNumber: string; issuingBank: string; vendorId: string; vendorName: string; amount: number; currency: string; expiryDate: Timestamp | any; status: string; notes?: string; }
 export interface InventoryAdjustment extends BaseEntity { adjustmentNumber: string; date: Timestamp | any; type: 'damage' | 'theft' | 'opening_balance' | 'purchase_return' | 'sales_return' | 'transfer' | 'material_issue'; warehouseId?: string; fromWarehouseId?: string; toWarehouseId?: string; items: any[]; journalEntryId?: string; notes?: string; projectId?: string | null; projectName?: string | null; clientId?: string | null; clientName?: string | null; vendorId?: string | null; issueType?: 'project_site' | 'direct_sale'; isDirectReturn?: boolean; isBypassed?: boolean; }
 export interface Holiday extends BaseEntity { name: string; date: Timestamp | any; }

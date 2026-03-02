@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, writeBatch, serverTimestamp, doc, getDoc, orderBy, where, Timestamp } from 'firebase/firestore';
-import type { ConstructionProject, Employee, FieldVisit, BoqItem } from '@/lib/types';
+import type { ConstructionProject, Employee, FieldVisit, BoqItem, WorkTeam } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Save, PlusCircle, Trash2, Table as TableIcon, Target, Users, HardHat } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { DateInput } from '@/components/ui/date-input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cleanFirestoreData, generateStableId } from '@/lib/utils';
@@ -29,9 +30,7 @@ const rowSchema = z.object({
   engineerId: z.string().min(1, "المهندس مطلوب"),
   plannedStageId: z.string().optional(),
   details: z.string().optional(),
-  team1: z.string().optional(),
-  team2: z.string().optional(),
-  team3: z.string().optional(),
+  teamIds: z.array(z.string()).default([]),
   subcontractorName: z.string().optional(),
   requiredPayment: z.string().optional(),
 });
@@ -43,19 +42,15 @@ const spreadsheetSchema = z.object({
 
 type SpreadsheetValues = z.infer<typeof spreadsheetSchema>;
 
-/**
- * محرك الإدخال الشبكي للزيارات (حصري للمشاريع الإنشائية):
- * تم تعديل جلب البيانات ليعتمد على كولكشن "projects" بدلاً من المعاملات العامة.
- */
 export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () => void }) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // جلب المشاريع والمهندسين
   const { data: projects = [], loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
   const { data: employees = [], loading: engLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+  const { data: workTeams = [] } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
   
   const [boqItemsMap, setBoqItemsMap] = React.useState<Map<string, {id: string, name: string}[]>>(new Map());
 
@@ -63,14 +58,13 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
     resolver: zodResolver(spreadsheetSchema),
     defaultValues: {
       date: new Date(),
-      rows: [{ uid: generateStableId(), projectId: '', engineerId: '', details: '', team1: '', team2: '', team3: '', subcontractorName: '', requiredPayment: '' }],
+      rows: [{ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], subcontractorName: '', requiredPayment: '' }],
     },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'rows' });
   const watchedRows = useWatch({ control, name: 'rows' });
 
-  // جلب بنود الـ BOQ لكل مشروع يتم اختياره في الجدول
   const fetchProjectStages = async (projectId: string, boqId: string) => {
     if (boqItemsMap.has(projectId)) return;
     try {
@@ -83,6 +77,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
   const projectOptions = React.useMemo(() => projects.map(p => ({ value: p.id!, label: p.projectName })), [projects]);
   const engineerOptions = React.useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
+  const teamOptions = React.useMemo(() => workTeams.map(t => ({ value: t.id!, label: t.name })), [workTeams]);
 
   const handleSaveAll = async (data: SpreadsheetValues) => {
     if (!firestore || !currentUser) return;
@@ -96,6 +91,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
             const engineer = employees.find(e => e.id === row.engineerId)!;
             const projectStages = boqItemsMap.get(row.projectId) || [];
             const stage = projectStages.find(s => s.id === row.plannedStageId);
+            const selectedTeams = workTeams.filter(t => row.teamIds.includes(t.id!));
 
             const visitData: Omit<FieldVisit, 'id'> = {
                 projectId: row.projectId,
@@ -110,10 +106,10 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 plannedStageId: row.plannedStageId || '',
                 plannedStageName: stage?.name || 'زيارة متابعة',
                 details: row.details || '',
-                team1: row.team1 || '',
-                team2: row.team2 || '',
-                team3: row.team3 || '',
-                subcontractorName: row.subcontractorName || '',
+                teamIds: row.teamIds,
+                teamNames: selectedTeams.map(t => t.name),
+                subcontractorId: project.subcontractorId || null,
+                subcontractorName: project.subcontractorName || null,
                 requiredPayment: row.requiredPayment || '',
                 status: 'planned',
                 createdAt: serverTimestamp(),
@@ -126,23 +122,17 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
             notificationsToCreate.push({
                 engineerId: row.engineerId,
-                title: 'زيارة موقع مجدولة',
-                body: `تم تكليفك بزيارة مشروع ${project.projectName} يوم ${format(data.date, 'dd/MM/yyyy')}.`,
+                title: 'زيارة موقع مجدولة (S)',
+                body: `جدولة مشروع ${project.projectName} لليوم.`,
                 link: `/dashboard/construction/field-visits/${newVisitRef.id}`
             });
         }
 
         await batch.commit();
-
-        for (const n of notificationsToCreate) {
-            const userId = await findUserIdByEmployeeId(firestore, n.engineerId);
-            if (userId) createNotification(firestore, { ...n, userId, link: n.link });
-        }
-
-        toast({ title: 'نجاح التخطيط', description: `تمت جدولة ${data.rows.length} موقع بنجاح.` });
+        toast({ title: 'نجاح الجدولة الجماعية', description: `تمت جدولة ${data.rows.length} موقع بنجاح.` });
         onSaveSuccess();
     } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الخطة الميدانية.' });
+        toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
     } finally {
         setIsSaving(false);
     }
@@ -156,9 +146,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 <div className="space-y-1">
                     <CardTitle className="text-2xl font-black flex items-center gap-2 text-primary">
                         <TableIcon className="h-6 w-6" />
-                        جدولة يومية لمشاريع المقاولات
+                        الجدولة الجماعية السريعة للمشاريع
                     </CardTitle>
-                    <CardDescription>أدخل خطة المواقع والفرق الفنية والمقاولين في سطر واحد لكل مشروع.</CardDescription>
+                    <CardDescription>أدخل خطة المواقع والفرق الفنية والمقاولين دفعة واحدة.</CardDescription>
                 </div>
                 <div className="flex items-center gap-4 bg-background p-3 rounded-2xl border shadow-inner">
                     <Label className="font-bold text-xs">تاريخ الخطة:</Label>
@@ -179,23 +169,22 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                   <TableRow className="h-14 border-b-2">
                     <TableHead className="w-12 text-center font-black">#</TableHead>
                     <TableHead className="w-16 text-center font-black">إجراء</TableHead>
-                    <TableHead className="w-80 font-black text-right border-l"><Target className="h-4 w-4 inline ml-1 text-primary"/> مشروع المقاولات</TableHead>
-                    <TableHead className="w-64 font-black text-right border-l"><Users className="h-4 w-4 inline ml-1 text-primary"/> المهندس الزائر</TableHead>
+                    <TableHead className="w-80 font-black text-right border-l"><Target className="h-4 w-4 inline ml-1 text-primary"/> المشروع</TableHead>
                     <TableHead className="w-64 font-black text-right border-l">بند المقايسة (BOQ)</TableHead>
-                    <TableHead className="w-32 font-black text-center border-l">فريق 1</TableHead>
-                    <TableHead className="w-32 font-black text-center border-l">فريق 2</TableHead>
-                    <TableHead className="w-32 font-black text-center border-l">فريق 3</TableHead>
-                    <TableHead className="w-56 font-black text-right border-l"><HardHat className="h-4 w-4 inline ml-1 text-primary"/> المقاول المنفذ</TableHead>
-                    <TableHead className="w-full font-black text-right border-l">تعليمات العمل المطلوبة</TableHead>
+                    <TableHead className="w-80 font-black text-right border-l">فرق العمل الميدانية</TableHead>
+                    <TableHead className="w-64 font-black text-right border-l">المقاول (Snapshot)</TableHead>
+                    <TableHead className="w-64 font-black text-right border-l">المهندس المسؤول</TableHead>
+                    <TableHead className="w-full font-black text-right border-l">العمل المطلوب</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {fields.map((field, index) => {
                     const row = watchedRows[index];
                     const projectStages = boqItemsMap.get(row.projectId) || [];
+                    const project = projects.find(p => p.id === row.projectId);
 
                     return (
-                      <TableRow key={field.id} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
+                      <TableRow key={field.uid} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
                         <TableCell className="text-center font-mono text-xs font-bold text-muted-foreground bg-muted/5 border-l">{index + 1}</TableCell>
                         <TableCell className="text-center border-l">
                             <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full">
@@ -216,27 +205,12 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                                             if (p) {
                                                 if (p.mainEngineerId) setValue(`rows.${index}.engineerId`, p.mainEngineerId);
                                                 if (p.boqId) fetchProjectStages(v, p.boqId);
+                                                if (p.subcontractorName) setValue(`rows.${index}.subcontractorName`, p.subcontractorName);
                                             }
                                         }}
                                         options={projectOptions}
-                                        placeholder="اختر مشروع مقاولات..."
-                                        className="border-none shadow-none focus-visible:ring-0 font-black text-primary bg-transparent h-12"
-                                    />
-                                )}
-                            />
-                        </TableCell>
-
-                        <TableCell className="border-l p-1">
-                            <Controller
-                                control={control}
-                                name={`rows.${index}.engineerId`}
-                                render={({ field: f }) => (
-                                    <InlineSearchList
-                                        value={f.value}
-                                        onSelect={f.onChange}
-                                        options={engineerOptions}
-                                        placeholder="اختر مهندس..."
-                                        className="border-none shadow-none focus-visible:ring-0 font-bold bg-transparent h-12"
+                                        placeholder="اختر مشروع..."
+                                        className="border-none shadow-none font-black text-primary bg-transparent h-12"
                                     />
                                 )}
                             />
@@ -253,20 +227,54 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                                         options={projectStages.map(s => ({ value: s.id, label: s.name }))}
                                         placeholder="بند الـ BOQ..."
                                         disabled={!row.projectId}
-                                        className="border-none shadow-none focus-visible:ring-0 text-[10px] font-bold bg-transparent h-12"
+                                        className="border-none shadow-none text-[10px] font-bold bg-transparent h-12"
                                     />
                                 )}
                             />
                         </TableCell>
 
-                        <TableCell className="border-l p-1"><Input {...register(`rows.${index}.team1`)} className="border-none shadow-none text-center font-bold h-12" placeholder="---"/></TableCell>
-                        <TableCell className="border-l p-1"><Input {...register(`rows.${index}.team2`)} className="border-none shadow-none text-center font-bold h-12" placeholder="---"/></TableCell>
-                        <TableCell className="border-l p-1"><Input {...register(`rows.${index}.team3`)} className="border-none shadow-none text-center font-bold h-12" placeholder="---"/></TableCell>
-                        
-                        <TableCell className="border-l p-1"><Input {...register(`rows.${index}.subcontractorName`)} className="border-none shadow-none font-bold h-12" placeholder="اسم المقاول..."/></TableCell>
+                        <TableCell className="border-l p-1">
+                            {!project?.subcontractorId ? (
+                                <Controller
+                                    control={control}
+                                    name={`rows.${index}.teamIds`}
+                                    render={({ field: f }) => (
+                                        <MultiSelect 
+                                            options={teamOptions}
+                                            selected={f.value || []}
+                                            onChange={f.onChange}
+                                            placeholder="اختر الفرق..."
+                                            className="border-none shadow-none bg-transparent"
+                                        />
+                                    )}
+                                />
+                            ) : (
+                                <div className="text-xs text-orange-600 font-bold px-3">إسناد لمقاول باطن</div>
+                            )}
+                        </TableCell>
+
+                        <TableCell className="border-l p-1">
+                            <Input {...register(`rows.${index}.subcontractorName`)} className="border-none shadow-none font-bold h-12" readOnly disabled={!project?.subcontractorId}/>
+                        </TableCell>
+
+                        <TableCell className="border-l p-1">
+                            <Controller
+                                control={control}
+                                name={`rows.${index}.engineerId`}
+                                render={({ field: f }) => (
+                                    <InlineSearchList
+                                        value={f.value}
+                                        onSelect={f.onChange}
+                                        options={engineerOptions}
+                                        placeholder="المهندس..."
+                                        className="border-none shadow-none font-bold bg-transparent h-12"
+                                    />
+                                )}
+                            />
+                        </TableCell>
                         
                         <TableCell className="border-l p-1">
-                            <Input {...register(`rows.${index}.details`)} className="border-none shadow-none text-right text-xs italic h-12" placeholder="مثال: استلام حديد الميدة، صب النظافة..."/>
+                            <Input {...register(`rows.${index}.details`)} className="border-none shadow-none text-right text-xs italic h-12" placeholder="التعليمات..."/>
                         </TableCell>
                       </TableRow>
                     );
@@ -278,7 +286,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
           </ScrollArea>
 
           <div className="flex justify-center p-8 bg-muted/10 border-t">
-            <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', team1: '', team2: '', team3: '', subcontractorName: '', requiredPayment: '' })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
+            <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], subcontractorName: '', requiredPayment: '' })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
                 <PlusCircle className="h-5 w-5 text-primary" />
                 إضافة سطر مشروع جديد
             </Button>
@@ -289,7 +297,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
             <Button type="button" variant="ghost" onClick={onSaveSuccess} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
             <Button type="submit" disabled={isSaving || projectsLoading} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px]">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                حفظ خطة المواقع
+                حفظ خطة المواقع واللوجستيات
             </Button>
         </CardFooter>
       </form>
