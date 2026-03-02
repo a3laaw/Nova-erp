@@ -12,12 +12,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import type { ConstructionProject, Client, Employee, ClientTransaction, ConstructionType, SubsidyQuota, Item } from '@/lib/types';
-import { Loader2, Save, X, LayoutGrid, ShieldCheck, PlusCircle, Trash2 } from 'lucide-react';
+import type { ConstructionProject, Client, Employee, ConstructionType, Item } from '@/lib/types';
+import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2 } from 'lucide-react';
 import { DialogFooter } from '../ui/dialog';
 import { query, collection, getDocs, orderBy, where } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '../ui/separator';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 
 const quotaSchema = z.object({
     itemId: z.string().min(1, "الصنف مطلوب"),
@@ -59,10 +59,10 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, 'clients');
     const { data: engineers = [], loading: engineersLoading } = useSubscription<Employee>(firestore, 'employees');
     const { data: constructionTypes = [] } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
-    const { data: subsidyItems = [] } = useSubscription<Item>(firestore, 'items', [where('isSubsidyEligible', '==', true)]);
+    const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     
-    const [clientTransactions, setClientTransactions] = useState<ClientTransaction[]>([]);
-    const [transactionsLoading, setTransactionsLoading] = useState(false);
+    // فلترة الأصناف التي تصلح للمدعوم
+    const subsidyItems = useMemo(() => allItems.filter(i => i.isSubsidyEligible), [allItems]);
 
     const { register, handleSubmit, control, watch, formState: { errors }, reset, setValue } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
@@ -89,16 +89,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         }
     }, [initialData, reset]);
 
-    useEffect(() => {
-        if (selectedClientId && firestore) {
-            setTransactionsLoading(true);
-            const q = query(collection(firestore, `clients/${selectedClientId}/transactions`));
-            getDocs(q).then(snap => {
-                setClientTransactions(snap.docs.map(d => ({id: d.id, ...d.data()} as ClientTransaction)));
-            }).finally(() => setTransactionsLoading(false));
-        }
-    }, [selectedClientId, firestore]);
-    
     const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
     const engineerOptions = useMemo(() => engineers.filter(e=> e.jobTitle?.includes('مهندس')).map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
     const constructionTypeOptions = useMemo(() => constructionTypes.map(t => ({ value: t.id!, label: t.name })), [constructionTypes]);

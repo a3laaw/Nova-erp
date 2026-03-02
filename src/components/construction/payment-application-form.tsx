@@ -94,7 +94,7 @@ export function PaymentApplicationForm({ onClose }: { onClose: () => void }) {
 
   const { fields, replace } = useFieldArray({ control, name: 'items' });
   const selectedProjectId = watch('projectId');
-  const watchedItems = useWatch({ control, name: 'items' });
+  const watchedItems = useWatch({ control, name: "items" });
 
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
@@ -108,7 +108,7 @@ export function PaymentApplicationForm({ onClose }: { onClose: () => void }) {
             getDocs(query(collection(firestore, `boqs/${selectedProject.boqId}/items`), orderBy('itemNumber'))),
             getDocs(query(collection(firestore, 'payment_applications'), where('projectId', '==', selectedProjectId), where('status', 'in', ['approved', 'paid']))),
             // جلب المواد المدعومة المصروفة للموقع والتي لم تخصم من مستخلص سابق
-            getDocs(query(collection(firestore, 'inventoryAdjustments'), where('projectId', '==', selectedProjectId), where('type', '==', 'material_issue'), where('issueType', '==', 'project_site')))
+            getDocs(query(collection(firestore, 'inventoryAdjustments'), where('projectId', '==', selectedProjectId), where('type', '==', 'material_issue')))
         ]);
 
         const previousTotals = new Map<string, number>();
@@ -124,8 +124,8 @@ export function PaymentApplicationForm({ onClose }: { onClose: () => void }) {
         let totalSubsidyVal = 0;
         subsidyIssuesSnap.forEach(doc => {
             const adj = doc.data() as InventoryAdjustment;
-            // نحن هنا نحسب فقط البنود التي تم وسمها كمدعومة في سجلات الصرف
             adj.items?.forEach((item: any) => {
+                // نحن نحسب هنا البنود التي تم صرفها بقيمة صفرية أو وسمت كمدعومة
                 if (item.unitCost === 0 || item.isSubsidy) {
                     totalSubsidyVal += item.totalCost || 0;
                 }
