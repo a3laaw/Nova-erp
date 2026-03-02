@@ -22,12 +22,11 @@ import { DateInput } from '@/components/ui/date-input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cleanFirestoreData, generateStableId } from '@/lib/utils';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { format } from 'date-fns';
 
 const rowSchema = z.object({
   uid: z.string(),
   projectId: z.string().min(1, "المشروع مطلوب"),
-  engineerId: z.string().min(1, "المهندس مطلوب"),
+  engineerId: z.string().optional().nullable(),
   plannedStageId: z.string().optional(),
   details: z.string().optional(),
   teamIds: z.array(z.string()).default([]),
@@ -88,7 +87,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
         for (const row of data.rows) {
             const project = projects.find(p => p.id === row.projectId)!;
-            const engineer = employees.find(e => e.id === row.engineerId)!;
+            const engineer = employees.find(e => e.id === row.engineerId);
             const projectStages = boqItemsMap.get(row.projectId) || [];
             const stage = projectStages.find(s => s.id === row.plannedStageId);
             const selectedTeams = workTeams.filter(t => row.teamIds.includes(t.id!));
@@ -100,8 +99,8 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 clientName: project.clientName || 'غير معروف',
                 transactionId: project.linkedTransactionId || '',
                 transactionType: project.projectType || 'مقاولات',
-                engineerId: row.engineerId,
-                engineerName: engineer.fullName,
+                engineerId: row.engineerId || null,
+                engineerName: engineer?.fullName || 'إشراف عام / فريق فني',
                 scheduledDate: Timestamp.fromDate(data.date),
                 plannedStageId: row.plannedStageId || '',
                 plannedStageName: stage?.name || 'زيارة متابعة',
@@ -120,12 +119,14 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
             const newVisitRef = doc(collection(firestore, 'field_visits'));
             batch.set(newVisitRef, cleanFirestoreData(visitData));
 
-            notificationsToCreate.push({
-                engineerId: row.engineerId,
-                title: 'زيارة موقع مجدولة (S)',
-                body: `جدولة مشروع ${project.projectName} لليوم.`,
-                link: `/dashboard/construction/field-visits/${newVisitRef.id}`
-            });
+            if (row.engineerId) {
+                notificationsToCreate.push({
+                    engineerId: row.engineerId,
+                    title: 'زيارة موقع مجدولة',
+                    body: `جدولة مشروع ${project.projectName} لليوم.`,
+                    link: `/dashboard/construction/field-visits/${newVisitRef.id}`
+                });
+            }
         }
 
         await batch.commit();
@@ -263,7 +264,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                                 name={`rows.${index}.engineerId`}
                                 render={({ field: f }) => (
                                     <InlineSearchList
-                                        value={f.value}
+                                        value={f.value || ''}
                                         onSelect={f.onChange}
                                         options={engineerOptions}
                                         placeholder="المهندس..."

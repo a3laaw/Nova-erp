@@ -17,12 +17,14 @@ import { Loader2, Save, X, Calendar, User, MapPin, HardHat, Building2, Users, Ta
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData, formatCurrency } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 /**
  * نموذج جدولة زيارة موقع (المحرك المطور):
  * - يدعم فرق العمل الديناميكية عبر Multi-Select.
  * - يعرض الفرق المختارة في جدول أفقي للمعاينة.
- * - ذكاء قالبي: يغير الحقول والمراحل بناءً على نوع المشروع (هيكل أسود، صحي، كهرباء).
+ * - المهندس اختيار (اختياري) لدعم الزيارات الجماعية أو غير المشرف عليها.
  */
 export function FieldVisitForm() {
     const { firestore } = useFirebase();
@@ -82,8 +84,8 @@ export function FieldVisitForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !selectedProjectId || !selectedEngineerId) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة' });
+        if (!firestore || !currentUser || !selectedProjectId) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار المشروع على الأقل.' });
             return;
         }
 
@@ -99,13 +101,13 @@ export function FieldVisitForm() {
                 clientName: selectedProject?.clientName || 'غير معروف',
                 transactionId: selectedProject?.linkedTransactionId || '',
                 transactionType: selectedProject?.projectType || 'مقاولات',
-                engineerId: selectedEngineerId,
-                engineerName: eng?.fullName || 'غير معروف',
+                engineerId: selectedEngineerId || null,
+                engineerName: eng?.fullName || 'إشراف عام / فريق فني',
                 scheduledDate: scheduledDate || new Date(),
                 plannedStageId: plannedStageId,
                 plannedStageName: stage?.description || 'زيارة متابعة عامة',
                 teamIds: isSubcontracted ? [] : selectedTeamIds,
-                teamNames: isSubcontracted ? [] : selectedTeamsData.map(t => t.name), // Snapshot
+                teamNames: isSubcontracted ? [] : selectedTeamsData.map(t => t.name), 
                 subcontractorId: selectedProject?.subcontractorId || null,
                 subcontractorName: selectedProject?.subcontractorName || null,
                 layoutType: selectedProject?.constructionTypeName || 'General',
@@ -116,7 +118,7 @@ export function FieldVisitForm() {
             };
 
             await addDoc(collection(firestore, 'field_visits'), cleanFirestoreData(visitData));
-            toast({ title: 'تمت الجدولة', description: 'تم حفظ الزيارة وتجميد بيانات الفرق الميدانية.' });
+            toast({ title: 'تمت الجدولة', description: 'تم حفظ الزيارة بنجاح.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
@@ -166,7 +168,6 @@ export function FieldVisitForm() {
 
                     <Separator />
 
-                    {/* --- قسم إدارة اللوجستيات والفرق --- */}
                     <div className="space-y-4">
                         <div className="flex items-center justify-between">
                             <Label className="font-black text-lg flex items-center gap-2">
@@ -236,19 +237,19 @@ export function FieldVisitForm() {
                     </div>
 
                     <div className="grid gap-2 pt-4 border-t">
-                        <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> المهندس المشرف الزائر *</Label>
+                        <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> المهندس المشرف الزائر (اختياري)</Label>
                         <InlineSearchList 
                             value={selectedEngineerId}
                             onSelect={setSelectedEngineerId}
                             options={engineerOptions}
-                            placeholder="اختر المهندس..."
+                            placeholder="يمكن تركه فارغاً للإشراف العام..."
                             disabled={engineersLoading || isSaving}
                         />
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/30 p-8 flex justify-end gap-3 border-t">
                     <Button type="button" variant="ghost" onClick={() => router.back()}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || projectsLoading || (!isSubcontracted && selectedTeamIds.length === 0)} className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-lg">
+                    <Button type="submit" disabled={isSaving || projectsLoading} className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-lg">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                         تأكيد الجدولة واللوجستيات
                     </Button>

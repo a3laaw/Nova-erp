@@ -208,8 +208,8 @@ export interface FieldVisit extends BaseEntity {
     status: string; 
     plannedStageId: string;     
     plannedStageName: string;   
-    engineerId: string;
-    engineerName: string; 
+    engineerId?: string | null;
+    engineerName?: string | null; 
     details?: string;           
     requiredPayment?: string;   
     lastPayment?: string;       
