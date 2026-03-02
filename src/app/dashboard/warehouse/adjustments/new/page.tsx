@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, RotateCcw, AlertTriangle, PackageSearch, ShieldCheck, History, User } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import type { Account, Item, Warehouse, Client, Vendor, InventoryAdjustment } from '@/lib/types';
@@ -70,11 +70,14 @@ export default function NewAdjustmentPage() {
     const savingRef = useRef(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
     
-    // أرصدة المخزن والمورد (الرقابة المتقاطعة)
+    // محركات الأرصدة والرقابة (The Triple Shield)
     const [stockBalances, setStockBalances] = useState<Record<string, number>>({});
     const [vendorPurchaseBalances, setVendorPurchaseBalances] = useState<Record<string, number>>({});
+    const [clientSalesBalances, setClientSalesBalances] = useState<Record<string, number>>({});
+    
     const [loadingStock, setLoadingStock] = useState(false);
     const [loadingVendorBalances, setLoadingVendorBalances] = useState(false);
+    const [loadingClientBalances, setLoadingClientBalances] = useState(false);
 
     const initialType = searchParams.get('type') as any;
 
@@ -98,15 +101,15 @@ export default function NewAdjustmentPage() {
     const adjType = watch('type');
     const selectedWarehouseId = watch('warehouseId');
     const selectedVendorId = watch('vendorId');
+    const selectedClientId = watch('clientId');
 
-    // تحديد ما إذا كانت العملية تتضمن خروج بضاعة للتحقق من الرصيد (مهم جداً للرقابة)
     const isOutbound = useMemo(() => ['damage', 'theft', 'purchase_return'].includes(adjType), [adjType]);
 
     const totalCost = useMemo(() =>
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
-    // محرك فحص الرصيد الفعلي في "الرف"
+    // 🛡️ الدرع 1: فحص الرصيد الفعلي في "الرف" (Stock Shield)
     const fetchStockBalances = useCallback(async (warehouseId: string) => {
         if (!firestore || !warehouseId) return;
         setLoadingStock(true);
@@ -114,8 +117,7 @@ export default function NewAdjustmentPage() {
             const balances: Record<string, number> = {};
             const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('warehouseId', '==', warehouseId)));
             grnsSnap.forEach(doc => {
-                const data = doc.data();
-                data.itemsReceived?.forEach((i: any) => {
+                doc.data().itemsReceived?.forEach((i: any) => {
                     balances[i.internalItemId] = (balances[i.internalItemId] || 0) + i.quantityReceived;
                 });
             });
@@ -139,7 +141,7 @@ export default function NewAdjustmentPage() {
         }
     }, [firestore]);
 
-    // محرك فحص رصيد المورد (الرقابة المتقاطعة - المستودع الافتراضي للمورد)
+    // 🛡️ الدرع 2: فحص رصيد المورد (Vendor Purchase History Shield)
     const fetchVendorPurchaseBalances = useCallback(async (vId: string) => {
         if (!firestore || !vId) {
             setVendorPurchaseBalances({});
@@ -170,6 +172,43 @@ export default function NewAdjustmentPage() {
         }
     }, [firestore]);
 
+    // 🛡️ الدرع 3: فحص رصيد مبيعات العميل (Client Sales History Shield)
+    const fetchClientSalesBalances = useCallback(async (cId: string) => {
+        if (!firestore || !cId) {
+            setClientSalesBalances({});
+            return;
+        }
+        setLoadingClientBalances(true);
+        try {
+            const balances: Record<string, number> = {};
+            // المبيعات في نظامنا هي inventoryAdjustments من نوع material_issue
+            const salesSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
+                where('clientId', '==', cId),
+                where('type', '==', 'material_issue')
+            ));
+            
+            salesSnap.forEach(doc => {
+                doc.data().items?.forEach((i: any) => {
+                    balances[i.itemId] = (balances[i.itemId] || 0) + i.quantity;
+                });
+            });
+
+            // خصم المرتجعات السابقة للعميل نفسه
+            const returnsSnap = await getDocs(query(collection(firestore, 'inventoryAdjustments'), 
+                where('clientId', '==', cId), 
+                where('type', '==', 'sales_return')
+            ));
+            returnsSnap.forEach(doc => {
+                doc.data().items?.forEach((i: any) => {
+                    balances[i.itemId] = (balances[i.itemId] || 0) - i.quantity;
+                });
+            });
+            setClientSalesBalances(balances);
+        } finally {
+            setLoadingClientBalances(false);
+        }
+    }, [firestore]);
+
     useEffect(() => {
         if (selectedWarehouseId) fetchStockBalances(selectedWarehouseId);
     }, [selectedWarehouseId, fetchStockBalances]);
@@ -177,8 +216,10 @@ export default function NewAdjustmentPage() {
     useEffect(() => {
         if (adjType === 'purchase_return' && selectedVendorId) {
             fetchVendorPurchaseBalances(selectedVendorId);
+        } else if (adjType === 'sales_return' && selectedClientId) {
+            fetchClientSalesBalances(selectedClientId);
         }
-    }, [adjType, selectedVendorId, fetchVendorPurchaseBalances]);
+    }, [adjType, selectedVendorId, selectedClientId, fetchVendorPurchaseBalances, fetchClientSalesBalances]);
 
     useEffect(() => {
         if (!firestore) return;
@@ -195,19 +236,28 @@ export default function NewAdjustmentPage() {
     const onSubmit = async (data: AdjFormValues) => {
         if (!firestore || !currentUser || savingRef.current) return;
 
-        // الرقابة الصارمة قبل الحفظ النهائي
+        // 🛡️ فحص الرقابة النهائية قبل الحفظ
         for (const item of data.items) {
             const currentStock = stockBalances[item.itemId] || 0;
             const purchasedFromVendor = vendorPurchaseBalances[item.itemId] || 0;
+            const soldToClient = clientSalesBalances[item.itemId] || 0;
             const itemName = items.find(i => i.id === item.itemId)?.name;
 
+            // حماية رصيد المخزن (للخارج)
             if (isOutbound && item.quantity > currentStock) {
                 toast({ variant: 'destructive', title: 'عجز مخزني', description: `لا يمكن سحب (${item.quantity}) من صنف "${itemName}" لأن المتوفر هو (${currentStock}) فقط.` });
                 return;
             }
 
+            // حماية المورد (للمرتجع)
             if (data.type === 'purchase_return' && data.vendorId && item.quantity > purchasedFromVendor) {
-                toast({ variant: 'destructive', title: 'تجاوز حد التوريد', description: `لا يمكن إرجاع كمية (${item.quantity}) للمورد لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.` });
+                toast({ variant: 'destructive', title: 'تجاوز حد التوريد', description: `لا يمكن إرجاع (${item.quantity}) للمورد لأنك لم تشترِ منه سوى (${purchasedFromVendor}) من هذا الصنف.` });
+                return;
+            }
+
+            // حماية المبيعات (لمردود المبيعات)
+            if (data.type === 'sales_return' && data.clientId && item.quantity > soldToClient) {
+                toast({ variant: 'destructive', title: 'تجاوز حد المبيعات', description: `لا يمكن استرجاع (${item.quantity}) من العميل لأنه لم يشترِ سوى (${soldToClient}) من هذا الصنف.` });
                 return;
             }
         }
@@ -256,7 +306,7 @@ export default function NewAdjustmentPage() {
                 const counterRef = doc(firestore, 'counters', 'inventoryAdjustments');
                 const counterDoc = await transaction.get(counterRef);
                 const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                const adjNumber = data.type === 'purchase_return' ? `RET-${currentYear}-${String(nextNumber).padStart(4, '0')}` : `ADJ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
+                const adjNumber = data.type === 'purchase_return' ? `RET-${currentYear}-${String(nextNumber).padStart(4, '0')}` : data.type === 'sales_return' ? `SRET-${currentYear}-${String(nextNumber).padStart(4, '0')}` : `ADJ-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
                 
                 const newAdjRef = doc(collection(firestore, 'inventoryAdjustments'));
                 const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
@@ -308,15 +358,14 @@ export default function NewAdjustmentPage() {
             });
 
             toast({ title: 'نجاح العملية', description: 'تمت المردودات وتحديث الأرصدة والقيود المحاسبية بدقة.' });
-            router.push('/dashboard/warehouse/adjustments');
+            router.push('/dashboard/warehouse/reports');
         } catch (error) {
+            console.error(error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إتمام العملية.' });
             setIsSaving(false);
             savingRef.current = false;
         }
     };
-
-    const isPurchaseReturn = adjType === 'purchase_return';
 
     return (
         <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
@@ -324,11 +373,9 @@ export default function NewAdjustmentPage() {
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <CardTitle className="flex items-center gap-3 text-2xl font-black">
                         <RotateCcw className="text-primary h-8 w-8"/> 
-                        {isPurchaseReturn ? 'مردود مشتريات للمورد' : 'إذن تسوية مخزنية'}
+                        {adjType === 'purchase_return' ? 'مردود مشتريات للمورد' : adjType === 'sales_return' ? 'مردود مبيعات من عميل' : 'إذن تسوية مخزنية'}
                     </CardTitle>
-                    <CardDescription>
-                        {isPurchaseReturn ? 'إرجاع بضاعة للمورد مع رقابة صارمة على المتاح لديه.' : 'تسجيل التوالف أو العجز المخزني مع الربط المحاسبي.'}
-                    </CardDescription>
+                    <CardDescription>إدارة المردودات والتسويات مع تفعيل نظام "الدروع الرقابية" للأرصدة التاريخية.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 p-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
@@ -359,16 +406,16 @@ export default function NewAdjustmentPage() {
                         
                         {adjType === 'sales_return' && (
                             <div className="grid gap-2 animate-in fade-in zoom-in-95">
-                                <Label className="font-bold">العميل (المرتجع منه) *</Label>
+                                <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> العميل (المرتجع منه) *</Label>
                                 <Controller name="clientId" control={control} render={({ field }) => (
                                     <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن عميل..." />
                                 )} />
                             </div>
                         )}
 
-                        {isPurchaseReturn && (
+                        {adjType === 'purchase_return' && (
                             <div className="grid gap-2 animate-in fade-in zoom-in-95">
-                                <Label className="font-bold">المورد (المرتجع إليه) *</Label>
+                                <Label className="font-bold flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary"/> المورد (المرتجع إليه) *</Label>
                                 <Controller name="vendorId" control={control} render={({ field }) => (
                                     <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={vendorOptions} placeholder="ابحث عن مورد..." />
                                 )} />
@@ -377,7 +424,7 @@ export default function NewAdjustmentPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label className="font-bold">الملاحظات / سبب الارتجاع *</Label>
+                        <Label className="font-bold">الملاحظات / سبب العملية *</Label>
                         <Input {...register('notes')} placeholder="لماذا يتم الإرجاع أو التسوية؟" className="h-11 rounded-xl" />
                         {errors.notes && <p className="text-xs text-destructive font-bold">{errors.notes.message}</p>}
                     </div>
@@ -387,11 +434,10 @@ export default function NewAdjustmentPage() {
                             <Label className="text-lg font-black flex items-center gap-2">
                                 <PackageSearch className="h-5 w-5 text-primary"/> الأصناف المرتجعة/المعدلة
                             </Label>
-                            {isPurchaseReturn && (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-700 gap-1.5 px-3 py-1">
-                                    <ShieldCheck className="h-3 w-3" /> تم تفعيل الرقابة المتقاطعة
-                                </Badge>
-                            )}
+                            <div className="flex gap-2">
+                                {adjType === 'purchase_return' && <Badge variant="secondary" className="bg-blue-100 text-blue-700">رقابة المورد نشطة</Badge>}
+                                {adjType === 'sales_return' && <Badge variant="secondary" className="bg-purple-100 text-purple-700">رقابة مبيعات العميل نشطة</Badge>}
+                            </div>
                         </div>
                         <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                             <Table>
@@ -400,7 +446,8 @@ export default function NewAdjustmentPage() {
                                         <TableHead className="w-[60px]"></TableHead>
                                         <TableHead className="font-bold">الصنف</TableHead>
                                         <TableHead className="w-28 text-center font-bold">في المخزن</TableHead>
-                                        {isPurchaseReturn && <TableHead className="w-28 text-center font-bold text-blue-700">من المورد</TableHead>}
+                                        {adjType === 'purchase_return' && <TableHead className="w-28 text-center font-bold text-blue-700">من المورد</TableHead>}
+                                        {adjType === 'sales_return' && <TableHead className="w-28 text-center font-bold text-purple-700">اشترى العميل</TableHead>}
                                         <TableHead className="w-32 text-center font-bold bg-primary/5">الكمية</TableHead>
                                         <TableHead className="w-40 text-left px-6 font-bold">القيمة</TableHead>
                                     </TableRow>
@@ -408,14 +455,18 @@ export default function NewAdjustmentPage() {
                                 <TableBody>
                                     {fields.map((field, index) => {
                                         const item = watchedItems?.[index];
-                                        const currentStock = stockBalances[item?.itemId || ''] || 0;
+                                        const curStock = stockBalances[item?.itemId || ''] || 0;
                                         const purchased = vendorPurchaseBalances[item?.itemId || ''] || 0;
+                                        const sold = clientSalesBalances[item?.itemId || ''] || 0;
                                         
-                                        const isInsufficientStock = isOutbound && (item?.quantity || 0) > currentStock;
-                                        const isInsufficientVendor = isPurchaseReturn && (item?.quantity || 0) > purchased;
+                                        const isInsufficientStock = isOutbound && (item?.quantity || 0) > curStock;
+                                        const isInsufficientVendor = adjType === 'purchase_return' && (item?.quantity || 0) > purchased;
+                                        const isInsufficientClient = adjType === 'sales_return' && (item?.quantity || 0) > sold;
+
+                                        const hasError = isInsufficientStock || isInsufficientVendor || isInsufficientClient;
 
                                         return (
-                                            <TableRow key={field.id} className={cn("h-16 border-b last:border-0", (isInsufficientStock || isInsufficientVendor) && "bg-red-50")}>
+                                            <TableRow key={field.id} className={cn("h-16 border-b last:border-0", hasError && "bg-red-50")}>
                                                 <TableCell className="text-center">
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive"><Trash2 className="h-4 w-4"/></Button>
                                                 </TableCell>
@@ -429,11 +480,16 @@ export default function NewAdjustmentPage() {
                                                     )} />
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientStock ? "text-red-600" : "text-muted-foreground")}>{currentStock}</span>}
+                                                    {loadingStock ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientStock ? "text-red-600" : "text-muted-foreground")}>{curStock}</span>}
                                                 </TableCell>
-                                                {isPurchaseReturn && (
+                                                {adjType === 'purchase_return' && (
                                                     <TableCell className="text-center">
                                                         {loadingVendorBalances ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientVendor ? "text-red-600" : "text-blue-700")}>{purchased}</span>}
+                                                    </TableCell>
+                                                )}
+                                                {adjType === 'sales_return' && (
+                                                    <TableCell className="text-center">
+                                                        {loadingClientBalances ? <Loader2 className="h-4 w-4 animate-spin mx-auto"/> : <span className={cn("font-mono font-bold", isInsufficientClient ? "text-red-600" : "text-purple-700")}>{sold}</span>}
                                                     </TableCell>
                                                 )}
                                                 <TableCell className="bg-primary/[0.02]">
@@ -447,7 +503,7 @@ export default function NewAdjustmentPage() {
                                 </TableBody>
                                 <TableFooter className="bg-primary/5 h-20">
                                     <TableRow>
-                                        <TableCell colSpan={isPurchaseReturn ? 5 : 4} className="text-right px-12 font-black text-xl">إجمالي قيمة المستند:</TableCell>
+                                        <TableCell colSpan={adjType === 'purchase_return' || adjType === 'sales_return' ? 5 : 4} className="text-right px-12 font-black text-xl">إجمالي قيمة المستند:</TableCell>
                                         <TableCell className="text-left font-mono font-black text-2xl text-primary px-6">{formatCurrency(totalCost)}</TableCell>
                                     </TableRow>
                                 </TableFooter>
@@ -460,7 +516,7 @@ export default function NewAdjustmentPage() {
                 </CardContent>
                 <CardFooter className="flex justify-end gap-4 p-8 border-t bg-muted/10">
                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loadingStock || loadingVendorBalances} className="h-12 px-16 rounded-xl font-black text-xl shadow-2xl shadow-primary/30">
+                    <Button type="submit" disabled={isSaving || loadingStock || loadingVendorBalances || loadingClientBalances} className="h-12 px-16 rounded-xl font-black text-xl shadow-2xl shadow-primary/30">
                         {isSaving ? <Loader2 className="ml-3 h-6 w-6 animate-spin"/> : <Save className="ml-3 h-6 w-6"/>}
                         اعتماد العملية والترحيل
                     </Button>
