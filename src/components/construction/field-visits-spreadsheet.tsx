@@ -6,8 +6,8 @@ import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, writeBatch, serverTimestamp, doc, getDoc, orderBy, where, Timestamp } from 'firebase/firestore';
-import type { ConstructionProject, Employee, FieldVisit, BoqItem, WorkTeam } from '@/lib/types';
+import { collection, query, getDocs, writeBatch, serverTimestamp, doc, orderBy, where, Timestamp } from 'firebase/firestore';
+import type { ConstructionProject, Employee, FieldVisit, WorkTeam } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Table as TableIcon, Target, Users, HardHat, Building2 } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Table as TableIcon, Target, Users, HardHat } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DateInput } from '@/components/ui/date-input';
@@ -43,8 +43,6 @@ const rowSchema = z.object({
   plannedStageId: z.string().optional(),
   details: z.string().optional(),
   teamIds: z.array(z.string()).default([]),
-  numFloors: z.string().optional(),
-  requiredPayment: z.string().optional(),
 });
 
 const spreadsheetSchema = z.object({
@@ -61,16 +59,16 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
   const [isSaving, setIsSaving] = React.useState(false);
 
   const { data: projects = [], loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
-  const { data: employees = [], loading: engLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const { data: workTeams = [] } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
   
   const [boqItemsMap, setBoqItemsMap] = React.useState<Map<string, {id: string, name: string, endDate: any}[]>>(new Map());
 
-  const { control, register, handleSubmit, formState: { errors }, watch, setValue } = useForm<SpreadsheetValues>({
+  const { control, register, handleSubmit, watch, setValue } = useForm<SpreadsheetValues>({
     resolver: zodResolver(spreadsheetSchema),
     defaultValues: {
       date: new Date(),
-      rows: [{ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], numFloors: '', requiredPayment: '' }],
+      rows: [{ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [] }],
     },
   });
 
@@ -87,14 +85,15 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
             return { 
                 id: d.id, 
                 name: `${data.itemNumber} - ${data.description}`,
-                endDate: data.endDate || null
+                endDate: data.endDate || null,
+                isHeader: data.isHeader || false
             }
-        }).filter(i => !i.name.includes('undefined'));
+        }).filter(i => !i.isHeader && !i.name.includes('undefined'));
         setBoqItemsMap(prev => new Map(prev).set(projectId, stages));
     } catch (e) { console.error(e); }
   };
 
-  const projectOptions = React.useMemo(() => projects.map(p => ({ value: p.id!, label: p.projectName })), [projects]);
+  const projectOptions = React.useMemo(() => projects.map(p => ({ value: p.id!, label: `${p.projectName} - ${p.clientName}` })), [projects]);
   const engineerOptions = React.useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
   const teamOptions = React.useMemo(() => workTeams.map(t => ({ value: t.id!, label: t.name })), [workTeams]);
 
@@ -119,14 +118,11 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 transactionId: project.linkedTransactionId || '',
                 transactionType: project.projectType || 'مقاولات',
                 engineerId: row.engineerId || null,
-                engineerName: engineer?.fullName || 'إشراف عام / فريق فني',
+                engineerName: engineer?.fullName || 'إشراف عام',
                 scheduledDate: Timestamp.fromDate(data.date),
                 plannedStageId: row.plannedStageId || '',
                 plannedStageName: stage?.name || 'زيارة متابعة',
-                phaseEndDate: stage?.endDate || null, // Link planned end date for deviation tracking
-                mainStageName: stage?.name.split(' - ')[1] || 'إشراف عام',
-                numFloors: row.numFloors || project.numFloors || 'سرداب + 3 أدوار',
-                details: row.details || '',
+                phaseEndDate: stage?.endDate || null,
                 teamIds: row.teamIds,
                 teamNames: selectedTeams.map(t => t.name),
                 subcontractorId: project.subcontractorId || null,
@@ -142,7 +138,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
         }
 
         await batch.commit();
-        toast({ title: 'نجاح الجدولة الجماعية', description: `تمت جدولة ${data.rows.length} موقع بنجاح.` });
+        toast({ title: 'تمت الجدولة بنجاح', description: `تم حفظ خطة العمل لـ ${data.rows.length} موقع.` });
         onSaveSuccess();
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
@@ -152,19 +148,19 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
   };
 
   return (
-    <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-card">
+    <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden">
       <form onSubmit={handleSubmit(handleSaveAll)}>
         <CardHeader className="bg-primary/5 pb-8 border-b">
             <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                 <div className="space-y-1">
                     <CardTitle className="text-2xl font-black flex items-center gap-2 text-primary">
                         <TableIcon className="h-6 w-6" />
-                        الجدولة الجماعية السريعة للمشاريع
+                        محرك الجدولة الجماعية السريعة (Planning Engine)
                     </CardTitle>
-                    <CardDescription>أدخل خطة المواقع والفرق الفنية والمقاولين دفعة واحدة.</CardDescription>
+                    <CardDescription>قم بجدولة يوميات كافة المواقع وتوزيع الفرق الفنية في واجهة واحدة تشبه Excel.</CardDescription>
                 </div>
                 <div className="flex items-center gap-4 bg-background p-3 rounded-2xl border shadow-inner">
-                    <Label className="font-bold text-xs">تاريخ الخطة:</Label>
+                    <Label className="font-bold text-xs">تاريخ تنفيذ الخطة:</Label>
                     <Controller
                         name="date"
                         control={control}
@@ -176,19 +172,17 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
         <CardContent className="p-0">
           <ScrollArea className="w-full">
-            <div className="min-w-[1800px]">
+            <div className="min-w-[1600px]">
               <Table className="border-collapse table-fixed w-full">
                 <TableHeader className="bg-muted/50 sticky top-0 z-20">
                   <TableRow className="h-14 border-b-2">
                     <TableHead className="w-12 text-center font-black">#</TableHead>
                     <TableHead className="w-16 text-center font-black">إجراء</TableHead>
-                    <TableHead className="w-80 font-black text-right border-l"><Target className="h-4 w-4 inline ml-1 text-primary"/> المشروع</TableHead>
-                    <TableHead className="w-48 font-black text-right border-l">بيانات العقار (أدوار)</TableHead>
-                    <TableHead className="w-64 font-black text-right border-l">بند المقايسة (WBS)</TableHead>
-                    <TableHead className="w-80 font-black text-right border-l">فرق العمل الميدانية</TableHead>
-                    <TableHead className="w-64 font-black text-right border-l">المقاول المشرف</TableHead>
-                    <TableHead className="w-64 font-black text-right border-l">المهندس المسؤول</TableHead>
-                    <TableHead className="w-full font-black text-right border-l">الأعمال المطلوبة اليوم</TableHead>
+                    <TableHead className="w-80 font-black text-right border-l"><Target className="h-4 w-4 inline ml-1 text-primary"/> المشروع المستهدف</TableHead>
+                    <TableHead className="w-64 font-black text-right border-l">بند المقايسة المخطط (WBS)</TableHead>
+                    <TableHead className="w-80 font-black text-right border-l">الفرق الفنية المنفذة</TableHead>
+                    <TableHead className="w-64 font-black text-right border-l">المهندس المشرف</TableHead>
+                    <TableHead className="w-full font-black text-right border-l">تعليمات العمل الميداني</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -219,7 +213,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                                             if (p) {
                                                 if (p.mainEngineerId) setValue(`rows.${index}.engineerId`, p.mainEngineerId);
                                                 if (p.boqId) fetchProjectStages(v, p.boqId);
-                                                if (p.numFloors) setValue(`rows.${index}.numFloors`, p.numFloors);
                                             }
                                         }}
                                         options={projectOptions}
@@ -231,10 +224,6 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                         </TableCell>
 
                         <TableCell className="border-l p-1">
-                            <Input {...register(`rows.${index}.numFloors`)} className="border-none shadow-none text-xs h-12 bg-transparent" placeholder="أدوار العقار..."/>
-                        </TableCell>
-
-                        <TableCell className="border-l p-1">
                             <Controller
                                 control={control}
                                 name={`rows.${index}.plannedStageId`}
@@ -243,7 +232,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                                         value={f.value || ''}
                                         onSelect={f.onChange}
                                         options={projectStages.map(s => ({ value: s.id, label: s.name }))}
-                                        placeholder="بند الـ BOQ..."
+                                        placeholder="المرحلة..."
                                         disabled={!row.projectId}
                                         className="border-none shadow-none text-[10px] font-bold bg-transparent h-12"
                                     />
@@ -269,13 +258,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                             ) : (
                                 <div className="text-xs text-orange-600 font-bold px-3 flex items-center gap-2 h-12">
                                     <HardHat className="h-3 w-3" />
-                                    إسناد لمقاول باطن
+                                    مقاول باطن: {project.subcontractorName}
                                 </div>
                             )}
-                        </TableCell>
-
-                        <TableCell className="border-l p-1">
-                            <Input value={project?.subcontractorName || '-'} className="border-none shadow-none font-bold h-12 bg-transparent" readOnly disabled/>
                         </TableCell>
 
                         <TableCell className="border-l p-1">
@@ -295,7 +280,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                         </TableCell>
                         
                         <TableCell className="border-l p-1">
-                            <Input {...register(`rows.${index}.details`)} className="border-none shadow-none text-right text-xs italic h-12 bg-transparent" placeholder="تفاصيل الأعمال..."/>
+                            <Input {...register(`rows.${index}.details`)} className="border-none shadow-none text-right text-xs italic h-12 bg-transparent" placeholder="ما العمل المطلوب اليوم؟"/>
                         </TableCell>
                       </TableRow>
                     );
@@ -307,9 +292,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
           </ScrollArea>
 
           <div className="flex justify-center p-8 bg-muted/10 border-t">
-            <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [], numFloors: '', requiredPayment: '' })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
+            <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [] })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
                 <PlusCircle className="h-5 w-5 text-primary" />
-                إضافة سطر مشروع جديد
+                إضافة سطر جديد للخطة
             </Button>
           </div>
         </CardContent>
@@ -318,7 +303,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
             <Button type="button" variant="ghost" onClick={onSaveSuccess} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
             <Button type="submit" disabled={isSaving || projectsLoading} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px]">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                حفظ خطة المواقع واللوجستيات
+                اعتماد خطة اليوميات والفرق
             </Button>
         </CardFooter>
       </form>
