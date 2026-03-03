@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, FileCheck, PackageCheck, ShoppingBag, AlertCircle, Calculator, CheckCircle2, AlertTriangle, Info, UserPlus, ShieldCheck, Tag, Truck } from 'lucide-react';
+import { Loader2, Save, X, FileCheck, PackageCheck, ShieldCheck, User, Truck, Box, Target, HardHat } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit, writeBatch } from 'firebase/firestore';
-import type { PurchaseOrder, Account, Warehouse, Item, Vendor, Employee, Department, ConstructionProject } from '@/lib/types';
+import type { PurchaseOrder, Account, Warehouse, Item, Vendor, Employee, Department, ConstructionProject, SubsidyQuota } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -22,9 +22,8 @@ import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Textarea } from '../ui/textarea';
 import { Switch } from '../ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const lineSchema = z.object({
   internalItemId: z.string(),
@@ -34,7 +33,6 @@ const lineSchema = z.object({
   quantityReceived: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0, "الكمية لا يمكن أن تكون سالبة")),
   unitPrice: z.number(),
   batchNumber: z.string().optional(),
-  expiryDate: z.date().optional().nullable(),
 });
 
 const grnSchema = z.object({
@@ -43,6 +41,7 @@ const grnSchema = z.object({
   purchaseOrderId: z.string().optional().nullable(),
   projectId: z.string().optional().nullable(),
   warehouseId: z.string().min(1, "يجب تحديد المستودع المستلم."),
+  possession: z.enum(['warehouse', 'subcontractor', 'site']).default('warehouse'),
   discountAmount: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   deliveryFees: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   itemsReceived: z.array(lineSchema).min(1, 'يجب استلام صنف واحد على الأقل.'),
@@ -60,17 +59,12 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
     const savingRef = useRef(false);
     const [loadingPoStatus, setLoadingPoStatus] = useState(false);
     
-    const [isProspectiveVendor, setIsProspectiveVendor] = useState(false);
-    const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
-    const [vendorData, setVendorData] = useState({ phone: '', address: '', contactPerson: '' });
-
-    const { data: pos = [], loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', [
+    const { data: pos = [] } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders', [
         where('status', 'in', ['approved', 'partially_received'])
     ]);
     const { data: projects = [] } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
     const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
-    const { data: registeredVendors = [] } = useSubscription<Vendor>(firestore, 'vendors');
-    const { data: warehouses = [], loading: warehousesLoading } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
+    const { data: warehouses = [] } = useSubscription<Warehouse>(firestore, 'warehouses', [orderBy('name')]);
     const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees');
     const { data: departments = [] } = useSubscription<Department>(firestore, 'departments');
 
@@ -79,6 +73,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
         defaultValues: { 
             date: new Date(), 
             isSubsidy: false,
+            possession: 'warehouse',
             itemsReceived: [],
             discountAmount: 0,
             deliveryFees: 0
@@ -109,9 +104,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
         const loadPoData = async () => {
             setLoadingPoStatus(true);
             try {
-                const isRegistered = registeredVendors.some(v => v.id === selectedPo.vendorId);
-                setIsProspectiveVendor(!isRegistered);
-
                 const grnsSnap = await getDocs(query(collection(firestore, 'grns'), where('purchaseOrderId', '==', selectedPoId)));
                 const receivedTotals = new Map<string, number>();
                 grnsSnap.forEach(doc => {
@@ -143,7 +135,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             }
         };
         loadPoData();
-    }, [selectedPoId, isSubsidy, firestore, selectedPo, registeredVendors, replace, setValue]);
+    }, [selectedPoId, isSubsidy, firestore, selectedPo, replace, setValue]);
 
     const poOptions = useMemo(() => pos.map(p => ({ value: p.id!, label: `${p.poNumber} - ${p.vendorName}` })), [pos]);
     const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: p.projectName })), [projects]);
@@ -162,17 +154,17 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
         savingRef.current = true;
         setIsSaving(true);
         try {
-            const coaSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+            const coaSnap = await getDocs(collection(firestore, 'chartOfAccounts'));
             const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
 
-            let projectInfo: any = null;
+            let projectInfo: ConstructionProject | null = null;
             let autoTags = {};
             const projId = data.isSubsidy ? data.projectId : selectedPo?.projectId;
             if (projId) {
                 const projSnap = await getDoc(doc(firestore, 'projects', projId));
                 if (projSnap.exists()) {
-                    projectInfo = projSnap.data();
-                    const engineer = employees.find(e => e.id === projectInfo.mainEngineerId);
+                    projectInfo = { id: projSnap.id, ...projSnap.data() } as ConstructionProject;
+                    const engineer = employees.find(e => e.id === projectInfo?.mainEngineerId);
                     const dept = departments.find(d => d.name === engineer?.department);
                     autoTags = { clientId: projectInfo.clientId, transactionId: projId, auto_profit_center: projId, auto_resource_id: projectInfo.mainEngineerId, ...(dept && { auto_dept_id: dept.id }) };
                 }
@@ -194,10 +186,22 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 let narration = '';
 
                 if (data.isSubsidy) {
-                    const subsidyRevAcc = allAccounts.find(a => a.code === '4104'); // إيرادات دعم مواد
+                    const subsidyRevAcc = allAccounts.find(a => a.code === '4104');
                     creditAccountId = subsidyRevAcc?.id || '';
                     creditAccountName = subsidyRevAcc?.name || 'إيرادات دعم';
-                    narration = `استلام مواد مدعومة (تموين) #${grnNumber} - مشروع: ${projectInfo?.projectName}`;
+                    narration = `استلام مواد مدعومة (تموين) #${grnNumber} - عهدة: ${data.possession} - مشروع: ${projectInfo?.projectName}`;
+                    
+                    // تحديث حصص المشروع (Received Quantity)
+                    if (projectInfo) {
+                        const updatedQuotas = (projectInfo.subsidyQuotas || []).map(q => {
+                            const receivedInThisGrn = data.itemsReceived.find(i => i.internalItemId === q.itemId);
+                            if (receivedInThisGrn) {
+                                return { ...q, receivedQuantity: (q.receivedQuantity || 0) + receivedInThisGrn.quantityReceived };
+                            }
+                            return q;
+                        });
+                        transaction.update(doc(firestore, 'projects', projectInfo.id!), { subsidyQuotas: updatedQuotas });
+                    }
                 } else {
                     const vendorAcc = allAccounts.find(a => a.name === selectedPo?.vendorName && a.parentCode === '2101');
                     creditAccountId = vendorAcc?.id || '';
@@ -208,7 +212,8 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 transaction.set(newGrnRef, cleanFirestoreData({
                     grnNumber, purchaseOrderId: data.purchaseOrderId || null, projectId: projId || null,
                     warehouseId: data.warehouseId, date: data.date, itemsReceived: data.itemsReceived,
-                    totalValue, isSubsidy: data.isSubsidy, vendorName: data.isSubsidy ? 'وزارة التجارة (تموين)' : selectedPo?.vendorName,
+                    totalValue, isSubsidy: data.isSubsidy, possession: data.possession,
+                    vendorName: data.isSubsidy ? 'وزارة التجارة (تموين)' : selectedPo?.vendorName,
                     journalEntryId: newJournalEntryRef.id, createdAt: serverTimestamp(), createdBy: currentUser.id,
                 }));
 
@@ -230,7 +235,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 }
             });
 
-            toast({ title: 'نجاح', description: 'تم استلام المواد وتحديث القيود المالية.' });
+            toast({ title: 'نجاح', description: 'تم استلام المواد وتحديث رصيد الحصص والقيود المالية.' });
             router.push('/dashboard/warehouse/grns');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: error.message });
@@ -245,8 +250,8 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-primary/10 rounded-2xl text-primary"><ShieldCheck className="h-8 w-8"/></div>
                     <div>
-                        <Label className="text-xl font-black text-primary">هل هذا استلام مواد مدعومة (تموين)؟</Label>
-                        <p className="text-xs text-muted-foreground font-medium">تفعيل هذا الخيار سيقوم بخصم القيمة من حساب "إيرادات الدعم" بدلاً من مديونية مورد.</p>
+                        <Label className="text-xl font-black text-primary">استلام مواد مدعومة (تموين)؟</Label>
+                        <p className="text-xs text-muted-foreground font-medium">سيتم تحديث حصص المالك المتبقية في ملف المشروع آلياً.</p>
                     </div>
                 </div>
                 <Controller name="isSubsidy" control={control} render={({field}) => (
@@ -264,7 +269,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     </div>
                 ) : (
                     <div className="grid gap-2 animate-in zoom-in-95">
-                        <Label className="font-bold text-primary">المشروع المستفيد من الدعم *</Label>
+                        <Label className="font-bold text-primary">المشروع المرتبط بالدعم *</Label>
                         <Controller control={control} name="projectId" render={({ field }) => (
                             <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." />
                         )} />
@@ -277,8 +282,17 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     )} />
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-bold">تاريخ الاستلام</Label>
-                    <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />} />
+                    <Label className="font-bold">جهة الحيازة / الاستلام</Label>
+                    <Controller name="possession" control={control} render={({field}) => (
+                        <Select value={field.value} onValueChange={field.onChange}>
+                            <SelectTrigger className="bg-white rounded-xl"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="warehouse">المخزن الرئيسي</SelectItem>
+                                <SelectItem value="site">مخزن الموقع</SelectItem>
+                                <SelectItem value="subcontractor">عهدة مقاول الباطن</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}/>
                 </div>
             </div>
 
@@ -344,6 +358,5 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                 </Button>
             </div>
         </form>
-        </>
     );
 }

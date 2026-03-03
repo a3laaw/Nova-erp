@@ -1,7 +1,7 @@
 
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم تحديثه ليشمل ميزة دعم مواد البناء (السكن الخاص الكويتي).
+ * تم تحديثه ليشمل محرك دعم مواد البناء (قرار 222 لعام 2024) وسلسلة حيازة مقاولي الباطن.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -15,11 +15,13 @@ export interface BaseEntity {
 }
 
 export type ProjectCategory = 'Private (Subsidized)' | 'Private (Non-Subsidized)' | 'Commercial' | 'Government';
+export type AreaRange = '100-199' | '200-299' | '300-400';
 
 export interface SubsidyQuota {
     itemId: string;
     itemName: string;
-    allocatedQuantity: number;
+    allocatedAmount: number; // القيمة المخصصة بالدينار حسب القرار
+    allocatedQuantity: number; // الكمية التقديرية بالوحدة
     receivedQuantity: number;
     consumedQuantity: number;
     unitPrice: number; // سعر السوق للتقييم المحاسبي
@@ -32,6 +34,12 @@ export interface ConstructionProject extends BaseEntity {
     clientName?: string;
     projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
     projectCategory: ProjectCategory;
+    
+    // بيانات دعم بنك الائتمان
+    subsidyAreaRange?: AreaRange;
+    subsidyRequestId?: string;
+    subsidyExpiryDate?: Timestamp | any;
+    
     contractValue: number;
     startDate: Timestamp | any;
     endDate: Timestamp | any;
@@ -41,10 +49,8 @@ export interface ConstructionProject extends BaseEntity {
     progressPercentage: number;
     boqId?: string;             
     linkedTransactionId?: string; 
-    constructionTypeName?: string;
     subcontractorId?: string;    
     subcontractorName?: string;
-    numFloors?: string; 
     subsidyQuotas?: SubsidyQuota[];
 }
 
@@ -59,10 +65,8 @@ export interface JournalEntry extends BaseEntity {
     transactionId?: string;     
     clientId?: string;          
     linkedReceiptId?: string;   
-    reconciliationStatus?: 'unreconciled' | 'reconciled';
-    reconciliationInfo?: any;
-    isBypassed?: boolean;
     isSubsidyEntry?: boolean; 
+    isBypassed?: boolean;
 }
 
 export interface JournalEntryLine {
@@ -82,13 +86,10 @@ export interface Employee extends BaseEntity {
     civilId: string;
     mobile: string;
     basicSalary: number;        
-    housingAllowance?: number;  
-    transportAllowance?: number;
     contractType: string;
     status: 'active' | 'terminated' | 'on-leave';
     hireDate: Timestamp | any;        
     terminationDate?: Timestamp | any; 
-    terminationReason?: 'resignation' | 'termination';
     residencyExpiry?: Timestamp | any; 
     department?: string;
     jobTitle?: string;
@@ -106,13 +107,12 @@ export interface FieldVisit extends BaseEntity {
     plannedStageId: string;     
     plannedStageName: string;   
     phaseEndDate?: Timestamp | any; 
-    numFloors?: string;         
     engineerId?: string | null;
     engineerName?: string | null; 
-    details?: string;           
-    requiredPayment?: string;   
     teamIds: string[];          
     teamNames: string[];        
+    subcontractorId?: string | null;
+    subcontractorName?: string | null;
     confirmationData?: {
         confirmedAt: Timestamp | any;
         notes: string;
@@ -165,8 +165,8 @@ export interface SubcontractorType extends BaseEntity { name: string; order?: nu
 export interface SubcontractorSpecialization extends BaseEntity { name: string; order?: number; }
 export interface SubcontractorCertificate extends BaseEntity { certificateNumber: string; date: any; subcontractorId: string; subcontractorName: string; projectId: string; projectName: string; amount: number; description: string; status: 'draft' | 'approved' | 'cancelled'; journalEntryId?: string; }
 export interface WorkTeam extends BaseEntity { name: string; leaderId?: string; leaderName?: string; }
-export interface InventoryAdjustment extends BaseEntity { adjustmentNumber: string; date: any; type: 'damage' | 'theft' | 'opening_balance' | 'transfer' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other'; warehouseId?: string; fromWarehouseId?: string; toWarehouseId?: string; notes?: string; items: any[]; journalEntryId?: string; projectId?: string | null; projectName?: string | null; clientId?: string | null; clientName?: string | null; issueType?: 'project_site' | 'direct_sale'; recoveredDiscount?: number; isDirectReturn?: boolean; isBypassed?: boolean; isSubsidy?: boolean; }
-export interface GoodsReceiptNote extends BaseEntity { grnNumber: string; purchaseOrderId: string; vendorId: string; vendorName: string; warehouseId: string; date: any; itemsReceived: any[]; totalValue: number; discountAmount: number; deliveryFees: number; journalEntryId: string; projectId?: string | null; isBypassed?: boolean; isSubsidy?: boolean; }
+export interface InventoryAdjustment extends BaseEntity { adjustmentNumber: string; date: any; type: 'damage' | 'theft' | 'opening_balance' | 'transfer' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other'; warehouseId?: string; fromWarehouseId?: string; toWarehouseId?: string; notes?: string; items: any[]; journalEntryId?: string; projectId?: string | null; projectName?: string | null; clientId?: string | null; clientName?: string | null; issueType?: 'project_site' | 'direct_sale'; recoveredDiscount?: number; isDirectReturn?: boolean; isBypassed?: boolean; isSubsidy?: boolean; possession?: 'warehouse' | 'subcontractor' | 'site'; }
+export interface GoodsReceiptNote extends BaseEntity { grnNumber: string; purchaseOrderId: string; vendorId: string; vendorName: string; warehouseId: string; date: any; itemsReceived: any[]; totalValue: number; discountAmount: number; deliveryFees: number; journalEntryId: string; projectId?: string | null; isBypassed?: boolean; isSubsidy?: boolean; possession?: 'warehouse' | 'subcontractor' | 'site'; }
 export interface ConstructionWorkStage extends BaseEntity { name: string; order: number; parentId: string | null; }
 export interface ConstructionType extends BaseEntity { name: string; }
 export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'JobChange' | 'StatusChange' | 'ResidencyUpdate' | 'DataUpdate'; field: string; oldValue: any; newValue: any; effectiveDate: any; changedBy: string; notes?: string; }
