@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
@@ -37,59 +38,31 @@ export function FieldVisitForm() {
     const { data: engineers = [], loading: engineersLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     const { data: allTeams = [], loading: teamsLoading } = useSubscription<WorkTeam>(firestore, 'workTeams', [orderBy('name')]);
     
-    const [boqItems, setBoqItems] = useState<{id: string, name: string, endDate: any}[]>([]);
-    const [isLoadingBoq, setIsLoadingBoq] = useState(false);
+    // الخطوة 1 — أضف state جديد
+    const [boqItemsMap, setBoqItemsMap] = React.useState<Map<string, {id: string, name: string}[]>>(new Map());
+
+    // الخطوة 2 — أضف دالة منفصلة للجلب (نفس الدالة في Spreadsheet)
+    const fetchProjectStages = async (projectId: string, boqId: string) => {
+        if (boqItemsMap.has(projectId)) return;
+        try {
+            const q = query(collection(firestore!, `boqs/${boqId}/items`), orderBy('itemNumber'));
+            const snap = await getDocs(q);
+            const stages = snap.docs.map(d => {
+                const data = d.data();
+                return { 
+                    id: d.id, 
+                    name: `${data.itemNumber || ''} - ${data.description || ''}`.trim(),
+                    isHeader: data.isHeader || false
+                }
+            }).filter(i => !i.isHeader && i.name !== '-');
+            setBoqItemsMap(prev => new Map(prev).set(projectId, stages));
+        } catch (e) { console.error(e); }
+    };
+
+    // الخطوة 3 — تم حذف useEffect الخاص بجلب BOQ بالكامل
 
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const isSubcontracted = !!selectedProject?.subcontractorId;
-
-    // ✨ محرك جلب بنود المقايسة (WBS logic المستقر)
-    useEffect(() => {
-        const fetchBoqData = async () => {
-            // الانتظار حتى اكتمال تحميل قائمة المشاريع لضمان توفر الـ boqId
-            if (!selectedProjectId || !firestore || projectsLoading) {
-                setBoqItems([]);
-                setIsLoadingBoq(false);
-                return;
-            }
-
-            const proj = projects.find(p => p.id === selectedProjectId);
-            if (!proj || !proj.boqId) {
-                setBoqItems([]);
-                setIsLoadingBoq(false);
-                return;
-            }
-
-            setIsLoadingBoq(true);
-            try {
-                const q = query(collection(firestore, `boqs/${proj.boqId}/items`), orderBy('itemNumber'));
-                const snap = await getDocs(q);
-                const stages = snap.docs.map(d => {
-                    const data = d.data();
-                    const itemNum = data.itemNumber || '';
-                    const desc = data.description || '';
-                    return { 
-                        id: d.id, 
-                        name: itemNum ? `${itemNum} - ${desc}` : desc,
-                        endDate: data.endDate || null,
-                        isHeader: data.isHeader || false
-                    }
-                }).filter(i => !i.isHeader && i.name);
-                
-                setBoqItems(stages);
-            } catch (e) {
-                console.error("Error fetching BOQ stages:", e);
-            } finally {
-                setIsLoadingBoq(false);
-            }
-        };
-
-        fetchBoqData();
-        
-        if (selectedProject) {
-            setSelectedEngineerId(selectedProject.mainEngineerId || '');
-        }
-    }, [selectedProjectId, firestore, projects, projectsLoading, selectedProject]);
 
     const projectOptions = useMemo(() => projects.map(p => ({ 
         value: p.id!, 
@@ -98,10 +71,13 @@ export function FieldVisitForm() {
 
     const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
     
-    const stageOptions = useMemo(() => boqItems.map(i => ({ 
-        value: i.id, 
-        label: i.name 
-    })), [boqItems]);
+    // الخطوة 5 — غير stageOptions ليقرأ من boqItemsMap
+    const stageOptions = useMemo(() => 
+        boqItemsMap.get(selectedProjectId)?.map(i => ({ 
+            value: i.id, 
+            label: i.name 
+        })) || []
+    , [boqItemsMap, selectedProjectId]);
 
     const teamOptions = useMemo(() => allTeams.map(t => ({ value: t.id!, label: t.name })), [allTeams]);
     const selectedTeamsData = useMemo(() => allTeams.filter(t => selectedTeamIds.includes(t.id!)), [allTeams, selectedTeamIds]);
@@ -109,14 +85,15 @@ export function FieldVisitForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!firestore || !currentUser || !selectedProjectId) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار المشروع.' });
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء اختيار المشروع.' });
             return;
         }
 
         setIsSaving(true);
         try {
             const eng = engineers.find(e => e.id === selectedEngineerId);
-            const stage = boqItems.find(s => s.id === plannedStageId);
+            const projectStages = boqItemsMap.get(selectedProjectId) || [];
+            const stage = projectStages.find(s => s.id === plannedStageId);
 
             const visitData: Omit<FieldVisit, 'id'> = {
                 projectId: selectedProjectId,
@@ -130,7 +107,7 @@ export function FieldVisitForm() {
                 scheduledDate: scheduledDate || new Date(),
                 plannedStageId: plannedStageId,
                 plannedStageName: stage?.name || 'زيارة متابعة',
-                phaseEndDate: stage?.endDate || null,
+                phaseEndDate: null,
                 teamIds: isSubcontracted ? [] : selectedTeamIds,
                 teamNames: isSubcontracted ? [] : selectedTeamsData.map(t => t.name), 
                 subcontractorId: selectedProject?.subcontractorId || null,
@@ -166,7 +143,15 @@ export function FieldVisitForm() {
                         <Label className="font-black text-primary">المشروع المستهدف *</Label>
                         <InlineSearchList 
                             value={selectedProjectId}
-                            onSelect={setSelectedProjectId}
+                            // الخطوة 4 — في InlineSearchList الخاص بالمشروع، غير onSelect ليستدعي الدالة مباشرة
+                            onSelect={(v) => {
+                                setSelectedProjectId(v);
+                                const p = projects.find(it => it.id === v);
+                                if (p) {
+                                    if (p.mainEngineerId) setSelectedEngineerId(p.mainEngineerId);
+                                    if (p.boqId) fetchProjectStages(v, p.boqId);
+                                }
+                            }}
                             options={projectOptions}
                             placeholder={projectsLoading ? "جاري التحميل..." : "ابحث عن مشروع..."}
                             disabled={projectsLoading || isSaving}
@@ -180,8 +165,14 @@ export function FieldVisitForm() {
                                 value={plannedStageId}
                                 onSelect={setPlannedStageId}
                                 options={stageOptions}
-                                placeholder={isLoadingBoq ? "جاري التحميل..." : selectedProjectId ? (boqItems.length === 0 ? "لا توجد بنود مقايسة" : "اختر المرحلة...") : "اختر مشروعاً أولاً"}
-                                disabled={!selectedProjectId || isLoadingBoq}
+                                // الخطوة 6 — غير placeholder حقل المرحلة
+                                placeholder={
+                                    !selectedProjectId ? "اختر مشروعاً أولاً" :
+                                    !boqItemsMap.has(selectedProjectId) ? "جاري تحميل البنود..." :
+                                    stageOptions.length === 0 ? "لا يوجد بنود مقايسة" :
+                                    "اختر بنداً من الـ BOQ..."
+                                }
+                                disabled={!selectedProjectId || !boqItemsMap.has(selectedProjectId)}
                             />
                         </div>
                         <div className="grid gap-2">
