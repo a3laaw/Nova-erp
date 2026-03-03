@@ -192,7 +192,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 </TableHeader>
                 <TableBody>
                   {fields.map((field, index) => {
-                    const row = watchedRows[index];
+                    const row = watchedRows?.[index];
+                    if (!row) return null;
+                    
                     const projectStages = boqItemsMap.get(row.projectId) || [];
                     const project = projects.find(p => p.id === row.projectId);
 

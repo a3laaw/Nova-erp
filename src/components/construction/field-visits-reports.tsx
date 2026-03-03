@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
   FileBarChart, Printer, ArrowRight, Calendar,
-  CheckCircle2, Clock, FileSearch, Loader2
+  CheckCircle2, Clock, FileSearch, Loader2, XCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
