@@ -35,16 +35,6 @@ import { useAuth } from '@/context/auth-context';
 import { cn, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 export default function FieldVisitDetailPage() {
@@ -60,9 +50,7 @@ export default function FieldVisitDetailPage() {
     
     const [notes, setNotes] = useState('');
     const [progressAchieved, setProgressAchieved] = useState([0]); 
-    const [cancellationReason, setCancellationReason] = useState('');
     const [location, setLocation] = useState<{ latitude: number, longitude: number, accuracy: number } | null>(null);
-    const [isNotDoneAlertOpen, setIsNotDoneAlertOpen] = useState(false);
 
     const [boqItems, setBoqItems] = useState<{id: string, name: string}[]>([]);
     const [selectedStageId, setSelectedStageId] = useState('');
@@ -71,7 +59,7 @@ export default function FieldVisitDetailPage() {
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
 
-    // ✨ محرك جلب بنود المقايسة للتأكيد (مطابق للجدولة السريعة)
+    // ✨ محرك جلب بنود المقايسة للتأكيد (WBS Logic - مطابق للجدولة السريعة)
     useEffect(() => {
         const fetchStages = async () => {
             if (!visit || !firestore) return;
@@ -113,9 +101,6 @@ export default function FieldVisitDetailPage() {
             setNotes(visit.confirmationData.notes);
             setLocation(visit.confirmationData.location || null);
             setProgressAchieved([visit.confirmationData.progressAchieved || 0]);
-        }
-        if (visit?.cancellationReason) {
-            setCancellationReason(visit.cancellationReason);
         }
     }, [visit]);
 

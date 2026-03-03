@@ -31,7 +31,6 @@ export function FieldVisitsGrid() {
 
   const visitsQuery = React.useMemo(() => [orderBy('scheduledDate', 'desc')], []);
   const { data: visits, loading: visitsLoading } = useSubscription<FieldVisit>(firestore, 'field_visits', visitsQuery);
-  const { data: employees } = useSubscription<Employee>(firestore, 'employees');
 
   if (visitsLoading) return <Skeleton className="h-[600px] w-full rounded-[2rem] animate-pulse" />;
 

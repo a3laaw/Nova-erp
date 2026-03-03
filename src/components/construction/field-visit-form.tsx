@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, X, Building2, Users, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { cleanFirestoreData } from '@/lib/utils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
@@ -44,7 +43,7 @@ export function FieldVisitForm() {
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const isSubcontracted = !!selectedProject?.subcontractorId;
 
-    // ✨ محرك جلب بنود المقايسة (مطابق للجدولة السريعة)
+    // ✨ محرك جلب بنود المقايسة (WBS Engine - مطابق للجدولة السريعة)
     useEffect(() => {
         const fetchBoqData = async () => {
             if (!selectedProjectId || !firestore || projectsLoading) {

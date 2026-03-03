@@ -4,6 +4,7 @@ import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
+// تم تحديث هذا الملف لإجبار النظام على إعادة بناء الحزم البرمجية (Force Re-bundle) وحل خطأ ChunkLoadError.
 const tajawal = Tajawal({ 
     subsets: ['arabic', 'latin'],
     weight: ['400', '500', '700', '800'],
