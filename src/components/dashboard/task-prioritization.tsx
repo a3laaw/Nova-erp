@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -18,20 +17,30 @@ import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 
 /**
- * مكون قائمة الأولويات الذكية: يحلل المشاريع الميدانية ويستخرج المهام المتأخرة والحرجة.
+ * مكون قائمة الأولويات الذكية: 
+ * يحلل سير العمل في الموقع ويستخرج التنبيهات الحرجة.
+ * تم تحديث المنطق لاستبعاد المهام المرتبطة بمشاريع تم حذفها أو معاملات متوقفة.
  */
 export function TaskPrioritization() {
-  const { transactions, loading } = useAnalyticalData();
+  const { transactions, projects, loading } = useAnalyticalData();
 
   const urgentTasks = useMemo(() => {
-    if (loading || !transactions) return [];
+    if (loading || !transactions || !projects) return [];
     
     const now = new Date();
     const tasks: any[] = [];
 
+    // إنشاء خريطة للمشاريع النشطة للتحقق السريع
+    const activeProjectIds = new Set(projects.map(p => p.id));
+
     transactions.forEach(tx => {
+        // الرقابة 1: استبعاد المعاملات المتوقفة أو المكتملة أو غير المرتبطة بمشروع فني موجود
+        if (tx.status !== 'in-progress') return;
+        if (tx.projectId && !activeProjectIds.has(tx.projectId)) return;
+
         (tx.stages || []).forEach(stage => {
             const expectedEnd = toFirestoreDate(stage.expectedEndDate);
+            // الرقابة 2: التركيز فقط على المراحل التي تجاوزت مدتها ولا تزال "قيد التنفيذ"
             if (stage.status === 'in-progress' && expectedEnd && isPast(expectedEnd)) {
                 tasks.push({
                     id: `${tx.id}-${stage.stageId}`,
@@ -45,8 +54,9 @@ export function TaskPrioritization() {
         });
     });
 
+    // ترتيب المهام حسب عدد أيام التأخير (الأكثر تأخراً أولاً)
     return tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
-  }, [transactions, loading]);
+  }, [transactions, projects, loading]);
 
   return (
     <Card className="h-full flex flex-col rounded-3xl border-none shadow-sm overflow-hidden">

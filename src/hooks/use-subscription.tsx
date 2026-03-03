@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   type Firestore,
   query,
   collection,
+  collectionGroup,
   onSnapshot,
   type QueryConstraint,
 } from 'firebase/firestore';
@@ -13,18 +14,18 @@ const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 
 /**
  * خطاف مطور ومستقر لجلب البيانات من Firestore في الوقت الفعلي.
- * تم تحسينه لمنع عمليات التحميل المتكررة (Flickering) وضمان استقرار الواجهة.
+ * يدعم الآن الـ Collection Group لضمان شمولية البيانات في لوحة التحكم.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
   collectionPath: string | null, 
-  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS
+  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS,
+  isGroup: boolean = false
 ): { data: T[], loading: boolean, error: Error | null } {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
     
-    // استخدام مراجع داخلية لتجنب إعادة التحميل عند تغير مراجع المصفوفات المتطابقة
     const lastPath = useRef<string | null>(null);
 
     useEffect(() => {
@@ -34,13 +35,17 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        // فقط قم بتعيين حالة التحميل إلى true إذا تغير المسار الأساسي للمجموعة
         if (lastPath.current !== collectionPath) {
             setLoading(true);
             lastPath.current = collectionPath;
         }
 
-        const q = query(collection(firestore, collectionPath), ...constraints);
+        // تحديد ما إذا كان البحث في مجموعة محددة أم في كل المجموعات التي تحمل نفس الاسم (Group)
+        const baseRef = isGroup 
+            ? collectionGroup(firestore, collectionPath) 
+            : collection(firestore, collectionPath);
+
+        const q = query(baseRef, ...constraints);
 
         const unsubscribe = onSnapshot(
             q,
@@ -58,7 +63,7 @@ export function useSubscription<T extends { id?: string }>(
         );
 
         return () => unsubscribe();
-    }, [firestore, collectionPath, constraints]);
+    }, [firestore, collectionPath, constraints, isGroup]);
 
     return { data, loading, error };
 }
