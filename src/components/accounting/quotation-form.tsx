@@ -17,7 +17,7 @@ import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import { Separator } from '../ui/separator';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
@@ -117,6 +117,22 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const watchedSubject = watch("subject");
   const watchedWorkNature = watch("workNature");
 
+  // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات
+  const watchedSuspendedExt = watch('suspendedExtensionCount');
+  const watchedOrdinaryExt = watch('ordinaryExtensionCount');
+  
+  const watchedSuspendedToilet = watch('suspendedToiletCount');
+  const watchedOrdinaryToilet = watch('ordinaryToiletCount');
+  
+  const watchedHiddenShower = watch('hiddenShowerCount');
+  const watchedOrdinaryShower = watch('ordinaryShowerCount');
+
+  // تحديث إجمالي الحمامات
+  React.useEffect(() => {
+    const total = (Number(watchedSuspendedExt) || 0) + (Number(watchedOrdinaryExt) || 0);
+    setValue('bathroomsCount', total);
+  }, [watchedSuspendedExt, watchedOrdinaryExt, setValue]);
+
   const showSanitary = React.useMemo(() => watchedSubject?.includes('صحي'), [watchedSubject]);
   const showElectrical = React.useMemo(() => watchedSubject?.includes('كهرباء'), [watchedSubject]);
   
@@ -203,11 +219,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       <div className="space-y-6">
           <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
-              <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-10 font-mono font-bold" /></div>
-              <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-10" /></div>
-              <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد مع المواد</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-mono font-bold" /></div>
+              <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
+              <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد مع المواد</SelectItem></SelectContent></Select>)}/></div>
           </div>
 
           {showSanitary && (
@@ -220,7 +236,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                     </CardHeader>
                     <CardContent className="p-6 space-y-8">
                         <div className="grid grid-cols-3 gap-6">
-                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات (محسوب)</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
                             <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
                             <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
                         </div>

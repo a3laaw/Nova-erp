@@ -109,6 +109,15 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const selectedGov = watch('siteAddress.governorate');
     const watchedWorkNature = watch('workNature');
 
+    // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات في المشروع
+    const watchedSuspendedExt = watch('suspendedExtensionCount');
+    const watchedOrdinaryExt = watch('ordinaryExtensionCount');
+
+    useEffect(() => {
+        const total = (Number(watchedSuspendedExt) || 0) + (Number(watchedOrdinaryExt) || 0);
+        setValue('bathroomsCount', total);
+    }, [watchedSuspendedExt, watchedOrdinaryExt, setValue]);
+
     useEffect(() => {
         if (!firestore || !selectedGov) return;
         const govObj = governorates.find(g => g.name === selectedGov);
@@ -164,7 +173,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" /></div>
+                        <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات (محسوب)</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
                         <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
                         <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
                     </div>
