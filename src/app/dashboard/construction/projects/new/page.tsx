@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useCallback } from 'react';
@@ -9,18 +10,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy, getDoc } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy, getDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import type { ConstructionProject } from '@/lib/types';
+import type { ConstructionProject, Employee, Department } from '@/lib/types';
 import { ProjectForm } from '@/components/construction/project-form';
 import { cleanFirestoreData } from '@/lib/utils';
 
 /**
  * صفحة إنشاء مشروع مقاولات جديد:
- * تم تعديلها لتكون "هيكل فني" فقط تماشياً مع الدورة المستندية الاحترافية.
- * الخطوات اللاحقة: إنشاء عرض سعر -> قبول العرض -> إنشاء العقد المحاسبي وربطه بالمشروع.
+ * تم تعديلها لتكون "هيكل فني" متكامل يشمل المساحة، الأدوار، السرداب والسطح.
  */
 export default function NewProjectPage() {
     const router = useRouter();
@@ -28,6 +28,10 @@ export default function NewProjectPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
+
+    // جلب البيانات المرجعية المطلوبة لمنطق الأتمتة
+    const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+    const { data: departments = [] } = useSubscription<Department>(firestore, 'departments');
 
     const handleSave = useCallback(async (newProjectData: any) => {
         if (!firestore || !currentUser) return;
@@ -52,7 +56,7 @@ export default function NewProjectPage() {
                 const newProjectRef = doc(collection(firestore, 'projects'));
                 newProjectId = newProjectRef.id;
 
-                // 2. حفظ بيانات المشروع الأساسية (بدون أثر مالي فوري)
+                // 2. حفظ بيانات المشروع الأساسية (تشمل المواصفات الفنية الجديدة)
                 const finalProjectData = {
                     ...newProjectData,
                     projectId: newId,
@@ -66,7 +70,7 @@ export default function NewProjectPage() {
                 transaction.set(newProjectRef, cleanFirestoreData(finalProjectData));
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
 
-                // 3. استنساخ مراحل العمل الشجرية (WBS) إذا وجدت
+                // 3. استنساخ مراحل العمل الشجرية (WBS) إذا وجدت بناءً على نوع المقاولات
                 if (newProjectData.constructionTypeId) {
                     const stagesRef = collection(firestore, `construction_types/${newProjectData.constructionTypeId}/stages`);
                     const stagesSnap = await getDocs(query(stagesRef, orderBy('order')));
@@ -85,7 +89,7 @@ export default function NewProjectPage() {
                 }
             });
             
-            toast({ title: 'تم إنشاء هيكل المشروع', description: 'تم التأسيس الفني بنجاح. يمكنك الآن البدء بإصدار عروض الأسعار المرتبطة.' });
+            toast({ title: 'تم إنشاء هيكل المشروع', description: 'تم التأسيس الفني بنجاح بمواصفات البناء والتموين المحددة.' });
             router.push(`/dashboard/construction/projects/${newProjectId}`);
             
         } catch (error) {
@@ -95,13 +99,13 @@ export default function NewProjectPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [firestore, currentUser, toast, router]);
+    }, [firestore, currentUser, toast, router, employees, departments]);
 
     return (
         <Card className="max-w-4xl mx-auto rounded-3xl shadow-xl overflow-hidden border-none" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8">
-                <CardTitle className="text-3xl font-black">إنشاء مشروع مقاولات جديد</CardTitle>
-                <CardDescription className="text-base font-medium">أدخل التفاصيل الفنية للمشروع وتتبع حصص التموين. يتم إنشاء العقد المالي في مرحلة لاحقة عبر عروض الأسعار.</CardDescription>
+                <CardTitle className="text-3xl font-black">إنشاء هيكل مشروع جديد</CardTitle>
+                <CardDescription className="text-base font-medium">أدخل التفاصيل الفنية للموقع (المساحة، الأدوار، القبو) وتتبع حصص التموين المعتمدة.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
                 <ProjectForm

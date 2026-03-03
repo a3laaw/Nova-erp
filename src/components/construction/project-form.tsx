@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -11,14 +12,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import type { ConstructionProject, Client, Employee, ConstructionType, Item, AreaRange } from '@/lib/types';
-import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2, Ruler, Package } from 'lucide-react';
+import type { ConstructionProject, Client, Employee, ConstructionType, Item, AreaRange, Governorate, Area } from '@/lib/types';
+import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2, Ruler, Package, Building2, MapPin, Layers } from 'lucide-react';
 import { DialogFooter } from '../ui/dialog';
-import { query, collection, orderBy, where } from 'firebase/firestore';
+import { query, collection, orderBy, where, getDocs } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '../ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '../ui/switch';
 
 // جدول قرار 222 لسنة 2024 - مبالغ الدعم بالدينار
 const SUBSIDY_TABLE: Record<AreaRange, Record<string, number>> = {
@@ -42,6 +44,21 @@ const projectSchema = z.object({
   clientId: z.string().min(1, "العميل مطلوب."),
   projectCategory: z.enum(['Private (Subsidized)', 'Private (Non-Subsidized)', 'Commercial', 'Government']),
   
+  // حقول البيانات الفنية للمشروع
+  totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
+  hasBasement: z.boolean().default(false),
+  floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
+  roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
+
+  // عنوان الموقع
+  siteAddress: z.object({
+      governorate: z.string().min(1, "المحافظة مطلوبة."),
+      area: z.string().min(1, "المنطقة مطلوبة."),
+      block: z.string().optional(),
+      street: z.string().optional(),
+      houseNumber: z.string().optional(),
+  }),
+
   // حقول الدعم الحكومي
   subsidyAreaRange: z.enum(['100-199', '200-299', '300-400']).optional(),
   subsidyRequestId: z.string().optional(),
@@ -49,7 +66,6 @@ const projectSchema = z.object({
 
   constructionTypeId: z.string().optional().nullable(),
   startDate: z.date(),
-  endDate: z.date(),
   status: z.enum(['مخطط', 'قيد التنفيذ', 'مكتمل', 'معلق']),
   mainEngineerId: z.string().min(1, "المهندس الرئيسي مطلوب."),
   progressPercentage: z.preprocess((a) => parseInt(String(a || '0'), 10), z.number().min(0).max(100)),
@@ -73,7 +89,11 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const { data: engineers = [] } = useSubscription<Employee>(firestore, 'employees');
     const { data: constructionTypes = [] } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
     const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
+    const { data: governorates = [] } = useSubscription<Governorate>(firestore, 'governorates', [orderBy('name')]);
     
+    const [areas, setAreas] = useState<Area[]>([]);
+    const [isLoadingAreas, setIsLoadingAreas] = useState(false);
+
     const subsidyItems = useMemo(() => allItems.filter(i => i.isSubsidyEligible), [allItems]);
 
     const { register, handleSubmit, control, watch, formState: { errors }, reset, setValue } = useForm<ProjectFormValues>({
@@ -81,7 +101,9 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         defaultValues: {
             projectName: '', clientId: '', 
             projectCategory: 'Private (Non-Subsidized)', constructionTypeId: '',
-            startDate: new Date(), endDate: new Date(), 
+            totalArea: 0, hasBasement: false, floorsCount: 1, roofExtension: 'none',
+            siteAddress: { governorate: '', area: '', block: '', street: '', houseNumber: '' },
+            startDate: new Date(),
             status: 'مخطط', mainEngineerId: '', progressPercentage: 0,
             subsidyQuotas: []
         }
@@ -90,6 +112,22 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const { fields: quotaFields, replace: replaceQuotas, remove: removeQuota, append: appendQuota } = useFieldArray({ control, name: "subsidyQuotas" });
     const projectCategory = watch('projectCategory');
     const selectedAreaRange = watch('subsidyAreaRange');
+    const selectedGov = watch('siteAddress.governorate');
+
+    // جلب المناطق عند تغيير المحافظة
+    useEffect(() => {
+        if (!firestore || !selectedGov) {
+            setAreas([]);
+            return;
+        }
+        const govObj = governorates.find(g => g.name === selectedGov);
+        if (govObj) {
+            setIsLoadingAreas(true);
+            getDocs(query(collection(firestore, `governorates/${govObj.id}/areas`), orderBy('name'))).then(snap => {
+                setAreas(snap.docs.map(d => ({ id: d.id, ...d.data() } as Area)));
+            }).finally(() => setIsLoadingAreas(false));
+        }
+    }, [selectedGov, firestore, governorates]);
 
     const handleAutoFillQuotas = useCallback(() => {
         if (!selectedAreaRange || projectCategory !== 'Private (Subsidized)') return;
@@ -119,9 +157,8 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
             reset({
                 ...initialData,
                 startDate: initialData.startDate?.toDate ? initialData.startDate.toDate() : new Date(),
-                endDate: initialData.endDate?.toDate ? initialData.endDate.toDate() : new Date(),
                 subsidyExpiryDate: initialData.subsidyExpiryDate?.toDate ? initialData.subsidyExpiryDate.toDate() : undefined,
-            });
+            } as any);
         }
     }, [initialData, reset]);
 
@@ -129,6 +166,8 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const engineerOptions = useMemo(() => engineers.filter(e=> e.jobTitle?.includes('مهندس')).map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
     const constructionTypeOptions = useMemo(() => constructionTypes.map(t => ({ value: t.id!, label: t.name })), [constructionTypes]);
     const itemOptions = useMemo(() => subsidyItems.map(i => ({ value: i.id!, label: i.name })), [subsidyItems]);
+    const governorateOptions = useMemo(() => governorates.map(g => ({ value: g.name, label: g.name })), [governorates]);
+    const areaOptions = useMemo(() => areas.map(a => ({ value: a.name, label: a.name })), [areas]);
 
     const onSubmit = (data: ProjectFormValues) => {
         const client = clients.find(c => c.id === data.clientId);
@@ -143,6 +182,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
         <div className="space-y-6">
+            {/* القسم الأساسي */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label>اسم المشروع (هيكل فني) *</Label>
@@ -176,6 +216,68 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     <Controller control={control} name="constructionTypeId" render={({ field }) => (
                         <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={constructionTypeOptions} placeholder="مثال: هيكل أسود، تشطيب..." />
                     )} />
+                </div>
+            </div>
+
+            <Separator />
+
+            {/* قسم العنوان والموقع */}
+            <div className="space-y-4">
+                <h3 className="font-black text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-primary"/> عنوان القسيمة والموقع</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label>المحافظة *</Label>
+                        <Controller control={control} name="siteAddress.governorate" render={({ field }) => (
+                            <InlineSearchList value={field.value} onSelect={field.onChange} options={governorateOptions} placeholder="اختر محافظة..." />
+                        )} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>المنطقة *</Label>
+                        <Controller control={control} name="siteAddress.area" render={({ field }) => (
+                            <InlineSearchList value={field.value} onSelect={field.onChange} options={areaOptions} placeholder={!selectedGov ? "اختر محافظة أولاً" : isLoadingAreas ? "تحميل..." : "اختر منطقة..."} disabled={!selectedGov || isLoadingAreas} />
+                        )} />
+                    </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="grid gap-2"><Label>قطعة</Label><Input {...register('siteAddress.block')} placeholder="0" /></div>
+                    <div className="grid gap-2"><Label>شارع</Label><Input {...register('siteAddress.street')} placeholder="0" /></div>
+                    <div className="grid gap-2"><Label>منزل / قسيمة</Label><Input {...register('siteAddress.houseNumber')} placeholder="0" /></div>
+                </div>
+            </div>
+
+            <Separator />
+
+            {/* قسم البيانات الفنية للبناء */}
+            <div className="space-y-4 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
+                <h3 className="font-black text-lg flex items-center gap-2 text-foreground"><Layers className="h-5 w-5 text-primary"/> مواصفات البناء</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                    <div className="grid gap-2">
+                        <Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة الإجمالية (م²)</Label>
+                        <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-11 font-mono font-bold" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>عدد الأدوار</Label>
+                        <Input type="number" {...register('floorsCount')} placeholder="1" className="h-11 font-mono" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>توسعة السطح</Label>
+                        <Controller name="roofExtension" control={control} render={({field}) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">لا يوجد</SelectItem>
+                                    <SelectItem value="quarter">ربع دور (سطح)</SelectItem>
+                                    <SelectItem value="half">نصف دور (سطح)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}/>
+                    </div>
+                    <div className="flex items-center justify-between p-2 h-11 border rounded-xl bg-background px-4">
+                        <Label htmlFor="hasBasement" className="font-bold cursor-pointer">وجود سرداب (قبو)</Label>
+                        <Controller name="hasBasement" control={control} render={({field}) => (
+                            <Switch id="hasBasement" checked={field.value} onCheckedChange={field.onChange} />
+                        )}/>
+                    </div>
                 </div>
             </div>
 
@@ -289,8 +391,8 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     )} />
                 </div>
                 <div className="grid gap-2">
-                    <Label>تاريخ الانتهاء المتوقع للمشروع</Label>
-                    <Controller name="endDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} className="h-11"/>} />
+                    <Label>تاريخ البدء المخطط</Label>
+                    <Controller name="startDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} className="h-11"/>} />
                 </div>
             </div>
         </div>

@@ -35,6 +35,21 @@ export interface ConstructionProject extends BaseEntity {
     projectType: 'استشاري' | 'تنفيذي' | 'مختلط';
     projectCategory: ProjectCategory;
     
+    // بيانات بناء إضافية
+    totalArea?: number;
+    hasBasement?: boolean;
+    floorsCount?: number;
+    roofExtension?: 'none' | 'quarter' | 'half';
+    
+    // عنوان الموقع
+    siteAddress?: {
+        governorate: string;
+        area: string;
+        block?: string;
+        street?: string;
+        houseNumber?: string;
+    };
+
     // بيانات دعم بنك الائتمان
     subsidyAreaRange?: AreaRange;
     subsidyRequestId?: string;
@@ -42,7 +57,7 @@ export interface ConstructionProject extends BaseEntity {
     
     contractValue: number;
     startDate: Timestamp | any;
-    endDate: Timestamp | any;
+    endDate?: Timestamp | any;
     status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى';
     mainEngineerId: string;
     mainEngineerName?: string;
