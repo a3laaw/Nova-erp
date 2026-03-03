@@ -96,11 +96,11 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
   const projectOptions = React.useMemo(() => projects.map(p => ({ 
     value: p.id!, 
-    label: `${p.projectName || 'مشروع بدون اسم'} - ${p.clientName || 'بدون عميل'}` 
+    label: [p.projectName, p.clientName].filter(Boolean).join(' - ')
   })), [projects]);
 
-  const engineerOptions = React.useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName || 'بدون اسم' })), [employees]);
-  const teamOptions = React.useMemo(() => workTeams.map(t => ({ value: t.id!, label: t.name || 'بدون اسم' })), [workTeams]);
+  const engineerOptions = React.useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
+  const teamOptions = React.useMemo(() => workTeams.map(t => ({ value: t.id!, label: t.name })), [workTeams]);
 
   const handleSaveAll = async (data: SpreadsheetValues) => {
     if (!firestore || !currentUser) return;
@@ -117,9 +117,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
             const visitData: Omit<FieldVisit, 'id'> = {
                 projectId: row.projectId,
-                projectName: project.projectName || 'بدون اسم',
+                projectName: project.projectName || '',
                 clientId: project.clientId || '',
-                clientName: project.clientName || 'غير معروف',
+                clientName: project.clientName || '',
                 transactionId: project.linkedTransactionId || '',
                 transactionType: project.projectType || 'مقاولات',
                 engineerId: row.engineerId || null,
@@ -143,7 +143,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
         }
 
         await batch.commit();
-        toast({ title: 'تمت الجدولة بنجاح', description: `تم حفظ خطة العمل لـ ${data.rows.length} موقع.` });
+        toast({ title: 'نجاح', description: 'تمت الجدولة بنجاح.' });
         onSaveSuccess();
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
@@ -160,9 +160,9 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 <div className="space-y-1">
                     <CardTitle className="text-2xl font-black flex items-center gap-2 text-primary">
                         <TableIcon className="h-6 w-6" />
-                        محرك الجدولة الجماعية السريعة (Planning Engine)
+                        الجدولة الجماعية السريعة للمشاريع
                     </CardTitle>
-                    <CardDescription>قم بجدولة يوميات كافة المواقع وتوزيع الفرق الفنية في واجهة واحدة تشبه Excel.</CardDescription>
+                    <CardDescription>قم بجدولة يوميات كافة المواقع وتوزيع الفرق الفنية في واجهة واحدة.</CardDescription>
                 </div>
                 <div className="flex items-center gap-4 bg-background p-3 rounded-2xl border shadow-inner">
                     <Label className="font-bold text-xs">تاريخ تنفيذ الخطة:</Label>
@@ -285,7 +285,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                         </TableCell>
                         
                         <TableCell className="border-l p-1">
-                            <Input {...register(`rows.${index}.details`)} className="border-none shadow-none text-right text-xs italic h-12 bg-transparent" placeholder="ما العمل المطلوب اليوم؟"/>
+                            <Input {...register(`rows.${index}.details`)} className="border-none shadow-none text-right text-xs italic h-12 bg-transparent" placeholder="العمل المطلوب..."/>
                         </TableCell>
                       </TableRow>
                     );
@@ -299,7 +299,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
           <div className="flex justify-center p-8 bg-muted/10 border-t">
             <Button type="button" variant="outline" onClick={() => append({ uid: generateStableId(), projectId: '', engineerId: '', details: '', teamIds: [] })} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 text-lg font-bold gap-2">
                 <PlusCircle className="h-5 w-5 text-primary" />
-                إضافة سطر جديد للخطة
+                إضافة سطر جديد
             </Button>
           </div>
         </CardContent>
@@ -308,7 +308,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
             <Button type="button" variant="ghost" onClick={onSaveSuccess} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
             <Button type="submit" disabled={isSaving || projectsLoading} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px]">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                اعتماد خطة اليوميات والفرق
+                اعتماد خطة العمل
             </Button>
         </CardFooter>
       </form>

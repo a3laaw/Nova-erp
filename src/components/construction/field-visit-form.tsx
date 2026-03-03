@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
@@ -46,6 +46,7 @@ export function FieldVisitForm() {
     // ✨ محرك جلب بنود المقايسة (WBS logic المستقر)
     useEffect(() => {
         const fetchBoqData = async () => {
+            // الانتظار حتى اكتمال تحميل قائمة المشاريع لضمان توفر الـ boqId
             if (!selectedProjectId || !firestore || projectsLoading) {
                 setBoqItems([]);
                 setIsLoadingBoq(false);
@@ -67,7 +68,6 @@ export function FieldVisitForm() {
                     const data = d.data();
                     const itemNum = data.itemNumber || '';
                     const desc = data.description || '';
-                    // منع ظهور كلمة undefined عبر استخدام الفراغ كقيمة بديلة
                     return { 
                         id: d.id, 
                         name: itemNum ? `${itemNum} - ${desc}` : desc,
@@ -93,23 +93,23 @@ export function FieldVisitForm() {
 
     const projectOptions = useMemo(() => projects.map(p => ({ 
         value: p.id!, 
-        label: `${p.projectName || 'بدون اسم'} - ${p.clientName || 'بدون عميل'}` 
+        label: [p.projectName, p.clientName].filter(Boolean).join(' - ')
     })), [projects]);
 
-    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName || 'بدون اسم' })), [engineers]);
+    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
     
     const stageOptions = useMemo(() => boqItems.map(i => ({ 
         value: i.id, 
         label: i.name 
     })), [boqItems]);
 
-    const teamOptions = useMemo(() => allTeams.map(t => ({ value: t.id!, label: t.name || 'بدون اسم' })), [allTeams]);
+    const teamOptions = useMemo(() => allTeams.map(t => ({ value: t.id!, label: t.name })), [allTeams]);
     const selectedTeamsData = useMemo(() => allTeams.filter(t => selectedTeamIds.includes(t.id!)), [allTeams, selectedTeamIds]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!firestore || !currentUser || !selectedProjectId) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار المشروع على الأقل.' });
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار المشروع.' });
             return;
         }
 
@@ -120,16 +120,16 @@ export function FieldVisitForm() {
 
             const visitData: Omit<FieldVisit, 'id'> = {
                 projectId: selectedProjectId,
-                projectName: selectedProject?.projectName || 'بدون اسم',
+                projectName: selectedProject?.projectName || '',
                 clientId: selectedProject?.clientId || '',
-                clientName: selectedProject?.clientName || 'غير معروف',
+                clientName: selectedProject?.clientName || '',
                 transactionId: selectedProject?.linkedTransactionId || '',
                 transactionType: selectedProject?.projectType || 'مقاولات',
                 engineerId: selectedEngineerId || null,
                 engineerName: eng?.fullName || 'إشراف عام',
                 scheduledDate: scheduledDate || new Date(),
                 plannedStageId: plannedStageId,
-                plannedStageName: stage?.name || 'زيارة متابعة عامة',
+                plannedStageName: stage?.name || 'زيارة متابعة',
                 phaseEndDate: stage?.endDate || null,
                 teamIds: isSubcontracted ? [] : selectedTeamIds,
                 teamNames: isSubcontracted ? [] : selectedTeamsData.map(t => t.name), 
@@ -142,7 +142,7 @@ export function FieldVisitForm() {
             };
 
             await addDoc(collection(firestore, 'field_visits'), cleanFirestoreData(visitData));
-            toast({ title: 'تمت الجدولة', description: 'تم حفظ الزيارة بنجاح.' });
+            toast({ title: 'نجاح', description: 'تمت جدولة الزيارة بنجاح.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
@@ -157,30 +157,30 @@ export function FieldVisitForm() {
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <CardTitle className="text-2xl font-black flex items-center gap-3">
                         <Building2 className="text-primary h-7 w-7" />
-                        جدولة خطة عمل ميدانية (WBS & Logistics)
+                        جدولة زيارة ميدانية جديدة
                     </CardTitle>
-                    <CardDescription>اربط الزيارة بالمشروع وحدد الفرق الفنية المنفذة للمرحلة المستهدفة.</CardDescription>
+                    <CardDescription>قم باختيار المشروع والمرحلة التنفيذية وتحديد فرق العمل.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-8">
                     <div className="grid gap-2">
-                        <Label className="font-black text-primary">مشروع المقاولات المستهدف *</Label>
+                        <Label className="font-black text-primary">المشروع المستهدف *</Label>
                         <InlineSearchList 
                             value={selectedProjectId}
                             onSelect={setSelectedProjectId}
                             options={projectOptions}
-                            placeholder={projectsLoading ? "جاري تحميل المشاريع..." : "ابحث عن مشروع..."}
+                            placeholder={projectsLoading ? "جاري التحميل..." : "ابحث عن مشروع..."}
                             disabled={projectsLoading || isSaving}
                         />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">
-                            <Label className="font-bold">المرحلة التنفيذية (من المقايسة) *</Label>
+                            <Label className="font-bold">المرحلة التنفيذية (WBS) *</Label>
                             <InlineSearchList 
                                 value={plannedStageId}
                                 onSelect={setPlannedStageId}
                                 options={stageOptions}
-                                placeholder={isLoadingBoq ? "جاري تحميل البنود..." : selectedProjectId ? (boqItems.length === 0 ? "لا يوجد بنود مقايسة متاحة" : "اختر بنداً من الـ BOQ...") : "اختر مشروعاً أولاً"}
+                                placeholder={isLoadingBoq ? "جاري التحميل..." : selectedProjectId ? (boqItems.length === 0 ? "لا توجد بنود مقايسة" : "اختر المرحلة...") : "اختر مشروعاً أولاً"}
                                 disabled={!selectedProjectId || isLoadingBoq}
                             />
                         </div>
@@ -196,7 +196,7 @@ export function FieldVisitForm() {
                         <div className="flex items-center justify-between">
                             <Label className="font-black text-lg flex items-center gap-2">
                                 <Users className="h-5 w-5 text-primary" />
-                                إدارة الموارد والفرق المنفذة
+                                إدارة الفرق المنفذة
                             </Label>
                             {isSubcontracted && (
                                 <Badge className="bg-orange-100 text-orange-700 border-none font-black px-3">
@@ -210,19 +210,19 @@ export function FieldVisitForm() {
                             <div className="p-6 border-2 border-dashed border-orange-200 bg-orange-50/20 rounded-2xl flex items-center gap-4">
                                 <HardHat className="h-8 w-8 text-orange-400" />
                                 <div>
-                                    <p className="font-black text-orange-900">المقاول: {selectedProject?.subcontractorName || 'غير مسمى'}</p>
+                                    <p className="font-black text-orange-900">المقاول: {selectedProject?.subcontractorName || ''}</p>
                                     <p className="text-xs text-orange-700">هذا المشروع يدار بواسطة مقاول باطن.</p>
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-6">
                                 <div className="grid gap-2">
-                                    <Label className="text-xs font-bold text-muted-foreground">اختر فرق العمل الفنية المشاركة في الموقع:</Label>
+                                    <Label className="text-xs font-bold text-muted-foreground">اختر الفرق الفنية المشاركة:</Label>
                                     <MultiSelect 
                                         options={teamOptions}
                                         selected={selectedTeamIds}
                                         onChange={setSelectedTeamIds}
-                                        placeholder={teamsLoading ? "تحميل الفرق..." : "اضغط لاختيار الفرق..."}
+                                        placeholder={teamsLoading ? "تحميل الفرق..." : "اختر الفرق..."}
                                         disabled={!selectedProjectId || isSaving}
                                     />
                                 </div>
@@ -231,7 +231,7 @@ export function FieldVisitForm() {
                     </div>
 
                     <div className="grid gap-2 pt-4 border-t">
-                        <Label className="font-bold flex items-center gap-2">المشرف المسؤول (اختياري)</Label>
+                        <Label className="font-bold flex items-center gap-2">المهندس المشرف</Label>
                         <InlineSearchList 
                             value={selectedEngineerId}
                             onSelect={setSelectedEngineerId}
@@ -245,7 +245,7 @@ export function FieldVisitForm() {
                     <Button type="button" variant="outline" onClick={() => router.back()}>إلغاء</Button>
                     <Button type="submit" disabled={isSaving || projectsLoading} className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-lg">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
-                        تأكيد الجدولة
+                        حفظ الزيارة
                     </Button>
                 </CardFooter>
             </form>

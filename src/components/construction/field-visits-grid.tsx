@@ -73,14 +73,14 @@ export function FieldVisitsGrid() {
                     
                     <TableCell className="p-4 border-l align-top space-y-3">
                         <div className="flex justify-between items-start">
-                            <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName || 'عميل غير معروف'}</p>
+                            <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName || ''}</p>
                             {isCancelled && <Badge variant="destructive" className="text-[8px] px-2 py-0">ملغي</Badge>}
                         </div>
                         <div className="space-y-1 bg-sky-50/50 p-3 rounded-xl border border-sky-100">
                             <p className="text-[10px] font-black text-sky-700 uppercase flex items-center gap-1">
                                 <Building2 className="h-3 w-3" /> المشروع:
                             </p>
-                            <p className="text-xs font-bold leading-relaxed">{visit.projectName || 'بدون اسم'}</p>
+                            <p className="text-xs font-bold leading-relaxed">{visit.projectName || ''}</p>
                         </div>
                     </TableCell>
 
@@ -120,7 +120,7 @@ export function FieldVisitsGrid() {
                             </div>
                             <div className="flex justify-between items-center border-b border-dashed pb-2">
                                 <span className="text-[9px] font-bold text-muted-foreground">التسليم المخطط:</span>
-                                <span className="text-[10px] font-bold font-mono">{phaseEndDate ? format(phaseEndDate, 'dd/MM/yyyy') : 'غير محدد'}</span>
+                                <span className="text-[10px] font-bold font-mono">{phaseEndDate ? format(phaseEndDate, 'dd/MM/yyyy') : '-'}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-[9px] font-bold text-muted-foreground">تاريخ الزيارة:</span>
@@ -143,7 +143,7 @@ export function FieldVisitsGrid() {
                                     {visit.teamNames?.map((teamName, i) => (
                                         <div key={i} className="bg-white border border-emerald-100 rounded-lg p-2 shadow-sm text-center">
                                             <p className="text-[10px] font-black text-emerald-700 flex items-center justify-center gap-1">
-                                                <Users className="h-3 w-3" /> {teamName || 'فريق'}
+                                                <Users className="h-3 w-3" /> {teamName}
                                             </p>
                                         </div>
                                     ))}
@@ -156,11 +156,11 @@ export function FieldVisitsGrid() {
                     <TableCell className="p-4 border-l align-top">
                         <div className="space-y-3 h-full">
                             <Badge className={cn("border-none font-black text-[9px] uppercase px-3", isConfirmed ? "bg-green-600 text-white" : "bg-slate-100 text-slate-800")}>
-                                {isConfirmed ? 'تقرير الإنجاز الفعلي المعتمد' : 'يوميات الأعمال المطلوبة'}
+                                {isConfirmed ? 'تقرير الإنجاز الفعلي' : 'يوميات الأعمال'}
                             </Badge>
                             <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-slate-200 h-[calc(100%-35px)] overflow-y-auto">
                                 <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">
-                                    {isConfirmed ? visit.confirmationData?.notes : (visit.details || 'بانتظار تنفيذ الأعمال...') }
+                                    {isConfirmed ? visit.confirmationData?.notes : (visit.details || '...') }
                                 </p>
                             </div>
                         </div>

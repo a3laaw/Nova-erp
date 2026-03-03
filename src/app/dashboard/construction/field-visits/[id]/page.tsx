@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, orderBy, where } from 'firebase/firestore';
 import type { FieldVisit, ConstructionProject } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,7 +54,7 @@ export default function FieldVisitDetailPage() {
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
 
-    // ✨ محرك جلب بنود المقايسة للتأكيد (WBS logic المستقر)
+    // ✨ محرك جلب بنود المقايسة (WBS logic المستقر)
     useEffect(() => {
         const fetchStages = async () => {
             if (!visit || !firestore) return;
@@ -154,18 +154,18 @@ export default function FieldVisitDetailPage() {
     return (
         <div className="max-w-2xl mx-auto space-y-6 pb-20" dir="rtl">
             <div className="flex items-center justify-between px-2">
-                <Button variant="ghost" onClick={() => router.back()} className="gap-2">
+                <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
                     <ArrowRight className="h-4 w-4" /> العودة للخطة
-                </Button>
+                </button>
             </div>
 
             <Card className="rounded-[2.5rem] shadow-xl border-none overflow-hidden bg-card">
                 <CardHeader className="bg-muted/30 pb-8 px-8 border-b">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                            <CardTitle className="text-2xl font-black">{visit.clientName || 'عميل غير معروف'}</CardTitle>
+                            <CardTitle className="text-2xl font-black">{visit.clientName || ''}</CardTitle>
                             <CardDescription className="font-bold text-primary flex items-center gap-2">
-                                <Building2 className="h-4 w-4" /> مشروع: {visit.projectName || 'بدون اسم'}
+                                <Building2 className="h-4 w-4" /> مشروع: {visit.projectName || ''}
                             </CardDescription>
                         </div>
                     </div>

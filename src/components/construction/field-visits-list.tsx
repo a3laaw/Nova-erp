@@ -37,7 +37,7 @@ export function FieldVisitsList() {
     return (
       <div className="p-20 text-center border-2 border-dashed rounded-[3rem] bg-muted/10">
         <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-20" />
-        <p className="text-xl font-bold text-muted-foreground">لا توجد زيارات ميدانية مجدولة.</p>
+        <p className="text-xl font-bold text-muted-foreground">لا توجد زيارات ميدانية حالياً.</p>
       </div>
     );
   }
@@ -64,8 +64,8 @@ export function FieldVisitsList() {
                     )}>
                     {visit.status === 'confirmed' ? 'تمت الزيارة' : isVisitToday ? 'زيارة اليوم' : 'مخطط لها'}
                     </Badge>
-                    <h3 className="text-xl font-black leading-tight text-foreground group-hover:text-primary transition-colors">{visit.clientName || 'عميل غير معروف'}</h3>
-                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.projectName || 'بدون اسم'}</p>
+                    <h3 className="text-xl font-black leading-tight text-foreground group-hover:text-primary transition-colors">{visit.clientName || ''}</h3>
+                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.projectName || ''}</p>
                 </div>
                 <div className="p-3 bg-background rounded-2xl border shadow-sm shrink-0">
                   <MapPin className={cn("h-6 w-6", visit.status === 'confirmed' ? "text-green-600" : "text-primary")} />
@@ -80,7 +80,7 @@ export function FieldVisitsList() {
                 
                 <div className="flex items-center gap-3 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-xs">المسؤول: {visit.engineerName || 'غير مسند'}</span>
+                  <span className="font-medium text-xs">المسؤول: {visit.engineerName || ''}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-2">
@@ -90,7 +90,7 @@ export function FieldVisitsList() {
                     </div>
                     <div className="p-2 bg-muted/50 rounded-xl border flex items-center gap-2">
                         <HardHat className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-[10px] font-bold truncate">{visit.subcontractorName || 'فريق داخلي'}</span>
+                        <span className="text-[10px] font-bold truncate">{visit.subcontractorName || 'داخلي'}</span>
                     </div>
                 </div>
 
@@ -102,7 +102,7 @@ export function FieldVisitsList() {
                 </div>
               </div>
 
-              <Button asChild className="w-full h-12 rounded-2xl font-black text-base mt-2 shadow-lg group-hover:shadow-primary/20 transition-all" variant={visit.status === 'confirmed' ? 'secondary' : 'default'}>
+              <Button asChild className="w-full h-12 rounded-2xl font-black text-base mt-2 shadow-lg transition-all" variant={visit.status === 'confirmed' ? 'secondary' : 'default'}>
                 <Link href={`/dashboard/construction/field-visits/${visit.id}`}>
                   {visit.status === 'confirmed' ? 'عرض تفاصيل الإنجاز' : 'تأكيد إنجاز الموقع'}
                   <ArrowRight className="mr-2 h-5 w-5" />
