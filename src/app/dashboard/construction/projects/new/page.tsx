@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -10,11 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy, getDoc, Timestamp } from 'firebase/firestore';
+import { useFirebase, useSubscription } from '@/firebase';
+import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy, getDoc, Timestamp, where, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import type { ConstructionProject, ContractTemplate, Client, Employee } from '@/lib/types';
+import type { ConstructionProject, ContractTemplate, Client, Employee, Department } from '@/lib/types';
 import { ProjectForm } from '@/components/construction/project-form';
 import { cleanFirestoreData, formatCurrency } from '@/lib/utils';
 
@@ -28,6 +28,10 @@ export default function NewProjectPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
+
+    // جلب البيانات المطلوبة لعملية الأتمتة المالية والإسناد
+    const { data: employees } = useSubscription<Employee>(firestore, 'employees');
+    const { data: departments } = useSubscription<Department>(firestore, 'departments');
     
     const handleSave = useCallback(async (newProjectData: any) => {
         if (!firestore || !currentUser) {
@@ -89,19 +93,24 @@ export default function NewProjectPage() {
                 }
 
                 // 3. إنشاء المعاملة المرتبطة (Linked Transaction)
-                // في Nova ERP، المشروع التنفيذي هو وجه فني لـ "معاملة" مالية
                 const clientSnap = await transaction.get(doc(firestore, 'clients', newProjectData.clientId));
                 const clientData = clientSnap.exists() ? clientSnap.data() as Client : null;
                 const nextTxCount = (clientData?.transactionCounter || 0) + 1;
                 const txNumber = `CL${clientData?.fileNumber}-TX${String(nextTxCount).padStart(2, '0')}`;
 
                 const newTxRef = doc(collection(firestore, `clients/${newProjectData.clientId}/transactions`));
+                
+                const assignedEngineerId = newProjectData.mainEngineerId;
+                const engineer = (employees || []).find(e => e.id === assignedEngineerId);
+                const department = (departments || []).find(d => d.name === engineer?.department);
+
                 const txData = {
                     transactionNumber: txNumber,
                     clientId: newProjectData.clientId,
                     transactionType: newProjectData.projectType === 'تنفيذي' ? 'مقاولات تنفيذية' : newProjectData.projectName,
                     status: 'in-progress',
-                    assignedEngineerId: newProjectData.mainEngineerId,
+                    assignedEngineerId: assignedEngineerId,
+                    departmentId: department?.id || null,
                     createdAt: serverTimestamp(),
                     contract: contractMeta ? {
                         ...contractMeta,
@@ -119,11 +128,20 @@ export default function NewProjectPage() {
                     const jeNumber = `JV-PRJ-${currentYear}-${String(nextJeNum).padStart(4, '0')}`;
 
                     // جلب الحسابات (إيرادات مقاولات و حساب العميل)
-                    const revenueAccSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
-                    const clientAccSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientData?.nameAr), limit(1)));
+                    const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
+                    const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientData?.nameAr), limit(1)));
 
-                    if (!revenueAccSnap.empty && !clientAccSnap.empty) {
+                    if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
                         const jeRef = doc(collection(firestore, 'journalEntries'));
+                        
+                        const autoTags = {
+                            clientId: newProjectData.clientId,
+                            transactionId: newTxRef.id,
+                            auto_profit_center: newProjectRef.id,
+                            auto_resource_id: assignedEngineerId,
+                            ...(department && { auto_dept_id: department.id }),
+                        };
+
                         const jeData = {
                             entryNumber: jeNumber,
                             date: serverTimestamp(),
@@ -132,8 +150,8 @@ export default function NewProjectPage() {
                             totalDebit: newProjectData.contractValue,
                             totalCredit: newProjectData.contractValue,
                             lines: [
-                                { accountId: clientAccSnap.docs[0].id, accountName: clientData?.nameAr, debit: newProjectData.contractValue, credit: 0, auto_profit_center: newProjectRef.id },
-                                { accountId: revenueAccSnap.docs[0].id, accountName: revenueAccSnap.docs[0].data().name, debit: 0, credit: newProjectData.contractValue, auto_profit_center: newProjectRef.id }
+                                { accountId: clientAccountSnap.docs[0].id, accountName: clientData?.nameAr, debit: newProjectData.contractValue, credit: 0, ...autoTags },
+                                { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: newProjectData.contractValue, ...autoTags }
                             ],
                             transactionId: newTxRef.id,
                             clientId: newProjectData.clientId,
