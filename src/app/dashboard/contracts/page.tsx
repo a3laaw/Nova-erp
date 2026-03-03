@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Pencil, Trash2, FileSignature, Construction, Briefcase } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, FileSignature, Construction, Briefcase, FileText, ArrowRightLeft } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 function TemplateList({
   templates,
@@ -62,7 +63,7 @@ function TemplateList({
               </CardHeader>
               <CardContent className="pt-4 flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                 <span>{template.financials?.milestones.length || 0} دفعات</span>
-                <Badge variant="secondary" className="h-5 px-2">جاهز للاستخدام</Badge>
+                <Badge variant="secondary" className="h-5 px-2">نموذج جاهز</Badge>
               </CardContent>
             </Card>
           ))}
@@ -97,14 +98,13 @@ export default function ContractsPage() {
       return { consultingTemplates: consulting, executionTemplates: execution };
   }, [templates]);
 
-  const handleAdd = () => {
+  const handleAddTemplate = () => {
     setSelectedTemplate(null);
     setIsFormOpen(true);
   };
 
   const handleEdit = (template: ContractTemplate) => {
     setSelectedTemplate(template);
-    // Ensure we open in the correct mode based on the template
     setActiveType(template.templateType || 'Consulting');
     setIsFormOpen(true);
   };
@@ -122,7 +122,57 @@ export default function ContractsPage() {
   };
   
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-8" dir="rtl">
+      {/* --- منطقة العمليات الكبرى (الأزرار المطلوبة) --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="rounded-[2rem] border-none shadow-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white overflow-hidden group hover:scale-[1.02] transition-transform">
+              <CardHeader className="relative z-10">
+                  <div className="flex justify-between items-start">
+                      <div className="p-3 bg-white/20 rounded-2xl"><FileText className="h-8 w-8" /></div>
+                      <Badge variant="outline" className="text-white border-white/40">المسار المالي المرن</Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-black mt-4">إنشاء عرض سعر</CardTitle>
+                  <CardDescription className="text-blue-100 font-bold">للمشاريع التي تتطلب تفاوضاً مالياً ومراجعة من المالك قبل التعاقد.</CardDescription>
+              </CardHeader>
+              <CardFooter className="relative z-10 pt-0 pb-8">
+                  <Button asChild className="w-full h-12 bg-white text-blue-700 hover:bg-blue-50 font-black text-lg rounded-xl gap-2 shadow-lg">
+                      <Link href="/dashboard/accounting/quotations/new">
+                          ابدأ بإنشاء عرض سعر
+                          <ArrowRightLeft className="h-5 w-5 rtl:rotate-180" />
+                      </Link>
+                  </Button>
+              </CardFooter>
+              <div className="absolute -bottom-10 -right-10 opacity-10 rotate-12 group-hover:scale-110 transition-transform">
+                  <FileText className="h-64 w-64" />
+              </div>
+          </Card>
+
+          <Card className="rounded-[2rem] border-none shadow-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white overflow-hidden group hover:scale-[1.02] transition-transform">
+              <CardHeader className="relative z-10">
+                  <div className="flex justify-between items-start">
+                      <div className="p-3 bg-white/20 rounded-2xl"><FileSignature className="h-8 w-8" /></div>
+                      <Badge variant="outline" className="text-white border-white/40">المسار القانوني الفوري</Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-black mt-4">عقد مباشر (بدون عرض)</CardTitle>
+                  <CardDescription className="text-emerald-100 font-bold">للتعاقد الفوري على المعاملات والخدمات المباشرة المتفق عليها مسبقاً.</CardDescription>
+              </CardHeader>
+              <CardFooter className="relative z-10 pt-0 pb-8">
+                  <Button asChild className="w-full h-12 bg-white text-emerald-700 hover:bg-emerald-50 font-black text-lg rounded-xl gap-2 shadow-lg">
+                      <Link href="/dashboard/contracts/new">
+                          توقيع عقد مباشر الآن
+                          <PlusCircle className="h-5 w-5" />
+                      </Link>
+                  </Button>
+              </CardFooter>
+              <div className="absolute -bottom-10 -right-10 opacity-10 rotate-12 group-hover:scale-110 transition-transform">
+                  <FileSignature className="h-64 w-64" />
+              </div>
+          </Card>
+      </div>
+
+      <Separator className="my-10" />
+
+      {/* --- مكتبة القوالب --- */}
       <Card className={cn(
         "rounded-3xl border-none shadow-sm transition-all duration-500",
         activeType === 'Consulting' 
@@ -134,12 +184,12 @@ export default function ContractsPage() {
             <div className="space-y-1 text-center md:text-right">
               <CardTitle className="text-2xl font-black flex items-center justify-center md:justify-start gap-3">
                 <FileSignature className={cn("h-7 w-7", activeType === 'Consulting' ? "text-primary" : "text-amber-600")} />
-                مكتبة نماذج العقود
+                مكتبة نماذج العقود (Templates)
               </CardTitle>
               <CardDescription>إدارة وتوحيد صيغ العقود والدفعات المالية للشركة بناءً على أنواع العمل.</CardDescription>
             </div>
             <Button 
-              onClick={handleAdd} 
+              onClick={handleAddTemplate} 
               className={cn(
                 "h-12 px-8 rounded-2xl font-black text-lg gap-2 shadow-xl transition-all",
                 activeType === 'Consulting' ? "bg-primary shadow-primary/20" : "bg-amber-600 hover:bg-amber-700 shadow-amber-200"
