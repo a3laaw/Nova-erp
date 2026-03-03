@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -12,10 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import type { ConstructionProject, Client, Employee, ConstructionType, Item, AreaRange, ContractTemplate } from '@/lib/types';
-import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2, CalendarClock, Ruler, FileSignature, Calculator } from 'lucide-react';
+import type { ConstructionProject, Client, Employee, ConstructionType, Item, AreaRange } from '@/lib/types';
+import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2, Ruler, Package } from 'lucide-react';
 import { DialogFooter } from '../ui/dialog';
-import { query, collection, getDocs, orderBy, where } from 'firebase/firestore';
+import { query, collection, orderBy, where } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '../ui/separator';
@@ -41,7 +40,6 @@ const quotaSchema = z.object({
 const projectSchema = z.object({
   projectName: z.string().min(1, "اسم المشروع مطلوب."),
   clientId: z.string().min(1, "العميل مطلوب."),
-  projectType: z.enum(['استشاري', 'تنفيذي', 'مختلط']),
   projectCategory: z.enum(['Private (Subsidized)', 'Private (Non-Subsidized)', 'Commercial', 'Government']),
   
   // حقول الدعم الحكومي
@@ -49,17 +47,12 @@ const projectSchema = z.object({
   subsidyRequestId: z.string().optional(),
   subsidyExpiryDate: z.date().optional(),
 
-  // الارتباط بالنماذج والعقود
   constructionTypeId: z.string().optional().nullable(),
-  contractTemplateId: z.string().optional().nullable(),
-  
-  contractValue: z.preprocess((a) => parseFloat(String(a || '0')), z.number().min(0)),
   startDate: z.date(),
   endDate: z.date(),
   status: z.enum(['مخطط', 'قيد التنفيذ', 'مكتمل', 'معلق']),
   mainEngineerId: z.string().min(1, "المهندس الرئيسي مطلوب."),
   progressPercentage: z.preprocess((a) => parseInt(String(a || '0'), 10), z.number().min(0).max(100)),
-  linkedTransactionId: z.string().optional(),
   subsidyQuotas: z.array(quotaSchema).optional()
 });
 
@@ -79,23 +72,16 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients');
     const { data: engineers = [] } = useSubscription<Employee>(firestore, 'employees');
     const { data: constructionTypes = [] } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
-    const { data: allTemplates = [] } = useSubscription<ContractTemplate>(firestore, 'contractTemplates');
     const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     
     const subsidyItems = useMemo(() => allItems.filter(i => i.isSubsidyEligible), [allItems]);
 
-    // فلترة قوالب عقود المقاولات فقط
-    const executionTemplates = useMemo(() => 
-        allTemplates.filter(t => t.templateType === 'Execution'),
-    [allTemplates]);
-
     const { register, handleSubmit, control, watch, formState: { errors }, reset, setValue } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
         defaultValues: {
-            projectName: '', clientId: '', projectType: 'تنفيذي', 
+            projectName: '', clientId: '', 
             projectCategory: 'Private (Non-Subsidized)', constructionTypeId: '',
-            contractTemplateId: '',
-            contractValue: 0, startDate: new Date(), endDate: new Date(), 
+            startDate: new Date(), endDate: new Date(), 
             status: 'مخطط', mainEngineerId: '', progressPercentage: 0,
             subsidyQuotas: []
         }
@@ -104,17 +90,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const { fields: quotaFields, replace: replaceQuotas, remove: removeQuota, append: appendQuota } = useFieldArray({ control, name: "subsidyQuotas" });
     const projectCategory = watch('projectCategory');
     const selectedAreaRange = watch('subsidyAreaRange');
-    const selectedTemplateId = watch('contractTemplateId');
-
-    // تحديث قيمة العقد آلياً عند اختيار قالب بـ "قيمة ثابتة"
-    useEffect(() => {
-        if (selectedTemplateId) {
-            const template = executionTemplates.find(t => t.id === selectedTemplateId);
-            if (template && template.financials?.type === 'fixed') {
-                setValue('contractValue', template.financials.totalAmount || 0);
-            }
-        }
-    }, [selectedTemplateId, executionTemplates, setValue]);
 
     const handleAutoFillQuotas = useCallback(() => {
         if (!selectedAreaRange || projectCategory !== 'Private (Subsidized)') return;
@@ -153,7 +128,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
     const engineerOptions = useMemo(() => engineers.filter(e=> e.jobTitle?.includes('مهندس')).map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
     const constructionTypeOptions = useMemo(() => constructionTypes.map(t => ({ value: t.id!, label: t.name })), [constructionTypes]);
-    const templateOptions = useMemo(() => executionTemplates.map(t => ({ value: t.id!, label: t.title })), [executionTemplates]);
     const itemOptions = useMemo(() => subsidyItems.map(i => ({ value: i.id!, label: i.name })), [subsidyItems]);
 
     const onSubmit = (data: ProjectFormValues) => {
@@ -171,7 +145,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                    <Label>اسم المشروع *</Label>
+                    <Label>اسم المشروع (هيكل فني) *</Label>
                     <Input {...register('projectName')} placeholder="مثال: فيلا السيد محمد - هيكل أسود" />
                 </div>
                 <div className="grid gap-2">
@@ -184,7 +158,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                    <Label>فئة المشروع (من حيث الاستحقاق الحكومي) *</Label>
+                    <Label>فئة المشروع *</Label>
                     <Controller name="projectCategory" control={control} render={({field}) => (
                         <Select onValueChange={field.onChange} value={field.value}>
                             <SelectTrigger className="font-bold border-2 border-primary/20 h-11"><SelectValue/></SelectTrigger>
@@ -198,43 +172,12 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     )}/>
                 </div>
                 <div className="grid gap-2">
-                    <Label>نوع المقاولات المنفذة</Label>
+                    <Label>نوع المقاولات</Label>
                     <Controller control={control} name="constructionTypeId" render={({ field }) => (
                         <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={constructionTypeOptions} placeholder="مثال: هيكل أسود، تشطيب..." />
                     )} />
                 </div>
             </div>
-
-            {/* --- ربط العقد من النماذج --- */}
-            <Card className="border-2 border-dashed rounded-[2rem] bg-muted/50 p-6 space-y-6">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-xl text-primary"><FileSignature className="h-6 w-6"/></div>
-                    <div>
-                        <CardTitle className="text-lg font-black">الربط مع نماذج العقود</CardTitle>
-                        <CardDescription>اختر نموذج العقد المعتمد للمقاولات لبرمجة الدفعات والقيود آلياً.</CardDescription>
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="grid gap-2">
-                        <Label className="font-bold">نموذج العقد المستهدف *</Label>
-                        <Controller control={control} name="contractTemplateId" render={({ field }) => (
-                            <InlineSearchList 
-                                value={field.value || ''} 
-                                onSelect={field.onChange} 
-                                options={templateOptions} 
-                                placeholder="اختر من القوالب المرجعية..." 
-                            />
-                        )} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label className="font-bold">إجمالي قيمة العقد (المبلغ المتفق عليه)</Label>
-                        <div className="relative">
-                            <Input type="number" step="0.001" {...register('contractValue')} className="h-11 font-mono text-xl font-black text-primary pl-12" />
-                            <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-30" />
-                        </div>
-                    </div>
-                </div>
-            </Card>
 
             {projectCategory === 'Private (Subsidized)' && (
                 <Card className="border-2 border-primary shadow-lg rounded-[2rem] overflow-hidden bg-primary/5">
@@ -272,7 +215,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                 <Input {...register('subsidyRequestId')} placeholder="00000000" className="dir-ltr h-11" />
                             </div>
                             <div className="grid gap-2">
-                                <Label className="flex items-center gap-2 font-bold"><CalendarClock className="h-4 w-4 text-red-600"/> تاريخ انتهاء الصلاحية</Label>
+                                <Label className="flex items-center gap-2 font-bold">تاريخ انتهاء صلاحية الدعم</Label>
                                 <Controller name="subsidyExpiryDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} className="h-11" />} />
                             </div>
                         </div>
@@ -346,7 +289,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     )} />
                 </div>
                 <div className="grid gap-2">
-                    <Label>تاريخ الانتهاء المتوقع</Label>
+                    <Label>تاريخ الانتهاء المتوقع للمشروع</Label>
                     <Controller name="endDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} className="h-11"/>} />
                 </div>
             </div>
@@ -355,7 +298,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="h-12 px-16 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-3">
                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                اعتماد العقد وبدء المشروع
+                حفظ هيكل المشروع
             </Button>
         </DialogFooter>
     </form>

@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import type { Client, Quotation, QuotationItem, ContractTemplate, ContractTerm, ContractScopeItem, TransactionType, WorkStage } from '@/lib/types';
+import type { Client, Quotation, ContractTemplate, ConstructionType, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
@@ -20,7 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
-import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { DialogFooter } from '@/components/ui/dialog';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -29,7 +28,7 @@ const itemSchema = z.object({
   id: z.string().optional(),
   description: z.string().min(1, "الوصف مطلوب"),
   quantity: z.preprocess((v) => parseFloat(String(v || '1')), z.number().min(0.01)),
-  unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
+  unitPrice: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)),
   percentage: z.preprocess(v => parseFloat(String(v || '0')), z.number().min(0)).optional(),
   condition: z.string().optional(),
   total: z.number().optional(),
@@ -37,21 +36,22 @@ const itemSchema = z.object({
 
 const quotationSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
+  projectId: z.string().optional().nullable(),
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   notes: z.string().optional(),
-  departmentId: z.string().min(1, 'القسم مطلوب'),
-  transactionTypeId: z.string().min(1, 'نوع المعاملة مطلوب'),
+  departmentId: z.string().optional(),
+  transactionTypeId: z.string().optional(),
   financialsType: z.enum(['fixed', 'percentage']),
   totalAmount: z.preprocess((a) => parseFloat(String(a || '0')), z.number().optional()),
   scopeOfWork: z.array(z.any()).optional(),
   termsAndConditions: z.array(z.any()).optional(),
   openClauses: z.array(z.any()).optional(),
   templateDescription: z.string().optional(),
+  templateId: z.string().optional(),
 });
-
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
 
@@ -67,20 +67,26 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const { firestore } = useFirebase();
   const { toast } = useToast();
   
-  const [allTransactionTypes, setAllTransactionTypes] = React.useState<any[]>([]);
   const [allTemplates, setAllTemplates] = React.useState<ContractTemplate[]>([]);
   const [clients, setClients] = React.useState<Client[]>([]);
-  const [allWorkStages, setAllWorkStages] = React.useState<MultiSelectOption[]>([]);
+  const [projects, setProjects] = React.useState<ConstructionProject[]>([]);
   const [refDataLoading, setRefDataLoading] = React.useState(true);
 
-  const { register, handleSubmit, control, formState: { errors }, watch, setValue, reset } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
+    defaultValues: {
+        date: new Date(),
+        validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
+        financialsType: 'fixed',
+        items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }]
+    }
   });
 
   const { fields, append, remove, replace } = useFieldArray({ control, name: "items" });
   const watchedItems = watch("items");
   const financials_type = watch("financialsType");
   const total_amount = watch("totalAmount");
+  const selectedClientId = watch("clientId");
   
   const totalCalculatedAmount = React.useMemo(() => {
     if (financials_type === 'fixed') {
@@ -94,293 +100,156 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const fetchRefData = async () => {
       setRefDataLoading(true);
       try {
-        const [clientsSnap, templatesSnapshot, transTypesSnapshot, stagesSnapshot] = await Promise.all([
+        const [clientsSnap, templatesSnapshot, projectsSnap] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
-          getDocs(query(collection(firestore, 'transactionTypes'))),
-          getDocs(query(collectionGroup(firestore, 'workStages'))),
+          getDocs(query(collection(firestore, 'projects'), where('status', '==', 'مخطط')))
         ]);
 
-        const fetchedClients = clientsSnap.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Client))
-            .filter(c => c && c.nameAr && c.isActive === true);
-        fetchedClients.sort((a, b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
-        setClients(fetchedClients);
-        
+        setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
-        
-        const types: MultiSelectOption[] = [];
-        const uniqueTypeNames = new Set<string>();
-        transTypesSnapshot.forEach(doc => {
-            const typeName = doc.data().name;
-            if (typeName && !uniqueTypeNames.has(typeName)) {
-                types.push({ value: doc.id, label: typeName });
-                uniqueTypeNames.add(typeName);
-            }
-        });
-        setAllTransactionTypes(types.sort((a,b) => a.label.localeCompare(b.label, 'ar')));
-
-        const stages: MultiSelectOption[] = [];
-        const uniqueStages = new Map<string, MultiSelectOption>();
-        stagesSnapshot.forEach(doc => {
-          const stageName = doc.data().name;
-          if (stageName && !uniqueStages.has(stageName)) {
-              uniqueStages.set(stageName, { value: stageName, label: stageName });
-          }
-        });
-        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
+        setProjects(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConstructionProject)));
 
       } catch (error) {
         console.error("Error fetching reference data:", error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
       } finally {
         setRefDataLoading(false);
       }
     };
     fetchRefData();
-  }, [firestore, toast]);
-  
-  const populateFormFromTemplate = React.useCallback((template: ContractTemplate | null) => {
-    if (template) {
-      setValue('financialsType', template.financials?.type || 'fixed');
-      setValue('totalAmount', template.financials?.totalAmount || 0);
+  }, [firestore]);
 
-      const notesParts: string[] = [];
-      if (template.description) {
-        notesParts.push(`**ملخص:**\n${template.description}`);
-      }
-      setValue('templateDescription', template.description || '');
-      
-      const scope = template.scopeOfWork || [];
-      setValue('scopeOfWork', scope);
-      if (scope.length > 0) {
-          notesParts.push(`\n**نطاق العمل:**\n${scope.map((item, index) => `${index + 1}. ${item.title}: ${item.description || ''}`).join('\n')}`);
-      }
+  const handleTemplateSelect = (templateId: string) => {
+    const template = allTemplates.find(t => t.id === templateId);
+    if (!template) return;
 
-      const terms = template.termsAndConditions || [];
-      setValue('termsAndConditions', terms);
-      if (terms.length > 0) {
-          notesParts.push(`\n**الشروط والأحكام:**\n${terms.map(term => `- ${term.text}`).join('\n')}`);
-      }
-      
-      const open = template.openClauses || [];
-      setValue('openClauses', open);
-      if (open.length > 0) {
-          notesParts.push(`\n**بنود إضافية:**\n${open.map(clause => `- ${clause.text}`).join('\n')}`);
-      }
-      
-      setValue('notes', notesParts.join('\n\n'));
+    setValue('financialsType', template.financials?.type || 'fixed');
+    setValue('totalAmount', template.financials?.totalAmount || 0);
+    setValue('templateDescription', template.description || '');
+    setValue('scopeOfWork', template.scopeOfWork || []);
+    setValue('termsAndConditions', template.termsAndConditions || []);
+    setValue('openClauses', template.openClauses || []);
+    setValue('subject', template.title);
 
-      const newItems = template.financials?.milestones?.map(milestone => {
-        const isPercentage = template.financials?.type === 'percentage';
-        const value = Number(milestone.value || 0);
-        return {
-          id: milestone.id || generateId(),
-          description: milestone.name,
-          quantity: 1,
-          unitPrice: isPercentage ? 0 : value,
-          percentage: isPercentage ? value : 0,
-          condition: milestone.condition || '',
-        };
-      }) || [];
+    const newItems = template.financials?.milestones?.map(m => ({
+      id: generateId(),
+      description: m.name,
+      quantity: 1,
+      unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
+      percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
+      condition: m.condition || '',
+    })) || [];
 
-      if (newItems.length > 0) {
-        replace(newItems);
-      }
-    } else {
-        setValue('financialsType', 'fixed');
-        setValue('totalAmount', 0);
-        setValue('templateDescription', '');
-        setValue('scopeOfWork', []);
-        setValue('termsAndConditions', []);
-        setValue('openClauses', []);
-        setValue('notes', '');
-        replace([{ id: generateId(), description: '', quantity: 1, unitPrice: 0, percentage: 0, condition: '' }]);
-    }
-  }, [replace, setValue]);
-
-
-  const selectedTransactionTypeId = watch("transactionTypeId");
-  React.useEffect(() => {
-    if (isEditing) return; // Don't auto-change template on edit
-    if (!selectedTransactionTypeId || allTransactionTypes.length === 0 || allTemplates.length === 0) return;
-
-    const transType = allTransactionTypes.find(t => t.value === selectedTransactionTypeId);
-    if (!transType) return;
-    
-    setValue('subject', transType.label);
-    
-    const matchingTemplates = allTemplates.filter(t => t.transactionTypes?.includes(transType.label));
-    
-    const templateToUse = matchingTemplates.length > 0 ? matchingTemplates[0] : null;
-    populateFormFromTemplate(templateToUse);
-  }, [isEditing, selectedTransactionTypeId, allTransactionTypes, allTemplates, setValue, populateFormFromTemplate]);
-
-  React.useEffect(() => {
-    if (initialData) {
-      reset({
-        ...initialData,
-        date: toFirestoreDate(initialData.date) || new Date(),
-        validUntil: toFirestoreDate(initialData.validUntil) || new Date(),
-        items: initialData.items?.map(item => ({
-            ...item,
-            unitPrice: item.unitPrice || 0,
-            percentage: item.percentage || 0,
-        })) || [],
-      });
-    }
-  }, [initialData, reset]);
-
-  const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
-  const transactionTypeOptions = React.useMemo(() => allTransactionTypes.map(t => ({ value: t.value, label: t.label })), [allTransactionTypes]);
-  
-  const onSubmit = (data: QuotationFormValues) => {
-    const processedItems = data.items.map(item => {
-        const isPercentage = data.financialsType === 'percentage';
-        const percentage = Number(item.percentage || 0);
-        const unitPrice = isPercentage 
-            ? 0
-            : Number(item.unitPrice || 0);
-        const total = isPercentage
-            ? (percentage / 100) * (data.totalAmount || 0)
-            : unitPrice * (Number(item.quantity) || 1);
-        
-        return { ...item, unitPrice, percentage, total };
-    });
-    
-    onSave({ ...data, items: processedItems });
+    replace(newItems);
+    toast({ title: 'تم تحميل النموذج', description: 'يمكنك الآن تعديل الأسعار والبنود كما ترغب.' });
   };
-  
-  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setPortalTarget(document.body);
-    }
-  }, []);
+
+  const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr })), [clients]);
+  const projectOptions = React.useMemo(() => 
+    projects.filter(p => p.clientId === selectedClientId).map(p => ({ value: p.id!, label: p.projectName })),
+  [projects, selectedClientId]);
+  const templateOptions = React.useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <div className="space-y-6 py-4 px-1 max-h-[70vh] overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="grid gap-2">
-                  <Label>العميل <span className="text-destructive">*</span></Label>
-                  <Controller
-                      control={control} name="clientId"
-                      render={({ field }) => (
-                          <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder={refDataLoading ? 'تحميل...' : 'ابحث عن عميل...'} disabled={refDataLoading || isEditing} />
-                      )}
-                  />
-                  {errors.clientId && <p className="text-xs text-destructive">{errors.clientId.message}</p>}
-              </div>
-               <div className="grid gap-2">
-                  <Label>نوع المعاملة <span className="text-destructive">*</span></Label>
-                  <Controller control={control} name="transactionTypeId"
-                      render={({ field }) => (
-                          <InlineSearchList value={field.value} onSelect={field.onChange} options={transactionTypeOptions} placeholder={refDataLoading ? 'تحميل...' : 'اختر نوع المعاملة...'} disabled={refDataLoading || isEditing}/>
-                      )}
-                  />
-                  {errors.transactionTypeId && <p className="text-xs text-destructive">{errors.transactionTypeId.message}</p>}
-              </div>
+    <form onSubmit={handleSubmit(onSave)} className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-muted/20 p-6 rounded-3xl border">
+          <div className="grid gap-2">
+              <Label className="font-bold">العميل المستهدف *</Label>
+              <Controller control={control} name="clientId" render={({ field }) => (
+                  <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن عميل..." disabled={isEditing} />
+              )} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-               <div className="grid gap-2 md:col-span-1">
-                  <Label htmlFor="subject">الموضوع <span className="text-destructive">*</span></Label>
-                  <Input id="subject" {...register('subject')} />
-                  {errors.subject && <p className="text-xs text-destructive">{errors.subject.message}</p>}
-              </div>
-              <div className="grid gap-2">
-                  <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                  <Controller name="date" control={control} render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} />
-                  {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
-              </div>
-              <div className="grid gap-2">
-                  <Label htmlFor="validUntil">صالح حتى تاريخ <span className="text-destructive">*</span></Label>
-                  <Controller name="validUntil" control={control} render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} />
-                  {errors.validUntil && <p className="text-xs text-destructive">{errors.validUntil.message}</p>}
-              </div>
+          <div className="grid gap-2">
+              <Label className="font-bold">ربط بهيكل مشروع (اختياري)</Label>
+              <Controller control={control} name="projectId" render={({ field }) => (
+                  <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={!selectedClientId} />
+              )} />
           </div>
-          
-           {financials_type === 'percentage' && (
-              <div className="grid gap-2 md:w-1/3">
-                  <Label>إجمالي قيمة العقد (لحساب النسب)</Label>
-                  <Input type="number" step="0.001" {...register('totalAmount')} />
-              </div>
-           )}
+          <div className="grid gap-2">
+              <Label className="font-bold text-primary">استخدام نموذج عقد كمسودة</Label>
+              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة السريعة..." />
+          </div>
+      </div>
 
-          <div>
-              <Label className="mb-2 block">البنود</Label>
-               <Table>
-                  <TableHeader>
-                      <TableRow>
-                          <TableHead className="w-2/5">الوصف</TableHead>
-                          <TableHead className="w-[100px]">الكمية</TableHead>
-                          <TableHead className="w-1/5">{financials_type === 'percentage' ? 'النسبة' : 'سعر الوحدة'}</TableHead>
-                          <TableHead className="w-1/6 text-left">الإجمالي</TableHead>
-                          <TableHead className="w-[50px]"><span className="sr-only">حذف</span></TableHead>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid gap-2 md:col-span-1">
+              <Label className="font-bold">موضوع العرض *</Label>
+              <Input {...register('subject')} placeholder="مثال: عرض سعر توريد وتركيب..." />
+          </div>
+          <div className="grid gap-2">
+              <Label className="font-bold">تاريخ العرض</Label>
+              <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />} />
+          </div>
+          <div className="grid gap-2">
+              <Label className="font-bold">صالح لغاية</Label>
+              <Controller name="validUntil" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />} />
+          </div>
+      </div>
+
+      <div className="space-y-4">
+          <div className="flex justify-between items-center px-2">
+              <Label className="text-lg font-black flex items-center gap-2"><Calculator className="h-5 w-5 text-primary"/> تسعير بنود العقد والدفعات</Label>
+              <div className="flex items-center gap-4">
+                  <Label className="text-xs font-bold">طريقة التسعير:</Label>
+                  <Controller name="financialsType" control={control} render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="w-32 h-8 rounded-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="fixed">مبالغ ثابتة</SelectItem>
+                              <SelectItem value="percentage">نسب مئوية</SelectItem>
+                          </SelectContent>
+                      </Select>
+                  )} />
+              </div>
+          </div>
+
+          <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
+              <Table>
+                  <TableHeader className="bg-muted/50">
+                      <TableRow className="h-14 border-b-2">
+                          <TableHead className="px-6 font-bold">بيان الدفعة / البند</TableHead>
+                          <TableHead className="text-center font-bold w-32">{financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}</TableHead>
+                          <TableHead className="w-12"></TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {fields.map((field, index) => {
-                          const item = watchedItems?.[index] || {};
-                          const lineTotal = financials_type === 'percentage'
-                              ? ((Number(item?.percentage) || 0) / 100) * (total_amount || 0)
-                              : (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
-
-                          return (
-                          <TableRow key={field.id}>
-                              <TableCell>
-                                  <Textarea {...register(`items.${index}.description`)} placeholder="وصف البند..."/>
-                                  {errors.items?.[index]?.description && <p className="text-xs text-destructive mt-1">{errors.items?.[index]?.description?.message}</p>}
+                      {fields.map((field, index) => (
+                          <TableRow key={field.id} className="h-16 border-b last:border-0">
+                              <TableCell className="px-4">
+                                  <Input {...register(`items.${index}.description`)} className="font-bold border-none shadow-none focus-visible:ring-0 text-base" placeholder="وصف الدفعة..." />
                               </TableCell>
                               <TableCell>
-                                  <Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" />
+                                  <Input 
+                                    type="number" step="any" 
+                                    {...register(financials_type === 'percentage' ? `items.${index}.percentage` : `items.${index}.unitPrice`)} 
+                                    className="text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0" 
+                                  />
                               </TableCell>
-                              <TableCell>
-                                  {financials_type === 'percentage' ? (
-                                      <div className="flex items-center gap-1">
-                                          <Input type="number" step="any" {...register(`items.${index}.percentage`)} className="dir-ltr" />
-                                          <span className="text-sm">%</span>
-                                      </div>
-                                  ) : (
-                                      <Input type="number" step="0.001" {...register(`items.${index}.unitPrice`)} className="dir-ltr" />
-                                  )}
-                              </TableCell>
-                              <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
-                              <TableCell>
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}>
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
+                              <TableCell className="text-center">
+                                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
                               </TableCell>
                           </TableRow>
-                      )})}
+                      ))}
                   </TableBody>
-                  <TableFooter>
-                      <TableRow>
-                          <TableCell colSpan={3} className="font-bold text-lg">الإجمالي</TableCell>
-                          <TableCell className="font-bold font-mono text-lg text-left">{formatCurrency(totalCalculatedAmount)}</TableCell>
+                  <TableFooter className="bg-primary/5">
+                      <TableRow className="h-20 border-t-4">
+                          <TableCell className="text-right px-12 font-black text-xl">إجمالي قيمة العرض:</TableCell>
+                          <TableCell className="text-center font-mono text-2xl font-black text-primary">
+                              {financials_type === 'fixed' ? formatCurrency(totalCalculatedAmount) : `${totalCalculatedAmount}%`}
+                          </TableCell>
                           <TableCell />
                       </TableRow>
                   </TableFooter>
               </Table>
-               <div className="flex justify-start mt-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0, percentage: 0, condition: '' })}>
-                      <PlusCircle className="ml-2 h-4 w-4" />
-                      إضافة بند
-                  </Button>
-               </div>
           </div>
-          {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
-
-          <div className="grid gap-2">
-              <Label htmlFor="notes">ملاحظات إضافية (تحتوي على بنود العقد)</Label>
-              <Textarea id="notes" {...register('notes')} placeholder="شروط الدفع، معلومات الضمان، إلخ." rows={5}/>
-          </div>
+          <Button type="button" variant="outline" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة دفعة مخصصة</Button>
       </div>
-      <DialogFooter className="mt-6 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-          <Button type="submit" disabled={isSaving || refDataLoading}>
-              {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-              {isSaving ? 'جاري الحفظ...' : 'حفظ'}
+
+      <DialogFooter className="pt-8 border-t">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+          <Button type="submit" disabled={isSaving || refDataLoading} className="h-12 px-16 rounded-xl font-black text-lg shadow-xl shadow-primary/30">
+              {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin" /> : <Save className="ml-3 h-5 w-5" />}
+              حفظ وتوليد المسودة
           </Button>
       </DialogFooter>
     </form>

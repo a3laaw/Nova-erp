@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Card,
@@ -10,17 +9,18 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useFirebase, useSubscription } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy, getDoc, Timestamp, where, limit } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { doc, runTransaction, collection, serverTimestamp, getDocs, query, orderBy, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import type { ConstructionProject, ContractTemplate, Client, Employee, Department } from '@/lib/types';
+import type { ConstructionProject } from '@/lib/types';
 import { ProjectForm } from '@/components/construction/project-form';
-import { cleanFirestoreData, formatCurrency } from '@/lib/utils';
+import { cleanFirestoreData } from '@/lib/utils';
 
 /**
  * صفحة إنشاء مشروع مقاولات جديد:
- * - تم تطويرها لتقوم باستنساخ بنود الدفعات والقيود المحاسبية آلياً من نموذج العقد المختار.
+ * تم تعديلها لتكون "هيكل فني" فقط تماشياً مع الدورة المستندية الاحترافية.
+ * الخطوات اللاحقة: إنشاء عرض سعر -> قبول العرض -> إنشاء العقد المحاسبي وربطه بالمشروع.
  */
 export default function NewProjectPage() {
     const router = useRouter();
@@ -29,15 +29,8 @@ export default function NewProjectPage() {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
 
-    // جلب البيانات المطلوبة لعملية الأتمتة المالية والإسناد
-    const { data: employees } = useSubscription<Employee>(firestore, 'employees');
-    const { data: departments } = useSubscription<Department>(firestore, 'departments');
-    
     const handleSave = useCallback(async (newProjectData: any) => {
-        if (!firestore || !currentUser) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الاتصال بقاعدة البيانات أو تحديد المستخدم.' });
-            return;
-        }
+        if (!firestore || !currentUser) return;
 
         setIsSaving(true);
         let newProjectId = '';
@@ -59,123 +52,21 @@ export default function NewProjectPage() {
                 const newProjectRef = doc(collection(firestore, 'projects'));
                 newProjectId = newProjectRef.id;
 
-                // 2. معالجة نموذج العقد (Template Logic)
-                let contractClauses: any[] = [];
-                let contractMeta: any = null;
-
-                if (newProjectData.contractTemplateId) {
-                    const templateSnap = await transaction.get(doc(firestore, 'contractTemplates', newProjectData.contractTemplateId));
-                    if (templateSnap.exists()) {
-                        const template = templateSnap.data() as ContractTemplate;
-                        contractMeta = {
-                            type: template.financials?.type || 'fixed',
-                            totalAmount: newProjectData.contractValue || template.financials?.totalAmount,
-                            scopeOfWork: template.scopeOfWork || [],
-                            termsAndConditions: template.termsAndConditions || [],
-                            openClauses: template.openClauses || []
-                        };
-
-                        // تحويل Milestones إلى Clauses مبرمجة في العقد
-                        contractClauses = (template.financials?.milestones || []).map(m => {
-                            const amount = template.financials?.type === 'percentage'
-                                ? (Number(m.value) / 100) * Number(contractMeta.totalAmount)
-                                : Number(m.value);
-                            return {
-                                id: m.id || Math.random().toString(36).substring(7),
-                                name: m.name,
-                                condition: m.condition || '',
-                                amount: amount,
-                                status: 'غير مستحقة',
-                                percentage: template.financials?.type === 'percentage' ? Number(m.value) : null
-                            };
-                        });
-                    }
-                }
-
-                // 3. إنشاء المعاملة المرتبطة (Linked Transaction)
-                const clientSnap = await transaction.get(doc(firestore, 'clients', newProjectData.clientId));
-                const clientData = clientSnap.exists() ? clientSnap.data() as Client : null;
-                const nextTxCount = (clientData?.transactionCounter || 0) + 1;
-                const txNumber = `CL${clientData?.fileNumber}-TX${String(nextTxCount).padStart(2, '0')}`;
-
-                const newTxRef = doc(collection(firestore, `clients/${newProjectData.clientId}/transactions`));
-                
-                const assignedEngineerId = newProjectData.mainEngineerId;
-                const engineer = (employees || []).find(e => e.id === assignedEngineerId);
-                const department = (departments || []).find(d => d.name === engineer?.department);
-
-                const txData = {
-                    transactionNumber: txNumber,
-                    clientId: newProjectData.clientId,
-                    transactionType: newProjectData.projectType === 'تنفيذي' ? 'مقاولات تنفيذية' : newProjectData.projectName,
-                    status: 'in-progress',
-                    assignedEngineerId: assignedEngineerId,
-                    departmentId: department?.id || null,
-                    createdAt: serverTimestamp(),
-                    contract: contractMeta ? {
-                        ...contractMeta,
-                        clauses: contractClauses
-                    } : null
-                };
-                transaction.set(newTxRef, txData);
-                transaction.update(doc(firestore, 'clients', newProjectData.clientId), { transactionCounter: nextTxCount, status: 'contracted' });
-
-                // 4. إنشاء القيد المحاسبي لإثبات المديونية (Accounts Receivable)
-                if (newProjectData.contractValue > 0) {
-                    const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
-                    const jeCounterDoc = await transaction.get(jeCounterRef);
-                    const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                    const jeNumber = `JV-PRJ-${currentYear}-${String(nextJeNum).padStart(4, '0')}`;
-
-                    // جلب الحسابات (إيرادات مقاولات و حساب العميل)
-                    const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
-                    const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', clientData?.nameAr), limit(1)));
-
-                    if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
-                        const jeRef = doc(collection(firestore, 'journalEntries'));
-                        
-                        const autoTags = {
-                            clientId: newProjectData.clientId,
-                            transactionId: newTxRef.id,
-                            auto_profit_center: newProjectRef.id,
-                            auto_resource_id: assignedEngineerId,
-                            ...(department && { auto_dept_id: department.id }),
-                        };
-
-                        const jeData = {
-                            entryNumber: jeNumber,
-                            date: serverTimestamp(),
-                            narration: `إثبات مديونية عقد مشروع: ${newProjectData.projectName}`,
-                            status: 'posted',
-                            totalDebit: newProjectData.contractValue,
-                            totalCredit: newProjectData.contractValue,
-                            lines: [
-                                { accountId: clientAccountSnap.docs[0].id, accountName: clientData?.nameAr, debit: newProjectData.contractValue, credit: 0, ...autoTags },
-                                { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: newProjectData.contractValue, ...autoTags }
-                            ],
-                            transactionId: newTxRef.id,
-                            clientId: newProjectData.clientId,
-                            createdAt: serverTimestamp(),
-                            createdBy: currentUser.id
-                        };
-                        transaction.set(jeRef, jeData);
-                        transaction.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
-                    }
-                }
-
-                // 5. حفظ بيانات المشروع النهائية
+                // 2. حفظ بيانات المشروع الأساسية (بدون أثر مالي فوري)
                 const finalProjectData = {
                     ...newProjectData,
                     projectId: newId,
-                    linkedTransactionId: newTxRef.id,
+                    progressPercentage: 0,
+                    status: 'مخطط',
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
+                    companyId: currentUser.companyId || null
                 };
                 
                 transaction.set(newProjectRef, cleanFirestoreData(finalProjectData));
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
 
-                // 6. استنساخ مراحل العمل الشجرية (WBS)
+                // 3. استنساخ مراحل العمل الشجرية (WBS) إذا وجدت
                 if (newProjectData.constructionTypeId) {
                     const stagesRef = collection(firestore, `construction_types/${newProjectData.constructionTypeId}/stages`);
                     const stagesSnap = await getDocs(query(stagesRef, orderBy('order')));
@@ -194,7 +85,7 @@ export default function NewProjectPage() {
                 }
             });
             
-            toast({ title: 'نجاح التأسيس المالي', description: 'تم إنشاء المشروع، ربط العقد، وتوليد القيد المحاسبي آلياً.' });
+            toast({ title: 'تم إنشاء هيكل المشروع', description: 'تم التأسيس الفني بنجاح. يمكنك الآن البدء بإصدار عروض الأسعار المرتبطة.' });
             router.push(`/dashboard/construction/projects/${newProjectId}`);
             
         } catch (error) {
@@ -204,13 +95,13 @@ export default function NewProjectPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [firestore, currentUser, toast, router, employees, departments]);
+    }, [firestore, currentUser, toast, router]);
 
     return (
         <Card className="max-w-4xl mx-auto rounded-3xl shadow-xl overflow-hidden border-none" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8">
                 <CardTitle className="text-3xl font-black">إنشاء مشروع مقاولات جديد</CardTitle>
-                <CardDescription className="text-base font-medium">أدخل تفاصيل المشروع التنفيذي لربطه آلياً بنموذج العقد وبنك الائتمان والمحاسبة.</CardDescription>
+                <CardDescription className="text-base font-medium">أدخل التفاصيل الفنية للمشروع وتتبع حصص التموين. يتم إنشاء العقد المالي في مرحلة لاحقة عبر عروض الأسعار.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
                 <ProjectForm
