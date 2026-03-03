@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -20,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '../ui/separator';
 import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from '../ui/switch';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -38,7 +37,6 @@ const itemSchema = z.object({
 
 const quotationSchema = z.object({
   clientId: z.string().min(1, 'العميل مطلوب.'),
-  projectId: z.string().optional().nullable(),
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
@@ -86,7 +84,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   
   const [allTemplates, setAllTemplates] = React.useState<ContractTemplate[]>([]);
   const [clients, setClients] = React.useState<Client[]>([]);
-  const [projects, setProjects] = React.useState<ConstructionProject[]>([]);
   const [refDataLoading, setRefDataLoading] = React.useState(true);
 
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<QuotationFormValues>({
@@ -127,7 +124,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const watchedHiddenShower = watch('hiddenShowerCount');
   const watchedOrdinaryShower = watch('ordinaryShowerCount');
 
-  // تحديث إجمالي الحمامات
+  // تحديث إجمالي الحمامات تلقائياً لمنع التضارب
   React.useEffect(() => {
     const total = (Number(watchedSuspendedExt) || 0) + (Number(watchedOrdinaryExt) || 0);
     setValue('bathroomsCount', total);
@@ -148,14 +145,12 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const fetchRefData = async () => {
       setRefDataLoading(true);
       try {
-        const [clientsSnap, templatesSnapshot, projectsSnap] = await Promise.all([
+        const [clientsSnap, templatesSnapshot] = await Promise.all([
           getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true), limit(200))),
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
-          getDocs(query(collection(firestore, 'projects'), where('status', '==', 'مخطط')))
         ]);
         setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
-        setProjects(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConstructionProject)));
       } catch (error) { console.error(error); } finally { setRefDataLoading(false); }
     };
     fetchRefData();
@@ -177,22 +172,15 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   };
 
   const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr })), [clients]);
-  const projectOptions = React.useMemo(() => projects.filter(p => p.clientId === selectedClientId).map(p => ({ value: p.id!, label: p.projectName })), [projects, selectedClientId]);
   const templateOptions = React.useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
 
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-muted/20 p-6 rounded-3xl border">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-6 rounded-3xl border">
           <div className="grid gap-2">
               <Label className="font-bold">العميل المستهدف *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
                   <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="ابحث عن عميل..." disabled={isEditing} />
-              )} />
-          </div>
-          <div className="grid gap-2">
-              <Label className="font-bold">ربط بهيكل مشروع (اختياري)</Label>
-              <Controller control={control} name="projectId" render={({ field }) => (
-                  <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={!selectedClientId} />
               )} />
           </div>
           <div className="grid gap-2">
