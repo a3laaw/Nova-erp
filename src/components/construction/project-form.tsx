@@ -12,13 +12,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import type { ConstructionProject, Client, Employee, ConstructionType, Item, AreaRange } from '@/lib/types';
-import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2, CalendarClock, Ruler } from 'lucide-react';
+import type { ConstructionProject, Client, Employee, ConstructionType, Item, AreaRange, ContractTemplate } from '@/lib/types';
+import { Loader2, Save, X, ShieldCheck, PlusCircle, Trash2, CalendarClock, Ruler, FileSignature, Calculator } from 'lucide-react';
 import { DialogFooter } from '../ui/dialog';
 import { query, collection, getDocs, orderBy, where } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '../ui/separator';
+import { useToast } from '@/hooks/use-toast';
 
 // جدول قرار 222 لسنة 2024 - مبالغ الدعم بالدينار
 const SUBSIDY_TABLE: Record<AreaRange, Record<string, number>> = {
@@ -48,7 +49,10 @@ const projectSchema = z.object({
   subsidyRequestId: z.string().optional(),
   subsidyExpiryDate: z.date().optional(),
 
+  // الارتباط بالنماذج والعقود
   constructionTypeId: z.string().optional().nullable(),
+  contractTemplateId: z.string().optional().nullable(),
+  
   contractValue: z.preprocess((a) => parseFloat(String(a || '0')), z.number().min(0)),
   startDate: z.date(),
   endDate: z.date(),
@@ -70,30 +74,48 @@ interface ProjectFormProps {
 
 export function ProjectForm({ onSave, onClose, initialData = null, isSaving = false }: ProjectFormProps) {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
 
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients');
     const { data: engineers = [] } = useSubscription<Employee>(firestore, 'employees');
     const { data: constructionTypes = [] } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
+    const { data: allTemplates = [] } = useSubscription<ContractTemplate>(firestore, 'contractTemplates');
     const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     
     const subsidyItems = useMemo(() => allItems.filter(i => i.isSubsidyEligible), [allItems]);
+
+    // فلترة قوالب عقود المقاولات فقط
+    const executionTemplates = useMemo(() => 
+        allTemplates.filter(t => t.templateType === 'Execution'),
+    [allTemplates]);
 
     const { register, handleSubmit, control, watch, formState: { errors }, reset, setValue } = useForm<ProjectFormValues>({
         resolver: zodResolver(projectSchema),
         defaultValues: {
             projectName: '', clientId: '', projectType: 'تنفيذي', 
             projectCategory: 'Private (Non-Subsidized)', constructionTypeId: '',
+            contractTemplateId: '',
             contractValue: 0, startDate: new Date(), endDate: new Date(), 
             status: 'مخطط', mainEngineerId: '', progressPercentage: 0,
             subsidyQuotas: []
         }
     });
 
-    const { fields: quotaFields, append: appendQuota, remove: removeQuota, replace: replaceQuotas } = useFieldArray({ control, name: "subsidyQuotas" });
+    const { fields: quotaFields, replace: replaceQuotas, remove: removeQuota, append: appendQuota } = useFieldArray({ control, name: "subsidyQuotas" });
     const projectCategory = watch('projectCategory');
     const selectedAreaRange = watch('subsidyAreaRange');
+    const selectedTemplateId = watch('contractTemplateId');
 
-    // منطق التوزيع التلقائي للمواد المدعومة بناءً على المساحة وقرار 222
+    // تحديث قيمة العقد آلياً عند اختيار قالب بـ "قيمة ثابتة"
+    useEffect(() => {
+        if (selectedTemplateId) {
+            const template = executionTemplates.find(t => t.id === selectedTemplateId);
+            if (template && template.financials?.type === 'fixed') {
+                setValue('contractValue', template.financials.totalAmount || 0);
+            }
+        }
+    }, [selectedTemplateId, executionTemplates, setValue]);
+
     const handleAutoFillQuotas = useCallback(() => {
         if (!selectedAreaRange || projectCategory !== 'Private (Subsidized)') return;
 
@@ -101,14 +123,12 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         const newQuotas: any[] = [];
 
         Object.entries(decisionData).forEach(([materialName, amount]) => {
-            // محاولة مطابقة المادة في النظام
             const systemItem = subsidyItems.find(i => i.name.includes(materialName) || materialName.includes(i.name));
-            
             newQuotas.push({
                 itemId: systemItem?.id || `temp-${materialName}`,
                 itemName: materialName,
                 allocatedAmount: amount,
-                allocatedQuantity: 0, // تترك للمهندس حسب حاجة المخطط
+                allocatedQuantity: 0,
                 receivedQuantity: 0,
                 consumedQuantity: 0,
                 unitPrice: systemItem?.costPrice || 0
@@ -117,7 +137,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
         replaceQuotas(newQuotas);
         toast({ title: 'تم التوزيع التلقائي', description: `تم تعبئة مبالغ الدعم بناءً على مساحة ${selectedAreaRange} م² وفق قرار 222.` });
-    }, [selectedAreaRange, projectCategory, subsidyItems, replaceQuotas]);
+    }, [selectedAreaRange, projectCategory, subsidyItems, replaceQuotas, toast]);
 
     useEffect(() => {
         if (initialData) {
@@ -133,6 +153,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
     const engineerOptions = useMemo(() => engineers.filter(e=> e.jobTitle?.includes('مهندس')).map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
     const constructionTypeOptions = useMemo(() => constructionTypes.map(t => ({ value: t.id!, label: t.name })), [constructionTypes]);
+    const templateOptions = useMemo(() => executionTemplates.map(t => ({ value: t.id!, label: t.title })), [executionTemplates]);
     const itemOptions = useMemo(() => subsidyItems.map(i => ({ value: i.id!, label: i.name })), [subsidyItems]);
 
     const onSubmit = (data: ProjectFormValues) => {
@@ -151,10 +172,10 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label>اسم المشروع *</Label>
-                    <Input {...register('projectName')} />
+                    <Input {...register('projectName')} placeholder="مثال: فيلا السيد محمد - هيكل أسود" />
                 </div>
                 <div className="grid gap-2">
-                    <Label>العميل *</Label>
+                    <Label>المالك / العميل *</Label>
                     <Controller control={control} name="clientId" render={({ field }) => (
                         <InlineSearchList value={field.value} onSelect={field.onChange} options={clientOptions} placeholder="اختر عميلاً..." />
                     )} />
@@ -163,13 +184,13 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                    <Label>نوع المشروع (من حيث الاستحقاق الحكومي) *</Label>
+                    <Label>فئة المشروع (من حيث الاستحقاق الحكومي) *</Label>
                     <Controller name="projectCategory" control={control} render={({field}) => (
                         <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className="font-bold border-2 border-primary/20"><SelectValue/></SelectTrigger>
+                            <SelectTrigger className="font-bold border-2 border-primary/20 h-11"><SelectValue/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="Private (Subsidized)">سكن خاص (مدعوم من التموين)</SelectItem>
-                                <SelectItem value="Private (Non-Subsidized)">سكن خاص (غير مدعوم)</SelectItem>
+                                <SelectItem value="Private (Non-Subsidized)">سكن خاص (تجاري)</SelectItem>
                                 <SelectItem value="Commercial">تجاري / استثماري</SelectItem>
                                 <SelectItem value="Government">مشروع حكومي</SelectItem>
                             </SelectContent>
@@ -177,12 +198,43 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     )}/>
                 </div>
                 <div className="grid gap-2">
-                    <Label>نوع المقاولات</Label>
+                    <Label>نوع المقاولات المنفذة</Label>
                     <Controller control={control} name="constructionTypeId" render={({ field }) => (
-                        <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={constructionTypeOptions} placeholder="اختر نوع المشروع..." />
+                        <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={constructionTypeOptions} placeholder="مثال: هيكل أسود، تشطيب..." />
                     )} />
                 </div>
             </div>
+
+            {/* --- ربط العقد من النماذج --- */}
+            <Card className="border-2 border-dashed rounded-[2rem] bg-muted/50 p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-xl text-primary"><FileSignature className="h-6 w-6"/></div>
+                    <div>
+                        <CardTitle className="text-lg font-black">الربط مع نماذج العقود</CardTitle>
+                        <CardDescription>اختر نموذج العقد المعتمد للمقاولات لبرمجة الدفعات والقيود آلياً.</CardDescription>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid gap-2">
+                        <Label className="font-bold">نموذج العقد المستهدف *</Label>
+                        <Controller control={control} name="contractTemplateId" render={({ field }) => (
+                            <InlineSearchList 
+                                value={field.value || ''} 
+                                onSelect={field.onChange} 
+                                options={templateOptions} 
+                                placeholder="اختر من القوالب المرجعية..." 
+                            />
+                        )} />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label className="font-bold">إجمالي قيمة العقد (المبلغ المتفق عليه)</Label>
+                        <div className="relative">
+                            <Input type="number" step="0.001" {...register('contractValue')} className="h-11 font-mono text-xl font-black text-primary pl-12" />
+                            <Calculator className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-30" />
+                        </div>
+                    </div>
+                </div>
+            </Card>
 
             {projectCategory === 'Private (Subsidized)' && (
                 <Card className="border-2 border-primary shadow-lg rounded-[2rem] overflow-hidden bg-primary/5">
@@ -206,7 +258,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                 <Label className="flex items-center gap-2 font-bold"><Ruler className="h-4 w-4 text-primary"/> مساحة القسيمة (م²)</Label>
                                 <Controller name="subsidyAreaRange" control={control} render={({field}) => (
                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <SelectTrigger className="border-2"><SelectValue placeholder="اختر المساحة..." /></SelectTrigger>
+                                        <SelectTrigger className="border-2 h-11"><SelectValue placeholder="اختر المساحة..." /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="100-199">100 - 199 م²</SelectItem>
                                             <SelectItem value="200-299">200 - 299 م²</SelectItem>
@@ -217,11 +269,11 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                             </div>
                             <div className="grid gap-2">
                                 <Label className="font-bold">رقم طلب الائتمان</Label>
-                                <Input {...register('subsidyRequestId')} placeholder="00000000" className="dir-ltr" />
+                                <Input {...register('subsidyRequestId')} placeholder="00000000" className="dir-ltr h-11" />
                             </div>
                             <div className="grid gap-2">
                                 <Label className="flex items-center gap-2 font-bold"><CalendarClock className="h-4 w-4 text-red-600"/> تاريخ انتهاء الصلاحية</Label>
-                                <Controller name="subsidyExpiryDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} />} />
+                                <Controller name="subsidyExpiryDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} className="h-11" />} />
                             </div>
                         </div>
 
@@ -229,7 +281,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
                         <div className="space-y-4">
                             <Label className="font-black text-lg">تفاصيل حصص المواد الموزعة</Label>
-                            <div className="border rounded-2xl overflow-hidden bg-white">
+                            <div className="border rounded-2xl overflow-hidden bg-white shadow-sm">
                                 <Table>
                                     <TableHeader className="bg-muted/50">
                                         <TableRow>
@@ -241,7 +293,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                     </TableHeader>
                                     <TableBody>
                                         {quotaFields.map((field, index) => (
-                                            <TableRow key={field.id} className="hover:bg-muted/5">
+                                            <TableRow key={field.id} className="hover:bg-muted/5 h-14">
                                                 <TableCell>
                                                     <Controller
                                                         control={control}
@@ -265,10 +317,10 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                                     />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Input type="number" {...register(`subsidyQuotas.${index}.allocatedAmount`, { valueAsNumber: true })} className="text-center font-black text-primary border-none shadow-none" />
+                                                    <Input type="number" {...register(`subsidyQuotas.${index}.allocatedAmount`, { valueAsNumber: true })} className="text-center font-black text-primary border-none shadow-none focus-visible:ring-0" />
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Input type="number" step="0.001" {...register(`subsidyQuotas.${index}.unitPrice`, { valueAsNumber: true })} className="text-center border-none shadow-none opacity-60" />
+                                                    <Input type="number" step="0.001" {...register(`subsidyQuotas.${index}.unitPrice`, { valueAsNumber: true })} className="text-center border-none shadow-none opacity-60 focus-visible:ring-0" />
                                                 </TableCell>
                                                 <TableCell>
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => removeQuota(index)} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -278,8 +330,8 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                     </TableBody>
                                 </Table>
                             </div>
-                            <Button type="button" variant="outline" size="sm" className="w-full border-dashed rounded-xl" onClick={() => appendQuota({ itemId: '', itemName: '', allocatedAmount: 0, allocatedQuantity: 0, receivedQuantity: 0, consumedQuantity: 0, unitPrice: 0 })}>
-                                <PlusCircle className="ml-2 h-4 w-4" /> إضافة مادة مخصصة
+                            <Button type="button" variant="outline" size="sm" className="w-full border-dashed border-2 rounded-xl h-11 gap-2" onClick={() => appendQuota({ itemId: '', itemName: '', allocatedAmount: 0, allocatedQuantity: 0, receivedQuantity: 0, consumedQuantity: 0, unitPrice: 0 })}>
+                                <PlusCircle className="h-4 w-4" /> إضافة مادة مخصصة للدعم
                             </Button>
                         </div>
                     </CardContent>
@@ -288,22 +340,22 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div className="grid gap-2">
-                    <Label>المهندس الرئيسي *</Label>
+                    <Label>المهندس المشرف *</Label>
                     <Controller control={control} name="mainEngineerId" render={({ field }) => (
-                        <InlineSearchList value={field.value} onSelect={field.onChange} options={engineerOptions} placeholder="اختر مهندسًا..." />
+                        <InlineSearchList value={field.value} onSelect={field.onChange} options={engineerOptions} placeholder="اختر مهندس المواقع..." />
                     )} />
                 </div>
                 <div className="grid gap-2">
-                    <Label>إجمالي قيمة العقد الرئيسي</Label>
-                    <Input type="number" step="0.001" {...register('contractValue')} className="font-mono text-lg font-bold" />
+                    <Label>تاريخ الانتهاء المتوقع</Label>
+                    <Controller name="endDate" control={control} render={({field}) => <DateInput value={field.value} onChange={field.onChange} className="h-11"/>} />
                 </div>
             </div>
         </div>
-        <DialogFooter className="mt-6 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20">
-                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                حفظ بيانات المشروع
+        <DialogFooter className="mt-10 pt-6 border-t">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
+            <Button type="submit" disabled={isSaving} className="h-12 px-16 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-3">
+                {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                اعتماد العقد وبدء المشروع
             </Button>
         </DialogFooter>
     </form>
