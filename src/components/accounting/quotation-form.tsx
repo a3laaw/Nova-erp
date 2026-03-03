@@ -25,6 +25,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 const itemSchema = z.object({
   id: z.string().optional(),
@@ -261,28 +262,26 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
                         <Separator className="bg-blue-100" />
 
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 bg-white rounded-xl border border-blue-100">
-                                <div className="space-y-3">
-                                    <Label className="font-black text-blue-900">توزيع نوع التمديد (حمامات)</Label>
-                                    <div className="flex gap-4">
-                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">تمديد معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center border-blue-200" /></div>
-                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">تمديد عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
-                                    </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
+                                <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع التمديد (حمامات)</Label>
+                                <div className="flex gap-4">
+                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center border-blue-200" /></div>
+                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
                                 </div>
-                                <div className="space-y-3">
-                                    <Label className="font-black text-blue-900">توزيع نوع المراحيض</Label>
-                                    <div className="flex gap-4">
-                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">مرحاض معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
-                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">مرحاض عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
-                                    </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
+                                <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع المراحيض</Label>
+                                <div className="flex gap-4">
+                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
+                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
                                 </div>
-                                <div className="space-y-3 md:col-span-2">
-                                    <Label className="font-black text-blue-900">توزيع نوع الشاورات</Label>
-                                    <div className="flex gap-4 max-w-md">
-                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">شاور مخفي (عدد)</Label><Input type="number" {...register('hiddenShowerCount')} className="h-9 text-center border-blue-200" /></div>
-                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">شاور عادي (عدد)</Label><Input type="number" {...register('ordinaryShowerCount')} className="h-9 text-center" /></div>
-                                    </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 md:col-span-2 max-w-xl mx-auto w-full">
+                                <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع الشاورات</Label>
+                                <div className="flex gap-4 justify-center">
+                                    <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور مخفي (عدد)</Label><Input type="number" {...register('hiddenShowerCount')} className="h-9 text-center border-blue-200" /></div>
+                                    <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور عادي (عدد)</Label><Input type="number" {...register('ordinaryShowerCount')} className="h-9 text-center" /></div>
                                 </div>
                             </div>
                         </div>

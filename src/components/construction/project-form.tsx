@@ -138,7 +138,9 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2"><Label>اسم المشروع *</Label><Input {...register('projectName')} /></div>
-                <div className="grid gap-2"><Label>المالك / العميل *</Label><Controller control={control} name="clientId" render={({ field }) => (<InlineSearchList value={field.value} onSelect={field.onChange} options={clients.map(c => ({ value: c.id!, label: c.nameAr }))} placeholder="اختر عميلاً..." />)} /></div>
+                <div className="grid gap-2"><Label>المالك / العميل *</Label><Controller control={control} name="clientId" render={({ field }) => (
+                    <InlineSearchList value={field.value} onSelect={field.onChange} options={clients.map(c => ({ value: c.id!, label: c.nameAr }))} placeholder="اختر عميلاً..." />
+                )} /></div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -177,7 +179,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                 <CardHeader className="pb-4 border-b border-blue-100 bg-blue-50/50">
                     <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700"><Droplets className="h-4 w-4" /> مواصفات عقد وتوزيع أعداد الصحي</CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 space-y-6">
+                <CardContent className="p-6 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
                         <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
@@ -195,17 +197,27 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                             )}/>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 bg-white rounded-xl border border-blue-100">
-                        <div className="space-y-3"><Label className="font-black text-blue-900">توزيع نوع التمديد</Label>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
+                            <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع التمديد (حمامات)</Label>
                             <div className="flex gap-4">
-                                <div className="flex-1 space-y-1"><Label className="text-[10px]">معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center" /></div>
-                                <div className="flex-1 space-y-1"><Label className="text-[10px]">عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
+                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center border-blue-200" /></div>
+                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
                             </div>
                         </div>
-                        <div className="space-y-3"><Label className="font-black text-blue-900">توزيع نوع المراحيض</Label>
+                        <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
+                            <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع المراحيض</Label>
                             <div className="flex gap-4">
-                                <div className="flex-1 space-y-1"><Label className="text-[10px]">معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
-                                <div className="flex-1 space-y-1"><Label className="text-[10px]">عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
+                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
+                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 md:col-span-2 max-w-xl mx-auto w-full">
+                            <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع الشاورات</Label>
+                            <div className="flex gap-4 justify-center">
+                                <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور مخفي (عدد)</Label><Input type="number" {...register('hiddenShowerCount')} className="h-9 text-center border-blue-200" /></div>
+                                <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور عادي (عدد)</Label><Input type="number" {...register('ordinaryShowerCount')} className="h-9 text-center" /></div>
                             </div>
                         </div>
                     </div>
