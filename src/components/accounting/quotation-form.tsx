@@ -90,7 +90,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const [clients, setClients] = React.useState<Client[]>([]);
   const [refDataLoading, setRefDataLoading] = React.useState(true);
 
-  const { register, handleSubmit, control, watch, setValue, formState: { errors }, replace } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     defaultValues: {
         date: new Date(),
@@ -113,7 +113,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   });
 
-  const watchedItems = watch("items");
+  // FIX: Extract fields and helper functions from useFieldArray
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' });
+
+  const watchedItems = useWatch({ control, name: "items" });
   const financials_type = watch("financialsType");
   const total_amount = watch("totalAmount");
   const watchedSubject = watch("subject");
@@ -232,86 +235,79 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
           {showSanitary && (
             <div className="space-y-6 animate-in fade-in zoom-in-95">
-                <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
-                    <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
-                        <CardTitle className="text-base font-black flex items-center gap-2 text-blue-700">
-                            <Droplets className="h-5 w-5"/> تفاصيل التمديدات والأجهزة الصحية
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                            <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
-                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
-                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-xs font-bold text-blue-800 text-center">نوع التمديد المعتمد</Label>
-                                <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                        <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="ordinary">تمديد عادي</SelectItem>
-                                            <SelectItem value="suspended">تمديد معلق</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}/>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
+                        <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
+                            <CardTitle className="text-xs font-black flex items-center gap-2 text-blue-700">
+                                <Droplets className="h-4 w-4"/> توزيع نوع التمديد
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 flex justify-center gap-4">
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] font-bold text-muted-foreground">معلق</Label>
+                                <Input type="number" {...register('suspendedExtensionCount')} className="h-8 w-16 text-center font-bold" />
                             </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] font-bold text-muted-foreground">عادي</Label>
+                                <Input type="number" {...register('ordinaryExtensionCount')} className="h-8 w-16 text-center font-bold" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
+                        <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
+                            <CardTitle className="text-xs font-black flex items-center gap-2 text-blue-700">
+                                <Package className="h-4 w-4"/> توزيع المراحيض
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 flex justify-center gap-4">
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] font-bold text-muted-foreground">معلق</Label>
+                                <Input type="number" {...register('suspendedToiletCount')} className="h-8 w-16 text-center font-bold" />
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] font-bold text-muted-foreground">عادي</Label>
+                                <Input type="number" {...register('ordinaryToiletCount')} className="h-8 w-16 text-center font-bold" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
+                        <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
+                            <CardTitle className="text-xs font-black flex items-center gap-2 text-blue-700">
+                                <Droplets className="h-4 w-4"/> توزيع الشاورات
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 flex justify-center gap-4">
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] font-bold text-muted-foreground">مخفي</Label>
+                                <Input type="number" {...register('hiddenShowerCount')} className="h-8 w-16 text-center font-bold" />
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <Label className="text-[10px] font-bold text-muted-foreground">عادي</Label>
+                                <Input type="number" {...register('ordinaryShowerCount')} className="h-8 w-16 text-center font-bold" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-blue-50/20 p-4 rounded-2xl border border-blue-100 items-center">
+                    <div className="grid gap-1.5">
+                        <Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label>
+                        <Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-white border-primary/20" />
+                    </div>
+                    <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
+                    <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
+                    {watchedWorkNature === 'with_materials' && (
+                        <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-200">
+                            <div className="flex items-center gap-3">
+                                <Package className="h-5 w-5 text-blue-600" />
+                                <div><p className="font-bold text-[10px] text-blue-900">توريد المواد</p></div>
+                            </div>
+                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
                         </div>
-
-                        <Separator className="bg-blue-100" />
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
-                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع التمديد (حمامات)</Label>
-                                <div className="flex gap-2 justify-center w-full">
-                                    <div className="space-y-1 flex flex-col items-center">
-                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">تمديد معلق</Label>
-                                        <Input type="number" {...register('suspendedExtensionCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
-                                    </div>
-                                    <div className="space-y-1 flex flex-col items-center">
-                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">تمديد عادي</Label>
-                                        <Input type="number" {...register('ordinaryExtensionCount')} className="h-8 w-16 text-center p-0" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
-                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع المراحيض</Label>
-                                <div className="flex gap-2 justify-center w-full">
-                                    <div className="space-y-1 flex flex-col items-center">
-                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">مرحاض معلق</Label>
-                                        <Input type="number" {...register('suspendedToiletCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
-                                    </div>
-                                    <div className="space-y-1 flex flex-col items-center">
-                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">مرحاض عادي</Label>
-                                        <Input type="number" {...register('ordinaryToiletCount')} className="h-8 w-16 text-center p-0" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
-                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع الشاورات</Label>
-                                <div className="flex gap-2 justify-center w-full">
-                                    <div className="space-y-1 flex flex-col items-center">
-                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">شاور مخفي</Label>
-                                        <Input type="number" {...register('hiddenShowerCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
-                                    </div>
-                                    <div className="space-y-1 flex flex-col items-center">
-                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">شاور عادي</Label>
-                                        <Input type="number" {...register('ordinaryShowerCount')} className="h-8 w-16 text-center p-0" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {watchedWorkNature === 'with_materials' && (
-                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
-                                <div className="flex items-center gap-3">
-                                    <Package className="h-5 w-5 text-blue-600" />
-                                    <div><p className="font-bold text-blue-900">توريد المواد الأساسية</p><p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة؟</p></div>
-                                </div>
-                                <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                    )}
+                </div>
             </div>
           )}
 
