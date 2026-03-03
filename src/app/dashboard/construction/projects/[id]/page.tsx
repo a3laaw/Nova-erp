@@ -9,8 +9,23 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Building, Calendar, User, ClipboardList, ShoppingCart, BarChart3, Camera, PlusCircle, Coins, Clock3, ShieldCheck, Package } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { 
+    ArrowRight, 
+    Building, 
+    Calendar, 
+    User, 
+    ClipboardList, 
+    ShoppingCart, 
+    BarChart3, 
+    Camera, 
+    PlusCircle, 
+    Coins, 
+    Clock3, 
+    ShieldCheck, 
+    Package,
+    TrendingUp
+} from 'lucide-react';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -66,11 +81,18 @@ export default function ProjectDetailPage() {
         return d ? format(d, 'PPP', { locale: ar }) : '-';
     };
 
-    if (loading) return <div className="space-y-4 p-6"><Skeleton className="h-48 w-full" /><Skeleton className="h-64 w-full" /></div>;
-    if (!project) return <div className="text-center p-20 text-muted-foreground">لم يتم العثور على المشروع.</div>;
+    if (loading) return (
+        <div className="space-y-4 p-6" dir="rtl">
+            <Skeleton className="h-48 w-full rounded-[2.5rem]" />
+            <Skeleton className="h-64 w-full rounded-[2rem]" />
+        </div>
+    );
+
+    if (!project) return <div className="text-center p-20 text-muted-foreground font-bold">لم يتم العثور على المشروع.</div>;
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto p-4 sm:p-6" dir="rtl">
+            {/* --- هيدر المشروع --- */}
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-card">
                 <CardHeader className="bg-muted/10 pb-8">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -90,39 +112,70 @@ export default function ProjectDetailPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-end">
-                                <Label className="font-black text-xs text-muted-foreground uppercase tracking-widest">نسبة الإنجاز الإجمالية</Label>
-                                <span className="font-mono text-xl font-black text-primary">{project.progressPercentage}%</span>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* عمود الحالة العامة */}
+                        <div className="space-y-6">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-end">
+                                    <Label className="font-black text-xs text-muted-foreground uppercase tracking-widest">نسبة الإنجاز الإجمالية</Label>
+                                    <span className="font-mono text-xl font-black text-primary">{project.progressPercentage}%</span>
+                                </div>
+                                <Progress value={project.progressPercentage} className="h-3" />
                             </div>
-                            <Progress value={project.progressPercentage} className="h-3" />
-                            <div className="grid grid-cols-2 gap-4 text-sm font-medium pt-4">
-                                <div className="space-y-1"><p className="text-[10px] text-muted-foreground uppercase">المهندس المسؤول</p><p className="font-bold flex items-center gap-2"><User className="h-3 w-3 text-primary"/> {engineer?.fullName || '...'}</p></div>
-                                <div className="space-y-1"><p className="text-[10px] text-muted-foreground uppercase">تاريخ البدء</p><p className="font-bold flex items-center gap-2"><Calendar className="h-3 w-3"/> {formatDate(project.startDate)}</p></div>
+                            
+                            <div className="grid grid-cols-2 gap-4 text-sm font-medium pt-2">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">المهندس المشرف</p>
+                                    <p className="font-bold flex items-center gap-2"><User className="h-3 w-3 text-primary"/> {engineer?.fullName || '...'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold">تاريخ البدء</p>
+                                    <p className="font-bold flex items-center gap-2"><Calendar className="h-3 w-3"/> {formatDate(project.startDate)}</p>
+                                </div>
                             </div>
                         </div>
 
                         {/* --- محرك تتبع حصص المدعوم (Quota Tracker) --- */}
                         {project.projectCategory === 'Private (Subsidized)' && (
-                            <div className="p-6 bg-primary/5 rounded-3xl border-2 border-dashed border-primary/20 space-y-4 shadow-inner">
-                                <h3 className="font-black text-primary flex items-center gap-2">
-                                    <ShieldCheck className="h-5 w-5" /> رصيد التموين الإنشائي
-                                </h3>
-                                <div className="space-y-3">
+                            <div className="p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/20 space-y-4 shadow-inner animate-in fade-in zoom-in-95 duration-500">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-black text-primary flex items-center gap-2">
+                                        <ShieldCheck className="h-5 w-5" /> رصيد التموين الإنشائي
+                                    </h3>
+                                    <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] font-black uppercase">Tamween Tracker</Badge>
+                                </div>
+                                
+                                <div className="space-y-4">
                                     {project.subsidyQuotas?.map(q => {
-                                        const progress = (q.receivedQuantity / q.allocatedQuantity) * 100;
+                                        const progress = q.allocatedQuantity > 0 ? (q.receivedQuantity / q.allocatedQuantity) * 100 : 0;
                                         return (
-                                            <div key={q.itemId} className="space-y-1">
-                                                <div className="flex justify-between text-[10px] font-bold">
-                                                    <span className="flex items-center gap-1"><Package className="h-3 w-3"/> {q.itemName}</span>
-                                                    <span>{q.receivedQuantity} / {q.allocatedQuantity}</span>
+                                            <div key={q.itemId} className="space-y-1.5">
+                                                <div className="flex justify-between text-[10px] font-black uppercase">
+                                                    <span className="flex items-center gap-1.5 text-foreground/80">
+                                                        <Package className="h-3 w-3 text-primary"/> {q.itemName}
+                                                    </span>
+                                                    <span className="text-primary font-mono">{q.receivedQuantity} / {q.allocatedQuantity}</span>
                                                 </div>
-                                                <Progress value={progress} className="h-1.5" />
+                                                <div className="relative h-2 w-full bg-primary/10 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className="absolute top-0 bottom-0 right-0 bg-primary transition-all duration-1000"
+                                                        style={{ width: `${Math.min(100, progress)}%` }}
+                                                    />
+                                                </div>
                                             </div>
                                         );
                                     })}
-                                    {(!project.subsidyQuotas || project.subsidyQuotas.length === 0) && <p className="text-xs text-muted-foreground italic">لم يتم إدخال أرصدة المدعوم بعد.</p>}
+                                    {(!project.subsidyQuotas || project.subsidyQuotas.length === 0) && (
+                                        <div className="text-center py-4 space-y-2 opacity-40">
+                                            <Package className="h-8 w-8 mx-auto text-muted-foreground" />
+                                            <p className="text-xs font-bold italic">لم يتم إدخال حصص التموين لهذا المشروع بعد.</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="pt-2">
+                                    <p className="text-[9px] text-muted-foreground leading-relaxed italic border-t border-primary/10 pt-2">
+                                        * يتم تحديث هذه الكميات تلقائياً عند إصدار أذونات استلام (GRN) بنوع "مواد مدعومة".
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -130,6 +183,7 @@ export default function ProjectDetailPage() {
                 </CardContent>
             </Card>
 
+            {/* --- تبويبات المشروع --- */}
             <Tabs defaultValue="financials" className="w-full">
                 <TabsList className="grid grid-cols-2 md:grid-cols-7 w-full h-auto p-1 bg-muted/50 rounded-xl mb-6">
                     <TabsTrigger value="financials" className="gap-2 py-3 rounded-lg"><BarChart3 className="h-4 w-4"/> التكاليف</TabsTrigger>
@@ -140,21 +194,43 @@ export default function ProjectDetailPage() {
                     <TabsTrigger value="procurement" className="gap-2 py-3 rounded-lg"><ShoppingCart className="h-4 w-4"/> المشتريات</TabsTrigger>
                     <TabsTrigger value="subcontracts" className="gap-2 py-3 rounded-lg">المقاولون</TabsTrigger>
                 </TabsList>
-                <TabsContent value="financials"><ProjectFinancialsTab project={project} /></TabsContent>
-                <TabsContent value="schedule"><ProjectScheduleTab project={project} /></TabsContent>
-                <TabsContent value="applications"><ProjectApplicationsTab project={project} /></TabsContent>
-                <TabsContent value="reports" className="space-y-6">
+                
+                <TabsContent value="financials" className="animate-in fade-in duration-500"><ProjectFinancialsTab project={project} /></TabsContent>
+                <TabsContent value="schedule" className="animate-in fade-in duration-500"><ProjectScheduleTab project={project} /></TabsContent>
+                <TabsContent value="applications" className="animate-in fade-in duration-500"><ProjectApplicationsTab project={project} /></TabsContent>
+                
+                <TabsContent value="reports" className="space-y-6 animate-in fade-in duration-500">
                     <div className="flex justify-between items-center bg-muted/30 p-6 rounded-2xl border">
-                        <div><CardTitle className="text-xl font-black">سجل تقارير الموقع اليومية</CardTitle><CardDescription>التوثيق الفني والصوري الميداني.</CardDescription></div>
-                        <Button onClick={() => setIsReporting(true)} disabled={isReporting} className="h-11 px-6 rounded-xl font-bold gap-2"><PlusCircle className="h-5 w-5" /> إرسال تقرير يومي</Button>
+                        <div>
+                            <CardTitle className="text-xl font-black">سجل تقارير الموقع اليومية</CardTitle>
+                            <CardDescription>التوثيق الفني والصوري الميداني من قبل المهندسين.</CardDescription>
+                        </div>
+                        <Button onClick={() => setIsReporting(true)} disabled={isReporting} className="h-11 px-6 rounded-xl font-bold gap-2">
+                            <PlusCircle className="h-5 w-5" /> 
+                            إرسال تقرير يومي
+                        </Button>
                     </div>
-                    {isReporting && <DailyReportForm projectId={project.id!} onSuccess={() => setIsReporting(false)} onCancel={() => setIsReporting(false)} />}
+                    {isReporting && (
+                        <DailyReportForm 
+                            projectId={project.id!} 
+                            onSuccess={() => setIsReporting(false)} 
+                            onCancel={() => setIsReporting(false)} 
+                        />
+                    )}
                     <DailyReportsList projectId={project.id!} />
                 </TabsContent>
-                <TabsContent value="boq"><ProjectBoqTab project={project} client={client} /></TabsContent>
-                <TabsContent value="procurement"><ProjectProcurementTab project={project} /></TabsContent>
-                <TabsContent value="subcontracts"><div className="p-12 text-center border-2 border-dashed rounded-3xl bg-muted/10">إدارة مقاولي الباطن وشهادات الإنجاز.</div></TabsContent>
+                
+                <TabsContent value="boq" className="animate-in fade-in duration-500"><ProjectBoqTab project={project} client={client} /></TabsContent>
+                <TabsContent value="procurement" className="animate-in fade-in duration-500"><ProjectProcurementTab project={project} /></TabsContent>
+                <TabsContent value="subcontracts" className="animate-in fade-in duration-500">
+                    <div className="p-12 text-center border-2 border-dashed rounded-3xl bg-muted/10">
+                        <HardHat className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                        <p className="font-bold text-muted-foreground italic">إدارة عقود مقاولي الباطن وشهادات الإنجاز المعتمدة للمشروع.</p>
+                    </div>
+                </TabsContent>
             </Tabs>
         </div>
     );
 }
+
+import { HardHat } from 'lucide-react';
