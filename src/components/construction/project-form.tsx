@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -109,7 +108,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const selectedGov = watch('siteAddress.governorate');
     const watchedWorkNature = watch('workNature');
 
-    // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات في المشروع
+    // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات
     const watchedSuspendedExt = watch('suspendedExtensionCount');
     const watchedOrdinaryExt = watch('ordinaryExtensionCount');
 
@@ -186,11 +185,21 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                         </div>
                         <div className="space-y-3"><Label className="font-black text-blue-900">توزيع نوع المراحيض</Label>
                             <div className="flex gap-4">
-                                <div className="flex-1 space-y-1"><Label className="text-[10px]">معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center" /></div>
+                                <div className="flex-1 space-y-1"><Label className="text-[10px]">معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
                                 <div className="flex-1 space-y-1"><Label className="text-[10px]">عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
                             </div>
                         </div>
                     </div>
+                    
+                    {watchedWorkNature === 'with_materials' && (
+                        <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
+                            <div className="flex items-center gap-3">
+                                <Package className="h-5 w-5 text-blue-600" />
+                                <div><p className="font-bold text-blue-900">توريد المواد الأساسية</p><p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة؟</p></div>
+                            </div>
+                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -204,7 +213,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         </div>
         <DialogFooter className="pt-6 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
+            <Button type="submit" disabled={isSaving}>
                 {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />} حفظ هيكل المشروع
             </Button>
         </DialogFooter>

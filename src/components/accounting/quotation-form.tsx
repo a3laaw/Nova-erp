@@ -117,12 +117,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات
   const watchedSuspendedExt = watch('suspendedExtensionCount');
   const watchedOrdinaryExt = watch('ordinaryExtensionCount');
-  
-  const watchedSuspendedToilet = watch('suspendedToiletCount');
-  const watchedOrdinaryToilet = watch('ordinaryToiletCount');
-  
-  const watchedHiddenShower = watch('hiddenShowerCount');
-  const watchedOrdinaryShower = watch('ordinaryShowerCount');
 
   // تحديث إجمالي الحمامات تلقائياً لمنع التضارب
   React.useEffect(() => {
@@ -206,7 +200,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
       <div className="space-y-6">
           <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
               <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-mono font-bold" /></div>
               <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
               <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
@@ -258,7 +252,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                         </div>
 
                         {watchedWorkNature === 'with_materials' && (
-                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between">
+                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
                                 <div className="flex items-center gap-3">
                                     <Package className="h-5 w-5 text-blue-600" />
                                     <div><p className="font-bold text-blue-900">توريد المواد الأساسية</p><p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة؟</p></div>
@@ -301,7 +295,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                   <TableHeader className="bg-muted/50"><TableRow className="h-14 border-b-2"><TableHead className="px-6 font-bold">بيان الدفعة / البند</TableHead><TableHead className="text-center font-bold w-32">{financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}</TableHead><TableHead className="w-12"></TableHead></TableRow></TableHeader>
                   <TableBody>
                       {fields.map((field, index) => (
-                          <TableRow key={field.id} className="h-16 border-b last:border-0">
+                          <TableRow key={field.id} className="h-16 border-b last:border-0 hover:bg-muted/5">
                               <TableCell className="px-4"><Input {...register(`items.${index}.description`)} className="font-bold border-none shadow-none focus-visible:ring-0 text-base" /></TableCell>
                               <TableCell><Input type="number" step="any" {...register(financials_type === 'percentage' ? `items.${index}.percentage` : `items.${index}.unitPrice`)} className="text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0" /></TableCell>
                               <TableCell className="text-center"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button></TableCell>
