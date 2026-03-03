@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -90,7 +91,7 @@ function TemplateSelectionView({
   );
 }
 
-// --- NEW Sub-component for Transaction Selection ---
+// --- Sub-component for Transaction Selection ---
 function TransactionSelectionView({
   transactions,
   onSelect,
@@ -290,7 +291,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                 const txQuery = query(collection(firestore, 'clients', clientId, 'transactions'));
                 const txSnap = await getDocs(txQuery);
                 const allTx = txSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientTransaction));
-                // **ROBUST FILTERING**
+                // Filter transactions that don't have a contract yet
                 const availableTx = allTx.filter(tx => !tx.contract || !Array.isArray(tx.contract.clauses) || tx.contract.clauses.length === 0);
                 
                 setClientTransactions(availableTx);
@@ -379,7 +380,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
     setFinancials(prev => ({ ...prev, milestones: prev.milestones.filter(m => m.id !== id) }));
   };
   
-  const totalAmount = useMemo(() => {
+  const totalAmountCalculated = useMemo(() => {
     if (financials.type === 'fixed') {
         return financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0);
     }
