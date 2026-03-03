@@ -31,6 +31,7 @@ export interface TechnicalSpecifications {
     basementType: 'none' | 'full' | 'half' | 'vault';
     floorsCount: number;
     roofExtension: 'none' | 'quarter' | 'half';
+    workNature?: 'labor_only' | 'with_materials'; // طبيعة التعاقد
     // مواصفات الصحي التفصيلية
     bathroomsCount?: number;
     kitchensCount?: number;

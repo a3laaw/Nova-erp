@@ -7,7 +7,7 @@ import { formatCurrency } from '@/lib/utils';
 import type { Client, ClientTransaction } from '@/lib/types';
 import { useBranding } from '@/context/branding-context';
 import { PrintableDocument } from '../layout/printable-document';
-import { Ruler, Building2, Droplets, Zap, Layers, Package, Check } from 'lucide-react';
+import { Ruler, Building2, Droplets, Zap, Layers, Package, Check, FileSignature } from 'lucide-react';
 
 interface TransactionContractProps {
   client: Client;
@@ -42,6 +42,11 @@ const toiletTypeLabels: Record<string, string> = {
 const showerTypeLabels: Record<string, string> = {
     ordinary: 'عادي',
     hidden: 'مخفي'
+};
+
+const workNatureLabels: Record<string, string> = {
+    labor_only: 'عقد مصنعية فقط (دون توريد مواد)',
+    with_materials: 'عقد توريد وتنفيذ (شامل المواد)'
 };
 
 export function TransactionContract({ client, transaction }: TransactionContractProps) {
@@ -124,9 +129,9 @@ export function TransactionContract({ client, transaction }: TransactionContract
                 {/* --- المواصفات الفنية المدمجة في العقد --- */}
                 {specs && (
                     <section>
-                        <h3 className="font-black border-r-4 border-primary pr-2 mb-4 text-lg">المواصفات الفنية والمساحات</h3>
+                        <h3 className="font-black border-r-4 border-primary pr-2 mb-4 text-lg">المواصفات الفنية المتعاقد عليها</h3>
                         <div className="p-6 border-2 border-dashed rounded-3xl space-y-6">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 items-start">
                                 <div className="flex items-center gap-3">
                                     <Ruler className="h-5 w-5 text-primary" />
                                     <div><p className="text-[10px] font-bold text-muted-foreground uppercase">المساحة الإجمالية:</p><p className="font-bold">{specs.totalArea} م²</p></div>
@@ -134,6 +139,13 @@ export function TransactionContract({ client, transaction }: TransactionContract
                                 <div className="flex items-center gap-3">
                                     <Layers className="h-5 w-5 text-primary" />
                                     <div><p className="text-[10px] font-bold text-muted-foreground uppercase">عدد الأدوار:</p><p className="font-bold">{specs.floorsCount} دور</p></div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <FileSignature className="h-5 w-5 text-primary" />
+                                    <div>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">طبيعة التعاقد:</p>
+                                        <p className="font-bold text-primary">{workNatureLabels[specs.workNature || 'labor_only']}</p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Building2 className="h-5 w-5 text-primary" />
@@ -145,7 +157,7 @@ export function TransactionContract({ client, transaction }: TransactionContract
                                 </div>
                             </div>
 
-                            {/* تفاصيل الصحي المحترفة - نفس الصورة */}
+                            {/* تفاصيل الصحي المحترفة */}
                             {isSanitary && (
                                 <div className="border-2 rounded-2xl overflow-hidden bg-blue-50/10 border-blue-100">
                                     <div className="bg-blue-600 text-white p-2 text-center text-xs font-black">تفاصيل عقد التمديدات والأدوات الصحية</div>

@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { z } from 'zod';
 import { useFirebase, useSubscription } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import type { ConstructionProject, Client, Employee, AreaRange, Governorate, Area, Item, SubsidyQuota } from '@/lib/types';
-import { Loader2, Save, ShieldCheck, PlusCircle, Trash2, Ruler, Building2, MapPin, Layers, Droplets, Zap, FileText, Package } from 'lucide-react';
+import { Loader2, Save, ShieldCheck, PlusCircle, Trash2, Ruler, Building2, MapPin, Layers, Droplets, Zap, FileText, Package, FileSignature } from 'lucide-react';
 import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -35,6 +35,7 @@ const projectSchema = z.object({
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
+  workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
   
   // مواصفات التمديدات الصحية
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
@@ -92,6 +93,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         defaultValues: {
             projectName: '', clientId: '', projectCategory: 'Private (Non-Subsidized)',
             totalArea: 0, basementType: 'none', floorsCount: 1, roofExtension: 'none',
+            workNature: 'labor_only',
             bathroomsCount: 0, kitchensCount: 0, laundryRoomsCount: 0, 
             sanitaryMaterialsIncluded: false, sanitaryExtensionType: 'ordinary',
             toiletType: 'ordinary', showerType: 'ordinary',
@@ -106,6 +108,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const projectCategory = watch('projectCategory');
     const selectedAreaRange = watch('subsidyAreaRange');
     const selectedGov = watch('siteAddress.governorate');
+    const watchedWorkNature = watch('workNature');
 
     useEffect(() => {
         if (!firestore || !selectedGov) return;
@@ -195,7 +198,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
             {/* --- قسم مواصفات البناء --- */}
             <div className="space-y-4 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
                 <h3 className="font-black text-lg flex items-center gap-2 text-foreground"><Layers className="h-5 w-5 text-primary"/> مواصفات البناء</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
                     <div className="grid gap-2">
                         <Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label>
                         <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-11 font-mono font-bold" />
@@ -223,6 +226,18 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                     <SelectItem value="full">سرداب كامل</SelectItem>
                                     <SelectItem value="half">سرداب نص</SelectItem>
                                     <SelectItem value="vault">قبو</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}/>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
+                        <Controller name="workNature" control={control} render={({field}) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className="h-11 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
+                                    <SelectItem value="with_materials">عقد مع المواد</SelectItem>
                                 </SelectContent>
                             </Select>
                         )}/>
@@ -273,12 +288,21 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                                 )}/>
                             </div>
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-100">
-                            <Label className="text-xs font-bold text-blue-800">هل يشمل العقد توريد المواد؟</Label>
-                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            )}/>
-                        </div>
+                        
+                        {watchedWorkNature === 'with_materials' && (
+                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3">
+                                    <Package className="h-5 w-5 text-blue-600" />
+                                    <div>
+                                        <p className="font-bold text-blue-900">توريد المواد الأساسية</p>
+                                        <p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة (مثل البيبات والقطع الرئيسية)؟</p>
+                                    </div>
+                                </div>
+                                <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (
+                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                )}/>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

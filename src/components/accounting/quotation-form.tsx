@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Building2, Layers, Ruler, Droplets, Zap, Package, ArrowDownLeft } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Building2, Layers, Ruler, Droplets, Zap, Package, ArrowDownLeft, FileSignature } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, ContractTemplate, ConstructionType, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +50,7 @@ const quotationSchema = z.object({
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
+  workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
   
   // مواصفات الصحي التفصيلية
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
@@ -105,6 +107,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         floorsCount: 1,
         basementType: 'none',
         roofExtension: 'none',
+        workNature: 'labor_only',
         sanitaryMaterialsIncluded: false,
         sanitaryExtensionType: 'ordinary',
         toiletType: 'ordinary',
@@ -119,6 +122,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const total_amount = watch("totalAmount");
   const selectedClientId = watch("clientId");
   const watchedSubject = watch("subject");
+  const watchedWorkNature = watch("workNature");
 
   // منطق الظهور المشروط بناءً على التخصص
   const showSanitary = React.useMemo(() => watchedSubject?.includes('صحي'), [watchedSubject]);
@@ -226,7 +230,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       <div className="space-y-6">
           <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
               <div className="grid gap-2">
                   <Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة الإجمالية (م²)</Label>
                   <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-10 font-mono font-bold" />
@@ -254,6 +258,18 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                               <SelectItem value="full">سرداب كامل</SelectItem>
                               <SelectItem value="half">سرداب نص</SelectItem>
                               <SelectItem value="vault">قبو</SelectItem>
+                          </SelectContent>
+                      </Select>
+                  )}/>
+              </div>
+              <div className="grid gap-2">
+                  <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
+                  <Controller name="workNature" control={control} render={({field}) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="h-10 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
+                              <SelectItem value="with_materials">عقد مع المواد</SelectItem>
                           </SelectContent>
                       </Select>
                   )}/>
@@ -310,18 +326,20 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                             </div>
                         </div>
 
-                        <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Package className="h-5 w-5 text-blue-600" />
-                                <div>
-                                    <p className="font-bold text-blue-900">توريد المواد</p>
-                                    <p className="text-[10px] text-blue-700">هل العقد يشمل توريد المواد الأساسية من قبل الشركة؟</p>
+                        {watchedWorkNature === 'with_materials' && (
+                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3">
+                                    <Package className="h-5 w-5 text-blue-600" />
+                                    <div>
+                                        <p className="font-bold text-blue-900">توريد المواد الأساسية</p>
+                                        <p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة (مثل البيبات والقطع الرئيسية)؟</p>
+                                    </div>
                                 </div>
+                                <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (
+                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                )}/>
                             </div>
-                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            )}/>
-                        </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
