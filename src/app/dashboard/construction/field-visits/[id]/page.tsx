@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, serverTimestamp, writeBatch, collection, getDoc, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
-import type { FieldVisit, ConstructionProject, BoqItem } from '@/lib/types';
+import type { FieldVisit, ConstructionProject } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,17 +14,12 @@ import {
     MapPin, 
     Loader2, 
     CheckCircle2, 
-    XCircle, 
     Save, 
     ArrowRight, 
-    Navigation, 
     ShieldCheck, 
-    Clock, 
     ClipboardCheck, 
     Building2, 
-    AlertTriangle,
-    TrendingUp,
-    Sparkles
+    TrendingUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -32,7 +27,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/auth-context';
-import { cn, formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -59,7 +54,7 @@ export default function FieldVisitDetailPage() {
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
 
-    // ✨ محرك جلب بنود المقايسة للتأكيد (WBS logic من الجدولة الجماعية)
+    // ✨ محرك جلب بنود المقايسة للتأكيد (WBS logic المستقر)
     useEffect(() => {
         const fetchStages = async () => {
             if (!visit || !firestore) return;
@@ -73,12 +68,14 @@ export default function FieldVisitDetailPage() {
                         const snap = await getDocs(q);
                         const stages = snap.docs.map(d => {
                             const data = d.data();
+                            const itemNum = data.itemNumber || '';
+                            const desc = data.description || '';
                             return { 
                                 id: d.id, 
-                                name: `${data.itemNumber} - ${data.description}`,
+                                name: itemNum ? `${itemNum} - ${desc}` : desc,
                                 isHeader: data.isHeader || false
                             }
-                        }).filter(i => !i.isHeader && !i.name.includes('undefined'));
+                        }).filter(i => !i.isHeader && i.name);
                         setBoqItems(stages);
                         
                         if (visit.plannedStageId) {
@@ -98,7 +95,7 @@ export default function FieldVisitDetailPage() {
 
     useEffect(() => {
         if (visit?.confirmationData) {
-            setNotes(visit.confirmationData.notes);
+            setNotes(visit.confirmationData.notes || '');
             setLocation(visit.confirmationData.location || null);
             setProgressAchieved([visit.confirmationData.progressAchieved || 0]);
         }
@@ -128,7 +125,7 @@ export default function FieldVisitDetailPage() {
             batch.update(visitRef!, {
                 status: 'confirmed',
                 plannedStageId: selectedStageId,
-                plannedStageName: actualStage?.name || visit.plannedStageName,
+                plannedStageName: actualStage?.name || visit.plannedStageName || 'متابعة ميدانية',
                 confirmationData: {
                     confirmedAt: serverTimestamp(),
                     notes,
@@ -166,9 +163,9 @@ export default function FieldVisitDetailPage() {
                 <CardHeader className="bg-muted/30 pb-8 px-8 border-b">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                            <CardTitle className="text-2xl font-black">{visit.clientName}</CardTitle>
+                            <CardTitle className="text-2xl font-black">{visit.clientName || 'عميل غير معروف'}</CardTitle>
                             <CardDescription className="font-bold text-primary flex items-center gap-2">
-                                <Building2 className="h-4 w-4" /> مشروع: {visit.projectName}
+                                <Building2 className="h-4 w-4" /> مشروع: {visit.projectName || 'بدون اسم'}
                             </CardDescription>
                         </div>
                     </div>
@@ -182,7 +179,7 @@ export default function FieldVisitDetailPage() {
                         <div className="space-y-1">
                             <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المنفذة</Label>
                             {isProcessed ? (
-                                <p className="font-black text-primary">{visit.plannedStageName}</p>
+                                <p className="font-black text-primary">{visit.plannedStageName || 'متابعة عامة'}</p>
                             ) : (
                                 <InlineSearchList 
                                     value={selectedStageId}

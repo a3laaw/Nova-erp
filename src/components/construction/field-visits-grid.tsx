@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { orderBy } from 'firebase/firestore';
-import type { FieldVisit, Employee } from '@/lib/types';
+import type { FieldVisit } from '@/lib/types';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -17,10 +17,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Eye, MapPin, HardHat, Users, Building2, Clock, AlertTriangle, CheckCircle2, Scale, TrendingUp } from 'lucide-react';
+import { Eye, MapPin, HardHat, Users, Building2, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -73,14 +73,14 @@ export function FieldVisitsGrid() {
                     
                     <TableCell className="p-4 border-l align-top space-y-3">
                         <div className="flex justify-between items-start">
-                            <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName}</p>
+                            <p className="font-black text-lg text-slate-900 border-b border-slate-100 pb-2">{visit.clientName || 'عميل غير معروف'}</p>
                             {isCancelled && <Badge variant="destructive" className="text-[8px] px-2 py-0">ملغي</Badge>}
                         </div>
                         <div className="space-y-1 bg-sky-50/50 p-3 rounded-xl border border-sky-100">
                             <p className="text-[10px] font-black text-sky-700 uppercase flex items-center gap-1">
                                 <Building2 className="h-3 w-3" /> المشروع:
                             </p>
-                            <p className="text-xs font-bold leading-relaxed">{visit.projectName}</p>
+                            <p className="text-xs font-bold leading-relaxed">{visit.projectName || 'بدون اسم'}</p>
                         </div>
                     </TableCell>
 
@@ -104,7 +104,7 @@ export function FieldVisitsGrid() {
                                 ) : (
                                     <div className="p-2 bg-green-50 border border-green-100 rounded-lg text-green-700 flex items-center gap-2">
                                         <CheckCircle2 className="h-3 w-3" />
-                                        <span className="text-[10px] font-bold">ضمن الجدول الزمني</span>
+                                        <span className="text-[10px] font-bold">ضمن الجدول</span>
                                     </div>
                                 )}
                             </div>
@@ -116,7 +116,7 @@ export function FieldVisitsGrid() {
                         <div className="p-3 space-y-3">
                             <div className="flex justify-between items-center border-b border-dashed pb-2">
                                 <span className="text-[9px] font-bold text-muted-foreground">بند المقايسة:</span>
-                                <span className="text-xs font-black text-orange-700">{visit.plannedStageName}</span>
+                                <span className="text-xs font-black text-orange-700">{visit.plannedStageName || 'متابعة عامة'}</span>
                             </div>
                             <div className="flex justify-between items-center border-b border-dashed pb-2">
                                 <span className="text-[9px] font-bold text-muted-foreground">التسليم المخطط:</span>
@@ -141,9 +141,9 @@ export function FieldVisitsGrid() {
                             ) : (
                                 <div className="space-y-2">
                                     {visit.teamNames?.map((teamName, i) => (
-                                        <div key={i} className="bg-white border border-emerald-100 rounded-lg p-2 shadow-sm">
-                                            <p className="text-[10px] font-black text-emerald-700 mb-1 flex items-center gap-1">
-                                                <Users className="h-3 w-3" /> {teamName}
+                                        <div key={i} className="bg-white border border-emerald-100 rounded-lg p-2 shadow-sm text-center">
+                                            <p className="text-[10px] font-black text-emerald-700 flex items-center justify-center gap-1">
+                                                <Users className="h-3 w-3" /> {teamName || 'فريق'}
                                             </p>
                                         </div>
                                     ))}
@@ -177,7 +177,6 @@ export function FieldVisitsGrid() {
             </TableBody>
           </Table>
         </div>
-        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </Card>
   );

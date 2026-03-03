@@ -64,8 +64,8 @@ export function FieldVisitsList() {
                     )}>
                     {visit.status === 'confirmed' ? 'تمت الزيارة' : isVisitToday ? 'زيارة اليوم' : 'مخطط لها'}
                     </Badge>
-                    <h3 className="text-xl font-black leading-tight text-foreground group-hover:text-primary transition-colors">{visit.clientName}</h3>
-                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.projectName}</p>
+                    <h3 className="text-xl font-black leading-tight text-foreground group-hover:text-primary transition-colors">{visit.clientName || 'عميل غير معروف'}</h3>
+                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.projectName || 'بدون اسم'}</p>
                 </div>
                 <div className="p-3 bg-background rounded-2xl border shadow-sm shrink-0">
                   <MapPin className={cn("h-6 w-6", visit.status === 'confirmed' ? "text-green-600" : "text-primary")} />
@@ -80,7 +80,7 @@ export function FieldVisitsList() {
                 
                 <div className="flex items-center gap-3 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-xs">المسؤول: {visit.engineerName}</span>
+                  <span className="font-medium text-xs">المسؤول: {visit.engineerName || 'غير مسند'}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-2">
@@ -97,7 +97,7 @@ export function FieldVisitsList() {
                 <div className="flex items-center justify-between p-3 bg-background rounded-xl border-2 border-dashed border-primary/10">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-black text-primary truncate max-w-[180px]">{visit.plannedStageName}</span>
+                    <span className="text-xs font-black text-primary truncate max-w-[180px]">{visit.plannedStageName || 'متابعة عامة'}</span>
                   </div>
                 </div>
               </div>

@@ -81,20 +81,26 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
         const snap = await getDocs(q);
         const stages = snap.docs.map(d => {
             const data = d.data();
+            const itemNum = data.itemNumber || '';
+            const desc = data.description || '';
             return { 
                 id: d.id, 
-                name: `${data.itemNumber} - ${data.description}`,
+                name: itemNum ? `${itemNum} - ${desc}` : desc,
                 endDate: data.endDate || null,
                 isHeader: data.isHeader || false
             }
-        }).filter(i => !i.isHeader && !i.name.includes('undefined'));
+        }).filter(i => !i.isHeader && i.name);
         setBoqItemsMap(prev => new Map(prev).set(projectId, stages));
     } catch (e) { console.error(e); }
   };
 
-  const projectOptions = React.useMemo(() => projects.map(p => ({ value: p.id!, label: `${p.projectName} - ${p.clientName}` })), [projects]);
-  const engineerOptions = React.useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
-  const teamOptions = React.useMemo(() => workTeams.map(t => ({ value: t.id!, label: t.name })), [workTeams]);
+  const projectOptions = React.useMemo(() => projects.map(p => ({ 
+    value: p.id!, 
+    label: `${p.projectName || 'مشروع بدون اسم'} - ${p.clientName || 'بدون عميل'}` 
+  })), [projects]);
+
+  const engineerOptions = React.useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName || 'بدون اسم' })), [employees]);
+  const teamOptions = React.useMemo(() => workTeams.map(t => ({ value: t.id!, label: t.name || 'بدون اسم' })), [workTeams]);
 
   const handleSaveAll = async (data: SpreadsheetValues) => {
     if (!firestore || !currentUser) return;
@@ -111,8 +117,8 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
 
             const visitData: Omit<FieldVisit, 'id'> = {
                 projectId: row.projectId,
-                projectName: project.projectName,
-                clientId: project.clientId,
+                projectName: project.projectName || 'بدون اسم',
+                clientId: project.clientId || '',
                 clientName: project.clientName || 'غير معروف',
                 transactionId: project.linkedTransactionId || '',
                 transactionType: project.projectType || 'مقاولات',
@@ -129,7 +135,7 @@ export function FieldVisitsSpreadsheet({ onSaveSuccess }: { onSaveSuccess: () =>
                 status: 'planned',
                 createdAt: serverTimestamp(),
                 createdBy: currentUser.id,
-                companyId: currentUser.companyId
+                companyId: currentUser.companyId || null
             };
 
             const newVisitRef = doc(collection(firestore, 'field_visits'));

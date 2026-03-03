@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, addDoc, serverTimestamp, getDocs, orderBy, doc, getDoc } from 'firebase/firestore';
-import type { ConstructionProject, Employee, FieldVisit, BoqItem, WorkTeam } from '@/lib/types';
+import type { ConstructionProject, Employee, FieldVisit, WorkTeam } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -43,7 +43,7 @@ export function FieldVisitForm() {
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const isSubcontracted = !!selectedProject?.subcontractorId;
 
-    // ✨ محرك جلب بنود المقايسة (WBS logic من الجدولة الجماعية)
+    // ✨ محرك جلب بنود المقايسة (WBS logic المستقر)
     useEffect(() => {
         const fetchBoqData = async () => {
             if (!selectedProjectId || !firestore || projectsLoading) {
@@ -65,13 +65,16 @@ export function FieldVisitForm() {
                 const snap = await getDocs(q);
                 const stages = snap.docs.map(d => {
                     const data = d.data();
+                    const itemNum = data.itemNumber || '';
+                    const desc = data.description || '';
+                    // منع ظهور كلمة undefined عبر استخدام الفراغ كقيمة بديلة
                     return { 
                         id: d.id, 
-                        name: `${data.itemNumber} - ${data.description}`,
+                        name: itemNum ? `${itemNum} - ${desc}` : desc,
                         endDate: data.endDate || null,
                         isHeader: data.isHeader || false
                     }
-                }).filter(i => !i.isHeader && !i.name.includes('undefined'));
+                }).filter(i => !i.isHeader && i.name);
                 
                 setBoqItems(stages);
             } catch (e) {
@@ -90,17 +93,17 @@ export function FieldVisitForm() {
 
     const projectOptions = useMemo(() => projects.map(p => ({ 
         value: p.id!, 
-        label: `${p.projectName} - ${p.clientName}` 
+        label: `${p.projectName || 'بدون اسم'} - ${p.clientName || 'بدون عميل'}` 
     })), [projects]);
 
-    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
+    const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName || 'بدون اسم' })), [engineers]);
     
     const stageOptions = useMemo(() => boqItems.map(i => ({ 
         value: i.id, 
         label: i.name 
     })), [boqItems]);
 
-    const teamOptions = useMemo(() => allTeams.map(t => ({ value: t.id!, label: t.name })), [allTeams]);
+    const teamOptions = useMemo(() => allTeams.map(t => ({ value: t.id!, label: t.name || 'بدون اسم' })), [allTeams]);
     const selectedTeamsData = useMemo(() => allTeams.filter(t => selectedTeamIds.includes(t.id!)), [allTeams, selectedTeamIds]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -117,7 +120,7 @@ export function FieldVisitForm() {
 
             const visitData: Omit<FieldVisit, 'id'> = {
                 projectId: selectedProjectId,
-                projectName: selectedProject?.projectName || '',
+                projectName: selectedProject?.projectName || 'بدون اسم',
                 clientId: selectedProject?.clientId || '',
                 clientName: selectedProject?.clientName || 'غير معروف',
                 transactionId: selectedProject?.linkedTransactionId || '',
@@ -135,7 +138,7 @@ export function FieldVisitForm() {
                 status: 'planned',
                 createdAt: serverTimestamp(),
                 createdBy: currentUser.id,
-                companyId: currentUser.companyId
+                companyId: currentUser.companyId || null
             };
 
             await addDoc(collection(firestore, 'field_visits'), cleanFirestoreData(visitData));
@@ -207,7 +210,7 @@ export function FieldVisitForm() {
                             <div className="p-6 border-2 border-dashed border-orange-200 bg-orange-50/20 rounded-2xl flex items-center gap-4">
                                 <HardHat className="h-8 w-8 text-orange-400" />
                                 <div>
-                                    <p className="font-black text-orange-900">المقاول: {selectedProject?.subcontractorName}</p>
+                                    <p className="font-black text-orange-900">المقاول: {selectedProject?.subcontractorName || 'غير مسمى'}</p>
                                     <p className="text-xs text-orange-700">هذا المشروع يدار بواسطة مقاول باطن.</p>
                                 </div>
                             </div>
