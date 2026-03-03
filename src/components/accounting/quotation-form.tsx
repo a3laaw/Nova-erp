@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -113,7 +112,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   });
 
-  // FIX: Extract fields and helper functions from useFieldArray
   const { fields, append, remove, replace } = useFieldArray({ control, name: 'items' });
 
   const watchedItems = useWatch({ control, name: "items" });
@@ -235,6 +233,26 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
           {showSanitary && (
             <div className="space-y-6 animate-in fade-in zoom-in-95">
+                {/* إجمالي الأعداد أولاً */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-blue-50/20 p-4 rounded-2xl border border-blue-100 items-center">
+                    <div className="grid gap-1.5">
+                        <Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label>
+                        <Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-white border-primary/20" />
+                    </div>
+                    <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
+                    <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
+                    {watchedWorkNature === 'with_materials' && (
+                        <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-200">
+                            <div className="flex items-center gap-3">
+                                <Package className="h-5 w-5 text-blue-600" />
+                                <div><p className="font-bold text-[10px] text-blue-900">توريد المواد</p></div>
+                            </div>
+                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
+                        </div>
+                    )}
+                </div>
+
+                {/* كروت التوزيع ثانياً */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
                         <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
@@ -289,24 +307,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                             </div>
                         </CardContent>
                     </Card>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-blue-50/20 p-4 rounded-2xl border border-blue-100 items-center">
-                    <div className="grid gap-1.5">
-                        <Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label>
-                        <Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-white border-primary/20" />
-                    </div>
-                    <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
-                    <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
-                    {watchedWorkNature === 'with_materials' && (
-                        <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-200">
-                            <div className="flex items-center gap-3">
-                                <Package className="h-5 w-5 text-blue-600" />
-                                <div><p className="font-bold text-[10px] text-blue-900">توريد المواد</p></div>
-                            </div>
-                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
-                        </div>
-                    )}
                 </div>
             </div>
           )}
