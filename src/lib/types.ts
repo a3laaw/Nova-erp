@@ -32,6 +32,7 @@ export interface ConstructionProject extends BaseEntity {
     clientId: string;
     clientName?: string;
     projectCategory: ProjectCategory;
+    projectType?: string;
     
     // البيانات الفنية الإنشائية
     totalArea: number;
@@ -39,6 +40,15 @@ export interface ConstructionProject extends BaseEntity {
     floorsCount: number;
     roofExtension: 'none' | 'quarter' | 'half';
     
+    // مواصفات التمديدات الصحية (عقود الصحي)
+    bathroomsCount?: number;
+    kitchensCount?: number;
+    laundryRoomsCount?: number;
+    
+    // مواصفات الكهرباء (عقود الكهرباء)
+    electricalPointsCount?: number;
+    planReferenceNumber?: string; // مرجع المخطط المعتمد
+
     // عنوان الموقع
     siteAddress: {
         governorate: string;

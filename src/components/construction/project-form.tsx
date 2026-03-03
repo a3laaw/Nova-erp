@@ -12,10 +12,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import type { ConstructionProject, Client, Employee, AreaRange, Governorate, Area, Item } from '@/lib/types';
-import { Loader2, Save, ShieldCheck, PlusCircle, Trash2, Ruler, Building2, MapPin, Layers } from 'lucide-react';
-import { DialogFooter } from '../ui/dialog';
-import { query, collection, orderBy, where, getDocs } from 'firebase/firestore';
+import type { ConstructionProject, Client, Employee, AreaRange, Governorate, Area, Item, SubsidyQuota } from '@/lib/types';
+import { Loader2, Save, ShieldCheck, PlusCircle, Trash2, Ruler, Building2, MapPin, Layers, Droplets, Zap, FileText } from 'lucide-react';
+import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Separator } from '../ui/separator';
@@ -36,6 +35,16 @@ const projectSchema = z.object({
   hasBasement: z.boolean().default(false),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
+  
+  // مواصفات التمديدات الصحية
+  bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  
+  // مواصفات الكهرباء
+  electricalPointsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  planReferenceNumber: z.string().optional(),
+
   siteAddress: z.object({
       governorate: z.string().min(1, "المحافظة مطلوبة."),
       area: z.string().min(1, "المنطقة مطلوبة."),
@@ -55,6 +64,13 @@ const projectSchema = z.object({
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
 
+interface ProjectFormProps {
+    onSave: (data: any) => Promise<void>;
+    onClose: () => void;
+    initialData?: Partial<ConstructionProject> | null;
+    isSaving?: boolean;
+}
+
 export function ProjectForm({ onSave, onClose, initialData = null, isSaving = false }: ProjectFormProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -72,13 +88,14 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         defaultValues: {
             projectName: '', clientId: '', projectCategory: 'Private (Non-Subsidized)',
             totalArea: 0, hasBasement: false, floorsCount: 1, roofExtension: 'none',
+            bathroomsCount: 0, kitchensCount: 0, laundryRoomsCount: 0, electricalPointsCount: 0,
             siteAddress: { governorate: '', area: '', block: '', street: '', houseNumber: '' },
             startDate: new Date(), status: 'مخطط', mainEngineerId: '', progressPercentage: 0,
             subsidyQuotas: []
         }
     });
 
-    const { fields: quotaFields, replace: replaceQuotas, remove: removeQuota, append: appendQuota } = useFieldArray({ control, name: "subsidyQuotas" });
+    const { replace: replaceQuotas } = useFieldArray({ control, name: "subsidyQuotas" });
     const projectCategory = watch('projectCategory');
     const selectedAreaRange = watch('subsidyAreaRange');
     const selectedGov = watch('siteAddress.governorate');
@@ -168,6 +185,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
             <Separator />
 
+            {/* --- قسم مواصفات البناء --- */}
             <div className="space-y-4 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
                 <h3 className="font-black text-lg flex items-center gap-2 text-foreground"><Layers className="h-5 w-5 text-primary"/> مواصفات البناء</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
@@ -176,7 +194,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                         <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-11 font-mono font-bold" />
                     </div>
                     <div className="grid gap-2">
-                        <Label>عدد الأدوار</Label>
+                        <Label>عدد الأدوار (كهرباء)</Label>
                         <Input type="number" {...register('floorsCount')} placeholder="1" className="h-11" />
                     </div>
                     <div className="grid gap-2">
@@ -188,13 +206,56 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                             </Select>
                         )}/>
                     </div>
-                    <div className="flex items-center justify-between p-2 h-11 border rounded-xl bg-background px-4">
+                    <div className="flex items-center justify-between p-2 h-11 border rounded-xl bg-background px-4 shadow-sm">
                         <Label htmlFor="hasBasement" className="font-bold cursor-pointer">سرداب (قبو)</Label>
                         <Controller name="hasBasement" control={control} render={({field}) => (
                             <Switch id="hasBasement" checked={field.value} onCheckedChange={field.onChange} />
                         )}/>
                     </div>
                 </div>
+            </div>
+
+            {/* --- قسم مواصفات الصحي والكهرباء التفصيلية --- */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700">
+                            <Droplets className="h-4 w-4" /> مواصفات الصحي (تمديدات)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-3 gap-4">
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">الحمامات</Label>
+                            <Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">المطابخ</Label>
+                            <Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">غرف الغسيل</Label>
+                            <Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl border-2 border-yellow-100 bg-yellow-50/10">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-sm font-black flex items-center gap-2 text-yellow-700">
+                            <Zap className="h-4 w-4" /> مواصفات الكهرباء (نقاط)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">عدد نقاط الكهرباء</Label>
+                            <Input type="number" {...register('electricalPointsCount')} className="h-10 text-center font-black" placeholder="بناءً على المخطط" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">رقم مرجع المخطط</Label>
+                            <Input {...register('planReferenceNumber')} className="h-10 text-center font-mono text-xs" placeholder="Ref-000" />
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <div className="space-y-4">

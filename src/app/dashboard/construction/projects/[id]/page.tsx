@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { 
     ArrowRight, 
-    Building, 
     Calendar, 
     User, 
     ClipboardList, 
@@ -23,7 +22,10 @@ import {
     Clock3, 
     ShieldCheck, 
     Package,
-    TrendingUp
+    Droplets,
+    Zap,
+    LayoutDashboard,
+    Home
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -113,7 +115,7 @@ export default function ProjectDetailPage() {
                 </CardHeader>
                 <CardContent className="pt-6">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* عمود الحالة العامة */}
+                        {/* عمود الحالة العامة والمواصفات */}
                         <div className="space-y-6">
                             <div className="space-y-4">
                                 <div className="flex justify-between items-end">
@@ -131,6 +133,25 @@ export default function ProjectDetailPage() {
                                 <div className="space-y-1">
                                     <p className="text-[10px] text-muted-foreground uppercase font-bold">تاريخ البدء</p>
                                     <p className="font-bold flex items-center gap-2"><Calendar className="h-3 w-3"/> {formatDate(project.startDate)}</p>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* --- المواصفات الفنية التفصيلية في المعاينة --- */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-2">
+                                    <p className="text-[10px] font-black text-blue-700 uppercase flex items-center gap-1"><Droplets className="h-3 w-3"/> الصحي</p>
+                                    <div className="flex justify-between text-xs font-bold">
+                                        <span>حمامات: {project.bathroomsCount || 0}</span>
+                                        <span>مطابخ: {project.kitchensCount || 0}</span>
+                                    </div>
+                                    <p className="text-[9px] font-bold text-blue-600/70">غرف غسيل: {project.laundryRoomsCount || 0}</p>
+                                </div>
+                                <div className="p-4 bg-yellow-50/50 rounded-2xl border border-yellow-100 space-y-2">
+                                    <p className="text-[10px] font-black text-yellow-700 uppercase flex items-center gap-1"><Zap className="h-3 w-3"/> الكهرباء</p>
+                                    <p className="text-xs font-bold">نقاط الكهرباء: {project.electricalPointsCount || 0}</p>
+                                    <p className="text-[9px] font-bold text-yellow-600/70 font-mono">مخطط: {project.planReferenceNumber || '-'}</p>
                                 </div>
                             </div>
                         </div>
@@ -171,11 +192,6 @@ export default function ProjectDetailPage() {
                                             <p className="text-xs font-bold italic">لم يتم إدخال حصص التموين لهذا المشروع بعد.</p>
                                         </div>
                                     )}
-                                </div>
-                                <div className="pt-2">
-                                    <p className="text-[9px] text-muted-foreground leading-relaxed italic border-t border-primary/10 pt-2">
-                                        * يتم تحديث هذه الكميات تلقائياً عند إصدار أذونات استلام (GRN) بنوع "مواد مدعومة".
-                                    </p>
                                 </div>
                             </div>
                         )}
@@ -224,7 +240,7 @@ export default function ProjectDetailPage() {
                 <TabsContent value="procurement" className="animate-in fade-in duration-500"><ProjectProcurementTab project={project} /></TabsContent>
                 <TabsContent value="subcontracts" className="animate-in fade-in duration-500">
                     <div className="p-12 text-center border-2 border-dashed rounded-3xl bg-muted/10">
-                        <HardHat className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                        <Home className="h-12 w-12 mx-auto mb-4 opacity-20" />
                         <p className="font-bold text-muted-foreground italic">إدارة عقود مقاولي الباطن وشهادات الإنجاز المعتمدة للمشروع.</p>
                     </div>
                 </TabsContent>
@@ -232,5 +248,3 @@ export default function ProjectDetailPage() {
         </div>
     );
 }
-
-import { HardHat } from 'lucide-react';
