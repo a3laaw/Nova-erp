@@ -12,9 +12,9 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, X, Calendar, User, MapPin, HardHat, Building2, Users, Table as TableIcon } from 'lucide-react';
+import { Loader2, Save, X, Building2, Users, HardHat } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
-import { cleanFirestoreData, formatCurrency } from '@/lib/utils';
+import { cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -47,7 +47,6 @@ export function FieldVisitForm() {
     // ✨ محرك جلب بنود المقايسة (مطابق للجدولة السريعة)
     useEffect(() => {
         const fetchBoqData = async () => {
-            // الانتظار حتى اكتمال تحميل المشاريع
             if (!selectedProjectId || !firestore || projectsLoading) {
                 setBoqItems([]);
                 setIsLoadingBoq(false);
@@ -73,7 +72,7 @@ export function FieldVisitForm() {
                         endDate: data.endDate || null,
                         isHeader: data.isHeader || false
                     }
-                }).filter(i => !i.isHeader && i.name && !i.name.includes('undefined'));
+                }).filter(i => !i.isHeader && !i.name.includes('undefined'));
                 
                 setBoqItems(stages);
             } catch (e) {
@@ -125,7 +124,7 @@ export function FieldVisitForm() {
                 transactionId: selectedProject?.linkedTransactionId || '',
                 transactionType: selectedProject?.projectType || 'مقاولات',
                 engineerId: selectedEngineerId || null,
-                engineerName: eng?.fullName || 'إشراف عام / فريق فني',
+                engineerName: eng?.fullName || 'إشراف عام',
                 scheduledDate: scheduledDate || new Date(),
                 plannedStageId: plannedStageId,
                 plannedStageName: stage?.name || 'زيارة متابعة عامة',
@@ -134,7 +133,6 @@ export function FieldVisitForm() {
                 teamNames: isSubcontracted ? [] : selectedTeamsData.map(t => t.name), 
                 subcontractorId: selectedProject?.subcontractorId || null,
                 subcontractorName: selectedProject?.subcontractorName || null,
-                layoutType: selectedProject?.constructionTypeName || 'General',
                 status: 'planned',
                 createdAt: serverTimestamp(),
                 createdBy: currentUser.id,
@@ -211,7 +209,7 @@ export function FieldVisitForm() {
                                 <HardHat className="h-8 w-8 text-orange-400" />
                                 <div>
                                     <p className="font-black text-orange-900">المقاول: {selectedProject?.subcontractorName}</p>
-                                    <p className="text-xs text-orange-700">هذا المشروع يدار بواسطة مقاول باطن، لا يتطلب إسناد فرق عمل داخلية.</p>
+                                    <p className="text-xs text-orange-700">هذا المشروع يدار بواسطة مقاول باطن.</p>
                                 </div>
                             </div>
                         ) : (
@@ -222,46 +220,16 @@ export function FieldVisitForm() {
                                         options={teamOptions}
                                         selected={selectedTeamIds}
                                         onChange={setSelectedTeamIds}
-                                        placeholder={teamsLoading ? "تحميل الفرق..." : "اضغط لاختيار الفرق (مثال: A1, B2)..."}
+                                        placeholder={teamsLoading ? "تحميل الفرق..." : "اضغط لاختيار الفرق..."}
                                         disabled={!selectedProjectId || isSaving}
                                     />
                                 </div>
-
-                                {selectedTeamIds.length > 0 && (
-                                    <div className="animate-in fade-in slide-in-from-top-2">
-                                        <Label className="text-[10px] font-black uppercase text-primary mb-2 block">معاينة جدول الفرق الميداني:</Label>
-                                        <div className="border-2 rounded-2xl overflow-hidden shadow-sm">
-                                            <Table>
-                                                <TableHeader className="bg-muted/50">
-                                                    <TableRow className="h-10">
-                                                        {selectedTeamsData.map(team => (
-                                                            <TableHead key={team.id} className="text-center font-black border-l last:border-l-0 text-foreground">
-                                                                {team.name}
-                                                            </TableHead>
-                                                        ))}
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    <TableRow className="h-12 bg-white">
-                                                        {selectedTeamsData.map(team => (
-                                                            <TableCell key={team.id} className="text-center border-l last:border-l-0">
-                                                                <span className="text-[10px] font-bold text-muted-foreground">
-                                                                    قائد الفريق: {team.leaderName || '-'}
-                                                                </span>
-                                                            </TableCell>
-                                                        ))}
-                                                    </TableRow>
-                                                </TableBody>
-                                            </Table>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         )}
                     </div>
 
                     <div className="grid gap-2 pt-4 border-t">
-                        <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-primary"/> المهندس المشرف الزائر (اختياري)</Label>
+                        <Label className="font-bold flex items-center gap-2">المشرف المسؤول (اختياري)</Label>
                         <InlineSearchList 
                             value={selectedEngineerId}
                             onSelect={setSelectedEngineerId}
@@ -275,7 +243,7 @@ export function FieldVisitForm() {
                     <Button type="button" variant="outline" onClick={() => router.back()}>إلغاء</Button>
                     <Button type="submit" disabled={isSaving || projectsLoading} className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-lg">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
-                        تأكيد الجدولة واللوجستيات
+                        تأكيد الجدولة
                     </Button>
                 </CardFooter>
             </form>

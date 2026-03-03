@@ -4,21 +4,16 @@ import { useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { query, orderBy } from 'firebase/firestore';
 import type { FieldVisit } from '@/lib/types';
-import { format, isToday, isFuture } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Calendar, User, ArrowRight, HardHat, Users, Coins, Clock } from 'lucide-react';
+import { MapPin, Calendar, User, ArrowRight, HardHat, Users, Clock } from 'lucide-react';
 import Link from 'next/link';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
-/**
- * مكون نظام البطاقات المطور:
- * تم تحديثه ليشمل كافة البيانات اللوجستية (الفرق والمقاول) لضمان اتساق البيانات مع العرض الأفقي،
- * مع تصميم عمودي مثالي لمستخدمي الموبايل في المواقع.
- */
 export function FieldVisitsList() {
   const { firestore } = useFirebase();
 
@@ -70,7 +65,7 @@ export function FieldVisitsList() {
                     {visit.status === 'confirmed' ? 'تمت الزيارة' : isVisitToday ? 'زيارة اليوم' : 'مخطط لها'}
                     </Badge>
                     <h3 className="text-xl font-black leading-tight text-foreground group-hover:text-primary transition-colors">{visit.clientName}</h3>
-                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.transactionType}</p>
+                    <p className="text-xs text-muted-foreground font-bold mt-1">{visit.projectName}</p>
                 </div>
                 <div className="p-3 bg-background rounded-2xl border shadow-sm shrink-0">
                   <MapPin className={cn("h-6 w-6", visit.status === 'confirmed' ? "text-green-600" : "text-primary")} />
@@ -85,31 +80,25 @@ export function FieldVisitsList() {
                 
                 <div className="flex items-center gap-3 text-sm">
                   <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-xs">المهندس: {visit.engineerName}</span>
+                  <span className="font-medium text-xs">المسؤول: {visit.engineerName}</span>
                 </div>
 
-                {/* تفاصيل الفرق اللوجستية - تظهر الآن في البطاقة أيضاً */}
                 <div className="grid grid-cols-2 gap-2 pt-2">
                     <div className="p-2 bg-muted/50 rounded-xl border flex items-center gap-2">
                         <Users className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-[10px] font-bold truncate">الفرق: {visit.team1 || visit.team2 || visit.team3 ? 'مخصصة' : '-'}</span>
+                        <span className="text-[10px] font-bold truncate">الفرق: {visit.teamNames?.length || 0}</span>
                     </div>
                     <div className="p-2 bg-muted/50 rounded-xl border flex items-center gap-2">
                         <HardHat className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-[10px] font-bold truncate">{visit.subcontractorName || 'بدون مقاول'}</span>
+                        <span className="text-[10px] font-bold truncate">{visit.subcontractorName || 'فريق داخلي'}</span>
                     </div>
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-background rounded-xl border-2 border-dashed border-primary/10">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-black text-primary">{visit.plannedStageName}</span>
+                    <span className="text-xs font-black text-primary truncate max-w-[180px]">{visit.plannedStageName}</span>
                   </div>
-                  {visit.requiredPayment && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px] gap-1 font-black">
-                        <Coins className="h-3 w-3" /> {visit.requiredPayment}
-                      </Badge>
-                  )}
                 </div>
               </div>
 

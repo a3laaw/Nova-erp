@@ -73,9 +73,8 @@ export default function FieldVisitDetailPage() {
 
     // ✨ محرك جلب بنود المقايسة للتأكيد (مطابق للجدولة السريعة)
     useEffect(() => {
-        if (!visit || !firestore) return;
-
         const fetchStages = async () => {
+            if (!visit || !firestore) return;
             setIsLoadingStages(true);
             try {
                 const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
@@ -91,17 +90,16 @@ export default function FieldVisitDetailPage() {
                                 name: `${data.itemNumber} - ${data.description}`,
                                 isHeader: data.isHeader || false
                             }
-                        }).filter(i => !i.isHeader && i.name && !i.name.includes('undefined'));
+                        }).filter(i => !i.isHeader && !i.name.includes('undefined'));
                         setBoqItems(stages);
                         
-                        // تعيين المرحلة المخطط لها كافتراضية
                         if (visit.plannedStageId) {
                             setSelectedStageId(visit.plannedStageId);
                         }
                     }
                 }
             } catch (e) {
-                console.error("Error fetching BOQ stages for confirmation:", e);
+                console.error("Error fetching BOQ stages:", e);
             } finally {
                 setIsLoadingStages(false);
             }
@@ -122,80 +120,29 @@ export default function FieldVisitDetailPage() {
     }, [visit]);
 
     const handleGetLocation = () => {
-        if (!navigator.geolocation) {
-            toast({ variant: 'destructive', title: 'غير مدعوم', description: 'متصفحك لا يدعم خاصية تحديد الموقع.' });
-            return;
-        }
+        if (!navigator.geolocation) return;
         setIsCapturingLocation(true);
         navigator.geolocation.getCurrentPosition(
             (pos) => {
                 setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy });
                 setIsCapturingLocation(false);
-                toast({ title: 'تم التقاط الموقع' });
             },
-            () => {
-                setIsCapturingLocation(false);
-                toast({ variant: 'destructive', title: 'فشل تحديد الموقع' });
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
+            () => setIsCapturingLocation(false),
+            { enableHighAccuracy: true }
         );
-    };
-
-    const triggerProgressReconciliation = async (projectId: string, boqId: string, itemId: string, batch: any) => {
-        if (!firestore) return;
-        
-        const confirmedVisitsQuery = query(
-            collection(firestore, 'field_visits'),
-            where('projectId', '==', projectId),
-            where('plannedStageId', '==', itemId),
-            where('status', '==', 'confirmed')
-        );
-        const visitsSnap = await getDocs(confirmedVisitsQuery);
-        
-        const totalItemProgress = visitsSnap.docs.reduce((sum, d) => sum + (d.data().confirmationData?.progressAchieved || 0), 0) + progressAchieved[0];
-        
-        const boqItemRef = doc(firestore, `boqs/${boqId}/items`, itemId);
-        batch.update(boqItemRef, { 
-            progressPercentage: Math.min(100, totalItemProgress), 
-            updatedAt: serverTimestamp() 
-        });
-
-        const allItemsSnap = await getDocs(collection(firestore, `boqs/${boqId}/items`));
-        const leafItems = allItemsSnap.docs
-            .map(d => ({ id: d.id, ...d.data() } as BoqItem))
-            .filter(i => !i.isHeader);
-        
-        const totalProjectWeight = leafItems.reduce((sum, i) => sum + (i.quantity * i.sellingUnitPrice), 0);
-        const totalCompletedWeight = leafItems.reduce((sum, i) => {
-            const progress = i.id === itemId ? Math.min(100, totalItemProgress) : (i.progressPercentage || 0);
-            return sum + ((progress / 100) * (i.quantity * i.sellingUnitPrice));
-        }, 0);
-
-        const newTotalProgress = totalProjectWeight > 0 ? Math.round((totalCompletedWeight / totalProjectWeight) * 100) : 0;
-
-        const projectRef = doc(firestore, 'projects', projectId);
-        batch.update(projectRef, { 
-            progressPercentage: newTotalProgress, 
-            updatedAt: serverTimestamp() 
-        });
     };
 
     const handleConfirmDone = async () => {
-        if (!firestore || !visit || !currentUser) return;
-        if (!notes.trim()) {
-            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى كتابة التقرير الفني.' });
-            return;
-        }
+        if (!firestore || !visit || !currentUser || !notes.trim()) return;
 
         setIsSaving(true);
         try {
             const batch = writeBatch(firestore);
             const actualStage = boqItems.find(s => s.id === selectedStageId);
             
-            // 1. تحديث حالة الزيارة
             batch.update(visitRef!, {
                 status: 'confirmed',
-                plannedStageId: selectedStageId, // تحديث المرحلة إذا تم تغييرها في الموقع
+                plannedStageId: selectedStageId,
                 plannedStageName: actualStage?.name || visit.plannedStageName,
                 confirmationData: {
                     confirmedAt: serverTimestamp(),
@@ -206,106 +153,13 @@ export default function FieldVisitDetailPage() {
                 }
             });
 
-            // 2. إعادة حساب الإنجاز
-            const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
-            if (projectSnap.exists() && selectedStageId) {
-                const projectData = projectSnap.data() as ConstructionProject;
-                if (projectData.boqId) {
-                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, selectedStageId, batch);
-                }
-
-                // 3. الربط المالي الذكي
-                if (projectData.linkedTransactionId) {
-                    const txRef = doc(firestore, `clients/${visit.clientId}/transactions/${projectData.linkedTransactionId}`);
-                    const txSnap = await getDoc(txRef);
-                    
-                    if (txSnap.exists()) {
-                        const txData = txSnap.data();
-                        const contractClauses = txData.contract?.clauses || [];
-                        const matchedClause = contractClauses.find((c: any) => c.condition === (actualStage?.name || visit.plannedStageName) && c.status === 'غير مستحقة');
-
-                        if (matchedClause) {
-                            const currentYear = new Date().getFullYear();
-                            const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
-                            const appCounterDoc = await getDoc(appCounterRef);
-                            const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                            const appNumber = `AUTO-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
-
-                            const newAppRef = doc(collection(firestore, 'payment_applications'));
-                            const newJeRef = doc(collection(firestore, 'journalEntries'));
-
-                            batch.set(newAppRef, {
-                                applicationNumber: appNumber, date: serverTimestamp(), projectId: visit.projectId,
-                                clientId: visit.clientId, clientName: visit.clientName, projectName: visit.projectName,
-                                totalAmount: matchedClause.amount, status: 'draft', journalEntryId: newJeRef.id,
-                                items: [{ description: `إنجاز مرحلة: ${actualStage?.name || visit.plannedStageName}`, currentQuantity: 1, unitPrice: matchedClause.amount, totalAmount: matchedClause.amount }],
-                                createdAt: serverTimestamp(), createdBy: 'system-auto-workflow'
-                            });
-
-                            const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
-                            const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', visit.clientName), limit(1)));
-
-                            if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
-                                batch.set(newJeRef, {
-                                    entryNumber: `JE-${appNumber}`, date: serverTimestamp(),
-                                    narration: `[توليد آلي] استحقاق دفعة إنجاز مرحلة: ${actualStage?.name || visit.plannedStageName} - مشروع: ${visit.projectName}`,
-                                    status: 'draft', totalDebit: matchedClause.amount, totalCredit: matchedClause.amount,
-                                    lines: [
-                                        { accountId: clientAccountSnap.docs[0].id, accountName: visit.clientName, debit: matchedClause.amount, credit: 0, auto_profit_center: visit.projectId },
-                                        { accountId: revenueAccountSnap.docs[0].id, accountName: revenueAccountSnap.docs[0].data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: visit.projectId }
-                                    ],
-                                    clientId: visit.clientId, transactionId: visit.projectId, createdAt: serverTimestamp(), createdBy: 'system-auto-workflow'
-                                });
-                            }
-
-                            const updatedClauses = contractClauses.map((c: any) => c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c);
-                            batch.update(txRef, { 'contract.clauses': updatedClauses });
-                            batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
-                        }
-                    }
-                }
-            }
-
             await batch.commit();
-            toast({ title: 'تم التوثيق', description: 'تم تحديث الإنجاز الميداني والربط المالي بنجاح.' });
-            router.push('/dashboard/construction/field-visits');
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التوثيق المالي والميداني.' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleMarkNotDone = async () => {
-        if (!firestore || !visit || !currentUser || !cancellationReason.trim()) return;
-
-        setIsSaving(true);
-        try {
-            const batch = writeBatch(firestore);
-            batch.update(visitRef!, {
-                status: 'cancelled',
-                cancellationReason,
-                cancelledAt: serverTimestamp(),
-                cancelledBy: currentUser.id,
-                'confirmationData.progressAchieved': 0 
-            });
-
-            const projectSnap = await getDoc(doc(firestore, 'projects', visit.projectId));
-            if (projectSnap.exists() && visit.plannedStageId) {
-                const projectData = projectSnap.data() as ConstructionProject;
-                if (projectData.boqId) {
-                    await triggerProgressReconciliation(visit.projectId, projectData.boqId, visit.plannedStageId, batch);
-                }
-            }
-
-            await batch.commit();
-            toast({ title: 'تم الإلغاء', description: 'تم إخراج الزيارة من الخطة النشطة وتصفير أثرها.' });
+            toast({ title: 'تم التوثيق', description: 'تم تحديث الإنجاز الميداني بنجاح.' });
             router.push('/dashboard/construction/field-visits');
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ' });
         } finally {
             setIsSaving(false);
-            setIsNotDoneAlertOpen(false);
         }
     };
 
@@ -321,17 +175,6 @@ export default function FieldVisitDetailPage() {
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2">
                     <ArrowRight className="h-4 w-4" /> العودة للخطة
                 </Button>
-                <div className="flex gap-2">
-                    {visit.status === 'confirmed' ? (
-                        <Badge className="bg-green-600 font-black px-4 py-1 rounded-full gap-2 text-white shadow-lg">
-                            <CheckCircle2 className="h-4 w-4" /> زيارة تمت بنجاح
-                        </Badge>
-                    ) : visit.status === 'cancelled' ? (
-                        <Badge className="bg-red-600 font-black px-4 py-1 rounded-full gap-2 text-white shadow-lg">
-                            <XCircle className="h-4 w-4" /> زيارة لم تتم (ملغاة)
-                        </Badge>
-                    ) : null}
-                </div>
             </div>
 
             <Card className="rounded-[2.5rem] shadow-xl border-none overflow-hidden bg-card">
@@ -340,12 +183,8 @@ export default function FieldVisitDetailPage() {
                         <div className="space-y-1">
                             <CardTitle className="text-2xl font-black">{visit.clientName}</CardTitle>
                             <CardDescription className="font-bold text-primary flex items-center gap-2">
-                                <Building2 className="h-4 w-4" />
-                                مشروع: {visit.projectName}
+                                <Building2 className="h-4 w-4" /> مشروع: {visit.projectName}
                             </CardDescription>
-                        </div>
-                        <div className="p-3 bg-background rounded-2xl border shadow-inner text-muted-foreground">
-                            <Clock className="h-6 w-6" />
                         </div>
                     </div>
                 </CardHeader>
@@ -356,7 +195,7 @@ export default function FieldVisitDetailPage() {
                             <p className="font-bold">{scheduledDate ? format(scheduledDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</p>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المنفذة (من المقايسة)</Label>
+                            <Label className="text-[10px] uppercase font-bold text-muted-foreground">المرحلة المنفذة</Label>
                             {isProcessed ? (
                                 <p className="font-black text-primary">{visit.plannedStageName}</p>
                             ) : (
@@ -377,47 +216,26 @@ export default function FieldVisitDetailPage() {
                     <div className="space-y-6 p-6 bg-primary/5 rounded-[2rem] border-2 border-primary/10 shadow-inner">
                         <div className="flex justify-between items-center">
                             <Label className="font-black text-lg text-primary flex items-center gap-2">
-                                <TrendingUp className="h-5 w-5" />
-                                {isProcessed ? 'الإنجاز الموثق في هذه الزيارة' : 'تحديد نسبة الإنجاز المحققة اليوم'}
+                                <TrendingUp className="h-5 w-5" /> نسبة الإنجاز
                             </Label>
                             <span className="text-2xl font-black text-primary font-mono">{progressAchieved[0]}%</span>
                         </div>
-                        {!isProcessed && (
-                            <>
-                                <Slider value={progressAchieved} onValueChange={setProgressAchieved} max={100} step={5} className="py-4" />
-                                <div className="flex items-center gap-2 justify-center p-2 bg-white rounded-xl border border-primary/10">
-                                    <Sparkles className="h-3 w-3 text-primary animate-pulse" />
-                                    <p className="text-[10px] text-primary font-black uppercase">سيتم تحديث مديونية العميل آلياً في حال إكمال المرحلة.</p>
-                                </div>
-                            </>
-                        )}
+                        {!isProcessed && <Slider value={progressAchieved} onValueChange={setProgressAchieved} max={100} step={5} className="py-4" />}
                     </div>
 
                     <div className="space-y-4">
                         <Label className="font-black text-lg flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-primary" />
-                            إثبات الحضور (GPS)
+                            <MapPin className="h-5 w-5 text-primary" /> إثبات الحضور (GPS)
                         </Label>
-                        <div className={cn(
-                            "p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4 transition-all",
-                            location ? "bg-green-50 border-green-200" : "bg-muted/10 border-muted-foreground/20"
-                        )}>
+                        <div className={cn("p-6 rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center gap-4", location ? "bg-green-50 border-green-200" : "bg-muted/10 border-muted-foreground/20")}>
                             {location ? (
-                                <div className="text-center space-y-2">
-                                    <div className="p-3 bg-green-600 text-white rounded-full inline-block shadow-md">
-                                        <ShieldCheck className="h-8 w-8" />
-                                    </div>
+                                <div className="text-center">
+                                    <ShieldCheck className="h-8 w-8 text-green-600 mx-auto mb-2" />
                                     <p className="font-black text-green-800">تم توثيق الموقع الجغرافي</p>
-                                    <Button variant="link" size="sm" asChild className="text-blue-600">
-                                        <a href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`} target="_blank" rel="noopener noreferrer">
-                                            معاينة الموقع على الخريطة <Navigation className="ml-1 h-3 w-3" />
-                                        </a>
-                                    </Button>
                                 </div>
                             ) : !isProcessed && (
-                                <Button onClick={handleGetLocation} disabled={isCapturingLocation} className="rounded-xl h-12 px-8 font-bold gap-2">
-                                    {isCapturingLocation ? <Loader2 className="animate-spin h-5 w-5" /> : <MapPin className="h-5 w-5" />}
-                                    تأكيد موقعي الآن
+                                <Button onClick={handleGetLocation} disabled={isCapturingLocation} className="rounded-xl h-12 font-bold gap-2">
+                                    {isCapturingLocation ? <Loader2 className="animate-spin h-5 w-5" /> : <MapPin className="h-5 w-5" />} تأكيد موقعي الآن
                                 </Button>
                             )}
                         </div>
@@ -425,62 +243,27 @@ export default function FieldVisitDetailPage() {
 
                     <div className="space-y-4">
                         <Label className="font-black text-lg flex items-center gap-2">
-                            <ClipboardCheck className="h-5 w-5 text-primary" />
-                            التقرير الفني للإنجاز
+                            <ClipboardCheck className="h-5 w-5 text-primary" /> التقرير الفني للإنجاز
                         </Label>
                         <Textarea 
                             value={notes}
                             onChange={e => setNotes(e.target.value)}
                             readOnly={isProcessed}
-                            placeholder="اشرح الأعمال التي تم تنفيذها أو أي ملاحظات فنية هامة..."
+                            placeholder="اشرح الأعمال التي تم تنفيذها اليوم..."
                             rows={4}
-                            className="rounded-3xl border-2 p-4 text-base"
+                            className="rounded-3xl border-2"
                         />
                     </div>
-
-                    {isProcessed && visit.status === 'cancelled' && (
-                        <div className="space-y-4 pt-4 border-t">
-                            <Label className="font-black text-lg flex items-center gap-2 text-red-700">
-                                <AlertTriangle className="h-5 w-5" /> مبررات تعثر الإنجاز
-                            </Label>
-                            <div className="p-6 bg-red-50/50 border border-red-100 rounded-3xl shadow-inner">
-                                <p className="text-sm font-bold text-red-800 leading-relaxed">{visit.cancellationReason}</p>
-                            </div>
-                        </div>
-                    )}
                 </CardContent>
                 
                 {!isProcessed && (
-                    <CardFooter className="p-8 bg-muted/10 border-t flex flex-col sm:flex-row gap-4">
+                    <CardFooter className="p-8 bg-muted/10 border-t flex gap-4">
                         <Button onClick={handleConfirmDone} disabled={isSaving || !notes.trim()} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-lg gap-2">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
-                            تم الإنجاز
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsNotDoneAlertOpen(true)} disabled={isSaving} className="flex-1 h-14 rounded-2xl font-black text-xl border-red-200 text-red-600 hover:bg-red-50 gap-2">
-                            لم يتم الإنجاز
+                            {isSaving ? <Loader2 className="animate-spin" /> : <CheckCircle2 className="h-6 w-6" />} تم الإنجاز
                         </Button>
                     </CardFooter>
                 )}
             </Card>
-
-            <AlertDialog open={isNotDoneAlertOpen} onOpenChange={setIsNotDoneAlertOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-[2rem]">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black text-red-700">توثيق عدم الإنجاز</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base">يرجى ذكر سبب تعثر الإنجاز للتدقيق الإداري وتصحيح الجدول الزمني.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="py-4">
-                        <Label className="font-bold mb-2 block">مبررات التعثر / معوقات الموقع *</Label>
-                        <Textarea value={cancellationReason} onChange={e => setCancellationReason(e.target.value)} placeholder="مثال: نقص مواد، عطل معدات، أوامر توقف..." className="rounded-xl border-2" rows={3}/>
-                    </div>
-                    <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel disabled={isSaving}>تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleMarkNotDone} disabled={isSaving || !cancellationReason.trim()} className="bg-red-600 hover:bg-red-700 font-bold">
-                            {isSaving ? <Loader2 className="animate-spin ml-2 h-4 w-4" /> : <XCircle className="ml-2 h-4 w-4" />} تأكيد الإلغاء
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
 }

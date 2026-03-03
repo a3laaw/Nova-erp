@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -27,10 +26,6 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * مكون عرض يوميات المواقع (التصميم الفني الهندسي المكثف):
- * يربط التقدم بالجدول الزمني المخطط ويكشف الانحرافات الزمنية.
- */
 export function FieldVisitsGrid() {
   const { firestore } = useFirebase();
 
@@ -71,7 +66,6 @@ export function FieldVisitsGrid() {
                 const phaseEndDate = toFirestoreDate(visit.phaseEndDate);
                 const isCancelled = visit.status === 'cancelled';
                 const isConfirmed = visit.status === 'confirmed';
-                
                 const isDelayed = scheduledDate && phaseEndDate && scheduledDate > phaseEndDate;
                 
                 return (
@@ -89,11 +83,6 @@ export function FieldVisitsGrid() {
                             </p>
                             <p className="text-xs font-bold leading-relaxed">{visit.projectName}</p>
                         </div>
-                        {visit.numFloors && (
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground">
-                                <Scale className="h-3 w-3" /> {visit.numFloors}
-                            </div>
-                        )}
                     </TableCell>
 
                     <TableCell className="p-0 border-l align-top">
@@ -105,9 +94,7 @@ export function FieldVisitsGrid() {
                                 </div>
                                 <Progress value={isConfirmed ? visit.confirmationData?.progressAchieved : 0} className="h-2" />
                             </div>
-                            
                             <Separator />
-                            
                             <div className="space-y-2">
                                 <span className="text-[9px] font-black text-muted-foreground block uppercase">الحالة الزمنية:</span>
                                 {isDelayed ? (
@@ -134,15 +121,11 @@ export function FieldVisitsGrid() {
                             </div>
                             <div className="flex justify-between items-center border-b border-dashed pb-2">
                                 <span className="text-[9px] font-bold text-muted-foreground">التسليم المخطط:</span>
-                                <span className="text-[10px] font-bold font-mono">
-                                    {phaseEndDate ? format(phaseEndDate, 'dd/MM/yyyy') : 'غير محدد'}
-                                </span>
+                                <span className="text-[10px] font-bold font-mono">{phaseEndDate ? format(phaseEndDate, 'dd/MM/yyyy') : 'غير محدد'}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-[9px] font-bold text-muted-foreground">تاريخ الزيارة:</span>
-                                <span className="text-[10px] font-bold font-mono text-primary">
-                                    {scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : '-'}
-                                </span>
+                                <span className="text-[10px] font-bold font-mono text-primary">{scheduledDate ? format(scheduledDate, 'dd/MM/yyyy') : '-'}</span>
                             </div>
                         </div>
                     </TableCell>
@@ -163,11 +146,6 @@ export function FieldVisitsGrid() {
                                             <p className="text-[10px] font-black text-emerald-700 mb-1 flex items-center gap-1">
                                                 <Users className="h-3 w-3" /> {teamName}
                                             </p>
-                                            <div className="space-y-0.5 border-t pt-1">
-                                                {employees?.filter(e => e.teamId === visit.teamIds?.[i]).slice(0, 2).map(e => (
-                                                    <p key={e.id} className="text-[9px] font-medium text-slate-600 truncate">• {e.fullName}</p>
-                                                ))}
-                                            </div>
                                         </div>
                                     ))}
                                     {!visit.teamNames?.length && <p className="text-[10px] italic text-center pt-4 text-muted-foreground">لم يتم تعيين فرق</p>}
@@ -178,10 +156,7 @@ export function FieldVisitsGrid() {
 
                     <TableCell className="p-4 border-l align-top">
                         <div className="space-y-3 h-full">
-                            <Badge className={cn(
-                                "border-none font-black text-[9px] uppercase px-3",
-                                isConfirmed ? "bg-green-600 text-white" : "bg-slate-100 text-slate-800"
-                            )}>
+                            <Badge className={cn("border-none font-black text-[9px] uppercase px-3", isConfirmed ? "bg-green-600 text-white" : "bg-slate-100 text-slate-800")}>
                                 {isConfirmed ? 'تقرير الإنجاز الفعلي المعتمد' : 'يوميات الأعمال المطلوبة'}
                             </Badge>
                             <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed border-slate-200 h-[calc(100%-35px)] overflow-y-auto">
@@ -194,9 +169,7 @@ export function FieldVisitsGrid() {
 
                     <TableCell className="text-center align-middle">
                         <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl hover:bg-primary hover:text-white transition-all shadow-md bg-white border" asChild>
-                            <Link href={`/dashboard/construction/field-visits/${visit.id}`}>
-                                <Eye className="h-6 w-6" />
-                            </Link>
+                            <Link href={`/dashboard/construction/field-visits/${visit.id}`}><Eye className="h-6 w-6" /></Link>
                         </Button>
                     </TableCell>
                   </TableRow>
