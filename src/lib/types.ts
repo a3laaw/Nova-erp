@@ -26,7 +26,19 @@ export interface SubsidyQuota {
     unitPrice: number; 
 }
 
-export interface ConstructionProject extends BaseEntity {
+export interface TechnicalSpecifications {
+    totalArea: number;
+    hasBasement: boolean;
+    floorsCount: number;
+    roofExtension: 'none' | 'quarter' | 'half';
+    bathroomsCount?: number;
+    kitchensCount?: number;
+    laundryRoomsCount?: number;
+    electricalPointsCount?: number;
+    planReferenceNumber?: string;
+}
+
+export interface ConstructionProject extends BaseEntity, TechnicalSpecifications {
     projectId: string;          
     projectName: string;
     clientId: string;
@@ -34,21 +46,6 @@ export interface ConstructionProject extends BaseEntity {
     projectCategory: ProjectCategory;
     projectType?: string;
     
-    // البيانات الفنية الإنشائية
-    totalArea: number;
-    hasBasement: boolean;
-    floorsCount: number;
-    roofExtension: 'none' | 'quarter' | 'half';
-    
-    // مواصفات التمديدات الصحية (عقود الصحي)
-    bathroomsCount?: number;
-    kitchensCount?: number;
-    laundryRoomsCount?: number;
-    
-    // مواصفات الكهرباء (عقود الكهرباء)
-    electricalPointsCount?: number;
-    planReferenceNumber?: string; // مرجع المخطط المعتمد
-
     // عنوان الموقع
     siteAddress: {
         governorate: string;
@@ -73,7 +70,7 @@ export interface ConstructionProject extends BaseEntity {
     subsidyQuotas?: SubsidyQuota[];
 }
 
-export interface Quotation extends BaseEntity {
+export interface Quotation extends BaseEntity, TechnicalSpecifications {
     quotationNumber: string;
     quotationSequence: number;
     quotationYear: number;
@@ -129,6 +126,7 @@ export interface ClientTransaction extends BaseEntity {
         scopeOfWork?: any[];
         termsAndConditions?: any[];
         openClauses?: any[];
+        specs?: TechnicalSpecifications; // إدراج المواصفات الفنية في العقد
     };
     boqId?: string;
 }

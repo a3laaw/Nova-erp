@@ -26,7 +26,7 @@ import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, LayoutGri
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Client, ClientTransaction, Employee, Department, Account, ContractFinancialMilestone } from '@/lib/types';
+import type { Client, ClientTransaction, Employee, Department, Account, ContractFinancialMilestone, TechnicalSpecifications } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Label } from '../ui/label';
@@ -61,6 +61,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   const [openClauses, setOpenClauses] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [financials, setFinancials] = useState<any>({ type: 'fixed', totalAmount: 0, milestones: [] });
+  const [specs, setSpecs] = useState<TechnicalSpecifications | undefined>();
   const [referenceData, setReferenceData] = useState<{ stages: MultiSelectOption[] }>({ stages: [] });
 
   useEffect(() => {
@@ -74,16 +75,33 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         })).values());
         setReferenceData({ stages });
 
-        if (transaction?.contract) {
-            const c = transaction.contract;
-            setScopeOfWork(c.scopeOfWork || []);
-            setTermsAndConditions(c.termsAndConditions || []);
-            setOpenClauses(c.openClauses || []);
-            setFinancials({
-                type: c.financialsType || 'fixed',
-                totalAmount: c.totalAmount || 0,
-                milestones: (c.clauses || []).map(cl => ({ id: cl.id || generateId(), name: cl.name, condition: cl.condition || '', value: c.financialsType === 'percentage' ? cl.percentage || 0 : cl.amount }))
-            });
+        if (transaction) {
+            if (transaction.contract) {
+                const c = transaction.contract;
+                setScopeOfWork(c.scopeOfWork || []);
+                setTermsAndConditions(c.termsAndConditions || []);
+                setOpenClauses(c.openClauses || []);
+                setSpecs(c.specs);
+                setFinancials({
+                    type: c.financialsType || 'fixed',
+                    totalAmount: c.totalAmount || 0,
+                    milestones: (c.clauses || []).map(cl => ({ id: cl.id || generateId(), name: cl.name, condition: cl.condition || '', value: c.financialsType === 'percentage' ? cl.percentage || 0 : cl.amount }))
+                });
+            } else if ((transaction as any).totalArea !== undefined) {
+                // If we are prefilling from a quotation object that was passed as transaction
+                const q = transaction as any;
+                setSpecs({
+                    totalArea: q.totalArea || 0,
+                    floorsCount: q.floorsCount || 1,
+                    hasBasement: q.hasBasement || false,
+                    roofExtension: q.roofExtension || 'none',
+                    bathroomsCount: q.bathroomsCount || 0,
+                    kitchensCount: q.kitchensCount || 0,
+                    laundryRoomsCount: q.laundryRoomsCount || 0,
+                    electricalPointsCount: q.electricalPointsCount || 0,
+                    planReferenceNumber: q.planReferenceNumber || ''
+                });
+            }
         }
       } catch (e) { console.error(e); }
     };
@@ -112,7 +130,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
             });
 
             const totalAmount = financials.type === 'fixed' ? totalValue : financials.totalAmount;
-            const contractData = { clauses: finalClauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: financials.type };
+            const contractData = { clauses: finalClauses, scopeOfWork, termsAndConditions, openClauses, totalAmount, financialsType: financials.type, specs };
 
             const clientRef = doc(firestore, 'clients', clientId);
             const clientSnap = await transaction_fs.get(clientRef);

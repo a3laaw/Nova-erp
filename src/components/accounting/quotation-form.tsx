@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Building2, Layers, Ruler, Droplets, Zap } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, ContractTemplate, ConstructionType, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -40,6 +42,18 @@ const quotationSchema = z.object({
   subject: z.string().min(1, 'الموضوع مطلوب.'),
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
+  
+  // المواصفات الفنية المتعاقد عليها
+  totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
+  hasBasement: z.boolean().default(false),
+  floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
+  roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
+  bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  electricalPointsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  planReferenceNumber: z.string().optional(),
+
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   notes: z.string().optional(),
   departmentId: z.string().optional(),
@@ -78,6 +92,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         date: new Date(),
         validUntil: new Date(new Date().setDate(new Date().getDate() + 30)),
         financialsType: 'fixed',
+        totalArea: 0,
+        floorsCount: 1,
+        hasBasement: false,
+        roofExtension: 'none',
         items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }]
     }
   });
@@ -186,6 +204,55 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
       </div>
 
+      {/* --- قسم المواصفات الفنية داخل عرض السعر --- */}
+      <div className="space-y-6">
+          <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية المتفق عليها</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed">
+              <div className="grid gap-2">
+                  <Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة الإجمالية (م²)</Label>
+                  <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-10 font-mono font-bold" />
+              </div>
+              <div className="grid gap-2">
+                  <Label>عدد الأدوار</Label>
+                  <Input type="number" {...register('floorsCount')} placeholder="1" className="h-10" />
+              </div>
+              <div className="grid gap-2">
+                  <Label>توسعة السطح</Label>
+                  <Controller name="roofExtension" control={control} render={({field}) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent>
+                      </Select>
+                  )}/>
+              </div>
+              <div className="flex items-center justify-between p-2 h-10 border rounded-xl bg-background px-4 shadow-sm">
+                  <Label htmlFor="hasBasement" className="font-bold cursor-pointer">سرداب</Label>
+                  <Controller name="hasBasement" control={control} render={({field}) => (
+                      <Switch id="hasBasement" checked={field.value} onCheckedChange={field.onChange} />
+                  )}/>
+              </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="p-6 border-2 border-blue-100 bg-blue-50/10 rounded-2xl space-y-4">
+                  <Label className="font-black text-blue-700 flex items-center gap-2"><Droplets className="h-4 w-4"/> مواصفات الصحي</Label>
+                  <div className="grid grid-cols-3 gap-4">
+                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-9 text-center" /></div>
+                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-9 text-center" /></div>
+                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-9 text-center" /></div>
+                  </div>
+              </div>
+              <div className="p-6 border-2 border-yellow-100 bg-yellow-50/10 rounded-2xl space-y-4">
+                  <Label className="font-black text-yellow-700 flex items-center gap-2"><Zap className="h-4 w-4"/> مواصفات الكهرباء</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">عدد النقاط (بناءً على المخطط)</Label><Input type="number" {...register('electricalPointsCount')} className="h-9 text-center" /></div>
+                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">رقم مرجع المخطط</Label><Input {...register('planReferenceNumber')} className="h-9 text-center font-mono text-xs" placeholder="Ref-000" /></div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
       <div className="space-y-4">
           <div className="flex justify-between items-center px-2">
               <Label className="text-lg font-black flex items-center gap-2"><Calculator className="h-5 w-5 text-primary"/> تسعير بنود العقد والدفعات</Label>
@@ -196,7 +263,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                           <SelectTrigger className="w-32 h-8 rounded-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                               <SelectItem value="fixed">مبالغ ثابتة</SelectItem>
-                              <SelectItem value="percentage">نسب مئوية</SelectItem>
+                              <SelectItem value="percentage">نسبة مئوية</SelectItem>
                           </SelectContent>
                       </Select>
                   )} />
@@ -242,7 +309,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                   </TableFooter>
               </Table>
           </div>
-          <Button type="button" variant="outline" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة دفعة مخصصة</Button>
+          <Button type="button" variant="outline" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة بند إضافي</Button>
       </div>
 
       <DialogFooter className="pt-8 border-t">

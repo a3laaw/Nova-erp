@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -11,7 +12,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Printer, Pencil, ArrowRight, FileSignature } from 'lucide-react';
+import { Printer, Pencil, ArrowRight, FileSignature, Ruler, Building2, Zap, Droplets, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
@@ -33,6 +34,11 @@ const statusColors: Record<Quotation['status'], string> = {
     expired: 'bg-gray-100 text-gray-800'
 };
 
+const roofExtensionLabels: Record<string, string> = {
+    none: 'بدون توسعة',
+    quarter: 'ربع دور',
+    half: 'نصف دور'
+};
 
 export default function ViewQuotationPage() {
   const router = useRouter();
@@ -49,32 +55,6 @@ export default function ViewQuotationPage() {
   }, [firestore, id]);
 
   const { data: quotation, loading: quotationLoading } = useDocument<Quotation>(firestore, quotationRef ? quotationRef.path : null);
-
-  // تحضير بيانات العقد من واقع عرض السعر المختار
-  const prefilledTransaction = useMemo((): Partial<ClientTransaction> | null => {
-    if (!quotation) return null;
-    return {
-      id: quotation.projectId || undefined, // ربط العقد بهيكل المشروع إن وجد
-      clientId: quotation.clientId,
-      transactionType: quotation.subject,
-      description: quotation.templateDescription || '',
-      contract: {
-        totalAmount: quotation.totalAmount || 0,
-        financialsType: quotation.financialsType || 'fixed',
-        clauses: (quotation.items || []).map(item => ({
-            id: item.id || Math.random().toString(36).substring(7),
-            name: item.description,
-            amount: item.total || 0,
-            status: 'غير مستحقة',
-            condition: item.condition || '',
-            percentage: item.percentage
-        })),
-        scopeOfWork: quotation.scopeOfWork || [],
-        termsAndConditions: quotation.termsAndConditions || [],
-        openClauses: quotation.openClauses || [],
-      }
-    };
-  }, [quotation]);
 
   const handlePrint = () => window.print();
   
@@ -94,11 +74,11 @@ export default function ViewQuotationPage() {
 
   return (
     <>
-    {isContractFormOpen && prefilledTransaction && (
+    {isContractFormOpen && (
         <ContractClausesForm
             isOpen={isContractFormOpen}
             onClose={() => setIsContractFormOpen(false)}
-            transaction={prefilledTransaction as ClientTransaction}
+            transaction={quotation as any} // نمرر كائن عرض السعر بالكامل ليتم تحويله
             clientId={quotation.clientId}
             clientName={quotation.clientName}
             quotationIdToUpdate={quotation.id}
@@ -145,6 +125,48 @@ export default function ViewQuotationPage() {
                     <div className='text-left'>
                         <p className='text-[10px] uppercase font-black text-muted-foreground mb-1'>الموضوع / Subject:</p>
                         <p className='text-lg font-bold'>{quotation.subject}</p>
+                    </div>
+                </section>
+
+                {/* --- معاينة المواصفات الفنية في عرض السعر --- */}
+                <section className="mb-8 space-y-4">
+                    <h3 className="font-black text-primary flex items-center gap-2 border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-6 border-2 border-dashed rounded-[2rem] bg-muted/5">
+                        <div className="flex items-center gap-2">
+                            <Ruler className="h-4 w-4 text-muted-foreground" />
+                            <div className="text-xs">
+                                <span className="text-muted-foreground font-bold ml-1">المساحة:</span>
+                                <span className="font-black text-primary">{quotation.totalArea} م²</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Layers className="h-4 w-4 text-muted-foreground" />
+                            <div className="text-xs">
+                                <span className="text-muted-foreground font-bold ml-1">الأدوار:</span>
+                                <span className="font-black">{quotation.floorsCount} {quotation.hasBasement ? '+ سرداب' : ''}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <div className="text-xs">
+                                <span className="text-muted-foreground font-bold ml-1">السطح:</span>
+                                <span className="font-black">{roofExtensionLabels[quotation.roofExtension]}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Droplets className="h-4 w-4 text-blue-600" />
+                            <div className="text-[10px]">
+                                <span className="text-muted-foreground font-bold ml-1">الصحي:</span>
+                                <span className="font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-yellow-600" />
+                            <div className="text-[10px]">
+                                <span className="text-muted-foreground font-bold ml-1">الكهرباء:</span>
+                                <span className="font-bold">{quotation.electricalPointsCount} نقطة</span>
+                            </div>
+                        </div>
                     </div>
                 </section>
                 
