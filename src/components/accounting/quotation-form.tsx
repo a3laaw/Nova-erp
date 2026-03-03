@@ -22,7 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from '../ui/switch';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -105,6 +105,11 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const financials_type = watch("financialsType");
   const total_amount = watch("totalAmount");
   const selectedClientId = watch("clientId");
+  const watchedSubject = watch("subject");
+
+  // منطق الظهور المشروط بناءً على التخصص
+  const showSanitary = React.useMemo(() => watchedSubject?.includes('صحي'), [watchedSubject]);
+  const showElectrical = React.useMemo(() => watchedSubject?.includes('كهرباء'), [watchedSubject]);
   
   const totalCalculatedAmount = React.useMemo(() => {
     if (financials_type === 'fixed') {
@@ -204,7 +209,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
       </div>
 
-      {/* --- قسم المواصفات الفنية داخل عرض السعر --- */}
+      {/* --- قسم المواصفات الفنية والمساحات (ثابتة للكل) --- */}
       <div className="space-y-6">
           <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
           
@@ -243,21 +248,42 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-6 border-2 border-blue-100 bg-blue-50/10 rounded-2xl space-y-4">
-                  <Label className="font-black text-blue-700 flex items-center gap-2"><Droplets className="h-4 w-4"/> مواصفات الصحي</Label>
-                  <div className="grid grid-cols-3 gap-4">
-                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-9 text-center" /></div>
-                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-9 text-center" /></div>
-                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">غرف الغسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-9 text-center" /></div>
-                  </div>
-              </div>
-              <div className="p-6 border-2 border-yellow-100 bg-yellow-50/10 rounded-2xl space-y-4">
-                  <Label className="font-black text-yellow-700 flex items-center gap-2"><Zap className="h-4 w-4"/> مواصفات الكهرباء</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">عدد النقاط (بناءً على المخطط)</Label><Input type="number" {...register('electricalPointsCount')} className="h-9 text-center" /></div>
-                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">رقم مرجع المخطط</Label><Input {...register('planReferenceNumber')} className="h-9 text-center font-mono text-xs" placeholder="Ref-000" /></div>
-                  </div>
-              </div>
+              {/* مواصفات الصحي تظهر فقط لعقود الصحي */}
+              {showSanitary && (
+                <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10 animate-in fade-in zoom-in-95">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700">
+                            <Droplets className="h-4 w-4"/> مواصفات الصحي (تمديدات)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-3 gap-4">
+                        <div className="grid gap-1.5"><Label className="text-[10px] font-bold">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-9 text-center" /></div>
+                        <div className="grid gap-1.5"><Label className="text-[10px] font-bold">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-9 text-center" /></div>
+                        <div className="grid gap-1.5"><Label className="text-[10px] font-bold">غرف الغسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-9 text-center" /></div>
+                    </CardContent>
+                </Card>
+              )}
+
+              {/* مواصفات الكهرباء تظهر فقط لعقود الكهرباء */}
+              {showElectrical && (
+                <Card className="rounded-2xl border-2 border-yellow-100 bg-yellow-50/10 animate-in fade-in zoom-in-95">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-sm font-black flex items-center gap-2 text-yellow-700">
+                            <Zap className="h-4 w-4"/> مواصفات الكهرباء (نقاط)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">عدد نقاط الكهرباء</Label>
+                            <Input type="number" {...register('electricalPointsCount')} className="h-9 text-center font-black" placeholder="بناءً على المخطط" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-bold">رقم مرجع المخطط</Label>
+                            <Input {...register('planReferenceNumber')} className="h-9 text-center font-mono text-xs" placeholder="Ref-000" />
+                        </div>
+                    </CardContent>
+                </Card>
+              )}
           </div>
       </div>
 

@@ -73,6 +73,10 @@ export default function ViewQuotationPage() {
       } catch { return '-'; }
   };
 
+  // منطق العرض الشرطي للمواصفات
+  const showSanitary = useMemo(() => quotation?.subject?.includes('صحي'), [quotation]);
+  const showElectrical = useMemo(() => quotation?.subject?.includes('كهرباء'), [quotation]);
+
   if (quotationLoading || brandingLoading) {
       return <div className="p-8 max-w-4xl mx-auto space-y-8" dir="rtl"><Skeleton className="h-32 w-full rounded-xl" /><Skeleton className="h-96 w-full rounded-xl" /></div>;
   }
@@ -135,10 +139,11 @@ export default function ViewQuotationPage() {
                     </div>
                 </section>
 
-                {/* --- معاينة المواصفات الفنية في عرض السعر --- */}
+                {/* --- معاينة المواصفات الفنية (شرطية) --- */}
                 <section className="mb-8 space-y-4">
                     <h3 className="font-black text-primary flex items-center gap-2 border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-6 border-2 border-dashed rounded-[2rem] bg-muted/5">
+                        {/* المساحة والأدوار تظهر للكل */}
                         <div className="flex items-center gap-2">
                             <Ruler className="h-4 w-4 text-muted-foreground" />
                             <div className="text-xs">
@@ -167,20 +172,28 @@ export default function ViewQuotationPage() {
                                 <span className="font-black">{roofExtensionLabels[quotation.roofExtension]}</span>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Droplets className="h-4 w-4 text-blue-600" />
-                            <div className="text-[10px]">
-                                <span className="text-muted-foreground font-bold ml-1">الصحي:</span>
-                                <span className="font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ</span>
+
+                        {/* الصحي فقط لعقود الصحي */}
+                        {showSanitary && (
+                            <div className="flex items-center gap-2 col-span-2 md:col-span-1 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                                <Droplets className="h-4 w-4 text-blue-600" />
+                                <div className="text-[10px]">
+                                    <p className="font-bold text-blue-800">مواصفات الصحي:</p>
+                                    <span className="font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ</span>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Zap className="h-4 w-4 text-yellow-600" />
-                            <div className="text-[10px]">
-                                <span className="text-muted-foreground font-bold ml-1">الكهرباء:</span>
-                                <span className="font-bold">{quotation.electricalPointsCount} نقطة</span>
+                        )}
+
+                        {/* الكهرباء فقط لعقود الكهرباء */}
+                        {showElectrical && (
+                            <div className="flex items-center gap-2 col-span-2 md:col-span-1 bg-yellow-50/50 p-2 rounded-lg border border-yellow-100">
+                                <Zap className="h-4 w-4 text-yellow-600" />
+                                <div className="text-[10px]">
+                                    <p className="font-bold text-yellow-800">مواصفات الكهرباء:</p>
+                                    <span className="font-bold">{quotation.electricalPointsCount} نقطة / مخطط: {quotation.planReferenceNumber || '-'}</span>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </section>
                 

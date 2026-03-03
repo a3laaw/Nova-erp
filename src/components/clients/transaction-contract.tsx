@@ -40,6 +40,10 @@ export function TransactionContract({ client, transaction }: TransactionContract
     const openClauses = transaction.contract?.openClauses || [];
     const financialsType = transaction.contract?.financialsType || 'fixed';
     const specs = transaction.contract?.specs;
+
+    // منطق العرض الشرطي للمواصفات
+    const isSanitary = transaction.transactionType?.includes('صحي');
+    const isElectrical = transaction.transactionType?.includes('كهرباء');
     
     useEffect(() => {
         const today = new Date();
@@ -102,11 +106,12 @@ export function TransactionContract({ client, transaction }: TransactionContract
                     </div>
                 </section>
 
-                {/* --- المواصفات الفنية المدمجة في العقد --- */}
+                {/* --- المواصفات الفنية المدمجة في العقد (شرطية) --- */}
                 {specs && (
                     <section>
                         <h3 className="font-black border-r-4 border-primary pr-2 mb-4 text-lg">المواصفات الفنية والمساحات المتعاقد عليها</h3>
                         <div className="p-6 border-2 border-dashed rounded-3xl grid grid-cols-2 md:grid-cols-3 gap-6">
+                            {/* المساحة والأدوار دائمة الظهور */}
                             <div className="flex items-center gap-3">
                                 <Ruler className="h-5 w-5 text-primary" />
                                 <div><p className="text-[10px] font-bold text-muted-foreground uppercase">المساحة الإجمالية:</p><p className="font-bold">{specs.totalArea} م²</p></div>
@@ -123,14 +128,22 @@ export function TransactionContract({ client, transaction }: TransactionContract
                                 <Building2 className="h-5 w-5 text-primary" />
                                 <div><p className="text-[10px] font-bold text-muted-foreground uppercase">توسعة السطح:</p><p className="font-bold">{roofExtensionLabels[specs.roofExtension]}</p></div>
                             </div>
-                            <div className="flex items-center gap-3">
-                                <Droplets className="h-5 w-5 text-blue-600" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">مواصفات الصحي:</p><p className="font-bold">{specs.bathroomsCount} حمامات - {specs.kitchensCount} مطابخ</p></div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Zap className="h-5 w-5 text-yellow-600" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">نقاط الكهرباء:</p><p className="font-bold">{specs.electricalPointsCount} نقطة (حسب المخطط)</p></div>
-                            </div>
+
+                            {/* الصحي فقط لعقود الصحي */}
+                            {isSanitary && (
+                                <div className="flex items-center gap-3 border-r-2 border-blue-200 pr-3">
+                                    <Droplets className="h-5 w-5 text-blue-600" />
+                                    <div><p className="text-[10px] font-bold text-blue-800 uppercase">مواصفات الصحي:</p><p className="font-bold">{specs.bathroomsCount} حمامات - {specs.kitchensCount} مطابخ</p></div>
+                                </div>
+                            )}
+
+                            {/* الكهرباء فقط لعقود الكهرباء */}
+                            {isElectrical && (
+                                <div className="flex items-center gap-3 border-r-2 border-yellow-200 pr-3">
+                                    <Zap className="h-5 w-5 text-yellow-600" />
+                                    <div><p className="text-[10px] font-bold text-yellow-800 uppercase">نقاط الكهرباء:</p><p className="font-bold">{specs.electricalPointsCount} نقطة (حسب المخطط)</p></div>
+                                </div>
+                            )}
                         </div>
                     </section>
                 )}
