@@ -33,13 +33,16 @@ export interface TechnicalSpecifications {
     roofExtension: 'none' | 'quarter' | 'half';
     workNature?: 'labor_only' | 'with_materials'; 
     
-    // مواصفات الصحي التفصيلية (تم التحديث لدعم الأعداد)
+    // مواصفات الصحي التفصيلية
     bathroomsCount?: number;
     kitchensCount?: number;
     laundryRoomsCount?: number;
     sanitaryMaterialsIncluded?: boolean;
+    sanitaryExtensionType?: 'ordinary' | 'suspended';
+    toiletType?: 'ordinary' | 'suspended';
+    showerType?: 'ordinary' | 'hidden';
     
-    // أعداد أنواع التمديد
+    // أعداد أنواع التمديد (للتوزيع الرقمي)
     suspendedExtensionCount?: number;
     ordinaryExtensionCount?: number;
     

@@ -88,7 +88,6 @@ export default function ViewQuotationPage() {
       } catch { return '-'; }
   };
 
-  // منطق العرض الشرطي للمواصفات
   const showSanitary = useMemo(() => quotation?.subject?.includes('صحي'), [quotation]);
   const showElectrical = useMemo(() => quotation?.subject?.includes('كهرباء'), [quotation]);
 
@@ -154,7 +153,6 @@ export default function ViewQuotationPage() {
                     </div>
                 </section>
 
-                {/* --- معاينة المواصفات الفنية (شرطية) --- */}
                 <section className="mb-8 space-y-4">
                     <h3 className="font-black text-primary flex items-center gap-2 border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-6 border-2 border-dashed rounded-[2rem] bg-muted/5">
@@ -187,12 +185,11 @@ export default function ViewQuotationPage() {
                             </div>
                         </div>
 
-                        {/* الصحي فقط لعقود الصحي */}
                         {showSanitary && (
                             <div className="col-span-2 md:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100 animate-in fade-in">
                                 <div className="flex flex-col">
                                     <span className="text-[10px] font-black text-blue-800 uppercase flex items-center gap-1"><Droplets className="h-3 w-3"/> العدد التقريبي</span>
-                                    <span className="text-xs font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ / {quotation.laundryRoomsCount} غسيل</span>
+                                    <span className="text-xs font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ</span>
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-[10px] font-black text-blue-800 uppercase">نوع التمديد</span>
@@ -209,7 +206,6 @@ export default function ViewQuotationPage() {
                             </div>
                         )}
 
-                        {/* الكهرباء فقط لعقود الكهرباء */}
                         {showElectrical && (
                             <div className="flex items-center gap-2 col-span-2 md:col-span-1 bg-yellow-50/50 p-2 rounded-lg border border-yellow-100">
                                 <Zap className="h-4 w-4 text-yellow-600" />

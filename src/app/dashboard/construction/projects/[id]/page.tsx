@@ -73,6 +73,11 @@ const workNatureLabels: Record<string, string> = {
     with_materials: 'توريد وتنفيذ'
 };
 
+const extensionTypeLabels: Record<string, string> = {
+    ordinary: 'تمديد عادي',
+    suspended: 'تمديد معلق'
+};
+
 export default function ProjectDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -130,7 +135,10 @@ export default function ProjectDetailPage() {
                             <Separator />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
-                                    <p className="text-[10px] font-black text-blue-700 uppercase flex items-center gap-1"><Droplets className="h-3 w-3"/> الصحي والبناء</p>
+                                    <div className="flex justify-between items-start">
+                                        <p className="text-[10px] font-black text-blue-700 uppercase flex items-center gap-1"><Droplets className="h-3 w-3"/> الصحي والبناء</p>
+                                        <Badge variant="outline" className="text-[8px] h-4 py-0 bg-white">{extensionTypeLabels[project.sanitaryExtensionType || 'ordinary']}</Badge>
+                                    </div>
                                     <div className="flex flex-col gap-1.5 text-[11px] font-bold">
                                         <div className="flex justify-between items-center bg-white/50 p-1.5 rounded-lg border border-blue-100/50">
                                             <span>حمامات: {project.bathroomsCount || 0}</span>

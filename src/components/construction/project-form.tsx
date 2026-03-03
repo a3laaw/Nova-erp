@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -19,12 +20,6 @@ import { Separator } from '../ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '../ui/switch';
 
-const SUBSIDY_TABLE: Record<AreaRange, Record<string, number>> = {
-    '100-199': { 'حديد التسليح': 2100, 'طابوق عازل': 600, 'طابوق أسود': 400, 'أسمنت': 500, 'خرسانة جاهزة': 2000, 'تكييف': 2000, 'ألمنيوم': 855, 'مواد اختيارية': 400 },
-    '200-299': { 'حديد التسليح': 3150, 'طابوق عازل': 900, 'طابوق أسود': 600, 'أسمنت': 750, 'خرسانة جاهزة': 3000, 'تكييف': 2500, 'ألمنيوم': 1200, 'مواد اختيارية': 600 },
-    '300-400': { 'حديد التسليح': 4200, 'طابوق عازل': 1200, 'طابوق أسود': 800, 'أسمنت': 1000, 'خرسانة جاهزة': 4000, 'تكييف': 3000, 'ألمنيوم': 1628, 'مواد اختيارية': 800 },
-};
-
 const projectSchema = z.object({
   projectName: z.string().min(1, "اسم المشروع مطلوب."),
   clientId: z.string().min(1, "العميل مطلوب."),
@@ -39,6 +34,7 @@ const projectSchema = z.object({
   kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   sanitaryMaterialsIncluded: z.boolean().default(false),
+  sanitaryExtensionType: z.enum(['ordinary', 'suspended']).default('ordinary'),
   
   suspendedExtensionCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   ordinaryExtensionCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
@@ -57,9 +53,6 @@ const projectSchema = z.object({
       street: z.string().optional(),
       houseNumber: z.string().optional(),
   }),
-  subsidyAreaRange: z.enum(['100-199', '200-299', '300-400']).optional(),
-  subsidyRequestId: z.string().optional(),
-  subsidyExpiryDate: z.date().optional(),
   startDate: z.date(),
   status: z.enum(['مخطط', 'قيد التنفيذ', 'مكتمل', 'معلق']),
   mainEngineerId: z.string().min(1, "المهندس الرئيسي مطلوب."),
@@ -82,7 +75,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients');
     const { data: engineers = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
-    const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     const { data: governorates = [] } = useSubscription<Governorate>(firestore, 'governorates', [orderBy('name')]);
     
     const [areas, setAreas] = useState<Area[]>([]);
@@ -96,6 +88,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
             workNature: 'labor_only',
             bathroomsCount: 0, kitchensCount: 0, laundryRoomsCount: 0, 
             sanitaryMaterialsIncluded: false,
+            sanitaryExtensionType: 'ordinary',
             suspendedExtensionCount: 0, ordinaryExtensionCount: 0,
             suspendedToiletCount: 0, ordinaryToiletCount: 0,
             hiddenShowerCount: 0, ordinaryShowerCount: 0,
@@ -104,7 +97,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         }
     });
 
-    const projectCategory = watch('projectCategory');
     const selectedGov = watch('siteAddress.governorate');
     const watchedWorkNature = watch('workNature');
 
@@ -162,7 +154,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
                     <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
                     
-                    {/* إخفاء طبيعة التعاقد إذا كانت مصنعية فقط */}
                     {watchedWorkNature !== 'labor_only' && (
                         <div className="grid gap-2">
                             <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
@@ -187,10 +178,22 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                     <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700"><Droplets className="h-4 w-4" /> مواصفات عقد وتوزيع أعداد الصحي</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات (محسوب)</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
                         <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
                         <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-xs font-bold text-blue-800">نوع التمديد المعتمد</Label>
+                            <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ordinary">تمديد عادي</SelectItem>
+                                        <SelectItem value="suspended">تمديد معلق</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}/>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 bg-white rounded-xl border border-blue-100">
                         <div className="space-y-3"><Label className="font-black text-blue-900">توزيع نوع التمديد</Label>

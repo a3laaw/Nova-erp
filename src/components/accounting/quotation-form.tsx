@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -51,6 +52,9 @@ const quotationSchema = z.object({
   kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   sanitaryMaterialsIncluded: z.boolean().default(false),
+  sanitaryExtensionType: z.enum(['ordinary', 'suspended']).default('ordinary'),
+  toiletType: z.enum(['ordinary', 'suspended']).default('ordinary'),
+  showerType: z.enum(['ordinary', 'hidden']).default('ordinary'),
   
   suspendedExtensionCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   ordinaryExtensionCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
@@ -98,6 +102,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         roofExtension: 'none',
         workNature: 'labor_only',
         sanitaryMaterialsIncluded: false,
+        sanitaryExtensionType: 'ordinary',
+        toiletType: 'ordinary',
+        showerType: 'ordinary',
         bathroomsCount: 0,
         suspendedExtensionCount: 0, ordinaryExtensionCount: 0,
         suspendedToiletCount: 0, ordinaryToiletCount: 0,
@@ -190,7 +197,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               <Input {...register('subject')} placeholder="مثال: عرض سعر توريد وتركيب..." />
           </div>
           <div className="grid gap-2">
-              <Label className="font-bold">تاريخ العرض</Label>
+              <Label className="font-bold">التاريخ</Label>
               <Controller name="date" control={control} render={({ field }) => <DateInput value={field.value} onChange={field.onChange} />} />
           </div>
           <div className="grid gap-2">
@@ -207,7 +214,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
               <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
               
-              {/* إخفاء طبيعة التعاقد إذا كانت مصنعية فقط */}
               {watchedWorkNature !== 'labor_only' && (
                 <div className="grid gap-2">
                     <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
@@ -235,10 +241,22 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-8">
-                        <div className="grid grid-cols-3 gap-6">
-                            <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات (محسوب)</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
                             <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
                             <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-xs font-bold text-blue-800">نوع التمديد المعتمد</Label>
+                                <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ordinary">تمديد عادي</SelectItem>
+                                            <SelectItem value="suspended">تمديد معلق</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
                         </div>
 
                         <Separator className="bg-blue-100" />

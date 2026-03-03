@@ -14,8 +14,6 @@ interface TransactionContractProps {
   transaction: ClientTransaction;
 }
 
-const arabicOrdinals = ['أولاً', 'ثانياً', 'ثالثاً', 'رابعاً', 'خامساً', 'سادساً', 'سابعاً', 'ثامناً', 'تاسعاً', 'عاشراً'];
-
 const roofExtensionLabels: Record<string, string> = {
     none: 'بدون توسعة',
     quarter: 'ربع دور',
@@ -34,12 +32,16 @@ const workNatureLabels: Record<string, string> = {
     with_materials: 'عقد توريد وتنفيذ (شامل المواد)'
 };
 
+const extensionTypeLabels: Record<string, string> = {
+    ordinary: 'تمديد عادي',
+    suspended: 'تمديد معلق'
+};
+
 export function TransactionContract({ client, transaction }: TransactionContractProps) {
     const { branding } = useBranding();
     const [contractDate, setContractDate] = useState('');
     const [contractNumber, setContractNumber] = useState('');
     
-    const scopeOfWork = transaction.contract?.scopeOfWork || [];
     const clauses = transaction.contract?.clauses || [];
     const financials = transaction.contract;
     const specs = transaction.contract?.specs;
@@ -137,6 +139,10 @@ export function TransactionContract({ client, transaction }: TransactionContract
                             {isSanitary && (
                                 <div className="border-2 rounded-2xl overflow-hidden bg-blue-50/10 border-blue-100">
                                     <div className="bg-blue-600 text-white p-2 text-center text-xs font-black">تفاصيل عقد وتوزيع الأعداد الصحية</div>
+                                    <div className="p-3 border-b border-blue-100 bg-blue-50/50 flex justify-between items-center text-xs">
+                                        <span className="font-bold text-blue-800">نوع التمديد المعتمد:</span>
+                                        <Badge className="bg-blue-600 text-white border-none">{extensionTypeLabels[specs.sanitaryExtensionType || 'ordinary']}</Badge>
+                                    </div>
                                     <table className="w-full text-center border-collapse">
                                         <thead>
                                             <tr className="bg-blue-50 text-[9px] font-black text-blue-800 border-b border-blue-100">
