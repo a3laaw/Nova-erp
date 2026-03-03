@@ -9,21 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Building2, Layers, Ruler, Droplets, Zap, Package, ArrowDownLeft, FileSignature } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Ruler, Building2, Layers, Droplets, Zap, Package, ArrowDownLeft, FileSignature } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import type { Client, Quotation, ContractTemplate, ConstructionType, ConstructionProject } from '@/lib/types';
+import type { Client, Quotation, ContractTemplate, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
-import { Textarea } from '@/components/ui/textarea';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { toFirestoreDate } from '@/services/date-converter';
-import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -45,37 +43,31 @@ const quotationSchema = z.object({
   date: z.date({ required_error: "التاريخ مطلوب." }),
   validUntil: z.date({ required_error: "تاريخ الانتهاء مطلوب." }),
   
-  // المواصفات الفنية المتعاقد عليها
   totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
   basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
   workNature: z.enum(['labor_only', 'with_materials']).default('labor_only'),
   
-  // مواصفات الصحي التفصيلية
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   sanitaryMaterialsIncluded: z.boolean().default(false),
-  sanitaryExtensionType: z.enum(['suspended', 'ordinary']).default('ordinary'),
-  toiletType: z.enum(['suspended', 'ordinary']).default('ordinary'),
-  showerType: z.enum(['hidden', 'ordinary']).default('ordinary'),
+  
+  suspendedExtensionCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  ordinaryExtensionCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  suspendedToiletCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  ordinaryToiletCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  hiddenShowerCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  ordinaryShowerCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
 
-  // مواصفات الكهرباء
   electricalPointsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   planReferenceNumber: z.string().optional(),
 
   items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
   notes: z.string().optional(),
-  departmentId: z.string().optional(),
-  transactionTypeId: z.string().optional(),
   financialsType: z.enum(['fixed', 'percentage']),
   totalAmount: z.preprocess((a) => parseFloat(String(a || '0')), z.number().optional()),
-  scopeOfWork: z.array(z.any()).optional(),
-  termsAndConditions: z.array(z.any()).optional(),
-  openClauses: z.array(z.any()).optional(),
-  templateDescription: z.string().optional(),
-  templateId: z.string().optional(),
 });
 
 type QuotationFormValues = z.infer<typeof quotationSchema>;
@@ -109,9 +101,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         roofExtension: 'none',
         workNature: 'labor_only',
         sanitaryMaterialsIncluded: false,
-        sanitaryExtensionType: 'ordinary',
-        toiletType: 'ordinary',
-        showerType: 'ordinary',
+        bathroomsCount: 0,
+        suspendedExtensionCount: 0, ordinaryExtensionCount: 0,
+        suspendedToiletCount: 0, ordinaryToiletCount: 0,
+        hiddenShowerCount: 0, ordinaryShowerCount: 0,
         items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }]
     }
   });
@@ -124,7 +117,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const watchedSubject = watch("subject");
   const watchedWorkNature = watch("workNature");
 
-  // منطق الظهور المشروط بناءً على التخصص
   const showSanitary = React.useMemo(() => watchedSubject?.includes('صحي'), [watchedSubject]);
   const showElectrical = React.useMemo(() => watchedSubject?.includes('كهرباء'), [watchedSubject]);
   
@@ -145,16 +137,10 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           getDocs(query(collection(firestore, 'contractTemplates'), orderBy('title'))),
           getDocs(query(collection(firestore, 'projects'), where('status', '==', 'مخطط')))
         ]);
-
         setClients(clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)));
         setAllTemplates(templatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ContractTemplate)));
         setProjects(projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ConstructionProject)));
-
-      } catch (error) {
-        console.error("Error fetching reference data:", error);
-      } finally {
-        setRefDataLoading(false);
-      }
+      } catch (error) { console.error(error); } finally { setRefDataLoading(false); }
     };
     fetchRefData();
   }, [firestore]);
@@ -162,32 +148,20 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
-
     setValue('financialsType', template.financials?.type || 'fixed');
     setValue('totalAmount', template.financials?.totalAmount || 0);
-    setValue('templateDescription', template.description || '');
-    setValue('scopeOfWork', template.scopeOfWork || []);
-    setValue('termsAndConditions', template.termsAndConditions || []);
-    setValue('openClauses', template.openClauses || []);
     setValue('subject', template.title);
-
     const newItems = template.financials?.milestones?.map(m => ({
-      id: generateId(),
-      description: m.name,
-      quantity: 1,
+      id: generateId(), description: m.name, quantity: 1,
       unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
       percentage: template.financials?.type === 'percentage' ? Number(m.value) : 0,
       condition: m.condition || '',
     })) || [];
-
     replace(newItems);
-    toast({ title: 'تم تحميل النموذج', description: 'يمكنك الآن تعديل الأسعار والبنود كما ترغب.' });
   };
 
   const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr })), [clients]);
-  const projectOptions = React.useMemo(() => 
-    projects.filter(p => p.clientId === selectedClientId).map(p => ({ value: p.id!, label: p.projectName })),
-  [projects, selectedClientId]);
+  const projectOptions = React.useMemo(() => projects.filter(p => p.clientId === selectedClientId).map(p => ({ value: p.id!, label: p.projectName })), [projects, selectedClientId]);
   const templateOptions = React.useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
 
   return (
@@ -226,118 +200,66 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
       </div>
 
-      {/* --- قسم المواصفات الفنية والمساحات (ثابتة للكل) --- */}
       <div className="space-y-6">
           <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
-              <div className="grid gap-2">
-                  <Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة الإجمالية (م²)</Label>
-                  <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-10 font-mono font-bold" />
-              </div>
-              <div className="grid gap-2">
-                  <Label>عدد الأدوار</Label>
-                  <Input type="number" {...register('floorsCount')} placeholder="1" className="h-10" />
-              </div>
-              <div className="grid gap-2">
-                  <Label>توسعة السطح</Label>
-                  <Controller name="roofExtension" control={control} render={({field}) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent>
-                      </Select>
-                  )}/>
-              </div>
-              <div className="grid gap-2">
-                  <Label>خيار السرداب</Label>
-                  <Controller name="basementType" control={control} render={({field}) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="none">بدون سرداب</SelectItem>
-                              <SelectItem value="full">سرداب كامل</SelectItem>
-                              <SelectItem value="half">سرداب نص</SelectItem>
-                              <SelectItem value="vault">قبو</SelectItem>
-                          </SelectContent>
-                      </Select>
-                  )}/>
-              </div>
-              <div className="grid gap-2">
-                  <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
-                  <Controller name="workNature" control={control} render={({field}) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                          <SelectTrigger className="h-10 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
-                              <SelectItem value="with_materials">عقد مع المواد</SelectItem>
-                          </SelectContent>
-                      </Select>
-                  )}/>
-              </div>
+              <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-10 font-mono font-bold" /></div>
+              <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-10" /></div>
+              <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد مع المواد</SelectItem></SelectContent></Select>)}/></div>
           </div>
 
-          {/* مواصفات الصحي تظهر فقط لعقود الصحي */}
           {showSanitary && (
             <div className="space-y-6 animate-in fade-in zoom-in-95">
                 <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
                     <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
                         <CardTitle className="text-base font-black flex items-center gap-2 text-blue-700">
-                            <Droplets className="h-5 w-5"/> تفاصيل التمديدات والأجهزة الصحية
+                            <Droplets className="h-5 w-5"/> تفاصيل التمديدات والأجهزة الصحية (توزيع الأعداد)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-8">
-                        {/* الأعداد */}
                         <div className="grid grid-cols-3 gap-6">
-                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" /></div>
                             <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
                             <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
                         </div>
 
                         <Separator className="bg-blue-100" />
 
-                        {/* خيارات النوع */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="grid gap-3">
-                                <Label className="font-bold text-blue-900">نوع التمديد</Label>
-                                <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
-                                    <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="ordinary">عادي</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent>
-                                    </Select>
-                                )}/>
-                            </div>
-                            <div className="grid gap-3">
-                                <Label className="font-bold text-blue-900">نوع المراحيض</Label>
-                                <Controller name="toiletType" control={control} render={({field}) => (
-                                    <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="ordinary">عادي</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent>
-                                    </Select>
-                                )}/>
-                            </div>
-                            <div className="grid gap-3">
-                                <Label className="font-bold text-blue-900">نوع الشاورات</Label>
-                                <Controller name="showerType" control={control} render={({field}) => (
-                                    <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="ordinary">عادي</SelectItem><SelectItem value="hidden">مخفي</SelectItem></SelectContent>
-                                    </Select>
-                                )}/>
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-4 bg-white rounded-xl border border-blue-100">
+                                <div className="space-y-3">
+                                    <Label className="font-black text-blue-900">توزيع نوع التمديد (حمامات)</Label>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">تمديد معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center border-blue-200" /></div>
+                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">تمديد عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    <Label className="font-black text-blue-900">توزيع نوع المراحيض</Label>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">مرحاض معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
+                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">مرحاض عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
+                                    </div>
+                                </div>
+                                <div className="space-y-3 md:col-span-2">
+                                    <Label className="font-black text-blue-900">توزيع نوع الشاورات</Label>
+                                    <div className="flex gap-4 max-w-md">
+                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">شاور مخفي (عدد)</Label><Input type="number" {...register('hiddenShowerCount')} className="h-9 text-center border-blue-200" /></div>
+                                        <div className="flex-1 space-y-1"><Label className="text-[10px]">شاور عادي (عدد)</Label><Input type="number" {...register('ordinaryShowerCount')} className="h-9 text-center" /></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         {watchedWorkNature === 'with_materials' && (
-                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
+                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <Package className="h-5 w-5 text-blue-600" />
-                                    <div>
-                                        <p className="font-bold text-blue-900">توريد المواد الأساسية</p>
-                                        <p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة (مثل البيبات والقطع الرئيسية)؟</p>
-                                    </div>
+                                    <div><p className="font-bold text-blue-900">توريد المواد الأساسية</p><p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة؟</p></div>
                                 </div>
-                                <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (
-                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                )}/>
+                                <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
                             </div>
                         )}
                     </CardContent>
@@ -345,23 +267,12 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
             </div>
           )}
 
-          {/* مواصفات الكهرباء تظهر فقط لعقود الكهرباء */}
           {showElectrical && (
             <Card className="rounded-2xl border-2 border-yellow-100 bg-yellow-50/10 animate-in fade-in zoom-in-95">
-                <CardHeader className="pb-4">
-                    <CardTitle className="text-sm font-black flex items-center gap-2 text-yellow-700">
-                        <Zap className="h-4 w-4"/> مواصفات الكهرباء (نقاط)
-                    </CardTitle>
-                </CardHeader>
+                <CardHeader className="pb-4"><CardTitle className="text-sm font-black flex items-center gap-2 text-yellow-700"><Zap className="h-4 w-4"/> مواصفات الكهرباء (نقاط)</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-1.5">
-                        <Label className="text-[10px] font-bold">عدد نقاط الكهرباء</Label>
-                        <Input type="number" {...register('electricalPointsCount')} className="h-9 text-center font-black" placeholder="بناءً على المخطط" />
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label className="text-[10px] font-bold">رقم مرجع المخطط</Label>
-                        <Input {...register('planReferenceNumber')} className="h-9 text-center font-mono text-xs" placeholder="Ref-000" />
-                    </div>
+                    <div className="grid gap-1.5"><Label className="text-[10px] font-bold">عدد نقاط الكهرباء</Label><Input type="number" {...register('electricalPointsCount')} className="h-9 text-center font-black" /></div>
+                    <div className="grid gap-1.5"><Label className="text-[10px] font-bold">رقم مرجع المخطط</Label><Input {...register('planReferenceNumber')} className="h-9 text-center font-mono text-xs" /></div>
                 </CardContent>
             </Card>
           )}
@@ -375,10 +286,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                   <Controller name="financialsType" control={control} render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
                           <SelectTrigger className="w-32 h-8 rounded-full"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="fixed">مبالغ ثابتة</SelectItem>
-                              <SelectItem value="percentage">نسبة مئوية</SelectItem>
-                          </SelectContent>
+                          <SelectContent><SelectItem value="fixed">مبلغ ثابت</SelectItem><SelectItem value="percentage">نسبة مئوية</SelectItem></SelectContent>
                       </Select>
                   )} />
               </div>
@@ -386,40 +294,18 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
           <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
               <Table>
-                  <TableHeader className="bg-muted/50">
-                      <TableRow className="h-14 border-b-2">
-                          <TableHead className="px-6 font-bold">بيان الدفعة / البند</TableHead>
-                          <TableHead className="text-center font-bold w-32">{financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}</TableHead>
-                          <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                  </TableHeader>
+                  <TableHeader className="bg-muted/50"><TableRow className="h-14 border-b-2"><TableHead className="px-6 font-bold">بيان الدفعة / البند</TableHead><TableHead className="text-center font-bold w-32">{financials_type === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}</TableHead><TableHead className="w-12"></TableHead></TableRow></TableHeader>
                   <TableBody>
                       {fields.map((field, index) => (
                           <TableRow key={field.id} className="h-16 border-b last:border-0">
-                              <TableCell className="px-4">
-                                  <Input {...register(`items.${index}.description`)} className="font-bold border-none shadow-none focus-visible:ring-0 text-base" placeholder="وصف الدفعة..." />
-                              </TableCell>
-                              <TableCell>
-                                  <Input 
-                                    type="number" step="any" 
-                                    {...register(financials_type === 'percentage' ? `items.${index}.percentage` : `items.${index}.unitPrice`)} 
-                                    className="text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0" 
-                                  />
-                              </TableCell>
-                              <TableCell className="text-center">
-                                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
-                              </TableCell>
+                              <TableCell className="px-4"><Input {...register(`items.${index}.description`)} className="font-bold border-none shadow-none focus-visible:ring-0 text-base" /></TableCell>
+                              <TableCell><Input type="number" step="any" {...register(financials_type === 'percentage' ? `items.${index}.percentage` : `items.${index}.unitPrice`)} className="text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0" /></TableCell>
+                              <TableCell className="text-center"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button></TableCell>
                           </TableRow>
                       ))}
                   </TableBody>
                   <TableFooter className="bg-primary/5">
-                      <TableRow className="h-20 border-t-4">
-                          <TableCell className="text-right px-12 font-black text-xl">إجمالي قيمة العرض:</TableCell>
-                          <TableCell className="text-center font-mono text-2xl font-black text-primary">
-                              {financials_type === 'fixed' ? formatCurrency(totalCalculatedAmount) : `${totalCalculatedAmount}%`}
-                          </TableCell>
-                          <TableCell />
-                      </TableRow>
+                      <TableRow className="h-20 border-t-4"><TableCell className="text-right px-12 font-black text-xl">إجمالي قيمة العرض:</TableCell><TableCell className="text-center font-mono text-2xl font-black text-primary">{financials_type === 'fixed' ? formatCurrency(totalCalculatedAmount) : `${totalCalculatedAmount}%`}</TableCell><TableCell /></TableRow>
                   </TableFooter>
               </Table>
           </div>

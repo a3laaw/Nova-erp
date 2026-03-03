@@ -31,15 +31,26 @@ export interface TechnicalSpecifications {
     basementType: 'none' | 'full' | 'half' | 'vault';
     floorsCount: number;
     roofExtension: 'none' | 'quarter' | 'half';
-    workNature?: 'labor_only' | 'with_materials'; // طبيعة التعاقد
-    // مواصفات الصحي التفصيلية
+    workNature?: 'labor_only' | 'with_materials'; 
+    
+    // مواصفات الصحي التفصيلية (تم التحديث لدعم الأعداد)
     bathroomsCount?: number;
     kitchensCount?: number;
     laundryRoomsCount?: number;
     sanitaryMaterialsIncluded?: boolean;
-    sanitaryExtensionType?: 'suspended' | 'ordinary';
-    toiletType?: 'suspended' | 'ordinary';
-    showerType?: 'hidden' | 'ordinary';
+    
+    // أعداد أنواع التمديد
+    suspendedExtensionCount?: number;
+    ordinaryExtensionCount?: number;
+    
+    // أعداد أنواع المراحيض
+    suspendedToiletCount?: number;
+    ordinaryToiletCount?: number;
+    
+    // أعداد أنواع الشاور
+    hiddenShowerCount?: number;
+    ordinaryShowerCount?: number;
+
     // مواصفات الكهرباء
     electricalPointsCount?: number;
     planReferenceNumber?: string;
@@ -53,7 +64,6 @@ export interface ConstructionProject extends BaseEntity, TechnicalSpecifications
     projectCategory: ProjectCategory;
     projectType?: string;
     
-    // عنوان الموقع
     siteAddress: {
         governorate: string;
         area: string;
@@ -62,7 +72,6 @@ export interface ConstructionProject extends BaseEntity, TechnicalSpecifications
         houseNumber?: string;
     };
 
-    // بيانات دعم بنك الائتمان
     subsidyAreaRange?: AreaRange;
     subsidyRequestId?: string;
     subsidyExpiryDate?: Timestamp | any;
@@ -133,7 +142,7 @@ export interface ClientTransaction extends BaseEntity {
         scopeOfWork?: any[];
         termsAndConditions?: any[];
         openClauses?: any[];
-        specs?: TechnicalSpecifications; // إدراج المواصفات الفنية في العقد
+        specs?: TechnicalSpecifications; 
     };
     boqId?: string;
 }
