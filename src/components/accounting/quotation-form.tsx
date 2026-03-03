@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Building2, Layers, Ruler, Droplets, Zap, Package } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, LayoutGrid, Calculator, Building2, Layers, Ruler, Droplets, Zap, Package, ArrowDownLeft } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import type { Client, Quotation, ContractTemplate, ConstructionType, ConstructionProject } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +21,9 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { collection, getDocs, query, collectionGroup, orderBy, where, limit } from 'firebase/firestore';
 import { DialogFooter } from '@/components/ui/dialog';
-import { Switch } from '../ui/switch';
+import { Switch } from '@/components/ui/switch';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
