@@ -112,40 +112,57 @@ const navItems = {
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
-        { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: Clock },
-        { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: Hourglass },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
         { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ShoppingBag },
       ]
     },
 
     { 
-      label: 'المقاولات والإنشاءات',
-      icon: Construction,
+      label: 'التعاقد والمقايسات',
+      icon: FileSignature,
       roles: ['Admin', 'Engineer', 'Accountant'],
-      hrefPrefix: '/dashboard/construction',
+      hrefPrefix: '/dashboard/contracts',
       children: [
-        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
-        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { href: '/dashboard/construction/schedules', label: 'مراجعة الجداول الزمنية', icon: LayoutGrid },
-        { href: '/dashboard/construction/boq', label: 'مكتبة جداول الكميات (BOQ)', icon: ClipboardList },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد للمشاريع', icon: ArrowUpFromLine },
-        { href: '/dashboard/construction/subcontractors', label: 'إدارة مقاولي الباطن', icon: HardHat },
-        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات إنجاز الأعمال', icon: FileCheck },
-        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال', icon: Coins },
+        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
+        { href: '/dashboard/contracts', label: 'العقود المبرمة', icon: FileSignature },
+        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
       ]
     },
 
     { 
-      label: 'المبيعات والتجارة',
-      icon: Store,
-      roles: ['Admin', 'Accountant', 'Secretary'],
-      hrefPrefix: '/dashboard/sales',
+      label: 'المشاريع والتنفيذ',
+      icon: Construction,
+      roles: ['Admin', 'Engineer'],
+      hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/warehouse/sales-deliveries', label: 'فواتير المبيعات / التسليم', icon: Receipt },
-        { href: '/dashboard/warehouse/adjustments/new?type=sales_return', label: 'مردود مبيعات (مرتجع)', icon: RotateCcw },
-        { href: '/dashboard/accounting/client-statements', label: 'تحصيل مديونيات العملاء', icon: DollarSign },
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
+        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
+        { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: LayoutGrid },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد المواقع', icon: ArrowUpFromLine },
+        { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: Clock },
+        { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: Hourglass },
+      ]
+    },
+
+    { 
+      label: 'مقاولين الباطن',
+      icon: HardHat,
+      roles: ['Admin', 'Engineer', 'Accountant'],
+      hrefPrefix: '/dashboard/construction/subcontractors',
+      children: [
+        { href: '/dashboard/construction/subcontractors', label: 'سجل المقاولين', icon: Users },
+        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات إنجاز الأعمال', icon: FileCheck },
+      ]
+    },
+
+    { 
+      label: 'المطالبات المالية',
+      icon: Coins,
+      roles: ['Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/construction/payment-applications',
+      children: [
+        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال', icon: Coins },
+        { href: '/dashboard/accounting/client-statements', label: 'مديونيات العملاء', icon: DollarSign },
       ]
     },
 
@@ -159,7 +176,6 @@ const navItems = {
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
-        { href: '/dashboard/warehouse/adjustments/new?type=purchase_return', label: 'مردود مشتريات للمورد', icon: RotateCcw },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: BankIcon },
       ]
@@ -177,14 +193,13 @@ const navItems = {
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات بين المخازن', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات العجز والتلف', icon: Ban },
         { href: '/dashboard/warehouse/reports/balances', label: 'تقرير أرصدة الأصناف', icon: Package },
-        { href: '/dashboard/warehouse/reports/item-movement', label: 'كرت الصنف (الحركة)', icon: History },
       ]
     },
 
     { 
       label: 'المحاسبة والمالية', 
       icon: Wallet, 
-      roles: ['Admin', 'Accountant', 'Secretary'],
+      roles: ['Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
@@ -209,7 +224,6 @@ const navItems = {
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarX },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان', icon: Clock },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
-        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة', icon: Calculator },
         { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
     },
@@ -222,9 +236,9 @@ const navItems = {
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
-        { href: '/dashboard/contracts', label: 'نماذج العقود', icon: FileSignature },
         { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
+        { href: '/dashboard/settings/data-integrity', label: 'سلامة البيانات', icon: ShieldCheck },
       ]
     },
   ],
