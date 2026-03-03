@@ -49,7 +49,7 @@ import {
 import type { ConstructionProject, BoqItem, Account, PaymentApplication, InventoryAdjustment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { DateInput } from '@/components/ui/date-input';
@@ -107,8 +107,7 @@ export function PaymentApplicationForm({ onClose }: { onClose: () => void }) {
         const [boqItemsSnap, prevAppsSnap, subsidyIssuesSnap] = await Promise.all([
             getDocs(query(collection(firestore, `boqs/${selectedProject.boqId}/items`), orderBy('itemNumber'))),
             getDocs(query(collection(firestore, 'payment_applications'), where('projectId', '==', selectedProjectId), where('status', 'in', ['approved', 'paid']))),
-            // جلب المواد المدعومة المصروفة للموقع والتي لم تخصم من مستخلص سابق
-            getDocs(query(collection(firestore, 'inventoryAdjustments'), where('projectId', '==', selectedProjectId), where('type', '==', 'material_issue')))
+            getDocs(query(collection(firestore, 'grns'), where('projectId', '==', selectedProjectId), where('isSubsidy', '==', true)))
         ]);
 
         const previousTotals = new Map<string, number>();
@@ -120,18 +119,11 @@ export function PaymentApplicationForm({ onClose }: { onClose: () => void }) {
             });
         });
 
-        // حساب قيمة المواد المدعومة المستهلكة (لأغراض الخصم من الشركة لصالح المالك)
-        let totalSubsidyVal = 0;
-        subsidyIssuesSnap.forEach(doc => {
-            const adj = doc.data() as InventoryAdjustment;
-            adj.items?.forEach((item: any) => {
-                // نحن نحسب هنا البنود التي تم صرفها بقيمة صفرية أو وسمت كمدعومة
-                if (item.unitCost === 0 || item.isSubsidy) {
-                    totalSubsidyVal += item.totalCost || 0;
-                }
-            });
-        });
-        setSubsidizedMaterialsValue(totalSubsidyVal);
+        // حساب قيمة المواد المدعومة المستلمة والتي لم تخصم بعد من مستخلص سابق
+        const alreadySubtractedValue = prevAppsSnap.docs.reduce((sum, doc) => sum + (doc.data().subsidizedMaterialsValue || 0), 0);
+        const totalReceivedSubsidy = subsidyIssuesSnap.docs.reduce((sum, doc) => sum + (doc.data().totalValue || 0), 0);
+        
+        setSubsidizedMaterialsValue(Math.max(0, totalReceivedSubsidy - alreadySubtractedValue));
 
         const appItems = boqItemsSnap.docs
             .map(doc => {
@@ -253,7 +245,7 @@ export function PaymentApplicationForm({ onClose }: { onClose: () => void }) {
               {subsidizedMaterialsValue > 0 && (
                 <TableRow className="h-16 text-orange-700 bg-orange-50/50">
                     <TableCell colSpan={3} className="text-right px-12 font-black flex items-center justify-end gap-2">
-                        <ArrowDownCircle className="h-5 w-5" /> خصم قيمة المواد المدعومة (التموين المورد من المالك):
+                        <ArrowDownCircle className="h-5 w-5" /> خصم قيمة المواد المدعومة المستلمة للمشروع (-):
                     </TableCell>
                     <TableCell className="text-left font-mono text-xl font-black px-8">({formatCurrency(subsidizedMaterialsValue)})</TableCell>
                 </TableRow>

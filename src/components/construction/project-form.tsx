@@ -61,7 +61,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const { data: constructionTypes = [] } = useSubscription<ConstructionType>(firestore, 'construction_types', [orderBy('name')]);
     const { data: allItems = [] } = useSubscription<Item>(firestore, 'items', [orderBy('name')]);
     
-    // فلترة الأصناف التي تصلح للمدعوم
     const subsidyItems = useMemo(() => allItems.filter(i => i.isSubsidyEligible), [allItems]);
 
     const { register, handleSubmit, control, watch, formState: { errors }, reset, setValue } = useForm<ProjectFormValues>({
@@ -77,7 +76,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
     const { fields: quotaFields, append: appendQuota, remove: removeQuota } = useFieldArray({ control, name: "subsidyQuotas" });
     const projectCategory = watch('projectCategory');
-    const selectedClientId = watch('clientId');
 
     useEffect(() => {
         if (initialData) {
@@ -143,7 +141,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                 </div>
             </div>
 
-            {/* --- محرك حصص مواد البناء المدعومة --- */}
             {projectCategory === 'Private (Subsidized)' && (
                 <Card className="border-2 border-dashed border-primary shadow-lg rounded-3xl overflow-hidden bg-primary/5">
                     <CardHeader className="bg-primary/10">

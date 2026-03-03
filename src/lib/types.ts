@@ -45,7 +45,6 @@ export interface ConstructionProject extends BaseEntity {
     subcontractorId?: string;    
     subcontractorName?: string;
     numFloors?: string; 
-    // ميزات الدعم
     subsidyQuotas?: SubsidyQuota[];
 }
 
@@ -63,7 +62,7 @@ export interface JournalEntry extends BaseEntity {
     reconciliationStatus?: 'unreconciled' | 'reconciled';
     reconciliationInfo?: any;
     isBypassed?: boolean;
-    isSubsidyEntry?: boolean; // وسم القيود الخاصة بالدعم
+    isSubsidyEntry?: boolean; 
 }
 
 export interface JournalEntryLine {
@@ -131,8 +130,8 @@ export interface PaymentApplication extends BaseEntity {
     clientName: string; 
     projectName: string; 
     totalAmount: number; 
-    subsidizedMaterialsValue: number; // قيمة المواد المدعومة المخصومة
-    netDueAmount: number; // الصافي المستحق للشركة
+    subsidizedMaterialsValue: number; 
+    netDueAmount: number; 
     status: 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled'; 
     items: any[]; 
     journalEntryId?: string; 
@@ -166,8 +165,8 @@ export interface SubcontractorType extends BaseEntity { name: string; order?: nu
 export interface SubcontractorSpecialization extends BaseEntity { name: string; order?: number; }
 export interface SubcontractorCertificate extends BaseEntity { certificateNumber: string; date: any; subcontractorId: string; subcontractorName: string; projectId: string; projectName: string; amount: number; description: string; status: 'draft' | 'approved' | 'cancelled'; journalEntryId?: string; }
 export interface WorkTeam extends BaseEntity { name: string; leaderId?: string; leaderName?: string; }
-export interface InventoryAdjustment extends BaseEntity { adjustmentNumber: string; date: any; type: 'damage' | 'theft' | 'opening_balance' | 'transfer' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other'; warehouseId?: string; fromWarehouseId?: string; toWarehouseId?: string; notes?: string; items: any[]; journalEntryId?: string; projectId?: string | null; projectName?: string | null; clientId?: string | null; clientName?: string | null; issueType?: 'project_site' | 'direct_sale'; recoveredDiscount?: number; isDirectReturn?: boolean; isBypassed?: boolean; }
-export interface GoodsReceiptNote extends BaseEntity { grnNumber: string; purchaseOrderId: string; vendorId: string; vendorName: string; warehouseId: string; date: any; itemsReceived: any[]; totalValue: number; discountAmount: number; deliveryFees: number; journalEntryId: string; projectId?: string | null; isBypassed?: boolean; }
+export interface InventoryAdjustment extends BaseEntity { adjustmentNumber: string; date: any; type: 'damage' | 'theft' | 'opening_balance' | 'transfer' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other'; warehouseId?: string; fromWarehouseId?: string; toWarehouseId?: string; notes?: string; items: any[]; journalEntryId?: string; projectId?: string | null; projectName?: string | null; clientId?: string | null; clientName?: string | null; issueType?: 'project_site' | 'direct_sale'; recoveredDiscount?: number; isDirectReturn?: boolean; isBypassed?: boolean; isSubsidy?: boolean; }
+export interface GoodsReceiptNote extends BaseEntity { grnNumber: string; purchaseOrderId: string; vendorId: string; vendorName: string; warehouseId: string; date: any; itemsReceived: any[]; totalValue: number; discountAmount: number; deliveryFees: number; journalEntryId: string; projectId?: string | null; isBypassed?: boolean; isSubsidy?: boolean; }
 export interface ConstructionWorkStage extends BaseEntity { name: string; order: number; parentId: string | null; }
 export interface ConstructionType extends BaseEntity { name: string; }
 export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'JobChange' | 'StatusChange' | 'ResidencyUpdate' | 'DataUpdate'; field: string; oldValue: any; newValue: any; effectiveDate: any; changedBy: string; notes?: string; }
