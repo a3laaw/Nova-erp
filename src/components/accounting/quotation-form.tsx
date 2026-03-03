@@ -22,10 +22,9 @@ import { collection, getDocs, query, orderBy, where, limit } from 'firebase/fire
 import { DialogFooter } from '@/components/ui/dialog';
 import { Switch } from '../ui/switch';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '../ui/badge';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
-const milestoneNames = ['الأولى', 'الثانية', 'الثالثة', 'الرابعة', 'الخامسة', 'السادسة', 'السابعة', 'الثامنة', 'التاسعة', 'العاشرة'];
 
 const itemSchema = z.object({
   id: z.string().optional(),
@@ -91,7 +90,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const [clients, setClients] = React.useState<Client[]>([]);
   const [refDataLoading, setRefDataLoading] = React.useState(true);
 
-  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<QuotationFormValues>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors }, replace } = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
     defaultValues: {
         date: new Date(),
@@ -114,11 +113,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     }
   });
 
-  const { fields, append, remove, replace } = useFieldArray({ control, name: "items" });
   const watchedItems = watch("items");
   const financials_type = watch("financialsType");
   const total_amount = watch("totalAmount");
-  const selectedClientId = watch("clientId");
   const watchedSubject = watch("subject");
   const watchedWorkNature = watch("workNature");
 
@@ -174,7 +171,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     replace(newItems);
   };
 
-  const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id, label: c.nameAr })), [clients]);
+  const clientOptions = React.useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
   const templateOptions = React.useMemo(() => allTemplates.map(t => ({ value: t.id!, label: t.title })), [allTemplates]);
 
   return (
@@ -208,7 +205,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
       </div>
 
       <div className="space-y-6">
-          <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
+          <h3 className="text-lg font-black text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
               <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-mono font-bold" /></div>
               <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
@@ -238,16 +235,16 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                 <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
                     <CardHeader className="pb-4 bg-blue-50/50 border-b border-blue-100">
                         <CardTitle className="text-base font-black flex items-center gap-2 text-blue-700">
-                            <Droplets className="h-5 w-5"/> تفاصيل التمديدات والأجهزة الصحية (توزيع الأعداد)
+                            <Droplets className="h-5 w-5"/> تفاصيل التمديدات والأجهزة الصحية
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-6 space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
-                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
-                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
                             <div className="grid gap-1.5">
-                                <Label className="text-xs font-bold text-blue-800">نوع التمديد المعتمد</Label>
+                                <Label className="text-xs font-bold text-blue-800 text-center">نوع التمديد المعتمد</Label>
                                 <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
                                     <Select onValueChange={field.onChange} value={field.value}>
                                         <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
@@ -262,26 +259,44 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
                         <Separator className="bg-blue-100" />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
-                                <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع التمديد (حمامات)</Label>
-                                <div className="flex gap-4">
-                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center border-blue-200" /></div>
-                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
+                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع التمديد (حمامات)</Label>
+                                <div className="flex gap-2 justify-center w-full">
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">تمديد معلق</Label>
+                                        <Input type="number" {...register('suspendedExtensionCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
+                                    </div>
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">تمديد عادي</Label>
+                                        <Input type="number" {...register('ordinaryExtensionCount')} className="h-8 w-16 text-center p-0" />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
-                                <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع المراحيض</Label>
-                                <div className="flex gap-4">
-                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
-                                    <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
+                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع المراحيض</Label>
+                                <div className="flex gap-2 justify-center w-full">
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">مرحاض معلق</Label>
+                                        <Input type="number" {...register('suspendedToiletCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
+                                    </div>
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">مرحاض عادي</Label>
+                                        <Input type="number" {...register('ordinaryToiletCount')} className="h-8 w-16 text-center p-0" />
+                                    </div>
                                 </div>
                             </div>
-                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 md:col-span-2 max-w-xl mx-auto w-full">
-                                <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع الشاورات</Label>
-                                <div className="flex gap-4 justify-center">
-                                    <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور مخفي (عدد)</Label><Input type="number" {...register('hiddenShowerCount')} className="h-9 text-center border-blue-200" /></div>
-                                    <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور عادي (عدد)</Label><Input type="number" {...register('ordinaryShowerCount')} className="h-9 text-center" /></div>
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
+                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع الشاورات</Label>
+                                <div className="flex gap-2 justify-center w-full">
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">شاور مخفي</Label>
+                                        <Input type="number" {...register('hiddenShowerCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
+                                    </div>
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">شاور عادي</Label>
+                                        <Input type="number" {...register('ordinaryShowerCount')} className="h-8 w-16 text-center p-0" />
+                                    </div>
                                 </div>
                             </div>
                         </div>

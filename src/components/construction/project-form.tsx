@@ -99,9 +99,13 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
     const selectedGov = watch('siteAddress.governorate');
     const watchedWorkNature = watch('workNature');
+    const watchedProjectName = watch('projectName');
 
     const watchedSuspendedExt = watch('suspendedExtensionCount');
     const watchedOrdinaryExt = watch('ordinaryExtensionCount');
+
+    const showSanitary = useMemo(() => watchedProjectName?.includes('صحي'), [watchedProjectName]);
+    const showElectrical = useMemo(() => watchedProjectName?.includes('كهرباء'), [watchedProjectName]);
 
     useEffect(() => {
         const total = (Number(watchedSuspendedExt) || 0) + (Number(watchedOrdinaryExt) || 0);
@@ -175,72 +179,94 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                 </div>
             </div>
 
-            <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
-                <CardHeader className="pb-4 border-b border-blue-100 bg-blue-50/50">
-                    <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700"><Droplets className="h-4 w-4" /> مواصفات عقد وتوزيع أعداد الصحي</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
-                        <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
-                        <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-xs font-bold text-blue-800">نوع التمديد المعتمد</Label>
-                            <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="ordinary">تمديد عادي</SelectItem>
-                                        <SelectItem value="suspended">تمديد معلق</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}/>
+            {showSanitary && (
+                <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
+                    <CardHeader className="pb-4 border-b border-blue-100 bg-blue-50/50">
+                        <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700"><Droplets className="h-4 w-4" /> مواصفات عقد وتوزيع أعداد الصحي</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="grid gap-1.5"><Label className="text-xs font-black text-primary">إجمالي عدد الحمامات</Label><Input type="number" {...register('bathroomsCount')} readOnly className="h-10 text-center font-black bg-muted/50 border-primary/20" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800 text-center">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-xs font-bold text-blue-800 text-center">نوع التمديد المعتمد</Label>
+                                <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="ordinary">تمديد عادي</SelectItem>
+                                            <SelectItem value="suspended">تمديد معلق</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
-                            <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع التمديد (حمامات)</Label>
-                            <div className="flex gap-4">
-                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد معلق (عدد)</Label><Input type="number" {...register('suspendedExtensionCount')} className="h-9 text-center border-blue-200" /></div>
-                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">تمديد عادي (عدد)</Label><Input type="number" {...register('ordinaryExtensionCount')} className="h-9 text-center" /></div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
+                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع التمديد (حمامات)</Label>
+                                <div className="flex gap-2 justify-center w-full">
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">تمديد معلق</Label>
+                                        <Input type="number" {...register('suspendedExtensionCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
+                                    </div>
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">تمديد عادي</Label>
+                                        <Input type="number" {...register('ordinaryExtensionCount')} className="h-8 w-16 text-center p-0" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
+                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع المراحيض</Label>
+                                <div className="flex gap-2 justify-center w-full">
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">مرحاض معلق</Label>
+                                        <Input type="number" {...register('suspendedToiletCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
+                                    </div>
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">مرحاض عادي</Label>
+                                        <Input type="number" {...register('ordinaryToiletCount')} className="h-8 w-16 text-center p-0" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 flex flex-col items-center">
+                                <Label className="font-black text-blue-900 text-center block w-full text-[11px]">توزيع نوع الشاورات</Label>
+                                <div className="flex gap-2 justify-center w-full">
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">شاور مخفي</Label>
+                                        <Input type="number" {...register('hiddenShowerCount')} className="h-8 w-16 text-center border-blue-200 p-0" />
+                                    </div>
+                                    <div className="space-y-1 flex flex-col items-center">
+                                        <Label className="text-[9px] text-muted-foreground whitespace-nowrap">شاور عادي</Label>
+                                        <Input type="number" {...register('ordinaryShowerCount')} className="h-8 w-16 text-center p-0" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3">
-                            <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع المراحيض</Label>
-                            <div className="flex gap-4">
-                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض معلق (عدد)</Label><Input type="number" {...register('suspendedToiletCount')} className="h-9 text-center border-blue-200" /></div>
-                                <div className="flex-1 space-y-1"><Label className="text-[10px] text-center block">مرحاض عادي (عدد)</Label><Input type="number" {...register('ordinaryToiletCount')} className="h-9 text-center" /></div>
+                        
+                        {watchedWorkNature === 'with_materials' && (
+                            <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
+                                <div className="flex items-center gap-3">
+                                    <Package className="h-5 w-5 text-blue-600" />
+                                    <div><p className="font-bold text-blue-900">توريد المواد الأساسية</p><p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة؟</p></div>
+                                </div>
+                                <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
                             </div>
-                        </div>
-                        <div className="p-4 bg-white rounded-xl border border-blue-100 space-y-3 md:col-span-2 max-w-xl mx-auto w-full">
-                            <Label className="font-black text-blue-900 text-center block w-full">توزيع نوع الشاورات</Label>
-                            <div className="flex gap-4 justify-center">
-                                <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور مخفي (عدد)</Label><Input type="number" {...register('hiddenShowerCount')} className="h-9 text-center border-blue-200" /></div>
-                                <div className="flex-1 max-w-[180px] space-y-1"><Label className="text-[10px] text-center block">شاور عادي (عدد)</Label><Input type="number" {...register('ordinaryShowerCount')} className="h-9 text-center" /></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {watchedWorkNature === 'with_materials' && (
-                        <div className="p-4 bg-blue-600/5 rounded-xl border border-blue-200 flex items-center justify-between animate-in slide-in-from-top-2">
-                            <div className="flex items-center gap-3">
-                                <Package className="h-5 w-5 text-blue-600" />
-                                <div><p className="font-bold text-blue-900">توريد المواد الأساسية</p><p className="text-[10px] text-blue-700">هل يشمل العقد توريد المواد من قبل الشركة؟</p></div>
-                            </div>
-                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (<Switch checked={field.value} onCheckedChange={field.onChange} />)}/>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
-            <Card className="rounded-2xl border-2 border-yellow-100 bg-yellow-50/10">
-                <CardHeader className="pb-4"><CardTitle className="text-sm font-black flex items-center gap-2 text-yellow-700"><Zap className="h-4 w-4" /> مواصفات الكهرباء</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-1.5"><Label className="text-[10px] font-bold">عدد نقاط الكهرباء</Label><Input type="number" {...register('electricalPointsCount')} className="h-10 text-center font-black" /></div>
-                    <div className="grid gap-1.5"><Label className="text-[10px] font-bold">رقم مرجع المخطط</Label><Input {...register('planReferenceNumber')} className="h-10 text-center" /></div>
-                </CardContent>
-            </Card>
+            {showElectrical && (
+                <Card className="rounded-2xl border-2 border-yellow-100 bg-yellow-50/10">
+                    <CardHeader className="pb-4"><CardTitle className="text-sm font-black flex items-center gap-2 text-yellow-700"><Zap className="h-4 w-4" /> مواصفات الكهرباء</CardTitle></CardHeader>
+                    <CardContent className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-1.5"><Label className="text-[10px] font-bold">عدد نقاط الكهرباء</Label><Input type="number" {...register('electricalPointsCount')} className="h-10 text-center font-black" /></div>
+                        <div className="grid gap-1.5"><Label className="text-[10px] font-bold">رقم مرجع المخطط</Label><Input {...register('planReferenceNumber')} className="h-10 text-center" /></div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
         <DialogFooter className="pt-6 border-t">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
