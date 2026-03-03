@@ -59,7 +59,7 @@ export default function FieldVisitDetailPage() {
     const visitRef = useMemo(() => (firestore && id ? doc(firestore, 'field_visits', id) : null), [firestore, id]);
     const { data: visit, loading } = useDocument<FieldVisit>(firestore, visitRef?.path || null);
 
-    // ✨ محرك جلب بنود المقايسة للتأكيد (WBS Logic - مطابق للجدولة السريعة)
+    // ✨ محرك جلب بنود المقايسة للتأكيد (WBS logic من الجدولة الجماعية)
     useEffect(() => {
         const fetchStages = async () => {
             if (!visit || !firestore) return;

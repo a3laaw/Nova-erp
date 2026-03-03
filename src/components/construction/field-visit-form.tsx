@@ -43,7 +43,7 @@ export function FieldVisitForm() {
     const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
     const isSubcontracted = !!selectedProject?.subcontractorId;
 
-    // ✨ محرك جلب بنود المقايسة (WBS Engine - مطابق للجدولة السريعة)
+    // ✨ محرك جلب بنود المقايسة (WBS logic من الجدولة الجماعية)
     useEffect(() => {
         const fetchBoqData = async () => {
             if (!selectedProjectId || !firestore || projectsLoading) {
