@@ -78,7 +78,8 @@ import {
   Scale,
   Package,
   Landmark as BankIcon,
-  CalendarClock
+  CalendarClock,
+  ShieldCheck
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
