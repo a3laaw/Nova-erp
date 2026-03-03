@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -92,7 +91,7 @@ export default function FieldVisitDetailPage() {
                                 name: `${data.itemNumber} - ${data.description}`,
                                 isHeader: data.isHeader || false
                             }
-                        }).filter(i => !i.isHeader && i.name);
+                        }).filter(i => !i.isHeader && i.name && !i.name.includes('undefined'));
                         setBoqItems(stages);
                         
                         // تعيين المرحلة المخطط لها كافتراضية

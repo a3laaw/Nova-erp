@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -20,10 +19,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * نموذج جدولة زيارة موقع (المحرك المطور):
- * - يستخدم نفس منطق الجدولة الجماعية (Spreadsheet Logic) لضمان استقرار جلب بنود الـ WBS.
- */
 export function FieldVisitForm() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -52,6 +47,7 @@ export function FieldVisitForm() {
     // ✨ محرك جلب بنود المقايسة (مطابق للجدولة السريعة)
     useEffect(() => {
         const fetchBoqData = async () => {
+            // الانتظار حتى اكتمال تحميل المشاريع
             if (!selectedProjectId || !firestore || projectsLoading) {
                 setBoqItems([]);
                 setIsLoadingBoq(false);
@@ -276,7 +272,7 @@ export function FieldVisitForm() {
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/30 p-8 flex justify-end gap-3 border-t">
-                    <Button type="button" variant="ghost" onClick={() => router.back()}>إلغاء</Button>
+                    <Button type="button" variant="outline" onClick={() => router.back()}>إلغاء</Button>
                     <Button type="submit" disabled={isSaving || projectsLoading} className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-lg">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                         تأكيد الجدولة واللوجستيات
