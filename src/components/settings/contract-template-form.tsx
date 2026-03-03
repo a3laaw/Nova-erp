@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview نموذج إنشاء وتعديل قوالب العقود (استشارات ومقاولات).
  * يتميز بتصميم مكثف (Compact UI) وفصل بصري كامل بين الأقسام.
@@ -37,7 +38,8 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  AlertTriangle
+  AlertTriangle,
+  FileSignature
 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
@@ -69,6 +71,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [templateType] = useState<'Consulting' | 'Execution'>(template?.templateType || initialType);
+  const [workNature, setWorkNature] = useState<'labor_only' | 'with_materials'>(template?.workNature || 'labor_only');
   
   const [constructionTypeId, setConstructionTypeId] = useState('');
   const [selectedTransactionTypes, setSelectedTransactionTypes] = useState<string[]>([]);
@@ -167,6 +170,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
         setTermsAndConditions(template.termsAndConditions || []);
         setFinancials(template.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
         setOpenClauses(template.openClauses || []);
+        setWorkNature(template.workNature || 'labor_only');
     }
   }, [template, isOpen]);
 
@@ -175,12 +179,6 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     return templateType === 'Execution' ? constructionStages : allWorkStages;
   }, [templateType, constructionStages, allWorkStages]);
 
-  const addScopeItem = () => setScopeOfWork(prev => [...prev, { id: generateId(), title: '', description: '' }]);
-  const updateScopeItem = (id: string, field: 'title' | 'description', value: string) => {
-    setScopeOfWork(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
-  const removeScopeItem = (id: string) => setScopeOfWork(prev => prev.filter(item => item.id !== id));
-  
   const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
   const updateTerm = (id: string, value: string) => {
     setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
@@ -234,7 +232,7 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     setIsSaving(true);
     try {
         const templateData = {
-            title, description, templateType,
+            title, description, templateType, workNature,
             constructionTypeId: templateType === 'Execution' ? constructionTypeId : null,
             transactionTypes: templateType === 'Consulting' ? selectedTransactionTypes : [],
             scopeOfWork, termsAndConditions, financials, openClauses,
@@ -261,13 +259,25 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent dir="rtl" className="max-w-5xl h-[95vh] flex flex-col p-0 rounded-xl overflow-hidden shadow-2xl">
             <DialogHeader className={cn("p-4 border-b bg-card", templateType === 'Consulting' ? "border-primary/20" : "border-amber-600/20")}>
-                <div className="flex items-center gap-3">
-                    <div className={cn("p-2 rounded-lg", templateType === 'Consulting' ? "bg-primary text-white" : "bg-amber-600 text-white")}>
-                        {templateType === 'Execution' ? <Construction className="h-5 w-5" /> : <Briefcase className="h-5 w-5" />}
+                <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                        <div className={cn("p-2 rounded-lg", templateType === 'Consulting' ? "bg-primary text-white" : "bg-amber-600 text-white")}>
+                            {templateType === 'Execution' ? <Construction className="h-5 w-5" /> : <Briefcase className="h-5 w-5" />}
+                        </div>
+                        <div>
+                            <DialogTitle className="text-lg font-black">{template ? 'تعديل' : 'إنشاء'} قالب {templateType === 'Execution' ? 'عقد مقاولات' : 'عقد استشارات'}</DialogTitle>
+                            <DialogDescription className="text-[10px]">برمجة بنود العقد وشروط استحقاق الدفعات.</DialogDescription>
+                        </div>
                     </div>
-                    <div>
-                        <DialogTitle className="text-lg font-black">{template ? 'تعديل' : 'إنشاء'} قالب {templateType === 'Execution' ? 'عقد مقاولات' : 'عقد استشارات'}</DialogTitle>
-                        <DialogDescription className="text-[10px]">برمجة بنود العقد وشروط استحقاق الدفعات.</DialogDescription>
+                    <div className="flex items-center gap-3 bg-muted/30 p-2 rounded-xl border ml-8">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">طبيعة التعاقد:</Label>
+                        <Select value={workNature} onValueChange={(v: any) => setWorkNature(v)}>
+                            <SelectTrigger className="h-8 w-40 text-xs font-bold border-none bg-transparent shadow-none"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
+                                <SelectItem value="with_materials">عقد توريد وتنفيذ</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
             </DialogHeader>

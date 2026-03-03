@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -153,9 +154,13 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const handleTemplateSelect = (templateId: string) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
+    
+    // ✨ التوريث الذكي لطبيعة التعاقد من القالب
+    setValue('workNature', template.workNature || 'labor_only');
     setValue('financialsType', template.financials?.type || 'fixed');
     setValue('totalAmount', template.financials?.totalAmount || 0);
     setValue('subject', template.title);
+    
     const newItems = template.financials?.milestones?.map(m => ({
       id: generateId(), description: m.name, quantity: 1,
       unitPrice: template.financials?.type === 'fixed' ? Number(m.value) : 0,
@@ -179,7 +184,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
           </div>
           <div className="grid gap-2">
               <Label className="font-bold text-primary">استخدام نموذج عقد كمسودة</Label>
-              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً للتعبئة السريعة..." />
+              <InlineSearchList value="" onSelect={handleTemplateSelect} options={templateOptions} placeholder="اختر قالباً لتوريث طبيعة التعاقد والدفعات..." />
           </div>
       </div>
 
@@ -205,7 +210,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
               <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
               <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
               <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد مع المواد</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value} disabled={!!watchedSubject}><SelectTrigger className="h-11 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد توريد وتنفيذ</SelectItem></SelectContent></Select>)}/></div>
           </div>
 
           {showSanitary && (
