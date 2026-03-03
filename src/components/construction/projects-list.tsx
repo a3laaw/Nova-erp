@@ -18,7 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ArrowUpDown, Pencil, FolderLock, FolderOpen } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, Pencil, FolderLock, FolderOpen, Trash2, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,9 +36,18 @@ import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/utils';
-import { Input } from '../ui/input';
-import { doc, orderBy, query, updateDoc } from 'firebase/firestore';
+import { doc, orderBy, query, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusColors: Record<string, string> = {
     'مخطط': 'bg-yellow-100 text-yellow-800',
@@ -57,7 +66,7 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
     const { toast } = useToast();
     const [sorting, setSorting] = React.useState<SortingState>([]);
     const [isProcessing, setIsProcessing] = React.useState(false);
-
+    const [projectToDelete, setProjectToDelete] = React.useState<ConstructionProject | null>(null);
 
     const projectsQuery = React.useMemo(() => {
         if (!firestore) return null;
@@ -82,7 +91,7 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
         return date ? format(date, 'dd/MM/yyyy') : '-';
     };
 
-     const handleToggleStatus = async (project: ConstructionProject) => {
+    const handleToggleStatus = async (project: ConstructionProject) => {
         if (!firestore) return;
         setIsProcessing(true);
         const newStatus = project.status === 'معلق' ? 'قيد التنفيذ' : 'معلق';
@@ -101,6 +110,23 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
         }
     };
 
+    const handleDelete = async () => {
+        if (!firestore || !projectToDelete) return;
+        setIsProcessing(true);
+        try {
+            await deleteDoc(doc(firestore, 'projects', projectToDelete.id!));
+            toast({
+                title: 'تم الحذف',
+                description: `تم حذف المشروع "${projectToDelete.projectName}" بنجاح.`
+            });
+        } catch (error) {
+            console.error("Failed to delete project:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف المشروع.' });
+        } finally {
+            setIsProcessing(false);
+            setProjectToDelete(null);
+        }
+    };
 
     const columns = React.useMemo<ColumnDef<ConstructionProject>[]>(
         () => [
@@ -132,14 +158,9 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                 cell: ({ row }) => formatDate(row.original.startDate),
             },
             {
-                accessorKey: 'endDate',
-                header: 'تاريخ الانتهاء',
-                cell: ({ row }) => formatDate(row.original.endDate),
-            },
-            {
-                accessorKey: 'contractValue',
-                header: 'قيمة العقد',
-                cell: ({ row }) => formatCurrency(row.original.contractValue),
+                accessorKey: 'projectCategory',
+                header: 'الفئة',
+                cell: ({ row }) => <Badge variant="outline">{row.original.projectCategory === 'Private (Subsidized)' ? 'مدعوم' : 'تجاري'}</Badge>,
             },
             {
                 accessorKey: 'status',
@@ -184,6 +205,14 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
                                     {project.status === 'معلق' ? <FolderOpen className="ml-2 h-4 w-4" /> : <FolderLock className="ml-2 h-4 w-4" />}
                                     {project.status === 'معلق' ? 'إلغاء التعليق' : 'تعليق المشروع'}
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                    onClick={() => setProjectToDelete(project)} 
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                >
+                                    <Trash2 className="ml-2 h-4 w-4" />
+                                    حذف المشروع
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )
@@ -205,43 +234,64 @@ export function ProjectsList({ searchQuery }: ProjectsListProps) {
     });
 
     return (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                        <TableRow key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => (
-                                <TableHead key={header.id}>
-                                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                                </TableHead>
-                            ))}
-                        </TableRow>
-                    ))}
-                </TableHeader>
-                <TableBody>
-                    {loading ? (
-                         Array.from({ length: 5 }).map((_, i) => (
-                            <TableRow key={i}><TableCell colSpan={columns.length}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-                        ))
-                    ) : table.getRowModel().rows?.length ? (
-                        table.getRowModel().rows.map((row) => (
-                            <TableRow key={row.id}>
-                                {row.getVisibleCells().map((cell) => (
-                                    <TableCell key={cell.id}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </TableCell>
+        <>
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                    </TableHead>
                                 ))}
                             </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                            <TableCell colSpan={columns.length} className="h-24 text-center">
-                                لا توجد مشاريع مقاولات لعرضها.
-                            </TableCell>
-                        </TableRow>
-                    )}
-                </TableBody>
-            </Table>
-        </div>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}><TableCell colSpan={columns.length}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                            ))
+                        ) : table.getRowModel().rows?.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id}>
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center">
+                                    لا توجد مشاريع مقاولات لعرضها.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
+                <AlertDialogContent dir="rtl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد حذف المشروع؟</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            هل أنت متأكد من رغبتك في حذف المشروع "{projectToDelete?.projectName}"؟ 
+                            سيؤدي هذا إلى حذف كافة البيانات الفنية والهيكل المرتبط بالمشروع بشكل نهائي. 
+                            لا يمكن التراجع عن هذا الإجراء.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isProcessing}>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive hover:bg-destructive/90">
+                            {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالحذف'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
