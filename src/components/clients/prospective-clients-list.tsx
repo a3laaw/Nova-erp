@@ -10,9 +10,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Calendar, MoreHorizontal, Trash2, Loader2, Search, RotateCcw } from 'lucide-react';
+import { UserPlus, Calendar, MoreHorizontal, Trash2, Loader2, Search, RotateCcw, AlertTriangle } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, writeBatch, getDocs, doc } from 'firebase/firestore';
+import { collection, query, where, writeBatch, getDocs, doc, deleteDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Appointment, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
@@ -76,6 +76,7 @@ export function ProspectiveClientsList() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [clientToUnfollow, setClientToUnfollow] = useState<ProspectiveClient | null>(null);
+  const [clientToDelete, setClientToDelete] = useState<ProspectiveClient | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState<'active' | 'cancelled'>('active');
 
@@ -204,6 +205,31 @@ export function ProspectiveClientsList() {
     }
   };
 
+  const handleDeletePermanently = async () => {
+    if (!clientToDelete || !firestore) return;
+
+    setIsProcessing(true);
+    try {
+        const appointmentsRef = collection(firestore, 'appointments');
+        const q = query(appointmentsRef, where('clientMobile', '==', clientToDelete.mobile));
+        const querySnapshot = await getDocs(q);
+
+        const batch = writeBatch(firestore);
+        querySnapshot.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        toast({ title: 'تم الحذف', description: `تم حذف جميع سجلات العميل المحتمل ${clientToDelete.name} نهائياً.` });
+    } catch (error) {
+        console.error("Error deleting prospective client:", error);
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف السجلات.' });
+    } finally {
+        setIsProcessing(false);
+        setClientToDelete(null);
+    }
+  };
+
 
   return (
     <>
@@ -222,13 +248,14 @@ export function ProspectiveClientsList() {
                 />
             </div>
             <TabsContent value="active">
-                <ClientsTableView loading={loading} clients={filteredClients} onUnfollow={handleUnfollowClick} />
+                <ClientsTableView loading={loading} clients={filteredClients} onUnfollow={handleUnfollowClick} onDelete={setClientToDelete} />
             </TabsContent>
             <TabsContent value="cancelled">
-                 <ClientsTableView loading={loading} clients={filteredClients} onUnfollow={handleUnfollowClick} isCancelledView />
+                 <ClientsTableView loading={loading} clients={filteredClients} onUnfollow={handleUnfollowClick} onDelete={setClientToDelete} isCancelledView />
             </TabsContent>
           </Tabs>
       </div>
+
       <AlertDialog open={!!clientToUnfollow} onOpenChange={() => setClientToUnfollow(null)}>
         <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
@@ -249,6 +276,32 @@ export function ProspectiveClientsList() {
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+
+    <AlertDialog open={!!clientToDelete} onOpenChange={() => setClientToDelete(null)}>
+        <AlertDialogContent dir="rtl">
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="h-5 w-5" />
+                    تأكيد الحذف النهائي
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                    أنت على وشك حذف جميع سجلات المواعيد والمتابعات للعميل المحتمل <span className="font-bold text-foreground">"{clientToDelete?.name}"</span> نهائياً من النظام.
+                    <br />
+                    <span className="font-bold text-destructive">هذا الإجراء لا يمكن التراجع عنه.</span>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel disabled={isProcessing}>تراجع</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleDeletePermanently}
+                    disabled={isProcessing}
+                    className="bg-destructive hover:bg-destructive/90"
+                >
+                    {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، احذف نهائياً'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
@@ -258,11 +311,13 @@ function ClientsTableView({
     loading,
     clients,
     onUnfollow,
+    onDelete,
     isCancelledView = false
 }: {
     loading: boolean;
     clients: ProspectiveClient[];
     onUnfollow: (client: ProspectiveClient) => void;
+    onDelete: (client: ProspectiveClient) => void;
     isCancelledView?: boolean;
 }) {
   return (
@@ -322,15 +377,17 @@ function ClientsTableView({
                                         تحويل إلى عميل
                                     </Link>
                                   </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
                                   {!isCancelledView && (
-                                    <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onUnfollow(client)}>
+                                      <DropdownMenuItem className="text-orange-600 focus:text-orange-700" onClick={() => onUnfollow(client)}>
                                           <Trash2 className="ml-2 h-4 w-4" />
                                           إلغاء المتابعة
                                       </DropdownMenuItem>
-                                    </>
                                   )}
+                                  <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => onDelete(client)}>
+                                      <Trash2 className="ml-2 h-4 w-4" />
+                                      حذف نهائي
+                                  </DropdownMenuItem>
                               </DropdownMenuContent>
                           </DropdownMenu>
                       </TableCell>
