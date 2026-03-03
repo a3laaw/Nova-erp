@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview نموذج إنشاء وتعديل قوالب العقود (استشارات ومقاولات).
  * يتميز بتصميم مكثف (Compact UI) وفصل بصري كامل بين الأقسام.
@@ -18,6 +17,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '../ui/scroll-area';
