@@ -25,7 +25,8 @@ import {
     Droplets,
     Zap,
     LayoutDashboard,
-    Home
+    Home,
+    CheckCircle2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -64,6 +65,11 @@ const basementLabels: Record<string, string> = {
     full: 'سرداب كامل',
     half: 'سرداب نص',
     vault: 'قبو'
+};
+
+const extensionTypeLabels: Record<string, string> = {
+    ordinary: 'تمديد عادي',
+    suspended: 'تمديد معلق'
 };
 
 export default function ProjectDetailPage() {
@@ -145,27 +151,44 @@ export default function ProjectDetailPage() {
 
                             <Separator />
 
-                            {/* --- المواصفات الفنية التفصيلية في المعاينة --- */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-2">
+                            {/* --- المواصفات الفنية المدمجة --- */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
                                     <p className="text-[10px] font-black text-blue-700 uppercase flex items-center gap-1"><Droplets className="h-3 w-3"/> الصحي والبناء</p>
-                                    <div className="flex flex-col gap-1 text-xs font-bold">
-                                        <div className="flex justify-between">
+                                    <div className="flex flex-col gap-1.5 text-xs font-bold">
+                                        <div className="flex justify-between items-center bg-white/50 p-1.5 rounded-lg border border-blue-100/50">
                                             <span>حمامات: {project.bathroomsCount || 0}</span>
                                             <span>مطابخ: {project.kitchensCount || 0}</span>
                                         </div>
-                                        <div className="flex justify-between border-t pt-1 border-blue-200/50 mt-1">
-                                            <span>{basementLabels[project.basementType]}</span>
-                                            <span>{project.totalArea} م²</span>
+                                        <div className="flex justify-between px-1">
+                                            <span className="opacity-70">نوع التمديد:</span>
+                                            <span className="text-blue-800">{extensionTypeLabels[project.sanitaryExtensionType || 'ordinary']}</span>
+                                        </div>
+                                        <div className="flex justify-between px-1">
+                                            <span className="opacity-70">المواد:</span>
+                                            <Badge variant="outline" className="h-4 text-[8px] bg-white border-blue-200">{project.sanitaryMaterialsIncluded ? 'شاملة' : 'على المالك'}</Badge>
+                                        </div>
+                                        <Separator className="bg-blue-200/30 my-1" />
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className="bg-blue-600 text-white px-2 py-0.5 rounded-full">{basementLabels[project.basementType]}</span>
+                                            <span className="font-black text-blue-700">{project.totalArea} م²</span>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-4 bg-yellow-50/50 rounded-2xl border border-yellow-100 space-y-2">
+                                <div className="p-4 bg-yellow-50/50 rounded-2xl border border-yellow-100 space-y-3">
                                     <p className="text-[10px] font-black text-yellow-700 uppercase flex items-center gap-1"><Zap className="h-3 w-3"/> الكهرباء والأدوار</p>
-                                    <div className="flex flex-col gap-1 text-xs font-bold">
-                                        <span>الأدوار: {project.floorsCount}</span>
-                                        <span>النقاط: {project.electricalPointsCount || 0}</span>
-                                        <p className="text-[9px] font-bold text-yellow-600/70 font-mono border-t pt-1 border-yellow-200/50 mt-1">مخطط: {project.planReferenceNumber || '-'}</p>
+                                    <div className="flex flex-col gap-1.5 text-xs font-bold">
+                                        <div className="flex justify-between items-center bg-white/50 p-1.5 rounded-lg border border-yellow-100/50">
+                                            <span>عدد الأدوار: {project.floorsCount}</span>
+                                            <Badge variant="outline" className="h-4 text-[8px] bg-white">{roofExtensionLabels[project.roofExtension]}</Badge>
+                                        </div>
+                                        <div className="flex justify-between px-1 items-center">
+                                            <span className="opacity-70">النقاط المخططة:</span>
+                                            <span className="font-black text-xl text-yellow-800 font-mono">{project.electricalPointsCount || 0}</span>
+                                        </div>
+                                        <div className="p-2 bg-yellow-100/50 rounded-lg text-[9px] font-bold text-yellow-800 border border-yellow-200 mt-1">
+                                            مرجع المخطط: {project.planReferenceNumber || 'غير مسجل'}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

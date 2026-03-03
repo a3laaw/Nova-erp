@@ -31,9 +31,15 @@ export interface TechnicalSpecifications {
     basementType: 'none' | 'full' | 'half' | 'vault';
     floorsCount: number;
     roofExtension: 'none' | 'quarter' | 'half';
+    // مواصفات الصحي التفصيلية
     bathroomsCount?: number;
     kitchensCount?: number;
     laundryRoomsCount?: number;
+    sanitaryMaterialsIncluded?: boolean;
+    sanitaryExtensionType?: 'suspended' | 'ordinary';
+    toiletType?: 'suspended' | 'ordinary';
+    showerType?: 'hidden' | 'ordinary';
+    // مواصفات الكهرباء
     electricalPointsCount?: number;
     planReferenceNumber?: string;
 }

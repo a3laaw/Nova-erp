@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import type { ConstructionProject, Client, Employee, AreaRange, Governorate, Area, Item, SubsidyQuota } from '@/lib/types';
-import { Loader2, Save, ShieldCheck, PlusCircle, Trash2, Ruler, Building2, MapPin, Layers, Droplets, Zap, FileText } from 'lucide-react';
+import { Loader2, Save, ShieldCheck, PlusCircle, Trash2, Ruler, Building2, MapPin, Layers, Droplets, Zap, FileText, Package } from 'lucide-react';
 import { query, collection, orderBy, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -40,6 +40,10 @@ const projectSchema = z.object({
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   kitchensCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
   laundryRoomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
+  sanitaryMaterialsIncluded: z.boolean().default(false),
+  sanitaryExtensionType: z.enum(['suspended', 'ordinary']).default('ordinary'),
+  toiletType: z.enum(['suspended', 'ordinary']).default('ordinary'),
+  showerType: z.enum(['hidden', 'ordinary']).default('ordinary'),
   
   // مواصفات الكهرباء
   electricalPointsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
@@ -88,7 +92,10 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         defaultValues: {
             projectName: '', clientId: '', projectCategory: 'Private (Non-Subsidized)',
             totalArea: 0, basementType: 'none', floorsCount: 1, roofExtension: 'none',
-            bathroomsCount: 0, kitchensCount: 0, laundryRoomsCount: 0, electricalPointsCount: 0,
+            bathroomsCount: 0, kitchensCount: 0, laundryRoomsCount: 0, 
+            sanitaryMaterialsIncluded: false, sanitaryExtensionType: 'ordinary',
+            toiletType: 'ordinary', showerType: 'ordinary',
+            electricalPointsCount: 0,
             siteAddress: { governorate: '', area: '', block: '', street: '', houseNumber: '' },
             startDate: new Date(), status: 'مخطط', mainEngineerId: '', progressPercentage: 0,
             subsidyQuotas: []
@@ -194,7 +201,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                         <Input type="number" {...register('totalArea')} placeholder="0.00" className="h-11 font-mono font-bold" />
                     </div>
                     <div className="grid gap-2">
-                        <Label>عدد الأدوار (كهرباء)</Label>
+                        <Label>عدد الأدوار</Label>
                         <Input type="number" {...register('floorsCount')} placeholder="1" className="h-11" />
                     </div>
                     <div className="grid gap-2">
@@ -224,25 +231,53 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
             </div>
 
             {/* --- قسم مواصفات الصحي والكهرباء التفصيلية --- */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
                 <Card className="rounded-2xl border-2 border-blue-100 bg-blue-50/10">
-                    <CardHeader className="pb-4">
+                    <CardHeader className="pb-4 border-b border-blue-100 bg-blue-50/50">
                         <CardTitle className="text-sm font-black flex items-center gap-2 text-blue-700">
-                            <Droplets className="h-4 w-4" /> مواصفات الصحي (تمديدات)
+                            <Droplets className="h-4 w-4" /> مواصفات عقد التمديدات الصحية
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-3 gap-4">
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-bold">الحمامات</Label>
-                            <Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" />
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" /></div>
+                            <div className="grid gap-1.5"><Label className="text-xs font-bold text-blue-800">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" /></div>
                         </div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-bold">المطابخ</Label>
-                            <Input type="number" {...register('kitchensCount')} className="h-10 text-center font-black" />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid gap-2">
+                                <Label className="text-xs font-bold text-blue-800">نوع التمديد</Label>
+                                <Controller name="sanitaryExtensionType" control={control} render={({field}) => (
+                                    <Select value={field.value} onValueChange={field.onChange}>
+                                        <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="ordinary">عادي</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="text-xs font-bold text-blue-800">نوع المراحيض</Label>
+                                <Controller name="toiletType" control={control} render={({field}) => (
+                                    <Select value={field.value} onValueChange={field.onChange}>
+                                        <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="ordinary">عادي</SelectItem><SelectItem value="suspended">معلق</SelectItem></SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="text-xs font-bold text-blue-800">نوع الشاورات</Label>
+                                <Controller name="showerType" control={control} render={({field}) => (
+                                    <Select value={field.value} onValueChange={field.onChange}>
+                                        <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="ordinary">عادي</SelectItem><SelectItem value="hidden">مخفي</SelectItem></SelectContent>
+                                    </Select>
+                                )}/>
+                            </div>
                         </div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-bold">غرف الغسيل</Label>
-                            <Input type="number" {...register('laundryRoomsCount')} className="h-10 text-center font-black" />
+                        <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-blue-100">
+                            <Label className="text-xs font-bold text-blue-800">هل يشمل العقد توريد المواد؟</Label>
+                            <Controller name="sanitaryMaterialsIncluded" control={control} render={({field}) => (
+                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            )}/>
                         </div>
                     </CardContent>
                 </Card>

@@ -7,7 +7,7 @@ import { formatCurrency } from '@/lib/utils';
 import type { Client, ClientTransaction } from '@/lib/types';
 import { useBranding } from '@/context/branding-context';
 import { PrintableDocument } from '../layout/printable-document';
-import { Ruler, Building2, Droplets, Zap, Layers } from 'lucide-react';
+import { Ruler, Building2, Droplets, Zap, Layers, Package, Check } from 'lucide-react';
 
 interface TransactionContractProps {
   client: Client;
@@ -27,6 +27,21 @@ const basementLabels: Record<string, string> = {
     full: 'سرداب كامل',
     half: 'سرداب نص',
     vault: 'قبو'
+};
+
+const extensionTypeLabels: Record<string, string> = {
+    ordinary: 'عادي',
+    suspended: 'معلق'
+};
+
+const toiletTypeLabels: Record<string, string> = {
+    ordinary: 'عادي',
+    suspended: 'معلق'
+};
+
+const showerTypeLabels: Record<string, string> = {
+    ordinary: 'عادي',
+    hidden: 'مخفي'
 };
 
 export function TransactionContract({ client, transaction }: TransactionContractProps) {
@@ -106,42 +121,66 @@ export function TransactionContract({ client, transaction }: TransactionContract
                     </div>
                 </section>
 
-                {/* --- المواصفات الفنية المدمجة في العقد (شرطية) --- */}
+                {/* --- المواصفات الفنية المدمجة في العقد --- */}
                 {specs && (
                     <section>
-                        <h3 className="font-black border-r-4 border-primary pr-2 mb-4 text-lg">المواصفات الفنية والمساحات المتعاقد عليها</h3>
-                        <div className="p-6 border-2 border-dashed rounded-3xl grid grid-cols-2 md:grid-cols-3 gap-6">
-                            {/* المساحة والأدوار دائمة الظهور */}
-                            <div className="flex items-center gap-3">
-                                <Ruler className="h-5 w-5 text-primary" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">المساحة الإجمالية:</p><p className="font-bold">{specs.totalArea} م²</p></div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Layers className="h-5 w-5 text-primary" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">عدد الأدوار:</p><p className="font-bold">{specs.floorsCount} دور</p></div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Building2 className="h-5 w-5 text-primary" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">السرداب:</p><p className="font-bold">{basementLabels[specs.basementType]}</p></div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Building2 className="h-5 w-5 text-primary" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">توسعة السطح:</p><p className="font-bold">{roofExtensionLabels[specs.roofExtension]}</p></div>
+                        <h3 className="font-black border-r-4 border-primary pr-2 mb-4 text-lg">المواصفات الفنية والمساحات</h3>
+                        <div className="p-6 border-2 border-dashed rounded-3xl space-y-6">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div className="flex items-center gap-3">
+                                    <Ruler className="h-5 w-5 text-primary" />
+                                    <div><p className="text-[10px] font-bold text-muted-foreground uppercase">المساحة الإجمالية:</p><p className="font-bold">{specs.totalArea} م²</p></div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Layers className="h-5 w-5 text-primary" />
+                                    <div><p className="text-[10px] font-bold text-muted-foreground uppercase">عدد الأدوار:</p><p className="font-bold">{specs.floorsCount} دور</p></div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Building2 className="h-5 w-5 text-primary" />
+                                    <div><p className="text-[10px] font-bold text-muted-foreground uppercase">السرداب:</p><p className="font-bold">{basementLabels[specs.basementType]}</p></div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Layers className="h-5 w-5 text-primary" />
+                                    <div><p className="text-[10px] font-bold text-muted-foreground uppercase">السطح:</p><p className="font-bold">{roofExtensionLabels[specs.roofExtension]}</p></div>
+                                </div>
                             </div>
 
-                            {/* الصحي فقط لعقود الصحي */}
+                            {/* تفاصيل الصحي المحترفة - نفس الصورة */}
                             {isSanitary && (
-                                <div className="flex items-center gap-3 border-r-2 border-blue-200 pr-3">
-                                    <Droplets className="h-5 w-5 text-blue-600" />
-                                    <div><p className="text-[10px] font-bold text-blue-800 uppercase">مواصفات الصحي:</p><p className="font-bold">{specs.bathroomsCount} حمامات - {specs.kitchensCount} مطابخ</p></div>
+                                <div className="border-2 rounded-2xl overflow-hidden bg-blue-50/10 border-blue-100">
+                                    <div className="bg-blue-600 text-white p-2 text-center text-xs font-black">تفاصيل عقد التمديدات والأدوات الصحية</div>
+                                    <table className="w-full text-center border-collapse">
+                                        <thead>
+                                            <tr className="bg-blue-50 text-[10px] font-black text-blue-800 border-b border-blue-100">
+                                                <th className="p-2 border-l border-blue-100">حمامات</th>
+                                                <th className="p-2 border-l border-blue-100">مطابخ</th>
+                                                <th className="p-2 border-l border-blue-100">غرف غسيل</th>
+                                                <th className="p-2 border-l border-blue-100">نوع التمديد</th>
+                                                <th className="p-2 border-l border-blue-100">المراحيض</th>
+                                                <th className="p-2 border-l border-blue-100">الشاورات</th>
+                                                <th className="p-2">توفير المواد</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-xs font-bold">
+                                            <tr>
+                                                <td className="p-3 border-l border-blue-100">{specs.bathroomsCount}</td>
+                                                <td className="p-3 border-l border-blue-100">{specs.kitchensCount}</td>
+                                                <td className="p-3 border-l border-blue-100">{specs.laundryRoomsCount}</td>
+                                                <td className="p-3 border-l border-blue-100">{extensionTypeLabels[specs.sanitaryExtensionType || 'ordinary']}</td>
+                                                <td className="p-3 border-l border-blue-100">{toiletTypeLabels[specs.toiletType || 'ordinary']}</td>
+                                                <td className="p-3 border-l border-blue-100">{showerTypeLabels[specs.showerType || 'ordinary']}</td>
+                                                <td className="p-3">{specs.sanitaryMaterialsIncluded ? 'شامل المواد' : 'لا يشمل المواد'}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
 
-                            {/* الكهرباء فقط لعقود الكهرباء */}
+                            {/* الكهرباء */}
                             {isElectrical && (
-                                <div className="flex items-center gap-3 border-r-2 border-yellow-200 pr-3">
-                                    <Zap className="h-5 w-5 text-yellow-600" />
-                                    <div><p className="text-[10px] font-bold text-yellow-800 uppercase">نقاط الكهرباء:</p><p className="font-bold">{specs.electricalPointsCount} نقطة (حسب المخطط)</p></div>
+                                <div className="flex items-center gap-3 border-r-4 border-yellow-400 pr-4 bg-yellow-50/30 p-4 rounded-xl">
+                                    <Zap className="h-6 w-6 text-yellow-600" />
+                                    <div><p className="text-[10px] font-bold text-yellow-800 uppercase">نقاط الكهرباء والمخطط:</p><p className="font-bold">{specs.electricalPointsCount} نقطة (حسب المخطط المعتمد رقم: {specs.planReferenceNumber || '-'})</p></div>
                                 </div>
                             )}
                         </div>

@@ -12,7 +12,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Logo } from '@/components/layout/logo';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Printer, Pencil, ArrowRight, FileSignature, Ruler, Building2, Zap, Droplets, Layers } from 'lucide-react';
+import { Printer, Pencil, ArrowRight, FileSignature, Ruler, Building2, Zap, Droplets, Layers, Package, ArrowDownLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ContractClausesForm } from '@/components/clients/contract-clauses-form';
@@ -45,6 +45,21 @@ const basementLabels: Record<string, string> = {
     full: 'سرداب كامل',
     half: 'سرداب نص',
     vault: 'قبو'
+};
+
+const extensionTypeLabels: Record<string, string> = {
+    ordinary: 'تمديد عادي',
+    suspended: 'تمديد معلق'
+};
+
+const toiletTypeLabels: Record<string, string> = {
+    ordinary: 'مرحاض عادي',
+    suspended: 'مرحاض معلق'
+};
+
+const showerTypeLabels: Record<string, string> = {
+    ordinary: 'شاور عادي',
+    hidden: 'شاور مخفي'
 };
 
 export default function ViewQuotationPage() {
@@ -143,7 +158,6 @@ export default function ViewQuotationPage() {
                 <section className="mb-8 space-y-4">
                     <h3 className="font-black text-primary flex items-center gap-2 border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-6 border-2 border-dashed rounded-[2rem] bg-muted/5">
-                        {/* المساحة والأدوار تظهر للكل */}
                         <div className="flex items-center gap-2">
                             <Ruler className="h-4 w-4 text-muted-foreground" />
                             <div className="text-xs">
@@ -175,11 +189,22 @@ export default function ViewQuotationPage() {
 
                         {/* الصحي فقط لعقود الصحي */}
                         {showSanitary && (
-                            <div className="flex items-center gap-2 col-span-2 md:col-span-1 bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                                <Droplets className="h-4 w-4 text-blue-600" />
-                                <div className="text-[10px]">
-                                    <p className="font-bold text-blue-800">مواصفات الصحي:</p>
-                                    <span className="font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ</span>
+                            <div className="col-span-2 md:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100 animate-in fade-in">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-blue-800 uppercase flex items-center gap-1"><Droplets className="h-3 w-3"/> العدد التقريبي</span>
+                                    <span className="text-xs font-bold">{quotation.bathroomsCount} حمام / {quotation.kitchensCount} مطبخ / {quotation.laundryRoomsCount} غسيل</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-blue-800 uppercase">نوع التمديد</span>
+                                    <span className="text-xs font-bold">{extensionTypeLabels[quotation.sanitaryExtensionType || 'ordinary']}</span>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black text-blue-800 uppercase">المراحيض / الشاور</span>
+                                    <span className="text-xs font-bold">{toiletTypeLabels[quotation.toiletType || 'ordinary']} / {showerTypeLabels[quotation.showerType || 'ordinary']}</span>
+                                </div>
+                                <div className="flex flex-col border-r pr-3 border-blue-200">
+                                    <span className="text-[10px] font-black text-blue-800 uppercase flex items-center gap-1"><Package className="h-3 w-3"/> المواد</span>
+                                    <Badge variant="outline" className="w-fit text-[10px] font-bold bg-white">{quotation.sanitaryMaterialsIncluded ? 'شامل المواد' : 'بدون مواد'}</Badge>
                                 </div>
                             </div>
                         )}
@@ -234,7 +259,7 @@ export default function ViewQuotationPage() {
 
                 {quotation.notes && (
                     <section className="mt-8">
-                        <h4 className="font-black mb-2 text-primary flex items-center gap-2"><ArrowRight className="h-4 w-4"/> ملاحظات وشروط إضافية:</h4>
+                        <h4 className="font-black mb-2 text-primary flex items-center gap-2"><ArrowDownLeft className="h-4 w-4"/> ملاحظات وشروط إضافية:</h4>
                         <div className="text-sm leading-loose whitespace-pre-wrap p-6 bg-muted/10 rounded-2xl border-2 border-dashed">
                             {quotation.notes}
                         </div>
