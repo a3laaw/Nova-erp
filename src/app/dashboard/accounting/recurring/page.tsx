@@ -1,25 +1,26 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useState, useMemo, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, orderBy, Timestamp, writeBatch, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, orderBy, Timestamp, writeBatch, getDoc } from 'firebase/firestore';
 import type { RecurringObligation, Account } from '@/lib/types';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
-import { Loader2, PlusCircle, History, RotateCcw, CalendarClock, Trash2, Save, AlertCircle, Banknote } from 'lucide-react';
+import { Loader2, PlusCircle, RotateCcw, CalendarClock, Trash2, Save, Banknote, Pencil } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
-import { format, addWeeks, addMonths, isPast } from 'date-fns';
+import { addWeeks, addMonths, isPast, format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import { DateInput } from '@/components/ui/date-input';
+import { Separator } from '@/components/ui/separator';
 
 export default function RecurringObligationsPage() {
     const { firestore } = useFirebase();
@@ -31,7 +32,7 @@ export default function RecurringObligationsPage() {
     const [editingItem, setEditingItem] = useState<RecurringObligation | null>(null);
 
     const { data: obligations, loading: obsLoading } = useSubscription<RecurringObligation>(firestore, 'recurring_obligations', [orderBy('dueDate', 'asc')]);
-    const { data: accounts } = useSubscription<Account>(firestore, 'chartOfAccounts', [orderBy('code')]);
+    const { data: accounts = [] } = useSubscription<Account>(firestore, 'chartOfAccounts', [orderBy('code')]);
 
     const [formData, setFormData] = useState<Partial<RecurringObligation>>({
         title: '',
@@ -76,7 +77,6 @@ export default function RecurringObligationsPage() {
         }
     };
 
-    // ✨ محرك توليد القيود الدورية
     const handleGenerateEntries = async () => {
         if (!firestore || !currentUser) return;
         const pending = obligations.filter(o => o.status === 'active' && isPast(toFirestoreDate(o.dueDate)!));
@@ -112,7 +112,6 @@ export default function RecurringObligationsPage() {
                     createdBy: 'system-auto-chain'
                 });
 
-                // تحديث موعد الاستحقاق القادم
                 const nextDate = ob.frequency === 'weekly' ? addWeeks(toFirestoreDate(ob.dueDate)!, 1) : addMonths(toFirestoreDate(ob.dueDate)!, 1);
                 batch.update(doc(firestore, 'recurring_obligations', ob.id!), {
                     dueDate: Timestamp.fromDate(nextDate),
@@ -161,12 +160,12 @@ export default function RecurringObligationsPage() {
                 <Table>
                     <TableHeader className="bg-muted/50">
                         <TableRow>
-                            <TableHead className="px-6 font-bold">الالتزام</TableHead>
-                            <TableHead>النوع</TableHead>
-                            <TableHead>التكرار</TableHead>
-                            <TableHead>الاستحقاق القادم</TableHead>
+                            <TableHead className="px-6 font-bold text-right">الالتزام</TableHead>
+                            <TableHead className="text-right">النوع</TableHead>
+                            <TableHead className="text-right">التكرار</TableHead>
+                            <TableHead className="text-right">الاستحقاق القادم</TableHead>
                             <TableHead className="text-left">المبلغ</TableHead>
-                            <TableHead>الحالة</TableHead>
+                            <TableHead className="text-right">الحالة</TableHead>
                             <TableHead className="w-[80px]"></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -252,7 +251,7 @@ export default function RecurringObligationsPage() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="ghost" onClick={closeDialog}>إلغاء</Button>
+                        <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>إلغاء</Button>
                         <Button onClick={handleSave} disabled={isProcessing || !formData.title}>
                             {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Save className="ml-2 h-4 w-4"/>}
                             تأكيد وبرمجة الالتزام
