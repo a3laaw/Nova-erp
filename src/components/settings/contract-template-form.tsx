@@ -92,6 +92,12 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [constructionStages, setConstructionStages] = useState<MultiSelectOption[]>([]);
   const [loadingStages, setLoadingStages] = useState(false);
 
+  // تعريف خيارات أنواع المقاولات للقائمة المنسدلة
+  const constructionTypeOptions = useMemo(() => 
+    constructionTypes.map(t => ({ value: t.id!, label: t.name })),
+    [constructionTypes]
+  );
+
   // دالة جلب مراحل المقاولات بناءً على النوع المختار
   const fetchConstructionStages = useCallback(async (typeId: string) => {
     if (!firestore || !typeId) {
