@@ -108,7 +108,6 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
     const selectedGov = watch('siteAddress.governorate');
     const watchedWorkNature = watch('workNature');
 
-    // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات
     const watchedSuspendedExt = watch('suspendedExtensionCount');
     const watchedOrdinaryExt = watch('ordinaryExtensionCount');
 
@@ -157,12 +156,29 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
 
             <div className="space-y-4 bg-muted/20 p-6 rounded-3xl border-2 border-dashed">
                 <h3 className="font-black text-lg flex items-center gap-2 text-foreground"><Layers className="h-5 w-5 text-primary"/> مواصفات البناء</h3>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                     <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-mono font-bold" /></div>
                     <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
                     <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
                     <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
-                    <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد مع المواد</SelectItem></SelectContent></Select>)}/></div>
+                    
+                    {/* إخفاء طبيعة التعاقد إذا كانت مصنعية فقط */}
+                    {watchedWorkNature !== 'labor_only' && (
+                        <div className="grid gap-2">
+                            <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
+                            <Controller name="workNature" control={control} render={({field}) => (
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                    <SelectTrigger className="h-11 border-primary/20 bg-primary/5">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
+                                        <SelectItem value="with_materials">عقد مع المواد</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}/>
+                        </div>
+                    )}
                 </div>
             </div>
 

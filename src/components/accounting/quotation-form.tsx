@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -115,11 +114,9 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
   const watchedSubject = watch("subject");
   const watchedWorkNature = watch("workNature");
 
-  // ✨ مراقبة الأعداد للتحديث التلقائي للإجماليات
   const watchedSuspendedExt = watch('suspendedExtensionCount');
   const watchedOrdinaryExt = watch('ordinaryExtensionCount');
 
-  // تحديث إجمالي الحمامات تلقائياً لمنع التضارب
   React.useEffect(() => {
     const total = (Number(watchedSuspendedExt) || 0) + (Number(watchedOrdinaryExt) || 0);
     setValue('bathroomsCount', total);
@@ -155,7 +152,6 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
     
-    // ✨ التوريث الذكي لطبيعة التعاقد من القالب
     setValue('workNature', template.workNature || 'labor_only');
     setValue('financialsType', template.financials?.type || 'fixed');
     setValue('totalAmount', template.financials?.totalAmount || 0);
@@ -205,12 +201,29 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
       <div className="space-y-6">
           <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed items-end">
               <div className="grid gap-2"><Label className="flex items-center gap-2"><Ruler className="h-4 w-4 text-primary"/> المساحة (م²)</Label><Input type="number" {...register('totalArea')} className="h-11 font-mono font-bold" /></div>
               <div className="grid gap-2"><Label>عدد الأدوار</Label><Input type="number" {...register('floorsCount')} className="h-11" /></div>
               <div className="grid gap-2"><Label>توسعة السطح</Label><Controller name="roofExtension" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">لا يوجد</SelectItem><SelectItem value="quarter">ربع دور</SelectItem><SelectItem value="half">نصف دور</SelectItem></SelectContent></Select>)}/></div>
               <div className="grid gap-2"><Label>خيار السرداب</Label><Controller name="basementType" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">بدون سرداب</SelectItem><SelectItem value="full">سرداب كامل</SelectItem><SelectItem value="half">سرداب نص</SelectItem><SelectItem value="vault">قبو</SelectItem></SelectContent></Select>)}/></div>
-              <div className="grid gap-2"><Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label><Controller name="workNature" control={control} render={({field}) => (<Select onValueChange={field.onChange} value={field.value} disabled={!!watchedSubject}><SelectTrigger className="h-11 border-primary/20 bg-primary/5"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="labor_only">عقد مصنعية فقط</SelectItem><SelectItem value="with_materials">عقد توريد وتنفيذ</SelectItem></SelectContent></Select>)}/></div>
+              
+              {/* إخفاء طبيعة التعاقد إذا كانت مصنعية فقط */}
+              {watchedWorkNature !== 'labor_only' && (
+                <div className="grid gap-2">
+                    <Label className="font-bold text-primary flex items-center gap-2"><FileSignature className="h-3 w-3"/> طبيعة التعاقد</Label>
+                    <Controller name="workNature" control={control} render={({field}) => (
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!watchedSubject}>
+                            <SelectTrigger className="h-11 border-primary/20 bg-primary/5">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
+                                <SelectItem value="with_materials">عقد توريد وتنفيذ</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}/>
+                </div>
+              )}
           </div>
 
           {showSanitary && (
