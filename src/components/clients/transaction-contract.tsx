@@ -22,6 +22,13 @@ const roofExtensionLabels: Record<string, string> = {
     half: 'نصف دور'
 };
 
+const basementLabels: Record<string, string> = {
+    none: 'بدون سرداب',
+    full: 'سرداب كامل',
+    half: 'سرداب نص',
+    vault: 'قبو'
+};
+
 export function TransactionContract({ client, transaction }: TransactionContractProps) {
     const { branding } = useBranding();
     const [contractDate, setContractDate] = useState('');
@@ -106,7 +113,11 @@ export function TransactionContract({ client, transaction }: TransactionContract
                             </div>
                             <div className="flex items-center gap-3">
                                 <Layers className="h-5 w-5 text-primary" />
-                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">عدد الأدوار:</p><p className="font-bold">{specs.floorsCount} أدوار {specs.hasBasement ? '+ سرداب' : ''}</p></div>
+                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">عدد الأدوار:</p><p className="font-bold">{specs.floorsCount} دور</p></div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Building2 className="h-5 w-5 text-primary" />
+                                <div><p className="text-[10px] font-bold text-muted-foreground uppercase">السرداب:</p><p className="font-bold">{basementLabels[specs.basementType]}</p></div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <Building2 className="h-5 w-5 text-primary" />

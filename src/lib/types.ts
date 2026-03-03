@@ -28,7 +28,7 @@ export interface SubsidyQuota {
 
 export interface TechnicalSpecifications {
     totalArea: number;
-    hasBasement: boolean;
+    basementType: 'none' | 'full' | 'half' | 'vault';
     floorsCount: number;
     roofExtension: 'none' | 'quarter' | 'half';
     bathroomsCount?: number;

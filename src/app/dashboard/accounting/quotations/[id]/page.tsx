@@ -40,6 +40,13 @@ const roofExtensionLabels: Record<string, string> = {
     half: 'نصف دور'
 };
 
+const basementLabels: Record<string, string> = {
+    none: 'بدون سرداب',
+    full: 'سرداب كامل',
+    half: 'سرداب نص',
+    vault: 'قبو'
+};
+
 export default function ViewQuotationPage() {
   const router = useRouter();
   const params = useParams();
@@ -78,7 +85,7 @@ export default function ViewQuotationPage() {
         <ContractClausesForm
             isOpen={isContractFormOpen}
             onClose={() => setIsContractFormOpen(false)}
-            transaction={quotation as any} // نمرر كائن عرض السعر بالكامل ليتم تحويله
+            transaction={quotation as any} 
             clientId={quotation.clientId}
             clientName={quotation.clientName}
             quotationIdToUpdate={quotation.id}
@@ -143,11 +150,18 @@ export default function ViewQuotationPage() {
                             <Layers className="h-4 w-4 text-muted-foreground" />
                             <div className="text-xs">
                                 <span className="text-muted-foreground font-bold ml-1">الأدوار:</span>
-                                <span className="font-black">{quotation.floorsCount} {quotation.hasBasement ? '+ سرداب' : ''}</span>
+                                <span className="font-black">{quotation.floorsCount} دور</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <div className="text-xs">
+                                <span className="text-muted-foreground font-bold ml-1">السرداب:</span>
+                                <span className="font-black">{basementLabels[quotation.basementType]}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Layers className="h-4 w-4 text-muted-foreground" />
                             <div className="text-xs">
                                 <span className="text-muted-foreground font-bold ml-1">السطح:</span>
                                 <span className="font-black">{roofExtensionLabels[quotation.roofExtension]}</span>
@@ -182,7 +196,7 @@ export default function ViewQuotationPage() {
                         </TableHeader>
                         <TableBody>
                             {quotation.items.map((item, index) => (
-                                <TableRow key={index} className="h-14 border-b last:border-0">
+                                <TableRow key={index} className="h-14 border-b last:border-0 hover:bg-transparent">
                                     <TableCell className="text-center font-mono text-xs font-bold text-muted-foreground bg-muted/5 border-l">{index + 1}</TableCell>
                                     <TableCell className="font-bold">{item.description}</TableCell>
                                     <TableCell className="text-center font-mono font-bold">

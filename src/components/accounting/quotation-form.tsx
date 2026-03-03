@@ -45,7 +45,7 @@ const quotationSchema = z.object({
   
   // المواصفات الفنية المتعاقد عليها
   totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
-  hasBasement: z.boolean().default(false),
+  basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
   bathroomsCount: z.preprocess((v) => parseInt(String(v || '0'), 10), z.number().min(0)).optional(),
@@ -94,7 +94,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
         financialsType: 'fixed',
         totalArea: 0,
         floorsCount: 1,
-        hasBasement: false,
+        basementType: 'none',
         roofExtension: 'none',
         items: [{ id: generateId(), description: '', quantity: 1, unitPrice: 0 }]
     }
@@ -206,7 +206,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
 
       {/* --- قسم المواصفات الفنية داخل عرض السعر --- */}
       <div className="space-y-6">
-          <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية المتفق عليها</h3>
+          <h3 className="text-lg font-black flex items-center gap-2 text-foreground border-r-4 border-primary pr-3">المواصفات الفنية والمساحات</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-muted/10 p-6 rounded-3xl border border-dashed">
               <div className="grid gap-2">
@@ -226,10 +226,18 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                       </Select>
                   )}/>
               </div>
-              <div className="flex items-center justify-between p-2 h-10 border rounded-xl bg-background px-4 shadow-sm">
-                  <Label htmlFor="hasBasement" className="font-bold cursor-pointer">سرداب</Label>
-                  <Controller name="hasBasement" control={control} render={({field}) => (
-                      <Switch id="hasBasement" checked={field.value} onCheckedChange={field.onChange} />
+              <div className="grid gap-2">
+                  <Label>خيار السرداب</Label>
+                  <Controller name="basementType" control={control} render={({field}) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="none">بدون سرداب</SelectItem>
+                              <SelectItem value="full">سرداب كامل</SelectItem>
+                              <SelectItem value="half">سرداب نص</SelectItem>
+                              <SelectItem value="vault">قبو</SelectItem>
+                          </SelectContent>
+                      </Select>
                   )}/>
               </div>
           </div>
@@ -240,7 +248,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                   <div className="grid grid-cols-3 gap-4">
                       <div className="grid gap-1.5"><Label className="text-[10px] font-bold">حمامات</Label><Input type="number" {...register('bathroomsCount')} className="h-9 text-center" /></div>
                       <div className="grid gap-1.5"><Label className="text-[10px] font-bold">مطابخ</Label><Input type="number" {...register('kitchensCount')} className="h-9 text-center" /></div>
-                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">غرف غسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-9 text-center" /></div>
+                      <div className="grid gap-1.5"><Label className="text-[10px] font-bold">غرف الغسيل</Label><Input type="number" {...register('laundryRoomsCount')} className="h-9 text-center" /></div>
                   </div>
               </div>
               <div className="p-6 border-2 border-yellow-100 bg-yellow-50/10 rounded-2xl space-y-4">

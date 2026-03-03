@@ -32,7 +32,7 @@ const projectSchema = z.object({
   clientId: z.string().min(1, "العميل مطلوب."),
   projectCategory: z.enum(['Private (Subsidized)', 'Private (Non-Subsidized)', 'Commercial', 'Government']),
   totalArea: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
-  hasBasement: z.boolean().default(false),
+  basementType: z.enum(['none', 'full', 'half', 'vault']).default('none'),
   floorsCount: z.preprocess((v) => parseInt(String(v || '1'), 10), z.number().min(1)),
   roofExtension: z.enum(['none', 'quarter', 'half']).default('none'),
   
@@ -87,7 +87,7 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
         resolver: zodResolver(projectSchema),
         defaultValues: {
             projectName: '', clientId: '', projectCategory: 'Private (Non-Subsidized)',
-            totalArea: 0, hasBasement: false, floorsCount: 1, roofExtension: 'none',
+            totalArea: 0, basementType: 'none', floorsCount: 1, roofExtension: 'none',
             bathroomsCount: 0, kitchensCount: 0, laundryRoomsCount: 0, electricalPointsCount: 0,
             siteAddress: { governorate: '', area: '', block: '', street: '', houseNumber: '' },
             startDate: new Date(), status: 'مخطط', mainEngineerId: '', progressPercentage: 0,
@@ -206,10 +206,18 @@ export function ProjectForm({ onSave, onClose, initialData = null, isSaving = fa
                             </Select>
                         )}/>
                     </div>
-                    <div className="flex items-center justify-between p-2 h-11 border rounded-xl bg-background px-4 shadow-sm">
-                        <Label htmlFor="hasBasement" className="font-bold cursor-pointer">سرداب (قبو)</Label>
-                        <Controller name="hasBasement" control={control} render={({field}) => (
-                            <Switch id="hasBasement" checked={field.value} onCheckedChange={field.onChange} />
+                    <div className="grid gap-2">
+                        <Label>خيار السرداب</Label>
+                        <Controller name="basementType" control={control} render={({field}) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">بدون سرداب</SelectItem>
+                                    <SelectItem value="full">سرداب كامل</SelectItem>
+                                    <SelectItem value="half">سرداب نص</SelectItem>
+                                    <SelectItem value="vault">قبو</SelectItem>
+                                </SelectContent>
+                            </Select>
                         )}/>
                     </div>
                 </div>
