@@ -240,3 +240,12 @@ export interface WarehouseTransfer extends BaseEntity { transferNumber: string; 
 export interface InventoryAdjustment extends BaseEntity { adjustmentNumber: string; date: any; type: 'damage' | 'theft' | 'opening_balance' | 'material_issue' | 'purchase_return' | 'sales_return' | 'transfer' | 'other'; notes: string; items: { itemId: string; itemName: string; quantity: number; unitCost: number; totalCost: number; boqItemId?: string | null; warrantyEndDate?: any; }[]; warehouseId?: string; fromWarehouseId?: string; toWarehouseId?: string; journalEntryId?: string; projectId?: string | null; projectName?: string | null; clientId?: string | null; clientName?: string | null; issueType?: 'project_site' | 'direct_sale'; isBypassed?: boolean; }
 export interface Subcontractor extends BaseEntity { name: string; type: string; specialization?: string; contactPerson?: string; phone: string; mobile?: string; email?: string; address?: string; bankAccount?: { bankName: string; accountNumber: string; iban: string; }; rating?: number; performanceRating?: number; isActive: boolean; blacklisted?: boolean; blacklistedReason?: string; }
 export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'JobChange' | 'StatusChange' | 'ResidencyUpdate' | 'DataUpdate'; field: string; oldValue: any; newValue: any; effectiveDate: any; changedBy: string; notes?: string; }
+
+export interface PaymentMethod {
+    id: string;
+    name: string;
+    type: 'fixed' | 'percentage';
+    value: number;
+    expenseAccountId: string;
+    expenseAccountName: string;
+}

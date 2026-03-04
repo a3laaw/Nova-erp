@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Card,
@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
+import { useBranding } from '@/context/branding-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DateInput } from '@/components/ui/date-input';
@@ -55,6 +56,7 @@ export default function EditCashReceiptPage() {
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
+  const { branding } = useBranding();
   const { toast } = useToast();
 
   const [receipt, setReceipt] = useState<CashReceipt | null>(null);
@@ -67,6 +69,7 @@ export default function EditCashReceiptPage() {
   
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   const [journalEntryIsPosted, setJournalEntryIsPosted] = useState(false);
 
   // Form state
@@ -168,9 +171,7 @@ export default function EditCashReceiptPage() {
   
   useEffect(() => {
     const generateDescription = async () => {
-      // Use originalReceipt to get the project ID and creation date, ensuring a stable reference
       if (!originalReceipt?.projectId || !amount || parseFloat(amount) <= 0 || !firestore) {
-        // Fallback to the stored description if we can't generate a new one
         setDescription(originalReceipt?.description || '');
         return;
       }
@@ -181,7 +182,6 @@ export default function EditCashReceiptPage() {
         return;
       }
 
-      // Logic to get total paid amount *before this specific receipt*
       const totalPaidPreviously = await getTotalPaidForProject(originalReceipt.projectId, firestore, id);
       
       let remainingAmountFromCurrentPayment = parseFloat(amount);
@@ -202,8 +202,6 @@ export default function EditCashReceiptPage() {
             descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
           } else {
             descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
-            const newRemaining = remainingOnClause - paymentForThisClause;
-            descriptionParts.push(`(المتبقي من هذه الدفعة: ${formatCurrency(newRemaining)})`);
           }
           remainingAmountFromCurrentPayment -= paymentForThisClause;
         }
@@ -238,11 +236,10 @@ export default function EditCashReceiptPage() {
             setClientProjects(fetchedProjects);
         } catch (error) {
             console.error("Error fetching client projects:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب عقود العميل.' });
         }
     };
     fetchClientProjects();
-  }, [firestore, receipt?.clientId, toast]);
+  }, [firestore, receipt?.clientId]);
 
 
   const projectOptions = useMemo(() => clientProjects.map(p => {
@@ -261,83 +258,47 @@ export default function EditCashReceiptPage() {
         return accounts
             .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('صندوق'))
             .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
-    } else { // Cheque, Bank Transfer, K-Net
+    } else {
         return accounts
             .filter(acc => acc.type === 'asset' && acc.isPayable && acc.name.includes('بنك'))
             .map(acc => ({ value: acc.id!, label: `${acc.name} (${acc.code})`, searchKey: acc.code }));
     }
   }, [accounts, paymentMethod]);
   
-  // This effect runs when payment method changes, to ensure the selected account is still valid.
-  useEffect(() => {
-    if (accounts.length > 0 && debitAccountId && paymentMethod) {
-      const selectedAcc = accounts.find(a => a.id === debitAccountId);
-      if (!selectedAcc) return; // Can't validate if account isn't found
-      
-      const isCash = paymentMethod === 'Cash';
-      const isBank = ['Cheque', 'Bank Transfer', 'K-Net'].includes(paymentMethod);
-
-      const accountIsCash = selectedAcc.name.includes('صندوق');
-      const accountIsBank = selectedAcc.name.includes('بنك');
-
-      if ((isCash && !accountIsCash) || (isBank && !accountIsBank)) {
-        setDebitAccountId(''); // Invalidate selection
-        toast({
-            title: 'تم تغيير طريقة الدفع',
-            description: 'الرجاء اختيار حساب استلام جديد متوافق مع الطريقة الجديدة.',
-            variant: 'default',
-        });
-      }
-    }
-  }, [paymentMethod, debitAccountId, accounts, toast]);
-
-
  const handleSave = async () => {
-    if (!firestore || !currentUser || !id || !originalReceipt || !date) return;
+    if (!firestore || !currentUser || !id || !originalReceipt || !date || savingRef.current) return;
 
     if (!amount || !paymentMethod || !debitAccountId) {
-        toast({
-            variant: 'destructive',
-            title: 'حقول ناقصة',
-            description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).',
-        });
+        toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).'});
         return;
     }
 
+    savingRef.current = true;
     setIsSaving(true);
     
-    // --- PRE-TRANSACTION READS AND LOGIC ---
-    let transactionDataForCheck: ClientTransaction | null = null;
-    const projectId = selectedProjectId || originalReceipt.projectId || null;
-
-    try {
-        if (projectId) {
-            const transactionRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', projectId);
-            const txSnap = await getDoc(transactionRef);
-            if (txSnap.exists()) {
-                transactionDataForCheck = { id: txSnap.id, ...txSnap.data() } as ClientTransaction;
-            }
-        }
-    } catch (err) {
-        console.error("Pre-transaction read failed for edit:", err);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التحقق من بيانات المشروع المرتبط. يرجى المحاولة مرة أخرى.' });
-        setIsSaving(false);
-        return;
-    }
-    // --- END OF PRE-TRANSACTION READS ---
-
     try {
         await runTransaction(firestore, async (transaction_fs) => {
             const receiptRefDoc = doc(firestore, 'cashReceipts', id);
-        
-            const clientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
+            const selectedClientAccount = accounts.find(acc => acc.name === originalReceipt.clientNameAr);
             const selectedDebitAccount = accounts.find(acc => acc.id === debitAccountId);
 
-            if (!clientAccount || !selectedDebitAccount) {
-                throw new Error("الحسابات المطلوبة (العميل أو حساب الاستلام) غير موجودة.");
+            if (!selectedClientAccount || !selectedDebitAccount) {
+                throw new Error("الحسابات المطلوبة غير موجودة.");
             }
 
-            const receiptUpdatePayload = {
+            // 🏦 محرك حساب العمولات البنكية المحدث (Banking Commission Engine)
+            const selectedMethodData = branding?.payment_methods?.find(m => m.name === paymentMethod);
+            let commissionAmount = 0;
+            if (selectedMethodData) {
+                if (selectedMethodData.type === 'percentage') {
+                    commissionAmount = parseFloat(amount) * (selectedMethodData.value / 100);
+                } else {
+                    commissionAmount = selectedMethodData.value;
+                }
+            }
+            const netBankDeposit = parseFloat(amount) - commissionAmount;
+
+            transaction_fs.update(receiptRefDoc, {
                 receiptDate: date,
                 projectId: selectedProjectId || null,
                 amount: parseFloat(amount),
@@ -345,293 +306,152 @@ export default function EditCashReceiptPage() {
                 description: description,
                 paymentMethod: paymentMethod,
                 reference: reference,
-            };
-            transaction_fs.update(receiptRefDoc, receiptUpdatePayload);
+                commissionAmount
+            });
             
+            const projectId = selectedProjectId || originalReceipt.projectId || null;
             let autoTags = {};
-            if (projectId && transactionDataForCheck?.assignedEngineerId) {
-                const engineer = employees.find(e => e.id === transactionDataForCheck.assignedEngineerId);
-                const department = departments.find(d => d.name === engineer?.department);
-                
-                autoTags = {
-                    clientId: originalReceipt.clientId,
-                    transactionId: projectId,
-                    auto_profit_center: projectId,
-                    auto_resource_id: transactionDataForCheck.assignedEngineerId,
-                    ...(department && { auto_dept_id: department.id }),
-                };
+            if (projectId) {
+                const project = clientProjects.find(p => p.id === projectId);
+                if (project && project.assignedEngineerId) {
+                    const engineer = employees.find(e => e.id === project.assignedEngineerId);
+                    const department = departments.find(d => d.name === engineer?.department);
+                    autoTags = { 
+                        clientId: originalReceipt.clientId, 
+                        transactionId: projectId, 
+                        auto_profit_center: projectId, 
+                        auto_resource_id: project.assignedEngineerId, 
+                        ...(department && { auto_dept_id: department.id }) 
+                    };
+                }
             }
 
-            const newLines = [
-                { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: parseFloat(amount), credit: 0 },
-                { accountId: clientAccount.id, accountName: clientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
+            const jeLines = [
+                { accountId: selectedDebitAccount.id!, accountName: selectedDebitAccount.name, debit: netBankDeposit, credit: 0 },
+                { accountId: selectedClientAccount.id!, accountName: selectedClientAccount.name, debit: 0, credit: parseFloat(amount), ...autoTags }
             ];
+
+            if (commissionAmount > 0 && selectedMethodData?.expenseAccountId) {
+                jeLines.push({
+                    accountId: selectedMethodData.expenseAccountId,
+                    accountName: selectedMethodData.expenseAccountName || 'مصروف عمولات بنكية',
+                    debit: commissionAmount,
+                    credit: 0
+                });
+            }
 
             const jeUpdatePayload = {
                 date: Timestamp.fromDate(date),
-                lines: newLines,
+                lines: jeLines,
                 totalDebit: parseFloat(amount),
                 totalCredit: parseFloat(amount),
-                narration: `[إشعار مالي - تعديل دفعة] ${description}`,
+                narration: `[تعديل دفعة] ${description} ${commissionAmount > 0 ? `(صافي المودع: ${formatCurrency(netBankDeposit)})` : ''}`,
                 transactionId: projectId,
                 clientId: originalReceipt.clientId,
             };
 
             if (originalReceipt.journalEntryId) {
-                const jeRef = doc(firestore, 'journalEntries', originalReceipt.journalEntryId);
-                transaction_fs.update(jeRef, jeUpdatePayload);
-            } else {
-                const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
-                transaction_fs.set(newJournalEntryRef, {
-                    ...jeUpdatePayload,
-                    status: 'posted',
-                    createdAt: serverTimestamp(),
-                    createdBy: currentUser.id,
-                    entryNumber: `CRV-JE-${originalReceipt.voucherNumber}`,
-                });
-                transaction_fs.update(receiptRefDoc, { journalEntryId: newJournalEntryRef.id });
+                transaction_fs.update(doc(firestore, 'journalEntries', originalReceipt.journalEntryId), jeUpdatePayload);
             }
         });
 
-        // --- Commission logic ---
-        const commissionJeQuery = query(collection(firestore, 'journalEntries'), where('linkedReceiptId', '==', id));
-        const oldCommissionEntries = await getDocs(commissionJeQuery);
-        
-        const deleteBatch = writeBatch(firestore);
-        oldCommissionEntries.forEach(doc => {
-            deleteBatch.delete(doc.ref);
-        });
-        await deleteBatch.commit();
-
-        const projectIdForCommission = selectedProjectId || originalReceipt.projectId || null;
-        if (projectIdForCommission) {
-            const projectForCommission = clientProjects.find(p => p.id === projectIdForCommission);
-            if (projectForCommission?.assignedEngineerId) {
-                 const engineer = employees.find(e => e.id === projectForCommission.assignedEngineerId);
-                 if (engineer && engineer.contractPercentage && engineer.contractPercentage > 0) {
-                    const commissionAmount = parseFloat(amount) * (engineer.contractPercentage / 100);
-                    if (commissionAmount > 0) {
-                        const salaryExpenseAccount = accounts.find(a => a.code === '5201');
-                        const accruedSalaryAccount = accounts.find(a => a.code === '210201');
-                        if (salaryExpenseAccount && accruedSalaryAccount && date) {
-                            const createBatch = writeBatch(firestore);
-                            const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
-                            const jeCounterDoc = await getDoc(jeCounterRef);
-                            let jeNextNumber = 1;
-                            const currentYear = new Date().getFullYear();
-                            if (jeCounterDoc.exists()) {
-                                 const counts = jeCounterDoc.data()?.counts || {};
-                                 jeNextNumber = (counts[currentYear] || 0) + 1;
-                            }
-                            const commissionJeNumber = `JV-${currentYear}-${String(jeNextNumber).padStart(4, '0')}`;
-
-                            const commissionJeRef = doc(collection(firestore, 'journalEntries'));
-                            createBatch.set(commissionJeRef, {
-                                entryNumber: commissionJeNumber,
-                                date: Timestamp.fromDate(date),
-                                narration: `(تحديث) إثبات عمولة للمهندس ${engineer.fullName} عن سند قبض ${originalReceipt.voucherNumber}`,
-                                totalDebit: commissionAmount,
-                                totalCredit: commissionAmount,
-                                status: 'posted',
-                                lines: [
-                                    { accountId: salaryExpenseAccount.id, accountName: salaryExpenseAccount.name, debit: commissionAmount, credit: 0, auto_resource_id: engineer.id },
-                                    { accountId: accruedSalaryAccount.id, accountName: accruedSalaryAccount.name, debit: 0, credit: commissionAmount, auto_resource_id: engineer.id }
-                                ],
-                                linkedReceiptId: id,
-                                createdAt: serverTimestamp(),
-                                createdBy: 'system-auto-commission',
-                            });
-                            createBatch.set(jeCounterRef, { counts: { [currentYear]: jeNextNumber } }, { merge: true });
-                            await createBatch.commit();
-                            toast({ title: 'إشعار', description: `تم تحديث قيد العمولة التلقائي للمهندس ${engineer.fullName}.` });
-                        }
-                    }
-                 }
-            }
-        }
-
-        // --- POST-TRANSACTION WRITES (Batch) ---
-        if (projectId && transactionDataForCheck) {
-            const batch = writeBatch(firestore);
-            const txRef = doc(firestore, 'clients', originalReceipt.clientId, 'transactions', projectId);
-
-            // 1. Update contract clauses
-            if (transactionDataForCheck.contract?.clauses) {
-                const totalPaid = await getTotalPaidForProject(projectId, firestore);
-                let accumulatedAmount = 0;
-                let dueClauseFound = false;
-                const updatedClauses = transactionDataForCheck.contract.clauses.map((clause: any) => {
-                    const newClause = {...clause};
-                    if (totalPaid >= accumulatedAmount + clause.amount) {
-                        newClause.status = 'مدفوعة';
-                    } else if (totalPaid > accumulatedAmount && !dueClauseFound) {
-                        newClause.status = 'مستحقة';
-                        dueClauseFound = true;
-                    } else {
-                        newClause.status = 'غير مستحقة';
-                    }
-                    accumulatedAmount += clause.amount;
-                    return newClause;
-                });
-                batch.update(txRef, { 'contract.clauses': updatedClauses });
-            }
-            
-            // 2. Add Timeline log & comment for the edit
-            const timelineRef = collection(txRef, 'timelineEvents');
-            const commentContent = `**[إشعار مالي - تعديل دفعة]**\n${description}\n\n(تم تعديل سند قبض رقم ${originalReceipt.voucherNumber} لتصبح القيمة الجديدة ${formatCurrency(parseFloat(amount))})`;
-            const commentData = { type: 'comment' as const, content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
-            batch.set(doc(timelineRef), commentData);
-
-            const logContent = `عدّل ${currentUser.fullName} سند قبض ${originalReceipt.voucherNumber}.`;
-            const logData = { type: 'log' as const, content: logContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
-            batch.set(doc(timelineRef), logData);
-            
-            // 3. Add to Client History Log as a 'log' event
-            const historyRef = collection(firestore, `clients/${originalReceipt.clientId}/history`);
-            const historyLogData = {
-                type: 'log' as const,
-                content: `[${transactionDataForCheck.transactionType}] قام ${currentUser.fullName} بتعديل سند قبض. القيمة الجديدة: ${formatCurrency(parseFloat(amount))}.`,
-                userId: currentUser.id,
-                userName: currentUser.fullName,
-                userAvatar: currentUser.avatarUrl,
-                createdAt: serverTimestamp(),
-            };
-            batch.set(doc(historyRef), historyLogData);
-
-            await batch.commit();
-        }
-        
-        toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي بنجاح.' });
+        toast({ title: 'نجاح', description: 'تم تحديث سند القبض والقيد المحاسبي.' });
         router.push(`/dashboard/accounting/cash-receipts/${id}`);
 
-    } catch (error) {
-        console.error("Error updating cash receipt:", error);
-        toast({
-            variant: 'destructive',
-            title: 'خطأ في الحفظ',
-            description: error instanceof Error ? error.message : 'لم يتم حفظ التعديلات، الرجاء المحاولة مرة أخرى.',
-        });
-    } finally {
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'خطأ', description: error.message });
         setIsSaving(false);
+        savingRef.current = false;
     }
   };
 
   if (receiptLoading || accountsLoading) {
       return (
-          <Card className="max-w-4xl mx-auto">
-              <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
-              <CardContent className="space-y-6">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-24 w-full" />
-              </CardContent>
-               <CardFooter className="flex justify-end gap-2">
-                    <Skeleton className="h-10 w-24" />
-                    <Skeleton className="h-10 w-28" />
-                </CardFooter>
-          </Card>
+          <Card className="max-w-4xl mx-auto"><CardHeader><Skeleton className="h-8 w-48" /></CardHeader><CardContent className="space-y-6"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-24 w-full" /></CardContent></Card>
       );
   }
 
   return (
-    <Card className="max-w-4xl mx-auto" dir="rtl">
-        <CardHeader>
-            <div className="flex justify-between items-start">
-                <div>
-                    <CardTitle>تعديل سند القبض</CardTitle>
-                    <CardDescription>
-                        تعديل بيانات سند القبض رقم: {receipt?.voucherNumber}
-                    </CardDescription>
-                </div>
-            </div>
-             {journalEntryIsPosted && (
-                <Alert variant="default" className="mt-4 bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
-                    <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
-                    <AlertTitle>ملاحظة</AlertTitle>
-                    <AlertDescription>
-                        سيتم تحديث القيد المحاسبي المرتبط تلقائيًا عند حفظ التعديلات.
-                    </AlertDescription>
-                </Alert>
-            )}
+    <Card className="max-w-4xl mx-auto rounded-3xl border-none shadow-xl" dir="rtl">
+        <CardHeader className="bg-primary/5 pb-8 rounded-t-3xl border-b">
+            <CardTitle>تعديل سند القبض</CardTitle>
+            <CardDescription>تعديل بيانات سند القبض رقم: {receipt?.voucherNumber}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8 p-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                 <div className="md:col-span-2 grid gap-2">
-                    <Label htmlFor="receivedFrom">استلمنا من السيد/السادة</Label>
-                    <Input id="receivedFrom" value={clients.find(c => c.id === receipt?.clientId)?.nameAr || ''} disabled readOnly />
+                    <Label className="font-bold">استلمنا من السيد/السادة</Label>
+                    <Input value={originalReceipt?.clientNameAr || ''} disabled readOnly className="bg-muted h-12 rounded-xl" />
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="date">التاريخ <span className="text-destructive">*</span></Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving}/>
+                    <Label className="font-bold">التاريخ *</Label>
+                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12" />
                 </div>
             </div>
             
-            <div className="grid gap-2">
-                <Label htmlFor="project">ربط بعقد/مشروع</Label>
+            <div className="grid gap-2 p-4 bg-muted/30 rounded-2xl border border-dashed">
+                <Label className="font-bold text-primary flex items-center gap-2"><Target className="h-4 w-4"/> العقد / المشروع المرتبط</Label>
                 <InlineSearchList 
                     value={selectedProjectId}
                     onSelect={setSelectedProjectId}
                     options={projectOptions}
                     placeholder={'اختر العقد المراد سداد دفعة له...'}
                     disabled={isSaving}
+                    className="h-11 bg-white border-primary/20"
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="grid gap-2">
-                    <Label htmlFor="amount">المبلغ <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Label className="font-bold">المبلغ المحصل *</Label>
+                    <Input id="amount" type="number" step="0.001" className='text-left dir-ltr h-12 text-xl font-black text-primary' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
-                <Label htmlFor="amountInWords">مبلغ وقدره (كتابة)</Label>
-                <div className='p-2 text-sm text-muted-foreground border rounded-md min-h-[40px] bg-muted/50'>
-                    {amountInWords || '(سيتم ملؤه تلقائياً)'}
-                </div>
+                    <Label className="text-xs font-bold text-muted-foreground uppercase">مبلغ وقدره (كتابة)</Label>
+                    <div className='p-3 text-sm font-bold text-muted-foreground border-2 border-dashed rounded-xl min-h-[48px] bg-muted/50 flex items-center justify-center italic'>
+                        {amountInWords}
+                    </div>
                 </div>
             </div>
             <div className="grid gap-2">
-                <Label htmlFor="description">وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع (سيتم توليده تلقائياً عند اختيار مشروع)..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving}/>
+                <Label htmlFor="description" className="font-bold">وذلك عن / البيان</Label>
+                <Textarea id="description" value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-xl" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
                 <div className="grid gap-2">
-                    <Label htmlFor="paymentMethod">طريقة الدفع <span className="text-destructive">*</span></Label>
+                    <Label className="font-bold">طريقة الدفع</Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger id="paymentMethod">
-                            <SelectValue placeholder="اختر طريقة الدفع" />
-                        </SelectTrigger>
-                        <SelectContent>
+                        <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                        <SelectContent dir="rtl">
                             <SelectItem value="Cash">نقداً</SelectItem>
                             <SelectItem value="Cheque">شيك</SelectItem>
                             <SelectItem value="Bank Transfer">تحويل بنكي</SelectItem>
-                            <SelectItem value="K-Net">كي-نت</SelectItem>
+                            {(branding?.payment_methods || []).map(m => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="debitAccountId">حساب الاستلام <span className="text-destructive">*</span></Label>
+                    <Label className="font-bold">حساب الإيداع *</Label>
                     <InlineSearchList 
                         value={debitAccountId}
                         onSelect={setDebitAccountId}
                         options={debitAccountOptions}
-                        placeholder={accountsLoading ? 'تحميل...' : 'اختر حساب البنك أو الصندوق...'}
+                        placeholder={'اختر حساب...'}
                         disabled={accountsLoading || isSaving}
+                        className="h-11"
                     />
                 </div>
                 <div className="grid gap-2">
-                <Label htmlFor="reference">رقم الشيك/المرجع</Label>
-                <Input id="reference" placeholder="رقم المرجع..." value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving}/>
+                    <Label className="font-bold">رقم الشيك / المرجع</Label>
+                    <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-11 rounded-xl" />
                 </div>
             </div>
         </CardContent>
-      <CardFooter className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => router.back()} disabled={isSaving}>
-            <X className="ml-2 h-4 w-4" />
-            إلغاء
-        </Button>
-        <Button onClick={handleSave} disabled={isSaving || receiptLoading || accountsLoading}>
-            {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-            {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+      <CardFooter className="flex justify-end gap-3 p-8 border-t bg-muted/10 rounded-b-3xl">
+        <Button variant="ghost" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
+        <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+            حفظ التعديلات
         </Button>
       </CardFooter>
     </Card>
