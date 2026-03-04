@@ -258,7 +258,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     const isActive = currentPath === item.href;
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-200">
+        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-300">
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             {item.icon && <item.icon className={cn("size-5", isActive ? "text-white" : "text-sidebar-foreground")} strokeWidth={2.5} />}
             <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black" : "font-bold")}>{item.label}</span>
@@ -276,7 +276,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label} className="transition-all duration-200">
+              <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label} className="transition-all duration-300">
                 <item.icon className="size-5" strokeWidth={2.5} />
                 <span className="sr-only">{item.label}</span>
               </SidebarMenuButton>
@@ -332,7 +332,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2 transition-all duration-200 hover:bg-primary/20 hover:scale-105 active:scale-95">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2 transition-all duration-300 hover:bg-primary/15 hover:scale-[1.02] active:scale-95">
               <div className='flex items-center gap-2'>
                 <item.icon className={cn("size-5", isActive ? "text-white" : "text-sidebar-foreground")} strokeWidth={2.5} />
                 <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black" : "font-bold")}>{item.label}</span>
@@ -405,7 +405,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
                     <AvatarFallback className="bg-primary/10 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className="text-sm font-black text-slate-100 truncate">{currentUser.fullName}</p>
+                    <p className="text-sm font-black text-slate-50 truncate">{currentUser.fullName}</p>
                     <p className="text-[10px] text-slate-400 truncate font-bold uppercase tracking-wider">{currentUser.role}</p>
                 </div>
                 <button className="h-9 w-9 rounded-xl hover:bg-destructive/20 hover:text-red-400 group-data-[state=collapsed]:hidden flex items-center justify-center transition-all active:scale-90" onClick={onLogout} title="تسجيل الخروج">
