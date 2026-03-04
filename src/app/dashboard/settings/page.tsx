@@ -1,10 +1,13 @@
-
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import Link from 'next/link';
 import { Users, Palette, Database, Clock, CreditCard, ShieldCheck, Building, FileSignature, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/**
+ * لوحة الإعدادات:
+ * تم تحديث رابط "نماذج العقود" ليوجه إلى صفحة الإدارة المخصصة بدلاً من صفحة العمليات.
+ */
 const settingsFeatures = [
     {
         title: 'إدارة المستخدمين',
@@ -24,7 +27,7 @@ const settingsFeatures = [
         title: 'البيانات المرجعية',
         description: 'التحكم في القوائم المنسدلة مثل الأقسام والوظائف والمواقع.',
         href: '/dashboard/settings/reference-data',
-        icon: Database,
+        icon: Network,
         color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
     },
     {
@@ -58,7 +61,7 @@ const settingsFeatures = [
      {
         title: 'نماذج العقود',
         description: 'إنشاء وإدارة قوالب العقود القابلة لإعادة الاستخدام.',
-        href: '/dashboard/contracts',
+        href: '/dashboard/settings/contract-templates',
         icon: FileSignature,
         color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
     },
@@ -70,6 +73,8 @@ const settingsFeatures = [
         color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300'
     },
 ];
+
+import { Network } from 'lucide-react';
 
 export default function SettingsDashboardPage() {
   return (
