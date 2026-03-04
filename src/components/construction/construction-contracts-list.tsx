@@ -23,7 +23,6 @@ import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 interface ConstructionContractsListProps {
   searchQuery?: string;
-  phoneQuery?: string;
   contractNo?: string;
   dateFrom?: Date;
   dateTo?: Date;
@@ -37,7 +36,7 @@ const statusMap: Record<string, { label: string, color: string }> = {
     'new': { label: 'مسودة', color: 'bg-gray-100 text-gray-800 border-gray-200' },
 };
 
-export function ConstructionContractsList({ searchQuery, phoneQuery, contractNo, dateFrom, dateTo }: ConstructionContractsListProps) {
+export function ConstructionContractsList({ searchQuery, contractNo, dateFrom, dateTo }: ConstructionContractsListProps) {
   const { firestore } = useFirebase();
 
   // جلب كافة المعاملات التي تحتوي على عقد مالي
@@ -75,8 +74,13 @@ export function ConstructionContractsList({ searchQuery, phoneQuery, contractNo,
 
   const filteredContracts = useMemo(() => {
     return contractsData.filter(c => {
-        const matchesName = !searchQuery || c.clientName.toLowerCase().includes(searchQuery.toLowerCase()) || c.transactionType.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesPhone = !phoneQuery || c.clientPhone.includes(phoneQuery);
+        // منطق البحث الموحد: فحص الاسم أو الهاتف أو نوع المعاملة في حقل واحد
+        const searchLower = searchQuery?.toLowerCase() || '';
+        const matchesSearch = !searchQuery || 
+            c.clientName.toLowerCase().includes(searchLower) || 
+            c.clientPhone.includes(searchQuery) ||
+            c.transactionType.toLowerCase().includes(searchLower);
+
         const matchesNo = !contractNo || c.transactionNumber.toLowerCase().includes(contractNo.toLowerCase());
         
         let matchesDate = true;
@@ -90,9 +94,9 @@ export function ConstructionContractsList({ searchQuery, phoneQuery, contractNo,
             }
         }
 
-        return matchesName && matchesPhone && matchesNo && matchesDate;
+        return matchesSearch && matchesNo && matchesDate;
     });
-  }, [contractsData, searchQuery, phoneQuery, contractNo, dateFrom, dateTo]);
+  }, [contractsData, searchQuery, contractNo, dateFrom, dateTo]);
 
   if (txLoading || projectsLoading) return (
     <div className="space-y-4">

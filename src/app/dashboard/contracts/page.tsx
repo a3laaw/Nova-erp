@@ -21,11 +21,10 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة العقود الموقعة:
- * تم تحديث واجهة البحث لتدعم الاسم والهاتف بشكل متزامن وبمظهر ناعم وفخم.
+ * تم دمج البحث بالاسم والهاتف في خانة واحدة ذكية لسهولة الاستخدام.
  */
 export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [phoneQuery, setPhoneQuery] = useState('');
   const [contractNo, setContractNo] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -94,29 +93,17 @@ export default function ContractsPage() {
               </div>
           </CardHeader>
           <CardContent className="p-8 space-y-8">
-              {/* واجهة الفلاتر المتقدمة (كما في الصورة) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 bg-muted/20 p-8 rounded-[2rem] border-2 border-dashed border-gray-200">
-                  <div className="grid gap-2">
+              {/* واجهة الفلاتر الموحدة */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-muted/20 p-8 rounded-[2rem] border-2 border-dashed border-gray-200">
+                  <div className="grid gap-2 lg:col-span-1">
                       <Label className="font-bold flex items-center gap-2 text-gray-700">
-                        اسم العميل <User className="h-4 w-4 text-primary opacity-70"/>
+                        بحث (الاسم أو الهاتف) <Search className="h-4 w-4 text-primary opacity-70"/>
                       </Label>
                       <Input 
-                          placeholder="ابحث بالاسم..." 
+                          placeholder="اكتب اسم العميل أو رقم هاتفه..." 
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="bg-white rounded-xl h-11 shadow-sm border-gray-100 focus:shadow-md focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
-                      />
-                  </div>
-                  <div className="grid gap-2">
-                      <Label className="font-bold flex items-center gap-2 text-gray-700">
-                        رقم الهاتف <Phone className="h-4 w-4 text-primary opacity-70"/>
-                      </Label>
-                      <Input 
-                          placeholder="...ابحث بالجوال" 
-                          value={phoneQuery}
-                          onChange={(e) => setPhoneQuery(e.target.value)}
-                          className="bg-white rounded-xl h-11 shadow-sm border-gray-100 focus:shadow-md focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
-                          dir="ltr"
                       />
                   </div>
                   <div className="grid gap-2">
@@ -143,7 +130,6 @@ export default function ContractsPage() {
               {/* الجدول الزمني للعقود */}
               <ConstructionContractsList 
                   searchQuery={searchQuery}
-                  phoneQuery={phoneQuery}
                   contractNo={contractNo}
                   dateFrom={dateFrom}
                   dateTo={dateTo}
