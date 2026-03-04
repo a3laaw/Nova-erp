@@ -260,8 +260,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-300">
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {item.icon && <item.icon className={cn("size-5", isActive ? "text-white" : "text-sidebar-foreground")} strokeWidth={2.5} />}
-            <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black" : "font-bold")}>{item.label}</span>
+            {item.icon && <item.icon className={cn("size-5", isActive ? "text-primary" : "text-sidebar-foreground")} strokeWidth={2.5} />}
+            <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black text-primary" : "font-bold")}>{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -332,10 +332,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2 transition-all duration-300 hover:bg-primary/15 hover:scale-[1.02] active:scale-95">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2 transition-all duration-300 hover:bg-blue-50/80 hover:scale-[1.02] active:scale-95">
               <div className='flex items-center gap-2'>
-                <item.icon className={cn("size-5", isActive ? "text-white" : "text-sidebar-foreground")} strokeWidth={2.5} />
-                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black" : "font-bold")}>{item.label}</span>
+                <item.icon className={cn("size-5", isActive ? "text-primary" : "text-sidebar-foreground")} strokeWidth={2.5} />
+                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black text-primary" : "font-bold")}>{item.label}</span>
               </div>
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />
             </SidebarMenuButton>
@@ -347,7 +347,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               const isChildActive = currentPath === child.href;
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("h-9 font-bold transition-all hover:bg-primary/10 hover:translate-x-[-4px]", isChildActive && "bg-primary/20 text-white shadow-sm")}>
+                   <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("h-9 font-bold transition-all hover:bg-blue-50/50 hover:translate-x-[-4px]", isChildActive && "bg-blue-100/50 text-primary shadow-sm")}>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-2">
                                 {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
@@ -378,9 +378,9 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     <>
       <SidebarHeader className="p-4 mb-2">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-lg border-2 border-primary/20 bg-white/5" />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-md border border-border bg-white" />
             <div className="flex flex-col">
-              <span className="text-xl font-black tracking-tight text-white leading-tight">{branding?.company_name || 'Nova ERP'}</span>
+              <span className="text-xl font-black tracking-tight text-foreground leading-tight">{branding?.company_name || 'Nova ERP'}</span>
               <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Pulse Suite</span>
             </div>
         </div>
@@ -397,18 +397,18 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-white/5 bg-black/20">
+      <SidebarFooter className="p-4 border-t border-border bg-muted/20">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-card/50 border border-white/10 shadow-lg group hover:bg-card transition-all">
-                <Avatar className="h-10 w-10 border-2 border-primary/30 transition-all group-hover:border-primary">
+            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-white border border-border shadow-sm group hover:bg-muted/30 transition-all">
+                <Avatar className="h-10 w-10 border-2 border-primary/10 transition-all group-hover:border-primary/30">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
-                    <AvatarFallback className="bg-primary/10 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/5 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className="text-sm font-black text-slate-50 truncate">{currentUser.fullName}</p>
-                    <p className="text-[10px] text-slate-400 truncate font-bold uppercase tracking-wider">{currentUser.role}</p>
+                    <p className="text-sm font-black text-foreground truncate">{currentUser.fullName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate font-bold uppercase tracking-wider">{currentUser.role}</p>
                 </div>
-                <button className="h-9 w-9 rounded-xl hover:bg-destructive/20 hover:text-red-400 group-data-[state=collapsed]:hidden flex items-center justify-center transition-all active:scale-90" onClick={onLogout} title="تسجيل الخروج">
+                <button className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive group-data-[state=collapsed]:hidden flex items-center justify-center transition-all active:scale-90" onClick={onLogout} title="تسجيل الخروج">
                     <LogOut className="h-4 w-4"/>
                 </button>
             </div>

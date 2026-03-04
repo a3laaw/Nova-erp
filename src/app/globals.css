@@ -7,46 +7,46 @@
 
 @layer base {
   :root {
-    /* Refined Comfortable Dark Theme (Lighter & Clearer) */
-    --background: 215 25% 27%; /* #1e293b - Slate 800 */
-    --foreground: 210 40% 98%; /* #f8fafc - Slate 50 */
+    /* Pure Professional Light Theme */
+    --background: 210 40% 98%; /* #f8fafc */
+    --foreground: 222 47% 11%; /* #0f172a */
     
-    --card: 215 19% 44%;       /* #475569 - Slate 600 (Lighter Surface) */
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
     
-    --popover: 215 19% 44%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     
-    --primary: 213 94% 68%;    /* #60a5fa - Blue 400 */
-    --primary-foreground: 215 25% 27%;
+    --primary: 217 91% 60%; /* #3b82f6 */
+    --primary-foreground: 210 40% 98%;
     
-    --secondary: 215 25% 33%;  /* #334155 - Slate 700 */
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11.2%;
     
-    --muted: 215 25% 33%;
-    --muted-foreground: 214 32% 91%; /* #e2e8f0 - Slate 200 */
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%; /* #475569 */
     
-    --accent: 215 25% 33%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11.2%;
     
-    --destructive: 0 91% 71%;  /* #f87171 - Red 400 */
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 215 25% 33%;
-    --input: 215 25% 33%;
-    --ring: 213 94% 68%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
     
     --radius: 0.75rem;
 
-    /* Sidebar Variables */
-    --sidebar-background: 215 25% 27%;
-    --sidebar-foreground: 214 32% 91%;
-    --sidebar-primary: 213 94% 68%;
-    --sidebar-primary-foreground: 215 25% 27%;
-    --sidebar-accent: 215 25% 33%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 25% 33%;
-    --sidebar-ring: 213 94% 68%;
+    /* Sidebar Variables for Light Mode */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215.4 16.3% 46.9%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222 47% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
@@ -63,16 +63,15 @@
 
 @layer utilities {
     .glass-surface {
-        @apply bg-card/80 backdrop-blur-md border border-slate-500/30 shadow-xl;
+        @apply bg-white/80 backdrop-blur-md border border-gray-200 shadow-xl;
     }
     
     .hover-lift {
-        @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:scale-[1.01];
+        @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:scale-[1.01];
     }
 
-    /* Sidebar Gradient - From BG to Lighter Surface */
     [data-sidebar="sidebar"] {
-        background: linear-gradient(to bottom, #1e293b, #334155) !important;
+        @apply border-l border-border bg-white shadow-sm !important;
     }
 
     input[type=number]::-webkit-inner-spin-button,
