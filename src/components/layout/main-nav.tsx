@@ -67,7 +67,8 @@ import {
   ChevronDown,
   LogOut,
   UserX,
-  ShoppingBag
+  ShoppingBag,
+  FileStack
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -75,7 +76,6 @@ import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
