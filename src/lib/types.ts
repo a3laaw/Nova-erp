@@ -195,7 +195,7 @@ export interface Employee extends BaseEntity {
     status: 'active' | 'terminated' | 'on-leave';
     department?: string;
     jobTitle?: string;
-    workTeam?: string;          // حقل فريق العمل الجديد
+    workTeam?: string;          
     basicSalary: number;
     housingAllowance?: number;
     transportAllowance?: number;
@@ -212,7 +212,7 @@ export interface Warehouse extends BaseEntity { name: string; location?: string;
 export interface Item extends BaseEntity { name: string; sku: string; categoryId: string; unitOfMeasure: string; costPrice?: number; sellingPrice?: number; inventoryTracked?: boolean; isSubsidyEligible?: boolean; warrantyYears?: number; }
 export interface Vendor extends BaseEntity { name: string; phone: string; contactPerson?: string; }
 export interface Account extends BaseEntity { code: string; name: string; type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; level: number; parentCode: string | null; isPayable: boolean; statement: 'Balance Sheet' | 'Income Statement'; balanceType: 'Debit' | 'Credit'; }
-export interface Department extends BaseEntity { name: string; order?: number; }
+export interface Department extends BaseEntity { name: string; order?: number; activityTypes?: string[]; }
 export interface Governorate extends BaseEntity { name: string; order?: number; }
 export interface Area extends BaseEntity { name: string; order?: number; }
 export interface TransactionType extends BaseEntity { name: string; order?: number; activityType?: string; departmentIds?: string[]; }

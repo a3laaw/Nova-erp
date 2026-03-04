@@ -22,6 +22,7 @@ import { Checkbox } from '../ui/checkbox';
 import { useBranding } from '@/context/branding-context';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
+import { Badge } from '../ui/badge';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -40,7 +41,7 @@ const commonNationalities = [
 
 const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n }));
 
-// ✨ محرك دمج رموز الفرق
+// ✨ محرك استخراج رمز القسم للفرق
 const getDeptPrefix = (deptName: string) => {
     if (!deptName) return 'G';
     const name = deptName.toLowerCase();
@@ -60,7 +61,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [formData, setFormData] = useState({
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date(), department: '', jobTitle: '',
-        workTeam: '', // حقل الفريق
+        workTeam: '', 
         contractType: 'permanent' as Employee['contractType'], basicSalary: '',
         housingAllowance: '', transportAllowance: '',
         salaryPaymentType: 'cash' as Employee['salaryPaymentType'],
@@ -88,14 +89,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [refDataLoading, setRefDataLoading] = useState(true);
     
     const isDayLaborer = formData.contractType === 'day_laborer';
-    const isSimpleLayout = isDayLaborer;
 
-    // ✨ منطق ظهور اختيار الفريق (عامل أو عامل يومية)
+    // ✨ منطق ظهور اختيار الفريق المحدث (للمسمى عامل أو لنوع العقد عامل يومية في أي قسم)
     const showTeamSelection = useMemo(() => {
         return formData.jobTitle === 'عامل' || formData.contractType === 'day_laborer';
     }, [formData.jobTitle, formData.contractType]);
 
-    // ✨ توليد خيارات الفريق بناءً على القسم
+    // ✨ توليد خيارات الفريق ديناميكياً بناءً على القسم المختار
     const teamOptions = useMemo(() => {
         const prefix = getDeptPrefix(formData.department);
         return Array.from({ length: 10 }, (_, i) => {
@@ -238,8 +238,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSelectChange = (id: keyof typeof formData, value: any) => {
         const newFormData = { ...formData, [id]: value };
         if (id === 'department') {
-            newFormData.jobTitle = ''; // Reset job title when department changes
-            newFormData.workTeam = ''; // Reset team when department changes
+            newFormData.jobTitle = ''; 
+            newFormData.workTeam = ''; // ريست للفريق عند تغيير القسم لضمان توافق الرموز
         }
         setFormData(newFormData);
     };
@@ -265,7 +265,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء تعبئة اسم الموظف بالعربية ورقم الجوال.' });
             return;
         }
-        if (!initialData && !isSimpleLayout && !formData.department) {
+        if (!initialData && !isDayLaborer && !formData.department) {
              toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء اختيار قسم للموظف.' });
             return;
         }
@@ -280,20 +280,18 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             (dataToSave as any).workTeam = formData.workTeam;
         }
 
-        if (isSimpleLayout) {
-            dataToSave.department = 'عمالة خارجية';
+        if (isDayLaborer) {
+            dataToSave.department = formData.department || 'عمالة خارجية';
             dataToSave.jobTitle = 'عامل يومية';
             dataToSave.civilId = formData.civilId || '000000000000';
-            dataToSave.hireDate = new Date();
+            dataToSave.hireDate = formData.hireDate;
             dataToSave.basicSalary = 0;
 
-            if (isDayLaborer) {
-                if (!formData.dailyRate || parseFloat(formData.dailyRate) <= 0) {
-                    toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'يجب إدخال اليومية وتكون أكبر من صفر.' });
-                    return;
-                }
-                dataToSave.dailyRate = parseFloat(formData.dailyRate);
+            if (!formData.dailyRate || parseFloat(formData.dailyRate) <= 0) {
+                toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'يجب إدخال اليومية وتكون أكبر من صفر.' });
+                return;
             }
+            dataToSave.dailyRate = parseFloat(formData.dailyRate);
         } else {
             // Logic for regular employees
             if (!formData.civilId || !formData.hireDate || !formData.department || !formData.jobTitle) {
@@ -385,58 +383,74 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 {isDayLaborer && (
                     <section className="space-y-4 p-4 border rounded-lg bg-muted/30">
-                        <h3 className="font-semibold text-lg">الأجر</h3>
-                        <div className="grid gap-1.5 max-w-sm">
-                            <Label htmlFor="dailyRate">اليومية (د.ك) <span className="text-destructive">*</span></Label>
-                            <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} dir="ltr" required />
+                        <h3 className="font-semibold text-lg">بيانات عامل اليومية</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="department-dl">القسم (التخصص)</Label>
+                                <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder="اختر قسم اليومية..." />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="dailyRate">اليومية (د.ك) <span className="text-destructive">*</span></Label>
+                                <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} dir="ltr" required />
+                            </div>
                         </div>
                     </section>
                 )}
                 
+                {!isDayLaborer && (
+                    <section className="space-y-4 p-4 border rounded-lg">
+                        <h3 className="font-semibold text-lg">المعلومات الوظيفية</h3>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
+                                <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder={refDataLoading ? "تحميل..." : "اختر قسمًا..."} disabled={refDataLoading} />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="jobTitle">المسمى الوظيفي <span className="text-destructive">*</span></Label>
+                                <InlineSearchList 
+                                    value={formData.jobTitle} 
+                                    onSelect={(v) => handleSelectChange('jobTitle', v)} 
+                                    options={filteredJobOptions} 
+                                    placeholder={!formData.department ? "اختر قسمًا أولاً" : refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} 
+                                    disabled={refDataLoading || !formData.department}
+                                />
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {/* ✨ اختيار فريق العمل الشرطي - يظهر للعامل أو لعامل اليومية بناءً على القسم المختار */}
+                {showTeamSelection && (
+                    <section className="space-y-4 p-4 border rounded-lg bg-primary/5 animate-in fade-in slide-in-from-top-2">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="workTeam" className="font-bold text-primary flex items-center gap-2">
+                                <Users className="h-4 w-4" /> توزيع فريق العمل (الرمز الميداني)
+                            </Label>
+                            <Select value={formData.workTeam} onValueChange={(v) => handleSelectChange('workTeam', v)} dir="rtl">
+                                <SelectTrigger id="workTeam" className="border-primary/20 bg-white">
+                                    <SelectValue placeholder={!formData.department ? "حدد القسم أولاً لتوليد الرموز" : "اختر الرمز..."} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {teamOptions.map(opt => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="font-mono bg-white">{opt.value}</Badge>
+                                                <span>فريق {formData.department} {opt.value.replace(/\D/g, '')}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground mt-1 pr-1">يتم توليد الرموز آلياً (E=كهرباء، M=صحي/ميكانيك، C=إنشائي، A=معماري، L=خارجية)</p>
+                        </div>
+                    </section>
+                )}
+
                 {!isSimpleLayout && (
                     <>
                         <section className="space-y-4 p-4 border rounded-lg">
-                            <h3 className="font-semibold text-lg">المعلومات الوظيفية</h3>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                    <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder={refDataLoading ? "تحميل..." : "اختر قسمًا..."} disabled={refDataLoading} />
-                                </div>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="jobTitle">المسمى الوظيفي <span className="text-destructive">*</span></Label>
-                                    <InlineSearchList 
-                                        value={formData.jobTitle} 
-                                        onSelect={(v) => handleSelectChange('jobTitle', v)} 
-                                        options={filteredJobOptions} 
-                                        placeholder={!formData.department ? "اختر قسمًا أولاً" : refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} 
-                                        disabled={refDataLoading || !formData.department}
-                                    />
-                                </div>
-                                
-                                {/* ✨ اختيار فريق العمل الشرطي */}
-                                {showTeamSelection && (
-                                    <div className="grid gap-1.5 animate-in fade-in slide-in-from-top-2">
-                                        <Label htmlFor="workTeam" className="font-bold text-primary flex items-center gap-2">
-                                            <Users className="h-4 w-4" /> فريق العمل (الرمز التشغيلي)
-                                        </Label>
-                                        <Select value={formData.workTeam} onValueChange={(v) => handleSelectChange('workTeam', v)} dir="rtl">
-                                            <SelectTrigger id="workTeam" className="border-primary/20 bg-primary/5">
-                                                <SelectValue placeholder={!formData.department ? "حدد القسم أولاً" : "اختر الفريق..."} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {teamOptions.map(opt => (
-                                                    <SelectItem key={opt.value} value={opt.value}>
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge variant="outline" className="font-mono">{opt.value}</Badge>
-                                                            <span>فريق {formData.department} {opt.value.replace(/\D/g, '')}</span>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-
+                            <h3 className="font-semibold text-lg">تفاصيل التعيين</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="grid gap-1.5">
                                     <Label>الرقم الوظيفي</Label>
                                     <Input value={employeeNumber || ''} disabled readOnly />
