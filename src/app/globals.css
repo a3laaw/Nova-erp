@@ -7,34 +7,46 @@
 
 @layer base {
   :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 217 33% 17%;
+    /* New Balanced Dark Theme */
+    --background: 215 33% 17%; /* #1e293b */
+    --foreground: 210 40% 98%; /* #f8fafc */
+    
+    --card: 215 25% 27%;       /* #334155 */
     --card-foreground: 210 40% 98%;
-    --popover: 217 33% 17%;
+    
+    --popover: 215 25% 27%;
     --popover-foreground: 210 40% 98%;
-    --primary: 221 83% 53%;
+    
+    --primary: 217 91% 60%;    /* #3b82f6 */
     --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 25%;
+    
+    --secondary: 215 25% 35%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 25%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 25%;
+    
+    --muted: 215 25% 35%;
+    --muted-foreground: 213 27% 84%; /* #cbd5e1 */
+    
+    --accent: 215 25% 35%;
     --accent-foreground: 210 40% 98%;
+    
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 25%;
-    --input: 217 33% 25%;
-    --ring: 221 83% 53%;
+    
+    --border: 215 25% 35%;
+    --input: 215 25% 35%;
+    --ring: 217 91% 60%;
+    
     --radius: 0.75rem;
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 221 83% 53%;
+
+    /* Sidebar Variables */
+    --sidebar-background: 215 33% 17%;
+    --sidebar-foreground: 213 27% 84%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 217 33% 25%;
+    --sidebar-accent: 215 25% 35%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 25%;
-    --sidebar-ring: 221 83% 53%;
+    --sidebar-border: 215 25% 35%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
@@ -50,13 +62,17 @@
 }
 
 @layer utilities {
-    /* Nova Pulse Custom Utilities */
     .glass-surface {
-        @apply bg-card/80 backdrop-blur-md border border-slate-700/50 shadow-xl;
+        @apply bg-card/80 backdrop-blur-md border border-slate-600/50 shadow-xl;
     }
     
     .hover-lift {
         @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:scale-[1.02];
+    }
+
+    /* Sidebar Gradient */
+    [data-sidebar="sidebar"] {
+        background: linear-gradient(to bottom, #1e293b, #111827) !important;
     }
 
     input[type=number]::-webkit-inner-spin-button,
@@ -78,4 +94,9 @@
 /* Custom transitions for Collapsibles and Sidebar */
 [data-state="open"] > .sidebar-icon {
     @apply rotate-180 transition-transform duration-200;
+}
+
+/* Contrast Boost */
+.text-high-contrast {
+    @apply text-slate-100;
 }

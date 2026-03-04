@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -261,8 +260,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-200">
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {item.icon && <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground")} strokeWidth={2.5} />}
-            <span className="group-data-[state=collapsed]:hidden">{item.label}</span>
+            {item.icon && <item.icon className={cn("size-5", isActive ? "text-white" : "text-sidebar-foreground")} strokeWidth={2.5} />}
+            <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black" : "font-bold")}>{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -333,48 +332,22 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-10 w-full justify-between pr-2 transition-all duration-200">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2 transition-all duration-200 hover:bg-primary/20 hover:scale-105 active:scale-95">
               <div className='flex items-center gap-2'>
-                <item.icon className={cn("size-5", isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground")} strokeWidth={2.5} />
-                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-bold" : "font-medium")}>{item.label}</span>
+                <item.icon className={cn("size-5", isActive ? "text-white" : "text-sidebar-foreground")} strokeWidth={2.5} />
+                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black" : "font-bold")}>{item.label}</span>
               </div>
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />
             </SidebarMenuButton>
           </CollapsibleTrigger>
         </SidebarMenuItem>
         <CollapsibleContent>
-          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-primary/10">
+          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-primary/20">
             {item.children.map((child: any, index: number) => {
-              if (child.children) {
-                return (
-                  <SidebarMenuSubItem key={`${child.label}-${index}`} className="mt-2">
-                     <div className="flex items-center justify-between w-full px-2 py-1.5 rounded-md mb-1 bg-muted/20">
-                        <div className="flex items-center gap-2">
-                            {child.icon && <child.icon className="h-4 w-4 text-sidebar-foreground/50" strokeWidth={2.2} />}
-                            <span className="text-xs font-bold text-sidebar-foreground/70">{child.label}</span>
-                        </div>
-                    </div>
-                    <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-2 pr-2 space-y-1 border-primary/5">
-                      {child.children.map((subChild: any) => (
-                        <SidebarMenuSubItem key={subChild.href}>
-                            <SidebarMenuSubButton isActive={currentPath === subChild.href} asChild className="h-8">
-                                <Link href={subChild.href} onClick={() => setOpenMobile(false)}>
-                                    <div className="flex items-center gap-2">
-                                        {subChild.icon && <subChild.icon className="h-3.5 w-3.5" strokeWidth={2} />}
-                                        <span className="truncate">{subChild.label}</span>
-                                    </div>
-                                </Link>
-                            </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </SidebarMenuSubItem>
-                );
-              }
               const isChildActive = currentPath === child.href;
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <SidebarMenuSubButton isActive={isChildActive} asChild className="h-8">
+                   <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("h-9 font-bold transition-all hover:bg-primary/10 hover:translate-x-[-4px]", isChildActive && "bg-primary/20 text-white shadow-sm")}>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-2">
                                 {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
@@ -403,17 +376,17 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
 
   return (
     <>
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 mb-2">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-sm border" />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-lg border-2 border-primary/20 bg-white/5" />
             <div className="flex flex-col">
-              <span className="text-lg font-black tracking-tight text-primary leading-tight">{branding?.company_name || 'Nova ERP'}</span>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Enterprise Suite</span>
+              <span className="text-xl font-black tracking-tight text-white leading-tight">{branding?.company_name || 'Nova ERP'}</span>
+              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Pulse Suite</span>
             </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="px-2">
-        <SidebarMenu className="gap-1">
+      <SidebarContent className="px-3">
+        <SidebarMenu className="gap-1.5">
           {currentNavItems.map((item, index) => (
             <NavItem 
                 key={`${item.href || item.label}-${index}`} 
@@ -424,18 +397,18 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t bg-muted/10">
+      <SidebarFooter className="p-4 border-t border-white/5 bg-black/20">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-xl p-2 bg-card border shadow-sm group">
-                <Avatar className="h-9 w-9 border-2 border-primary/10 transition-all group-hover:border-primary/30">
+            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-card/50 border border-white/10 shadow-lg group hover:bg-card transition-all">
+                <Avatar className="h-10 w-10 border-2 border-primary/30 transition-all group-hover:border-primary">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
-                    <AvatarFallback className="bg-primary/5 text-primary font-bold">{currentUser.fullName?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div className="ml-2 mr-2 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className="text-sm font-bold truncate">{currentUser.fullName}</p>
-                    <p className="text-[10px] text-muted-foreground truncate font-medium">{currentUser.role}</p>
+                <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
+                    <p className="text-sm font-black text-slate-100 truncate">{currentUser.fullName}</p>
+                    <p className="text-[10px] text-slate-400 truncate font-bold uppercase tracking-wider">{currentUser.role}</p>
                 </div>
-                <button className="h-8 w-8 rounded-md hover:bg-destructive/10 hover:text-destructive group-data-[state=collapsed]:hidden flex items-center justify-center transition-colors" onClick={onLogout} title="تسجيل الخروج">
+                <button className="h-9 w-9 rounded-xl hover:bg-destructive/20 hover:text-red-400 group-data-[state=collapsed]:hidden flex items-center justify-center transition-all active:scale-90" onClick={onLogout} title="تسجيل الخروج">
                     <LogOut className="h-4 w-4"/>
                 </button>
             </div>
