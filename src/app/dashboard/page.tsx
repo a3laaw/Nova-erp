@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -87,7 +86,7 @@ export default function DashboardPage() {
   }, [journalEntries, projects, clients, loading]);
 
   return (
-    <div className="space-y-6" dir="rtl">
+    <div className="space-y-10" dir="rtl">
         {/* نظام التنبيه الاستباقي لعجز السيولة */}
         {liquidityAlert && (
             <Card className="border-none shadow-2xl bg-gradient-to-br from-red-600 to-red-800 text-white rounded-[2.5rem] overflow-hidden animate-pulse">
@@ -129,8 +128,8 @@ export default function DashboardPage() {
         {/* نظام تنبيهات الخلل وسلامة البيانات */}
         <DataAnomalyAlert />
 
-        <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-            <div className="grid gap-4 md:grid-cols-2 xl:col-span-3">
+        <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 xl:col-span-3">
                 <Card className="border-none shadow-sm bg-gradient-to-br from-white to-blue-50/50 rounded-3xl">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
@@ -201,16 +200,16 @@ export default function DashboardPage() {
                 </Card>
             </div>
             
-            <div className="grid gap-4">
+            <div className="grid gap-6">
                 <PendingVisits />
                 <TaskPrioritization />
             </div>
 
-            <div className="grid gap-4 xl:col-span-2">
+            <div className="grid gap-6 xl:col-span-2">
                 <RecentActivity />
             </div>
             
-            <div className="grid gap-4 xl:col-span-3">
+            <div className="grid gap-6 xl:col-span-3">
                 <UpcomingAppointments />
             </div>
         </div>
