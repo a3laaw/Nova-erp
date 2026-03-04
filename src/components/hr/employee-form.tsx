@@ -95,14 +95,17 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         return formData.jobTitle === 'عامل' || formData.contractType === 'day_laborer';
     }, [formData.jobTitle, formData.contractType]);
 
-    // ✨ توليد خيارات الفريق ديناميكياً بناءً على القسم المختار
+    // ✨ محرك توليد الرموز الثنائية الذكي
+    // الـ L يثبت لعمال اليومية فقط، لتمييزهم عن العمال الثابتين
     const teamOptions = useMemo(() => {
-        const prefix = getDeptPrefix(formData.department);
+        const deptPrefix = getDeptPrefix(formData.department);
+        const finalPrefix = formData.contractType === 'day_laborer' ? `L${deptPrefix}` : deptPrefix;
+        
         return Array.from({ length: 10 }, (_, i) => {
-            const code = `${prefix}${i + 1}`;
+            const code = `${finalPrefix}${i + 1}`;
             return { value: code, label: code };
         });
-    }, [formData.department]);
+    }, [formData.department, formData.contractType]);
 
     const showStandardSalary = useMemo(() => {
         if (formData.contractType === 'percentage' || 
@@ -116,7 +119,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [formData.contractType, formData.pieceRateMode]);
 
     useEffect(() => {
-        const generalHours = branding?.group_work_hours?.general;
+        const generalHours = branding?.work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
         const defaultEndTime = generalHours?.evening_end_time || '17:00';
 
@@ -239,7 +242,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const newFormData = { ...formData, [id]: value };
         if (id === 'department') {
             newFormData.jobTitle = ''; 
-            newFormData.workTeam = ''; // ريست للفريق عند تغيير القسم لضمان توافق الرموز
+            newFormData.workTeam = ''; 
         }
         setFormData(newFormData);
     };
@@ -423,12 +426,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </section>
                 )}
 
-                {/* ✨ اختيار فريق العمل الشرطي - يظهر للعامل أو لعامل اليومية بناءً على القسم المختار */}
+                {/* ✨ اختيار فريق العمل الترميز الثنائي الذكي (L + الحرف) */}
                 {showTeamSelection && (
                     <section className="space-y-4 p-4 border rounded-lg bg-primary/5 animate-in fade-in slide-in-from-top-2">
                         <div className="grid gap-1.5">
                             <Label htmlFor="workTeam" className="font-bold text-primary flex items-center gap-2">
-                                <Users className="h-4 w-4" /> توزيع فريق العمل (الرمز الميداني)
+                                <Users className="h-4 w-4" /> توزيع فريق العمل (ترميز ثنائي ذكي)
                             </Label>
                             <Select value={formData.workTeam} onValueChange={(v) => handleSelectChange('workTeam', v)} dir="rtl">
                                 <SelectTrigger id="workTeam" className="border-primary/20 bg-white">
@@ -439,13 +442,18 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                         <SelectItem key={opt.value} value={opt.value}>
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline" className="font-mono bg-white">{opt.value}</Badge>
-                                                <span>فريق {formData.department} {opt.value.replace(/\D/g, '')}</span>
+                                                <span>
+                                                    {formData.contractType === 'day_laborer' ? 'يومية ' : 'فريق '}
+                                                    {formData.department} {opt.value.replace(/\D/g, '')}
+                                                </span>
                                             </div>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <p className="text-[10px] text-muted-foreground mt-1 pr-1">يتم توليد الرموز آلياً (E=كهرباء، M=صحي/ميكانيك، C=إنشائي، A=معماري، L=خارجية)</p>
+                            <p className="text-[10px] text-muted-foreground mt-1 pr-1 font-bold">
+                                الترميز: (L=يومية، E=كهرباء، M=صحي، C=إنشائي). مثال: <span className="text-primary">LM1</span> = يومية ميكانيك/صحي فريق 1
+                            </p>
                         </div>
                     </section>
                 )}
