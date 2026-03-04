@@ -10,13 +10,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirebase } from '@/firebase';
-import { useSubscription } from '@/hooks/use-subscription';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { formatCurrency, cn } from '@/lib/utils';
+import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search, User } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -24,29 +23,25 @@ import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { Label } from '../ui/label';
 import { searchQuotations } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
-import { DateInput } from '../ui/date-input';
-import { Input } from '@/components/ui/input';
 
-const statusTranslations: Record<Quotation['status'], string> = {
-    draft: 'مسودة',
-    sent: 'تم الإرسال',
-    accepted: 'مقبول',
-    rejected: 'مرفوض',
-    expired: 'منتهي الصلاحية'
+interface QuotationsListProps {
+  searchQuery?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  statusFilter?: string;
+}
+
+const statusMap: Record<string, { label: string, color: string }> = {
+    draft: { label: 'مسودة (Draft)', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+    sent: { label: 'مرسل (Sent)', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+    accepted: { label: 'مقبول (Accepted)', color: 'bg-green-50 text-green-700 border-green-200' },
+    rejected: { label: 'مرفوض (Rejected)', color: 'bg-red-50 text-red-700 border-red-200' },
+    expired: { label: 'منتهي (Expired)', color: 'bg-gray-50 text-gray-700 border-gray-200' }
 };
 
-const statusColors: Record<Quotation['status'], string> = {
-    draft: 'bg-yellow-100 text-yellow-800',
-    sent: 'bg-blue-100 text-blue-800',
-    accepted: 'bg-green-100 text-green-800',
-    rejected: 'bg-red-100 text-red-800',
-    expired: 'bg-gray-100 text-gray-800'
-};
-
-export function QuotationsList() {
+export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = 'all' }: QuotationsListProps) {
   const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
@@ -54,32 +49,31 @@ export function QuotationsList() {
   const [itemToDelete, setItemToDelete] = useState<Quotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
-
   const quotationsQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
   const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, 'quotations', quotationsQueryConstraints);
 
   const filteredQuotations = useMemo(() => {
-    const dateFiltered = quotations.filter(quotation => {
+    let results = quotations.filter(quotation => {
         const quotationDate = toFirestoreDate(quotation.date);
         
-        if (!dateFrom && !dateTo) return true;
-        if (!quotationDate) return false;
-      
-        const matchesDateFrom = !dateFrom || (quotationDate >= new Date(new Date(dateFrom).setHours(0, 0, 0, 0)));
-        const matchesDateTo = !dateTo || (quotationDate <= new Date(new Date(dateTo).setHours(23, 59, 59, 999)));
+        const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter;
+        let matchesDate = true;
+        if (dateFrom && dateTo && quotationDate) {
+            matchesDate = quotationDate >= dateFrom && quotationDate <= dateTo;
+        }
         
-        return matchesDateFrom && matchesDateTo;
+        return matchesStatus && matchesDate;
     });
-    return searchQuotations(dateFiltered, searchQuery);
-  }, [quotations, searchQuery, dateFrom, dateTo]);
+
+    if (searchQuery) {
+        results = searchQuotations(results, searchQuery);
+    }
+    return results;
+  }, [quotations, searchQuery, dateFrom, dateTo, statusFilter]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
-    if (!date) return '-';
-    return format(date, 'dd/MM/yyyy');
+    return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
   const handleDelete = async () => {
@@ -96,158 +90,97 @@ export function QuotationsList() {
     }
   }
 
-  if (loading) {
-    return (
-        <div className="border rounded-lg">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>رقم العرض</TableHead>
-                        <TableHead>العميل</TableHead>
-                        <TableHead>التاريخ</TableHead>
-                        <TableHead>الإجمالي</TableHead>
-                        <TableHead>الحالة</TableHead>
-                        <TableHead>الإجراءات</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    );
-  }
-  
-  if (error) {
-      return <div className="text-center py-10 text-destructive">فشل تحميل قائمة عروض الأسعار.</div>;
-  }
+  if (loading) return <div className="space-y-4"><Skeleton className="h-16 w-full rounded-2xl" /><Skeleton className="h-16 w-full rounded-2xl" /></div>;
 
   return (
-    <>
-        <div className="bg-muted/50 p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                <div className="grid gap-2 md:col-span-1">
-                    <Label htmlFor="search">بحث ذكي</Label>
-                    <div className="relative">
-                        <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            id="search"
-                            placeholder="رقم العرض, اسم العميل, الموضوع..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 rtl:pr-10"
-                        />
-                    </div>
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="dateFrom">من تاريخ</Label>
-                    <DateInput 
-                        value={dateFrom}
-                        onChange={setDateFrom}
-                    />
-                </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="dateTo">إلى تاريخ</Label>
-                    <DateInput 
-                        value={dateTo}
-                        onChange={setDateTo}
-                    />
-                </div>
-            </div>
-        </div>
-
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>رقم العرض</TableHead>
-                <TableHead>العميل</TableHead>
-                <TableHead>التاريخ</TableHead>
-                <TableHead className="text-left">الإجمالي</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead>الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-                {quotations.length === 0 ? (
-                    <TableRow>
-                        <TableCell colSpan={6}>
-                            <div className="p-8 text-center border-2 border-dashed rounded-lg">
-                                <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-                                <h3 className="mt-4 text-lg font-medium">لا توجد عروض أسعار</h3>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    ابدأ بإنشاء عرض سعر جديد ليظهر هنا.
-                                </p>
+    <div className="rounded-[2rem] border-none shadow-sm overflow-hidden bg-white">
+      <Table className="border-separate border-spacing-y-2 px-2">
+        <TableHeader className="bg-[#F8F9FE]">
+          <TableRow className="hover:bg-transparent border-none">
+            <TableHead className="px-6 py-5 font-black text-[#7209B7] text-right rounded-r-2xl">رقم العرض</TableHead>
+            <TableHead className="font-black text-[#7209B7] text-right">العميل</TableHead>
+            <TableHead className="font-black text-[#7209B7] text-right">الموضوع</TableHead>
+            <TableHead className="font-black text-[#7209B7] text-center">التاريخ</TableHead>
+            <TableHead className="font-black text-[#7209B7] text-left">الإجمالي</TableHead>
+            <TableHead className="font-black text-[#7209B7] text-center">الحالة</TableHead>
+            <TableHead className="w-[120px] font-black text-[#7209B7] text-center rounded-l-2xl">إجراءات</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="before:block before:h-2">
+            {filteredQuotations.length === 0 ? (
+                <TableRow>
+                    <TableCell colSpan={7} className="h-48 text-center text-muted-foreground opacity-40">
+                        لا توجد عروض أسعار مسجلة تطابق البحث.
+                    </TableCell>
+                </TableRow>
+            ) : (
+                filteredQuotations.map((quotation) => (
+                    <TableRow key={quotation.id} className="group border-none shadow-sm transition-all duration-300 hover:bg-[#F3E8FF]/50 [&:nth-child(even)]:bg-[#F3E8FF]/20">
+                        <TableCell className="px-6 py-5 font-mono font-black text-[#7209B7] text-sm rounded-r-2xl">
+                            {quotation.quotationNumber}
+                        </TableCell>
+                        <TableCell>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#F8F9FE] rounded-full group-hover:bg-white transition-colors">
+                                    <User className="h-4 w-4 text-[#7209B7]" />
+                                </div>
+                                <span className="font-black text-[#14453D]">{quotation.clientName}</span>
+                            </div>
+                        </TableCell>
+                        <TableCell className="font-bold text-foreground/80">{quotation.subject}</TableCell>
+                        <TableCell className="text-center font-mono text-xs font-bold text-muted-foreground">{formatDate(quotation.date)}</TableCell>
+                        <TableCell className="text-left font-mono font-black text-[#2E5BCC] text-lg">{formatCurrency(quotation.totalAmount)}</TableCell>
+                        <TableCell className="text-center">
+                            <Badge variant="outline" className={cn("font-black px-4 py-1 rounded-full border-2", statusMap[quotation.status]?.color)}>
+                                {statusMap[quotation.status]?.label || quotation.status}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-center rounded-l-2xl">
+                            <div className="flex items-center justify-center gap-2">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-9 w-9 rounded-xl border-2 border-[#7209B7]/20 text-[#7209B7] hover:bg-[#7209B7] hover:text-white transition-all shadow-none" 
+                                    asChild
+                                >
+                                    <Link href={`/dashboard/accounting/quotations/${quotation.id}`}>
+                                        <Eye className="h-4 w-4" />
+                                    </Link>
+                                </Button>
+                                {quotation.status === 'draft' && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-9 w-9 rounded-xl border-2 border-[#7209B7]/20 text-[#7209B7] hover:bg-[#7209B7] hover:text-white transition-all shadow-none" 
+                                        asChild
+                                    >
+                                        <Link href={`/dashboard/accounting/quotations/${quotation.id}/edit`}>
+                                            <Pencil className="h-4 w-4" />
+                                        </Link>
+                                    </Button>
+                                )}
                             </div>
                         </TableCell>
                     </TableRow>
-                ) : filteredQuotations.length === 0 ? (
-                    <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
-                            لا توجد نتائج تطابق بحثك.
-                        </TableCell>
-                    </TableRow>
-                ) : (
-                    filteredQuotations.map((quotation) => (
-                        <TableRow key={quotation.id}>
-                        <TableCell className="font-mono">{quotation.quotationNumber}</TableCell>
-                        <TableCell>
-                            <Link href={`/dashboard/clients/${quotation.clientId}`} className="hover:underline">
-                            {quotation.clientName}
-                            </Link>
-                        </TableCell>
-                        <TableCell>{formatDate(quotation.date)}</TableCell>
-                        <TableCell className="text-left font-mono">{formatCurrency(quotation.totalAmount)}</TableCell>
-                        <TableCell><Badge variant="outline" className={statusColors[quotation.status]}>{statusTranslations[quotation.status]}</Badge></TableCell>
-                        <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl">
-                                        <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}`)}>
-                                            <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
-                                        </DropdownMenuItem>
-                                        {quotation.status === 'draft' && (
-                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/quotations/${quotation.id}/edit`)}>
-                                                <Pencil className="ml-2 h-4 w-4" /> تعديل
-                                            </DropdownMenuItem>
-                                        )}
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setItemToDelete(quotation)} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="ml-2 h-4 w-4" /> حذف
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                        </TableCell>
-                        </TableRow>
-                    ))
-                )}
-            </TableBody>
-          </Table>
-        </div>
-        
-         <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
-            <AlertDialogContent dir="rtl">
+                ))
+            )}
+        </TableBody>
+      </Table>
+
+      <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
+            <AlertDialogContent dir="rtl" className="rounded-3xl">
                 <AlertDialogHeader>
                     <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        سيتم حذف عرض السعر رقم "{itemToDelete?.quotationNumber}" بشكل دائم.
-                    </AlertDialogDescription>
+                    <AlertDialogDescription>سيتم حذف عرض السعر رقم "{itemToDelete?.quotationNumber}" بشكل دائم.</AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                <AlertDialogFooter className="gap-2">
+                    <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
                         {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-    </>
+    </div>
   );
 }
