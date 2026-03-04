@@ -9,7 +9,7 @@ import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -18,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Switch } from '../ui/switch';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const defaultSchedule = {
     morning_start_time: '08:00',
@@ -55,47 +56,57 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSchedule, setSchedule: any }) => (
-    <div className="space-y-6">
-        <div>
-            <h4 className="font-medium text-muted-foreground mb-4">الفترة الصباحية</h4>
+const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSchedule, setSchedule: any }) => {
+    // فحص صلاحية الوقت المدخل (أن النهاية بعد البداية)
+    const morningInvalid = schedule.morning_start_time >= schedule.morning_end_time && schedule.morning_end_time !== '';
+    const eveningInvalid = schedule.evening_start_time >= schedule.evening_end_time && schedule.evening_end_time !== '';
+
+    return (
+        <div className="space-y-6">
+            <div className="space-y-4">
+                <h4 className="font-bold text-sm text-primary">الفترة الصباحية</h4>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label className="text-xs">من الساعة</Label>
+                        <Input type="time" value={schedule.morning_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_start_time: e.target.value }))} className="rounded-xl"/>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label className="text-xs">إلى الساعة</Label>
+                        <Input type="time" value={schedule.morning_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_end_time: e.target.value }))} className={cn("rounded-xl", morningInvalid && "border-red-500 bg-red-50")}/>
+                    </div>
+                </div>
+                {morningInvalid && <p className="text-[10px] text-red-600 font-bold">تنبيه: وقت النهاية يجب أن يكون بعد البداية.</p>}
+            </div>
+
+            <div className="space-y-4">
+                <h4 className="font-bold text-sm text-primary">الفترة المسائية</h4>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label className="text-xs">من الساعة</Label>
+                        <Input type="time" value={schedule.evening_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_start_time: e.target.value }))} className="rounded-xl"/>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label className="text-xs">إلى الساعة</Label>
+                        <Input type="time" value={schedule.evening_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_end_time: e.target.value }))} className={cn("rounded-xl", eveningInvalid && "border-red-500 bg-red-50")}/>
+                    </div>
+                </div>
+                {eveningInvalid && <p className="text-[10px] text-red-600 font-bold">تنبيه: وقت النهاية يجب أن يكون بعد البداية.</p>}
+            </div>
+
+            <Separator/>
             <div className="grid grid-cols-2 gap-4">
-                 <div className="grid gap-2">
-                    <Label>من الساعة</Label>
-                    <Input type="time" value={schedule.morning_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_start_time: e.target.value }))} className="rounded-xl"/>
+                <div className="grid gap-2">
+                    <Label className="text-xs">مدة كل موعد (بالدقائق)</Label>
+                    <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} className="rounded-xl"/>
                 </div>
                 <div className="grid gap-2">
-                    <Label>إلى الساعة</Label>
-                    <Input type="time" value={schedule.morning_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_end_time: e.target.value }))} className="rounded-xl"/>
+                    <Label className="text-xs">فترة الراحة (بالدقائق)</Label>
+                    <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} className="rounded-xl"/>
                 </div>
             </div>
         </div>
-        <div>
-            <h4 className="font-medium text-muted-foreground mb-4">الفترة المسائية</h4>
-            <div className="grid grid-cols-2 gap-4">
-                 <div className="grid gap-2">
-                    <Label>من الساعة</Label>
-                    <Input type="time" value={schedule.evening_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_start_time: e.target.value }))} className="rounded-xl"/>
-                </div>
-                <div className="grid gap-2">
-                    <Label>إلى الساعة</Label>
-                    <Input type="time" value={schedule.evening_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_end_time: e.target.value }))} className="rounded-xl"/>
-                </div>
-            </div>
-        </div>
-        <Separator/>
-        <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-                <Label>مدة كل موعد (بالدقائق)</Label>
-                <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} className="rounded-xl"/>
-            </div>
-             <div className="grid gap-2">
-                <Label>فترة الراحة بين المواعيد (بالدقائق)</Label>
-                <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} className="rounded-xl"/>
-            </div>
-        </div>
-    </div>
-);
+    );
+};
 
 export function WorkHoursManager() {
     const { firestore } = useFirebase();
@@ -113,11 +124,11 @@ export function WorkHoursManager() {
     useEffect(() => {
         if (branding?.work_hours) {
             const wh = branding.work_hours;
-            setGeneralSchedule({ ...defaultSchedule, ...wh.general });
-            setArchitecturalSchedule({ ...defaultSchedule, ...wh.architectural });
+            if (wh.general) setGeneralSchedule({ ...defaultSchedule, ...wh.general });
+            if (wh.architectural) setArchitecturalSchedule({ ...defaultSchedule, ...wh.architectural });
             setHolidays(wh.holidays || []);
-            setHalfDay({ ...defaultHalfDay, ...wh.half_day });
-             if (wh.ramadan) {
+            if (wh.half_day) setHalfDay({ ...defaultHalfDay, ...wh.half_day });
+            if (wh.ramadan) {
                 setRamadanSchedule({
                     ...defaultRamadanSchedule,
                     ...wh.ramadan,
@@ -130,6 +141,14 @@ export function WorkHoursManager() {
     
     const handleSave = async () => {
         if (!firestore) return;
+        
+        // منع الحفظ إذا كان هناك تداخل زمني واضح
+        if (generalSchedule.morning_end_time <= generalSchedule.morning_start_time || 
+            architecturalSchedule.morning_end_time <= architecturalSchedule.morning_start_time) {
+            toast({ variant: 'destructive', title: 'خطأ في الأوقات', description: 'يرجى التأكد من أن وقت نهاية الدوام دائماً بعد وقت البداية.' });
+            return;
+        }
+
         setIsSaving(true);
         try {
             const dataToSave = {
@@ -148,7 +167,7 @@ export function WorkHoursManager() {
                 }
             };
             await setDoc(doc(firestore, 'company_settings', 'main'), dataToSave, { merge: true });
-            toast({ title: 'نجاح', description: 'تم حفظ إعدادات الدوام والمواعيد.' });
+            toast({ title: 'نجاح', description: 'تم حفظ إعدادات الدوام والمواعيد بنجاح.' });
         } catch (error) {
             console.error("Error saving work hours:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الإعدادات.' });

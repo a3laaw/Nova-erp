@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -67,8 +67,14 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
     const slots: string[] = [];
     try {
-        let currentTime = parse(start, 'HH:mm', new Date());
+        const startTime = parse(start, 'HH:mm', new Date());
         const endTime = parse(end, 'HH:mm', new Date());
+        
+        if (!isValid(startTime) || !isValid(endTime) || startTime >= endTime) {
+            return [];
+        }
+
+        let currentTime = startTime;
         while (currentTime < endTime) {
             const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
             if (slotEndTime > endTime) break;

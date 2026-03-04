@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy, limit } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -50,9 +50,15 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
     const slots: string[] = [];
     try {
-        let currentTime = parse(start, 'HH:mm', new Date());
+        const startTime = parse(start, 'HH:mm', new Date());
         const endTime = parse(end, 'HH:mm', new Date());
         
+        // حماية: إذا كان وقت النهاية قبل أو يساوي وقت البداية، لا تولد أي خانات
+        if (!isValid(startTime) || !isValid(endTime) || startTime >= endTime) {
+            return [];
+        }
+
+        let currentTime = startTime;
         while (currentTime < endTime) {
             const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
             if (slotEndTime > endTime) break;
@@ -108,7 +114,7 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
     } catch (error) { console.error("Reconciliation failed:", error); }
 }
 
-// مصفوفة أيام الأسبوع المتوافقة مع getDay() (0 = الأحد)
+// مصفوفة أيام الأسبوع (0 = الأحد)
 const weekDays = [
     { id: 'Sunday', label: 'الأحد' },
     { id: 'Monday', label: 'الاثنين' },
