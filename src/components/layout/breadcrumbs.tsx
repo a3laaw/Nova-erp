@@ -78,6 +78,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'sales': 'المبيعات',
     'schedules': 'مراجعة الجداول الزمنية',
     'field-visits': 'الزيارات الميدانية',
+    'contracts': 'عروض الأسعار والعقود',
   },
   en: {
     dashboard: 'Dashboard',
@@ -131,6 +132,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'client-statements': 'Client Statements',
     'schedules': 'Review Timelines',
     'field-visits': 'Field Visits',
+    'contracts': 'Quotations & Contracts',
   },
 };
 

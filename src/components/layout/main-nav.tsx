@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -106,23 +107,13 @@ const navItems = {
     },
 
     { 
-      label: 'التعاقد والمقايسات',
-      icon: FileSignature,
-      roles: ['Admin', 'Engineer', 'Accountant'],
-      hrefPrefix: '/dashboard/contracts',
-      children: [
-        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/contracts', label: 'العقود المبرمة', icon: FileSignature },
-        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
-      ]
-    },
-
-    { 
       label: 'المشاريع والتنفيذ',
       icon: Construction,
-      roles: ['Admin', 'Engineer'],
+      roles: ['Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
+        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: FileSignature },
+        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: LayoutGrid },
