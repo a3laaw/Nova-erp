@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -70,6 +71,7 @@ function PaymentMethodForm({
     method: PaymentMethod | null;
     accounts: Account[];
 }) {
+    const { toast } = useToast();
     const isEditing = !!method;
     const [name, setName] = useState('');
     const [commissionType, setCommissionType] = useState<PaymentMethod['commissionType']>('percentage');
@@ -95,14 +97,25 @@ function PaymentMethodForm({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const expenseAccount = accounts.find(a => a.id === expenseAccountId);
-        if (!name || !expenseAccountId || !expenseAccount) {
+        
+        if (!name.trim()) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'اسم الطريقة مطلوب.' });
             return;
         }
         
-        // تصفير الحقول غير المستخدمة بناءً على النوع
-        const finalFixedFee = (commissionType === 'fixed' || commissionType === 'both') ? Number(fixedFee) : 0;
-        const finalPercentageFee = (commissionType === 'percentage' || commissionType === 'both') ? Number(percentageFee) : 0;
+        if (!expenseAccountId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'يجب اختيار حساب للمصروف (العمولات البنكية).' });
+            return;
+        }
+
+        const expenseAccount = accounts.find(a => a.id === expenseAccountId);
+        if (!expenseAccount) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الحساب المختار غير موجود.' });
+            return;
+        }
+        
+        const finalFixedFee = (commissionType === 'fixed' || commissionType === 'both') ? (parseFloat(String(fixedFee)) || 0) : 0;
+        const finalPercentageFee = (commissionType === 'percentage' || commissionType === 'both') ? (parseFloat(String(percentageFee)) || 0) : 0;
 
         onSave({
             id: method?.id || new Date().toISOString(),
@@ -235,7 +248,7 @@ export function PaymentMethodsManager() {
             await setDoc(doc(firestore, 'company_settings', 'main'), { payment_methods: updatedMethods }, { merge: true });
             toast({ title: 'نجاح', description: 'تم تحديث طرق الدفع والعمولات.' });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات في النظام السحابي.' });
         } finally {
             setIsSaving(false);
         }
