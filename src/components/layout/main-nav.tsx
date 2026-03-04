@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -236,7 +237,7 @@ const navItems = {
 };
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden p-3 text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-purple-50 hover:text-purple-700 hover:cursor-pointer rounded-[0.5rem] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-semibold data-[active=true]:border-r-4 data-[active=true]:border-purple-600 group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden p-3 text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-purple-50 hover:text-purple-700 hover:cursor-pointer rounded-[0.5rem] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-semibold data-[active=true]:border-r-4 data-[active=true]:border-purple-600 group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -245,9 +246,9 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-11",
-        sm: "h-9 text-xs",
-        lg: "h-14 group-data-[collapsible=icon]:!p-0",
+        default: "h-14",
+        sm: "h-11 text-xs",
+        lg: "h-16 group-data-[collapsible=icon]:!p-0",
       },
     },
     defaultVariants: {
@@ -271,7 +272,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className={cn(sidebarMenuButtonVariants())}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {Icon && <Icon className="size-5" strokeWidth={2.5} />}
+            {Icon && <Icon className="size-8" strokeWidth={2.5} />}
             <span className={cn("group-data-[state=collapsed]:hidden")}>{item.label}</span>
           </Link>
         </SidebarMenuButton>
@@ -288,7 +289,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label} className={cn(sidebarMenuButtonVariants())}>
-                {Icon && <Icon className="size-5" strokeWidth={2.5} />}
+                {Icon && <Icon className="size-8" strokeWidth={2.5} />}
                 <span className="sr-only">{item.label}</span>
               </SidebarMenuButton>
             </DropdownMenuTrigger>
@@ -300,8 +301,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 return (
                   <DropdownMenuItem key={child.href} asChild>
                     <Link href={child.href}>
-                        <div className="flex items-center gap-2">
-                            {ChildIcon && <ChildIcon className="h-4 w-4" strokeWidth={2.2} />}
+                        <div className="flex items-center gap-3">
+                            {ChildIcon && <ChildIcon className="size-8" strokeWidth={2.2} />}
                             <span>{child.label}</span>
                         </div>
                     </Link>
@@ -319,8 +320,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton as="button" isActive={isActive} className={cn(sidebarMenuButtonVariants(), "justify-between")}>
-              <div className='flex items-center gap-2'>
-                {Icon && <Icon className="size-5" strokeWidth={2.5} />}
+              <div className='flex items-center gap-3'>
+                {Icon && <Icon className="size-8" strokeWidth={2.5} />}
                 <span className={cn("group-data-[state=collapsed]:hidden")}>{item.label}</span>
               </div>
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />
@@ -335,13 +336,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               return (
                 <SidebarMenuSubItem key={child.href}>
                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "flex h-9 min-w-0 w-full justify-start -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-3 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-purple-50 hover:text-purple-700",
+                        "flex h-12 min-w-0 w-full justify-start -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-3 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-purple-50 hover:text-purple-700",
                         "data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-bold data-[active=true]:border-r-4 data-[active=true]:border-purple-600"
                    )}>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                            <div className="flex items-center gap-2">
-                                {ChildIcon && <ChildIcon className="h-4 w-4" strokeWidth={2.2} />}
-                                <span>{child.label}</span>
+                            <div className="flex items-center gap-3">
+                                {ChildIcon && <ChildIcon className="size-8 ml-1" strokeWidth={2.2} />}
+                                <span className={cn("group-data-[state=collapsed]:hidden")}>{child.label}</span>
                             </div>
                         </Link>
                     </SidebarMenuSubButton>
