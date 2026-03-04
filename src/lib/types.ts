@@ -231,7 +231,7 @@ export interface BoqReferenceItem extends BaseEntity { name: string; unit?: stri
 export interface SubcontractorCertificate extends BaseEntity { certificateNumber: string; subcontractorId: string; subcontractorName: string; projectId: string; projectName: string; date: any; amount: number; amountInWords: string; description: string; status: 'draft' | 'approved' | 'cancelled'; journalEntryId?: string; }
 export interface SubcontractorSpecialization extends BaseEntity { name: string; }
 export interface JournalEntry extends BaseEntity { entryNumber: string; date: any; narration: string; reference?: string; totalDebit: number; totalCredit: number; status: 'draft' | 'posted'; lines: { accountId: string; accountName: string; debit: number; credit: number; notes?: string; clientId?: string; transactionId?: string; auto_profit_center?: string; auto_resource_id?: string; auto_dept_id?: string; }[]; linkedReceiptId?: string; isSubsidyEntry?: boolean; isBypassed?: boolean; reconciliationStatus?: 'none' | 'reconciled'; reconciliationInfo?: any; }
-export interface CashReceipt extends BaseEntity { voucherNumber: string; voucherSequence: number; voucherYear: number; clientId: string; clientNameAr: string; clientNameEn: string; amount: number; amountInWords: string; receiptDate: any; paymentMethod: string; description: string; reference?: string; journalEntryId?: string; projectId?: string | null; projectNameAr?: string | null; isBypassed?: boolean; }
+export interface CashReceipt extends BaseEntity { voucherNumber: string; voucherSequence: number; voucherYear: number; clientId: string; clientNameAr: string; clientNameEn: string; amount: number; amountInWords: string; receiptDate: any; paymentMethod: string; description: string; reference?: string; journalEntryId?: string; projectId?: string | null; projectNameAr?: string | null; isBypassed?: boolean; commissionAmount?: number; }
 export interface PaymentVoucher extends BaseEntity { voucherNumber: string; voucherSequence: number; voucherYear: number; payeeName: string; payeeType: string; amount: number; amountInWords: string; paymentDate: any; paymentMethod: string; description: string; reference?: string; debitAccountId: string; debitAccountName: string; creditAccountId: string; creditAccountName: string; status: 'draft' | 'paid' | 'cancelled'; journalEntryId: string; clientId?: string | null; transactionId?: string | null; employeeId?: string | null; renewalExpiryDate?: any; }
 export interface PurchaseOrder extends BaseEntity { poNumber: string; poSequence: number; poYear: number; vendorId: string; vendorName: string; orderDate: any; status: 'draft' | 'approved' | 'received' | 'partially_received' | 'cancelled'; items: { internalItemId: string; itemName: string; quantity: number; unitPrice: number; total: number; }[]; totalAmount: number; discountAmount?: number; deliveryFees?: number; rfqId?: string | null; sourcePrId?: string | null; supplierQuotationId?: string; paymentTerms?: string; notes?: string; projectId?: string | null; isBypassed?: boolean; }
 export interface RequestForQuotation extends BaseEntity { rfqNumber: string; date: any; vendorIds: string[]; prospectiveVendors?: { id: string; name: string; }[]; projectId?: string | null; items: { id: string; internalItemId: string; itemName: string; quantity: number; }[]; status: 'draft' | 'sent' | 'closed' | 'cancelled'; awardedVendorId?: string | null; awardedPoIds?: string[]; awardedItems?: Record<string, string>; }
@@ -244,8 +244,8 @@ export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'Job
 export interface PaymentMethod {
     id: string;
     name: string;
-    type: 'fixed' | 'percentage';
-    value: number;
+    fixedFee: number;
+    percentageFee: number;
     expenseAccountId: string;
     expenseAccountName: string;
 }

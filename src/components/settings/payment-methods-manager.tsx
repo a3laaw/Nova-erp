@@ -45,7 +45,6 @@ import {
 } from "../ui/alert-dialog";
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useBranding } from '@/context/branding-context';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -72,20 +71,20 @@ function PaymentMethodForm({
 }) {
     const isEditing = !!method;
     const [name, setName] = useState('');
-    const [type, setType] = useState<'fixed' | 'percentage'>('percentage');
-    const [value, setValue] = useState<number | string>('');
+    const [fixedFee, setFixedFee] = useState<number | string>('0');
+    const [percentageFee, setPercentageFee] = useState<number | string>('0');
     const [expenseAccountId, setExpenseAccountId] = useState('');
 
     useEffect(() => {
         if (method) {
             setName(method.name);
-            setType(method.type);
-            setValue(method.value);
+            setFixedFee(method.fixedFee || 0);
+            setPercentageFee(method.percentageFee || 0);
             setExpenseAccountId(method.expenseAccountId);
         } else {
             setName('');
-            setType('percentage');
-            setValue('');
+            setFixedFee('0');
+            setPercentageFee('0');
             setExpenseAccountId('');
         }
     }, [method, isOpen]);
@@ -93,14 +92,14 @@ function PaymentMethodForm({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const expenseAccount = accounts.find(a => a.id === expenseAccountId);
-        if (!name || value === '' || !expenseAccountId || !expenseAccount) {
+        if (!name || !expenseAccountId || !expenseAccount) {
             return;
         }
         onSave({
             id: method?.id || new Date().toISOString(),
             name,
-            type,
-            value: Number(value),
+            fixedFee: Number(fixedFee) || 0,
+            percentageFee: Number(percentageFee) || 0,
             expenseAccountId,
             expenseAccountName: expenseAccount.name,
         });
@@ -113,37 +112,31 @@ function PaymentMethodForm({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md">
+            <DialogContent dir="rtl" className="max-w-md rounded-3xl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Calculator className="h-5 w-5 text-primary"/>
+                        <DialogTitle className="flex items-center gap-2 text-xl font-black">
+                            <Calculator className="h-6 w-6 text-primary"/>
                             {isEditing ? 'تعديل طريقة الدفع' : 'إضافة طريقة دفع جديدة'}
                         </DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-6 py-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="name" className="font-bold">اسم طريقة الدفع (مثال: K-Net, Visa)</Label>
-                            <Input id="name" value={name} onChange={e => setName(e.target.value)} required placeholder="K-Net" />
+                            <Label htmlFor="name" className="font-bold">اسم الطريقة (مثال: K-Net, Visa) *</Label>
+                            <Input id="name" value={name} onChange={e => setName(e.target.value)} required placeholder="K-Net" className="h-11 rounded-xl" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="type" className="font-bold">نوع العمولة البنكية</Label>
-                                <Select value={type} onValueChange={(v) => setType(v as any)}>
-                                    <SelectTrigger className="rounded-xl h-11"><SelectValue/></SelectTrigger>
-                                    <SelectContent dir="rtl">
-                                        <SelectItem value="percentage">نسبة مئوية (%)</SelectItem>
-                                        <SelectItem value="fixed">مبلغ ثابت (Fixed)</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                <Label htmlFor="fixedFee" className="font-bold">عمولة ثابتة (د.ك)</Label>
+                                <Input id="fixedFee" type="number" step="any" value={fixedFee} onChange={e => setFixedFee(e.target.value)} placeholder="0.000" className="h-11 font-mono text-lg rounded-xl" />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="value" className="font-bold">القيمة</Label>
-                                <Input id="value" type="number" step="any" value={value} onChange={e => setValue(e.target.value)} required placeholder="0.000" className="h-11 font-mono text-lg" />
+                                <Label htmlFor="percentageFee" className="font-bold">عمولة نسبة (%)</Label>
+                                <Input id="percentageFee" type="number" step="any" value={percentageFee} onChange={e => setPercentageFee(e.target.value)} placeholder="0%" className="h-11 font-mono text-lg rounded-xl" />
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="expenseAccountId" className="font-bold">حساب مصروف العمولة</Label>
+                            <Label htmlFor="expenseAccountId" className="font-bold">حساب مصروف العمولات *</Label>
                              <InlineSearchList 
                                 value={expenseAccountId} 
                                 onSelect={setExpenseAccountId} 
@@ -155,9 +148,9 @@ function PaymentMethodForm({
                     </div>
                     <DialogFooter className="gap-2">
                         <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">إلغاء</Button>
-                        <Button type="submit" className="rounded-xl font-bold gap-2">
+                        <Button type="submit" className="rounded-xl font-black gap-2 h-11 px-8">
                             <Save className="h-4 w-4" />
-                            حفظ البيانات
+                            حفظ الطريقة
                         </Button>
                     </DialogFooter>
                 </form>
@@ -227,7 +220,7 @@ export function PaymentMethodsManager() {
                 <div className="flex justify-between items-center">
                     <div>
                         <CardTitle className="text-xl font-black">إدارة طرق الدفع والعمولات البنكية</CardTitle>
-                        <CardDescription>حدد طرق التحصيل والعمولات التي يخصمها البنك تلقائياً من الإيداعات.</CardDescription>
+                        <CardDescription>حدد طرق التحصيل والعمولات (ثابتة أو نسبية) التي يخصمها البنك تلقائياً من الإيداعات.</CardDescription>
                     </div>
                     <Button onClick={() => { setEditingMethod(null); setIsFormOpen(true); }} className="h-10 rounded-xl font-bold gap-2">
                         <PlusCircle className="h-4 w-4" /> إضافة طريقة دفع
@@ -240,9 +233,9 @@ export function PaymentMethodsManager() {
                         <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead className="px-6 font-bold">اسم الطريقة</TableHead>
-                                <TableHead className="font-bold">نوع العمولة</TableHead>
-                                <TableHead className="text-center font-bold">قيمة العمولة</TableHead>
-                                <TableHead className="font-bold">حساب مصروف العمولات</TableHead>
+                                <TableHead className="text-center font-bold">عمولة ثابتة</TableHead>
+                                <TableHead className="text-center font-bold">عمولة مئوية</TableHead>
+                                <TableHead className="font-bold">حساب المصروف</TableHead>
                                 <TableHead className="w-[80px]"><span className="sr-only">الإجراءات</span></TableHead>
                             </TableRow>
                         </TableHeader>
@@ -250,15 +243,21 @@ export function PaymentMethodsManager() {
                             {loading ? <TableRow><TableCell colSpan={5} className="p-8"><Skeleton className="h-10 w-full"/></TableCell></TableRow>
                             : methods.length === 0 ? <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">لم يتم إضافة طرق دفع بعد.</TableCell></TableRow>
                             : methods.map(method => (
-                                <TableRow key={method.id} className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="px-6 font-black text-primary">{method.name}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className={cn("font-bold px-3", method.type === 'percentage' ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700")}>
-                                            {method.type === 'percentage' ? 'نسبة مئوية' : 'مبلغ ثابت'}
-                                        </Badge>
+                                <TableRow key={method.id} className="hover:bg-muted/30 transition-colors h-16">
+                                    <TableCell className="px-6 font-black text-primary text-lg">{method.name}</TableCell>
+                                    <TableCell className="text-center">
+                                        {method.fixedFee > 0 ? (
+                                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 font-mono font-black text-sm">
+                                                {formatCurrency(method.fixedFee)}
+                                            </Badge>
+                                        ) : <span className="text-muted-foreground opacity-30">-</span>}
                                     </TableCell>
-                                    <TableCell className="text-center font-mono font-black text-lg">
-                                        {method.type === 'percentage' ? `${method.value}%` : formatCurrency(method.value)}
+                                    <TableCell className="text-center">
+                                        {method.percentageFee > 0 ? (
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-mono font-black text-sm">
+                                                {method.percentageFee}%
+                                            </Badge>
+                                        ) : <span className="text-muted-foreground opacity-30">-</span>}
                                     </TableCell>
                                     <TableCell className="text-xs font-bold text-muted-foreground">{method.expenseAccountName}</TableCell>
                                     <TableCell>

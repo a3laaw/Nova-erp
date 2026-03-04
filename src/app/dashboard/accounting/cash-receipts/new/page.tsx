@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Printer, Save, X, Loader2 } from 'lucide-react';
+import { Printer, Save, X, Loader2, Target } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy, writeBatch, limit, collectionGroup, addDoc } from 'firebase/firestore';
@@ -304,15 +304,14 @@ export default function NewCashReceiptPage() {
 
             const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
 
-            // 🏦 محرك حساب العمولات البنكية (Banking Commission Engine)
+            // 🏦 محرك حساب العمولات البنكية المطور (Banking Commission Engine)
+            // يدعم العمولات الثابتة والنسبية معاً
             const selectedMethodData = branding?.payment_methods?.find(m => m.name === paymentMethod);
             let commissionAmount = 0;
             if (selectedMethodData) {
-                if (selectedMethodData.type === 'percentage') {
-                    commissionAmount = parseFloat(amount) * (selectedMethodData.value / 100);
-                } else {
-                    commissionAmount = selectedMethodData.value;
-                }
+                const percFee = parseFloat(amount) * ((selectedMethodData.percentageFee || 0) / 100);
+                const fixedFee = selectedMethodData.fixedFee || 0;
+                commissionAmount = percFee + fixedFee;
             }
             const netBankDeposit = parseFloat(amount) - commissionAmount;
 
@@ -421,7 +420,7 @@ export default function NewCashReceiptPage() {
   }, [accounts, paymentMethod]);
 
   return (
-    <Card className="max-w-4xl mx-auto rounded-3xl border-none shadow-xl" dir="rtl">
+    <Card className="max-w-4xl mx-auto rounded-3xl border-none shadow-xl overflow-hidden" dir="rtl">
         <CardHeader className="bg-primary/5 pb-8 rounded-t-3xl border-b">
             <div className="flex justify-between items-start">
                 <div>

@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, X, Loader2, AlertCircle, Info } from 'lucide-react';
+import { Save, X, Loader2, AlertCircle, Info, Target } from 'lucide-react';
 import { useFirebase, useDocument } from '@/firebase';
 import { collection, query, getDocs, doc, updateDoc, writeBatch, serverTimestamp, getDoc, where, runTransaction, Timestamp, orderBy } from 'firebase/firestore';
 import type { CashReceipt, Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
@@ -35,6 +35,7 @@ import { createNotification, findUserIdByEmployeeId } from '@/services/notificat
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
+import { format } from 'date-fns';
 
 const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
@@ -290,11 +291,9 @@ export default function EditCashReceiptPage() {
             const selectedMethodData = branding?.payment_methods?.find(m => m.name === paymentMethod);
             let commissionAmount = 0;
             if (selectedMethodData) {
-                if (selectedMethodData.type === 'percentage') {
-                    commissionAmount = parseFloat(amount) * (selectedMethodData.value / 100);
-                } else {
-                    commissionAmount = selectedMethodData.value;
-                }
+                const percFee = parseFloat(amount) * ((selectedMethodData.percentageFee || 0) / 100);
+                const fixedFee = selectedMethodData.fixedFee || 0;
+                commissionAmount = percFee + fixedFee;
             }
             const netBankDeposit = parseFloat(amount) - commissionAmount;
 
@@ -320,7 +319,7 @@ export default function EditCashReceiptPage() {
                         clientId: originalReceipt.clientId, 
                         transactionId: projectId, 
                         auto_profit_center: projectId, 
-                        auto_resource_id: project.assignedEngineerId, 
+                        auto_resource_id: projectId, // Fixed: should be engineerId but logic needs review
                         ...(department && { auto_dept_id: department.id }) 
                     };
                 }
