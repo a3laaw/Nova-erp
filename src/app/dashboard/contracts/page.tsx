@@ -21,6 +21,7 @@ import { DateInput } from '@/components/ui/date-input';
 /**
  * صفحة العقود المبرمة (مركز العمليات):
  * تم تحديث الألوان للهوية الجديدة (Blue & Dark Emerald) مع خلفية ناعمة.
+ * تم تصحيح لون العناوين لتظهر بالأبيض الواضح فوق الخلفيات الداكنة.
  */
 export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,8 +42,8 @@ export default function ContractsPage() {
                         <div className="p-3 bg-white/20 rounded-2xl"><FileText className="h-8 w-8" /></div>
                         <Badge variant="outline" className="text-white border-white/40">المسار المالي المرن</Badge>
                     </div>
-                    <CardTitle className="text-2xl font-black mt-4">إنشاء عرض سعر</CardTitle>
-                    <CardDescription className="text-blue-50 font-bold">للمشاريع التي تتطلب تفاوضاً مالياً ومراجعة من المالك قبل التعاقد.</CardDescription>
+                    <CardTitle className="text-2xl font-black mt-4 text-white">إنشاء عرض سعر</CardTitle>
+                    <CardDescription className="text-blue-100 font-bold">للمشاريع التي تتطلب تفاوضاً مالياً ومراجعة من المالك قبل التعاقد.</CardDescription>
                 </CardHeader>
                 <CardFooter className="relative z-10 pt-0 pb-8">
                     <Button asChild className="w-full h-12 bg-white text-[#2E5BCC] hover:bg-blue-50 font-black text-lg rounded-xl gap-2 shadow-lg">
@@ -64,7 +65,7 @@ export default function ContractsPage() {
                         <div className="p-3 bg-white/20 rounded-2xl"><FileSignature className="h-8 w-8" /></div>
                         <Badge variant="outline" className="text-white border-white/40">المسار القانوني الفوري</Badge>
                     </div>
-                    <CardTitle className="text-2xl font-black mt-4">عقد مباشر (بدون عرض)</CardTitle>
+                    <CardTitle className="text-2xl font-black mt-4 text-white">عقد مباشر (بدون عرض)</CardTitle>
                     <CardDescription className="text-emerald-50 font-bold">للتعاقد الفوري على المعاملات والخدمات المباشرة المتفق عليها مسبقاً.</CardDescription>
                 </CardHeader>
                 <CardFooter className="relative z-10 pt-0 pb-8">
