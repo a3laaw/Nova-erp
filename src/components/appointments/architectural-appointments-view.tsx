@@ -43,37 +43,35 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
-import { DateInput } from '../ui/date-input';
 
 // --- مساعدات النظام ---
 
-// توليد الفترات الزمنية بناءً على إعدادات الدوام
 const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
     const slots: string[] = [];
-    let currentTime = parse(start, 'HH:mm', new Date());
-    const endTime = parse(end, 'HH:mm', new Date());
-    if (buffer > 0) {
-      currentTime = new Date(currentTime.getTime() + buffer * 60000);
-    }
-    while (currentTime < endTime) {
-        const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
-        if (slotEndTime > endTime) break;
-        slots.push(format(currentTime, 'HH:mm'));
-        currentTime = new Date(slotEndTime.getTime() + buffer * 60000);
+    try {
+        let currentTime = parse(start, 'HH:mm', new Date());
+        const endTime = parse(end, 'HH:mm', new Date());
+        
+        while (currentTime < endTime) {
+            const slotEndTime = new Date(currentTime.getTime() + slotDuration * 60000);
+            if (slotEndTime > endTime) break;
+            slots.push(format(currentTime, 'HH:mm'));
+            currentTime = new Date(slotEndTime.getTime() + buffer * 60000);
+        }
+    } catch (e) {
+        console.error("Slot generation error:", e);
     }
     return slots;
 };
 
-// تحديد لون الزيارة بناءً على رقمها والحالة التعاقدية
 function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean }) {
-  if (visit.visitCount === 1) return "#facc15"; // أصفر: أول زيارة
-  if (visit.visitCount! > 1 && !visit.contractSigned) return "#22c55e"; // أخضر: متابعة بدون عقد
-  if (visit.visitCount! > 1 && visit.contractSigned) return "#3b82f6"; // أزرق: متابعة بعد العقد
-  return "#9ca3af"; // رمادي: أخرى
+  if (visit.visitCount === 1) return "#facc15"; 
+  if (visit.visitCount! > 1 && !visit.contractSigned) return "#22c55e"; 
+  if (visit.visitCount! > 1 && visit.contractSigned) return "#3b82f6"; 
+  return "#9ca3af"; 
 }
 
-// دالة تصحيح ترقيم وتلوين الزيارات (Reconciliation)
 async function reconcileClientAppointments(firestore: any, identifier: { clientId?: string | null; clientMobile?: string | null }) {
     if (!identifier.clientId && !identifier.clientMobile) return;
     try {
@@ -110,10 +108,15 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
     } catch (error) { console.error("Reconciliation failed:", error); }
 }
 
-const weekDays: { id: string, label: string }[] = [
-    { id: 'Saturday', label: 'السبت' }, { id: 'Sunday', label: 'الأحد' }, { id: 'Monday', label: 'الاثنين' },
-    { id: 'Tuesday', label: 'الثلاثاء' }, { id: 'Wednesday', label: 'الأربعاء' }, { id: 'Thursday', label: 'الخميس' },
+// مصفوفة أيام الأسبوع المتوافقة مع getDay() (0 = الأحد)
+const weekDays = [
+    { id: 'Sunday', label: 'الأحد' },
+    { id: 'Monday', label: 'الاثنين' },
+    { id: 'Tuesday', label: 'الثلاثاء' },
+    { id: 'Wednesday', label: 'الأربعاء' },
+    { id: 'Thursday', label: 'الخميس' },
     { id: 'Friday', label: 'الجمعة' },
+    { id: 'Saturday', label: 'السبت' },
 ];
 
 export function ArchitecturalAppointmentsView() {
@@ -135,15 +138,15 @@ export function ArchitecturalAppointmentsView() {
     
     useEffect(() => { if (!date) setDate(new Date()); }, [date]);
 
-    // حساب خانات الدوام (صباحي/مسائي/رمضان)
     const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
         if (!date) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
+        
         const ramadanSettings = branding?.work_hours?.ramadan;
         const isDateInRamadan = ramadanSettings?.is_enabled && ramadanSettings.start_date && ramadanSettings.end_date &&
             date >= toFirestoreDate(ramadanSettings.start_date)! && date <= toFirestoreDate(ramadanSettings.end_date)!;
     
         if (isDateInRamadan) {
-            const slots = generateTimeSlots(ramadanSettings.start_time!, ramadanSettings.end_time!, ramadanSettings.appointment_slot_duration || 30, ramadanSettings.appointment_buffer_time || 0);
+            const slots = generateTimeSlots(ramadanSettings.start_time || '09:00', ramadanSettings.end_time || '15:00', ramadanSettings.appointment_slot_duration || 30, ramadanSettings.appointment_buffer_time || 0);
             return { morningSlots: slots, eveningSlots: [], hasWorkHours: slots.length > 0, isRamadan: true };
         }
     
@@ -153,22 +156,34 @@ export function ArchitecturalAppointmentsView() {
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
         const todayDayName = weekDays[date.getDay()].id;
-        if (branding?.work_hours?.holidays?.includes(todayDayName)) return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
+        
+        if (branding?.work_hours?.holidays?.includes(todayDayName)) {
+            return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
+        }
     
         const halfDaySettings = branding?.work_hours?.half_day;
         const isHalfDay = halfDaySettings?.day === todayDayName;
         let { morning_start_time, morning_end_time, evening_start_time, evening_end_time } = workHours;
     
         if (isHalfDay) {
-            if (halfDaySettings.type === 'morning_only') { evening_start_time = morning_end_time; evening_end_time = morning_end_time; }
-            else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
+            if (halfDaySettings.type === 'morning_only') { 
+                evening_start_time = ''; 
+                evening_end_time = ''; 
+            } else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
                 const customEnd = halfDaySettings.end_time;
-                if (customEnd <= morning_end_time) { morning_end_time = customEnd; evening_start_time = customEnd; evening_end_time = customEnd; }
-                else if (customEnd > evening_start_time) evening_end_time = customEnd < evening_end_time ? customEnd : evening_end_time;
+                if (customEnd <= morning_end_time) { 
+                    morning_end_time = customEnd; 
+                    evening_start_time = ''; 
+                    evening_end_time = ''; 
+                } else {
+                    evening_end_time = customEnd < evening_end_time ? customEnd : evening_end_time;
+                }
             }
         }
+
         const mSlots = generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer);
         const eSlots = generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer);
+        
         return { morningSlots: mSlots, eveningSlots: eSlots, hasWorkHours: mSlots.length > 0 || eSlots.length > 0, isRamadan: false };
     }, [branding, date]);
 
@@ -230,7 +245,7 @@ export function ArchitecturalAppointmentsView() {
     const renderGridSection = (title: string, slots: string[]) => {
       if (slots.length === 0) return null;
       return (
-        <div className="border rounded-lg overflow-x-auto">
+        <div className="border rounded-lg overflow-x-auto bg-card">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup><col className="w-[8rem]" />{slots.map((_, i) => <col key={i} className="w-[8rem]" />)}</colgroup>
@@ -247,7 +262,7 @@ export function ArchitecturalAppointmentsView() {
                                         {booking ? (
                                              <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                     <div className="relative h-full w-full rounded-md p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer shadow-sm" style={{ backgroundColor: booking.color }}>
+                                                     <div className="relative h-full w-full rounded-md p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:brightness-95 transition-all" style={{ backgroundColor: booking.color }}>
                                                         {isClosed && <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />}
                                                         <p className="font-black leading-tight">{booking.clientName}</p>
                                                         {booking.visitCount && <span className="text-[10px] mt-1 opacity-75 font-bold">(الزيارة {booking.visitCount})</span>}
@@ -260,7 +275,7 @@ export function ArchitecturalAppointmentsView() {
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         ) : (
-                                            <div className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print" onClick={() => {
+                                            <div className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" onClick={() => {
                                                 const apptDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
                                                 if (isPast(apptDate)) return toast({ title: 'لا يمكن الحجز في الماضي' });
                                                 setDialogData({ isEditing: false, engineerId: eng.id, engineerName: eng.fullName, appointmentDate: apptDate });
@@ -277,35 +292,54 @@ export function ArchitecturalAppointmentsView() {
         </div>
     )};
 
-    if (brandingLoading || loading) return <Skeleton className="h-[500px] w-full" />;
+    if (brandingLoading || loading) return <Skeleton className="h-[500px] w-full rounded-3xl" />;
+
+    if (!hasWorkHours) {
+        return (
+             <Card className="mt-4 rounded-3xl border-2 border-dashed">
+                <CardHeader>
+                    <CardTitle className="text-center">لم يتم تكوين أوقات الدوام</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center text-muted-foreground pb-10">
+                    <p>الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات عمل القسم المعماري.</p>
+                    <Button asChild className="mt-6 rounded-xl font-bold">
+                        <Link href="/dashboard/settings/work-hours">الذهاب إلى الإعدادات</Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        )
+    }
 
     return (
         <div className="space-y-6" dir='rtl'>
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-xl border no-print">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-2xl border no-print">
                 <div className="flex items-center gap-3">
                     <CalendarIcon className="text-primary h-6 w-6" />
                     <h2 className="text-lg font-black">جدول زيارات القسم المعماري</h2>
                 </div>
                 <div className='flex items-center gap-2'>
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild><Button variant="outline" className="w-[240px] font-bold"><CalendarIcon className="ml-2 h-4 w-4" />{date ? format(date, "PPP", { locale: ar }) : "اختر تاريخ"}</Button></PopoverTrigger>
+                        <PopoverTrigger asChild><Button variant="outline" className="w-[240px] font-bold rounded-xl"><CalendarIcon className="ml-2 h-4 w-4" />{date ? format(date, "PPP", { locale: ar }) : "اختر تاريخ"}</Button></PopoverTrigger>
                         <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
             </div>
             
-            <div id="architectural-appointments-printable-area" className="space-y-4">
+            <div id="architectural-appointments-printable-area" className="space-y-6">
                 {isRamadan ? renderGridSection('فترة دوام رمضان', morningSlots) : (
-                    <>{renderGridSection('الفترة الصباحية', morningSlots)}{renderGridSection('الفترة المسائية', eveningSlots)}</>
+                    <>
+                        {renderGridSection('الفترة الصباحية', morningSlots)}
+                        {renderGridSection('الفترة المسائية', eveningSlots)}
+                    </>
                 )}
             </div>
 
             <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} />
             
             <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
                     <AlertDialogHeader><AlertDialogTitle>تأكيد الإلغاء؟</AlertDialogTitle><AlertDialogDescription>سيتم تغيير حالة الموعد إلى ملغي وتعديل ترقيم الزيارات المتبقية.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>تراجع</AlertDialogCancel><AlertDialogAction onClick={handleCancelBooking} className="bg-destructive">{isDeleting ? <Loader2 className="animate-spin"/> : 'إلغاء الموعد'}</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogFooter><AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleCancelBooking} className="bg-destructive rounded-xl">{isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'إلغاء الموعد'}</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
@@ -347,22 +381,22 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md">
+            <DialogContent dir="rtl" className="max-w-md rounded-3xl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader><DialogTitle>حجز موعد جديد</DialogTitle><DialogDescription>{dialogData?.engineerName} - {dialogData?.appointmentDate && format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription></DialogHeader>
                     <div className="grid gap-4 py-4">
-                        <div className="grid gap-2"><Label>الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." /></div>
-                        <div className="flex items-center gap-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} /><Label>عميل جديد (غير مسجل)</Label></div>
+                        <div className="grid gap-2"><Label>الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="rounded-xl" /></div>
+                        <div className="flex items-center gap-2 pt-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} /><Label>عميل جديد (غير مسجل)</Label></div>
                         {isNewClient ? (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2"><Label>الاسم</Label><Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required /></div>
-                                <div className="grid gap-2"><Label>الجوال</Label><Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} required /></div>
+                            <div className="grid grid-cols-2 gap-4 animate-in fade-in">
+                                <div className="grid gap-2"><Label>الاسم</Label><Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required className="rounded-xl" /></div>
+                                <div className="grid gap-2"><Label>الجوال</Label><Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} required className="rounded-xl" /></div>
                             </div>
                         ) : (
-                            <div className="grid gap-2"><Label>العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." /></div>
+                            <div className="grid gap-2 animate-in fade-in"><Label>العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." className="rounded-xl" /></div>
                         )}
                     </div>
-                    <DialogFooter><Button type="button" variant="outline" onClick={onClose}>إلغاء</Button><Button type="submit" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin" /> : 'تأكيد الحجز'}</Button></DialogFooter>
+                    <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-bold">{isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'تأكيد الحجز'}</Button></DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

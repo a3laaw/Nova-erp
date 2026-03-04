@@ -44,14 +44,15 @@ const defaultRamadanSchedule = {
     appointment_buffer_time: 15,
 };
 
-const weekDays: { id: 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday', label: string }[] = [
-    { id: 'Saturday', label: 'السبت' },
+// الترتيب المتوافق مع getDay()
+const weekDays = [
     { id: 'Sunday', label: 'الأحد' },
     { id: 'Monday', label: 'الاثنين' },
     { id: 'Tuesday', label: 'الثلاثاء' },
     { id: 'Wednesday', label: 'الأربعاء' },
     { id: 'Thursday', label: 'الخميس' },
     { id: 'Friday', label: 'الجمعة' },
+    { id: 'Saturday', label: 'السبت' },
 ];
 
 const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSchedule, setSchedule: any }) => (
@@ -61,11 +62,11 @@ const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSched
             <div className="grid grid-cols-2 gap-4">
                  <div className="grid gap-2">
                     <Label>من الساعة</Label>
-                    <Input type="time" value={schedule.morning_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_start_time: e.target.value }))} />
+                    <Input type="time" value={schedule.morning_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_start_time: e.target.value }))} className="rounded-xl"/>
                 </div>
                 <div className="grid gap-2">
                     <Label>إلى الساعة</Label>
-                    <Input type="time" value={schedule.morning_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_end_time: e.target.value }))} />
+                    <Input type="time" value={schedule.morning_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, morning_end_time: e.target.value }))} className="rounded-xl"/>
                 </div>
             </div>
         </div>
@@ -74,11 +75,11 @@ const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSched
             <div className="grid grid-cols-2 gap-4">
                  <div className="grid gap-2">
                     <Label>من الساعة</Label>
-                    <Input type="time" value={schedule.evening_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_start_time: e.target.value }))} />
+                    <Input type="time" value={schedule.evening_start_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_start_time: e.target.value }))} className="rounded-xl"/>
                 </div>
                 <div className="grid gap-2">
                     <Label>إلى الساعة</Label>
-                    <Input type="time" value={schedule.evening_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_end_time: e.target.value }))} />
+                    <Input type="time" value={schedule.evening_end_time} onChange={(e) => setSchedule((p:any) => ({ ...p, evening_end_time: e.target.value }))} className="rounded-xl"/>
                 </div>
             </div>
         </div>
@@ -86,11 +87,11 @@ const ScheduleForm = ({ schedule, setSchedule }: { schedule: typeof defaultSched
         <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
                 <Label>مدة كل موعد (بالدقائق)</Label>
-                <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} />
+                <Input type="number" min="15" step="5" value={schedule.appointment_slot_duration} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_slot_duration: e.target.value }))} className="rounded-xl"/>
             </div>
              <div className="grid gap-2">
                 <Label>فترة الراحة بين المواعيد (بالدقائق)</Label>
-                <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} />
+                <Input type="number" min="0" step="5" value={schedule.appointment_buffer_time} onChange={(e) => setSchedule((p:any) => ({ ...p, appointment_buffer_time: e.target.value }))} className="rounded-xl"/>
             </div>
         </div>
     </div>
@@ -158,7 +159,7 @@ export function WorkHoursManager() {
 
     if (loading) {
         return (
-            <Card>
+            <Card className="rounded-3xl shadow-sm border-none">
                 <CardHeader>
                     <Skeleton className="h-8 w-48" />
                     <Skeleton className="h-4 w-64 mt-2" />
@@ -175,7 +176,7 @@ export function WorkHoursManager() {
     }
 
     return (
-        <Card>
+        <Card className="rounded-3xl shadow-sm border-none">
             <CardHeader>
                 <CardTitle>إعدادات الدوام والمواعيد</CardTitle>
                 <CardDescription>
@@ -184,18 +185,18 @@ export function WorkHoursManager() {
             </CardHeader>
             <CardContent className="space-y-8">
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card>
+                    <Card className="rounded-2xl border-2">
                         <CardHeader>
-                            <CardTitle>الدوام العام (للقاعات)</CardTitle>
+                            <CardTitle className="text-lg">الدوام العام (للقاعات)</CardTitle>
                             <CardDescription>تطبق على حجز قاعات الاجتماعات والأقسام العامة.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ScheduleForm schedule={generalSchedule} setSchedule={setGeneralSchedule} />
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="rounded-2xl border-2 border-primary/10 bg-primary/5">
                         <CardHeader>
-                            <CardTitle>دوام القسم المعماري</CardTitle>
+                            <CardTitle className="text-lg text-primary">دوام القسم المعماري</CardTitle>
                             <CardDescription>أوقات مخصصة لزيارات العملاء مع المهندسين المعماريين.</CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -204,15 +205,15 @@ export function WorkHoursManager() {
                     </Card>
                  </div>
                  
-                 <Card>
+                 <Card className="rounded-2xl border-2">
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div className="space-y-1">
-                                <CardTitle>أوقات دوام شهر رمضان</CardTitle>
+                                <CardTitle className="text-lg">أوقات دوام شهر رمضان</CardTitle>
                                 <CardDescription>تفعيل وتخصيص أوقات العمل والمواعيد خلال شهر رمضان.</CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Label htmlFor="ramadan-enabled">تعطيل/تفعيل</Label>
+                                <Label htmlFor="ramadan-enabled" className="text-xs font-bold">تعطيل/تفعيل</Label>
                                 <Switch
                                     id="ramadan-enabled"
                                     checked={ramadanSchedule.is_enabled}
@@ -222,7 +223,7 @@ export function WorkHoursManager() {
                         </div>
                     </CardHeader>
                     {ramadanSchedule.is_enabled && (
-                        <CardContent className="space-y-6 pt-4">
+                        <CardContent className="space-y-6 pt-4 animate-in slide-in-from-top-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label>تاريخ بداية رمضان</Label>
@@ -236,22 +237,22 @@ export function WorkHoursManager() {
                              <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label>من الساعة</Label>
-                                    <Input type="time" value={ramadanSchedule.start_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, start_time: e.target.value }))} />
+                                    <Input type="time" value={ramadanSchedule.start_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, start_time: e.target.value }))} className="rounded-xl"/>
                                 </div>
                                 <div className="grid gap-2">
                                     <Label>إلى الساعة</Label>
-                                    <Input type="time" value={ramadanSchedule.end_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, end_time: e.target.value }))} />
+                                    <Input type="time" value={ramadanSchedule.end_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, end_time: e.target.value }))} className="rounded-xl"/>
                                 </div>
                             </div>
                             <Separator />
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label>مدة كل موعد (بالدقائق)</Label>
-                                    <Input type="number" min="15" step="5" value={ramadanSchedule.appointment_slot_duration} onChange={(e) => setRamadanSchedule(p => ({ ...p, appointment_slot_duration: Number(e.target.value) }))} />
+                                    <Input type="number" min="15" step="5" value={ramadanSchedule.appointment_slot_duration} onChange={(e) => setRamadanSchedule(p => ({ ...p, appointment_slot_duration: Number(e.target.value) }))} className="rounded-xl"/>
                                 </div>
                                 <div className="grid gap-2">
                                     <Label>فترة الراحة بين المواعيد (بالدقائق)</Label>
-                                    <Input type="number" min="0" step="5" value={ramadanSchedule.appointment_buffer_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, appointment_buffer_time: Number(e.target.value) }))} />
+                                    <Input type="number" min="0" step="5" value={ramadanSchedule.appointment_buffer_time} onChange={(e) => setRamadanSchedule(p => ({ ...p, appointment_buffer_time: Number(e.target.value) }))} className="rounded-xl"/>
                                 </div>
                             </div>
                         </CardContent>
@@ -260,9 +261,9 @@ export function WorkHoursManager() {
 
                 <div className="space-y-4 pt-6 border-t">
                     <h3 className="font-semibold text-lg">إعدادات أيام الأسبوع</h3>
-                    <div className="p-4 border rounded-lg space-y-4">
-                        <Label>أيام العطلة الأسبوعية</Label>
-                         <div className="flex flex-wrap gap-x-6 gap-y-3">
+                    <div className="p-6 border-2 rounded-2xl space-y-4">
+                        <Label className="font-bold">أيام العطلة الأسبوعية</Label>
+                         <div className="flex flex-wrap gap-x-8 gap-y-4 pt-2">
                             {weekDays.map(day => (
                                 <div key={day.id} className="flex items-center space-x-2 rtl:space-x-reverse">
                                     <Checkbox
@@ -274,54 +275,58 @@ export function WorkHoursManager() {
                                             );
                                         }}
                                     />
-                                    <Label htmlFor={`holiday-${day.id}`}>{day.label}</Label>
+                                    <Label htmlFor={`holiday-${day.id}`} className="cursor-pointer font-medium">{day.label}</Label>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                     <div className="p-4 border rounded-lg space-y-4">
-                        <Label className="font-semibold">يوم نصف الدوام (اختياري)</Label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Select 
-                                value={halfDay.day || '_NONE_'} 
-                                onValueChange={(d) => setHalfDay(p => ({...p, day: d === '_NONE_' ? '' : d}))}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="اختر اليوم..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="_NONE_">لا يوجد</SelectItem>
-                                    {weekDays.filter(d => !holidays.includes(d.id)).map(day => (
-                                        <SelectItem key={day.id} value={day.id}>{day.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                     <div className="p-6 border-2 rounded-2xl space-y-4">
+                        <Label className="font-bold">يوم نصف الدوام (اختياري)</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                            <div className="grid gap-2">
+                                <Label className="text-xs text-muted-foreground">اختر اليوم:</Label>
+                                <Select 
+                                    value={halfDay.day || '_NONE_'} 
+                                    onValueChange={(d) => setHalfDay(p => ({...p, day: d === '_NONE_' ? '' : d}))}
+                                >
+                                    <SelectTrigger className="rounded-xl">
+                                        <SelectValue placeholder="اختر اليوم..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="_NONE_">لا يوجد</SelectItem>
+                                        {weekDays.filter(d => !holidays.includes(d.id)).map(day => (
+                                            <SelectItem key={day.id} value={day.id}>{day.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             
                             <RadioGroup
                                 value={halfDay.type}
                                 onValueChange={(value: "morning_only" | "custom_end_time") => setHalfDay(p => ({...p, type: value}))}
                                 disabled={!halfDay.day}
-                                className="flex items-center space-x-4 rtl:space-x-reverse pt-2"
+                                className="flex items-center space-x-6 rtl:space-x-reverse pt-6"
                             >
                                 <div className="flex items-center space-x-2 rtl:space-x-reverse">
                                     <RadioGroupItem value="morning_only" id="r1" />
-                                    <Label htmlFor="r1">دوام صباحي فقط</Label>
+                                    <Label htmlFor="r1" className="cursor-pointer">دوام صباحي فقط</Label>
                                 </div>
                                 <div className="flex items-center space-x-2 rtl:space-x-reverse">
                                     <RadioGroupItem value="custom_end_time" id="r2" />
-                                    <Label htmlFor="r2">وقت انتهاء مخصص</Label>
+                                    <Label htmlFor="r2" className="cursor-pointer">وقت انتهاء مخصص</Label>
                                 </div>
                             </RadioGroup>
                         </div>
                         {halfDay.day && halfDay.type === 'custom_end_time' && (
-                            <div className="grid gap-2 max-w-xs">
+                            <div className="grid gap-2 max-w-xs animate-in slide-in-from-top-2">
                                 <Label htmlFor="half-day-end-time" className="text-xs text-muted-foreground">وقت انتهاء الدوام</Label>
                                 <Input 
                                     id="half-day-end-time"
                                     type="time"
                                     value={halfDay.end_time}
                                     onChange={(e) => setHalfDay(p => ({...p, end_time: e.target.value}))}
+                                    className="rounded-xl"
                                 />
                             </div>
                         )}
@@ -329,13 +334,12 @@ export function WorkHoursManager() {
                 </div>
 
             </CardContent>
-            <CardFooter className="flex justify-end pt-6 border-t">
-                <Button onClick={handleSave} disabled={isSaving}>
+            <CardFooter className="flex justify-end pt-6 border-t bg-muted/10 p-6">
+                <Button onClick={handleSave} disabled={isSaving} className="rounded-xl h-12 px-10 font-bold gap-2 shadow-lg">
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                    {isSaving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
+                    حفظ إعدادات المواعيد
                 </Button>
             </CardFooter>
         </Card>
     );
 }
-    
