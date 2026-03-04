@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -89,8 +88,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [refDataLoading, setRefDataLoading] = useState(true);
     
     const isDayLaborer = formData.contractType === 'day_laborer';
+    const isSimpleLayout = isDayLaborer;
 
-    // ✨ منطق ظهور اختيار الفريق المحدث (للمسمى عامل أو لنوع العقد عامل يومية في أي قسم)
+    // ✨ منطق ظهور اختيار فريق العمل المحدث (للمسمى عامل أو لنوع العقد عامل اليومية في أي قسم)
     const showTeamSelection = useMemo(() => {
         return formData.jobTitle === 'عامل' || formData.contractType === 'day_laborer';
     }, [formData.jobTitle, formData.contractType]);
@@ -116,7 +116,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [formData.contractType, formData.pieceRateMode]);
 
     useEffect(() => {
-        const generalHours = branding?.work_hours?.general;
+        const generalHours = branding?.group_work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
         const defaultEndTime = generalHours?.evening_end_time || '17:00';
 
@@ -265,7 +265,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء تعبئة اسم الموظف بالعربية ورقم الجوال.' });
             return;
         }
-        if (!initialData && !isDayLaborer && !formData.department) {
+        if (!initialData && !isSimpleLayout && !formData.department) {
              toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء اختيار قسم للموظف.' });
             return;
         }
@@ -280,18 +280,20 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             (dataToSave as any).workTeam = formData.workTeam;
         }
 
-        if (isDayLaborer) {
+        if (isSimpleLayout) {
             dataToSave.department = formData.department || 'عمالة خارجية';
             dataToSave.jobTitle = 'عامل يومية';
             dataToSave.civilId = formData.civilId || '000000000000';
             dataToSave.hireDate = formData.hireDate;
             dataToSave.basicSalary = 0;
 
-            if (!formData.dailyRate || parseFloat(formData.dailyRate) <= 0) {
-                toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'يجب إدخال اليومية وتكون أكبر من صفر.' });
-                return;
+            if (isDayLaborer) {
+                if (!formData.dailyRate || parseFloat(formData.dailyRate) <= 0) {
+                    toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'يجب إدخال اليومية وتكون أكبر من صفر.' });
+                    return;
+                }
+                dataToSave.dailyRate = parseFloat(formData.dailyRate);
             }
-            dataToSave.dailyRate = parseFloat(formData.dailyRate);
         } else {
             // Logic for regular employees
             if (!formData.civilId || !formData.hireDate || !formData.department || !formData.jobTitle) {
@@ -381,7 +383,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {isDayLaborer && (
+                {isSimpleLayout && (
                     <section className="space-y-4 p-4 border rounded-lg bg-muted/30">
                         <h3 className="font-semibold text-lg">بيانات عامل اليومية</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -389,15 +391,17 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <Label htmlFor="department-dl">القسم (التخصص)</Label>
                                 <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder="اختر قسم اليومية..." />
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="dailyRate">اليومية (د.ك) <span className="text-destructive">*</span></Label>
-                                <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} dir="ltr" required />
-                            </div>
+                            {isDayLaborer && (
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="dailyRate">اليومية (د.ك) <span className="text-destructive">*</span></Label>
+                                    <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} dir="ltr" required />
+                                </div>
+                            )}
                         </div>
                     </section>
                 )}
                 
-                {!isDayLaborer && (
+                {!isSimpleLayout && (
                     <section className="space-y-4 p-4 border rounded-lg">
                         <h3 className="font-semibold text-lg">المعلومات الوظيفية</h3>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
