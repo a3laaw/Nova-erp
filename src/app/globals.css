@@ -7,64 +7,34 @@
 
 @layer base {
   :root {
-    --background: 220 14.3% 97.5%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 25% 27%;
-    --sidebar-primary: 221.2 83.2% 53.3%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 95% 93%;
-    --sidebar-accent-foreground: 221.2 83.2% 53.3%;
-    --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 221.2 83.2% 53.3%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 11%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 217 33% 17%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 217 33% 17%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 217 33% 25%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 217 33% 25%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 25%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 217.2 91.2% 59.8%;
-    --sidebar-background: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217.2 91.2% 59.8%;
-    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 217.2 32.6% 25%;
+    --border: 217 33% 25%;
+    --input: 217 33% 25%;
+    --ring: 221 83% 53%;
+    --radius: 0.75rem;
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 25%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-border: 217 33% 25%;
+    --sidebar-ring: 221 83% 53%;
   }
 }
 
@@ -74,12 +44,21 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-body), sans-serif;
+    font-family: 'Tajawal', sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
 @layer utilities {
-    /* إخفاء أسهم حقول الأرقام */
+    /* Nova Pulse Custom Utilities */
+    .glass-surface {
+        @apply bg-card/80 backdrop-blur-md border border-slate-700/50 shadow-xl;
+    }
+    
+    .hover-lift {
+        @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:scale-[1.02];
+    }
+
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button {
       -webkit-appearance: none;
@@ -89,126 +68,14 @@
       -moz-appearance: textfield;
     }
 
-    /* ─── القواعد الذهبية للطباعة ─── */
     @media print {
-        html, body {
-            background: white !important;
-            color: black !important;
-            -webkit-print-color-adjust: exact;
-            color-adjust: exact;
-            height: auto !important;
-            width: 100% !important;
-            overflow: visible !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-
-        /* إخفاء كل شيء غير ضروري للوثيقة */
-        .no-print, 
-        [role="navigation"], 
-        header, 
-        button, 
-        .sidebar, 
-        .sidebar-trigger,
-        nav,
-        .fixed,
-        [data-sidebar="sidebar"] {
-            display: none !important;
-        }
-
-        /* إلغاء تأثيرات الـ Flex والـ Sidebar لضمان تمدد المحتوى */
-        main {
-            margin: 0 !important;
-            padding: 0 !important;
-            display: block !important;
-            width: 100% !important;
-        }
-
-        .printable-wrapper {
-            box-shadow: none !important;
-            border: none !important;
-            background: transparent !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            position: absolute;
-            left: 0;
-            top: 0;
-        }
-
-        /* ─── التحكم في اتجاه الورقة ─── */
-        
-        /* الاتجاه الرأسي الافتراضي */
-        .print-portrait {
-            @page {
-                size: A4 portrait;
-                margin: 15mm;
-            }
-        }
-
-        /* الاتجاه الأفقي للجداول العريضة */
-        .print-landscape {
-            @page {
-                size: A4 landscape;
-                margin: 10mm;
-            }
-        }
-
-        /* لضمان كسر الصفحة بشكل صحيح */
-        .page-break {
-            page-break-before: always;
-        }
-
-        /* تحسين ظهور الجداول في الطباعة */
-        table {
-            width: 100% !important;
-            table-layout: auto !important;
-            border-collapse: collapse !important;
-        }
-        
-        th, td {
-            word-break: break-word !important;
-        }
+        .no-print { display: none !important; }
+        main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        .printable-wrapper { box-shadow: none !important; border: none !important; }
     }
 }
 
-@layer components {
-    .rdp {
-        --rdp-cell-size: 40px;
-        --rdp-caption-font-size: 18px;
-        --rdp-accent-color: hsl(var(--primary));
-        --rdp-background-color: hsl(var(--card));
-        --rdp-accent-color-dark: hsl(var(--primary));
-        --rdp-background-color-dark: hsl(var(--card));
-        --rdp-outline: 2px solid hsl(var(--ring));
-        --rdp-outline-selected: 3px solid hsl(var(--primary));
-        --rdp-selected-color: hsl(var(--primary-foreground));
-    }
-}
-
-/* Fix for dropdown/popover click issues */
-[data-radix-popper-content-wrapper],
-.react-select__menu-portal,
-[role="listbox"],
-[role="dialog"] {
-  z-index: 999999 !important;
-  pointer-events: auto !important;
-}
-
-[data-state="open"][data-radix-select-content],
-[data-state="open"][data-radix-popover-content] {
-  pointer-events: auto !important;
-  z-index: 999999 !important;
-}
-
-[role="option"],
-[role="menuitem"],
-[cmdk-item],
-.react-select__option {
-  cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-.radix-themes {
-  pointer-events: auto !important;
+/* Custom transitions for Collapsibles and Sidebar */
+[data-state="open"] > .sidebar-icon {
+    @apply rotate-180 transition-transform duration-200;
 }
