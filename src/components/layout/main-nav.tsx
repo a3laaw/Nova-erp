@@ -28,14 +28,14 @@ import {
   Wallet,
   Warehouse,
   Settings,
-  HeartHandshake,
+  Handshake,
   FileText,
   ChevronDown,
   ShoppingCart,
   LogOut,
   LineChart,
   Construction,
-  UserSearch,
+  Search,
   FileCheck,
   Building2,
   Building,
@@ -53,13 +53,13 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Receipt,
-  BarChart3,
+  BarChart,
   TrendingUp,
   Landmark,
   CalendarX,
   Banknote,
   FileBarChart,
-  FileSearch,
+  SearchCode,
   Truck,
   Settings2,
   FileSignature,
@@ -78,7 +78,8 @@ import {
   Package,
   Landmark as BankIcon,
   CalendarClock,
-  ShieldCheck
+  ShieldCheck,
+  CircleHelp
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -111,7 +112,7 @@ const navItems = {
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
-        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UserSearch },
+        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
         { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ShoppingBag },
       ]
@@ -174,7 +175,7 @@ const navItems = {
       children: [
         { href: '/dashboard/purchasing/direct-invoice', label: 'فاتورة مشتريات مباشرة', icon: ShoppingBag },
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: FileSearch },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: SearchCode },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: BankIcon },
@@ -216,7 +217,7 @@ const navItems = {
 
     { 
       label: 'شؤون الموظفين (HR)', 
-      icon: HeartHandshake, 
+      icon: Handshake, 
       roles: ['Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
       children: [
@@ -249,6 +250,7 @@ const navItems = {
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile, state: sidebarState } = useSidebar();
+  const Icon = item.icon;
 
   if (item.roles && !item.roles.includes(userRole)) {
     return null;
@@ -258,10 +260,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     const isActive = currentPath === item.href;
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className="transition-all duration-300">
+        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {item.icon && <item.icon className={cn("size-5", isActive ? "text-primary" : "text-sidebar-foreground")} strokeWidth={2.5} />}
-            <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black text-primary" : "font-bold")}>{item.label}</span>
+            {Icon && <Icon className="size-5" strokeWidth={2.5} />}
+            <span className={cn("group-data-[state=collapsed]:hidden")}>{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -276,8 +278,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label} className="transition-all duration-300">
-                <item.icon className="size-5" strokeWidth={2.5} />
+              <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label}>
+                {Icon && <Icon className="size-5" strokeWidth={2.5} />}
                 <span className="sr-only">{item.label}</span>
               </SidebarMenuButton>
             </DropdownMenuTrigger>
@@ -285,37 +287,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any, index: number) => {
-                if (child.children) {
-                  return (
-                    <DropdownMenuSub key={`${child.label}-${index}`}>
-                      <DropdownMenuSubTrigger>
-                        <div className="flex items-center gap-2">
-                            {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
-                            <span>{child.label}</span>
-                        </div>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent className="bg-muted/50">
-                          {child.children.map((subChild: any) => (
-                            <DropdownMenuItem key={subChild.href} asChild>
-                              <Link href={subChild.href}>
-                                <div className="flex items-center gap-2">
-                                    {subChild.icon && <subChild.icon className="h-3.5 w-3.5" strokeWidth={2} />}
-                                    <span>{subChild.label}</span>
-                                </div>
-                              </Link>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  );
-                }
+                const ChildIcon = child.icon;
                 return (
                   <DropdownMenuItem key={child.href} asChild>
                     <Link href={child.href}>
                         <div className="flex items-center gap-2">
-                            {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
+                            {ChildIcon && <ChildIcon className="h-4 w-4" strokeWidth={2.2} />}
                             <span>{child.label}</span>
                         </div>
                     </Link>
@@ -332,10 +309,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2 transition-all duration-300 hover:bg-blue-50/80 hover:scale-[1.02] active:scale-95">
+            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2">
               <div className='flex items-center gap-2'>
-                <item.icon className={cn("size-5", isActive ? "text-primary" : "text-sidebar-foreground")} strokeWidth={2.5} />
-                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-black text-primary" : "font-bold")}>{item.label}</span>
+                {Icon && <Icon className="size-5" strokeWidth={2.5} />}
+                <span className={cn("group-data-[state=collapsed]:hidden")}>{item.label}</span>
               </div>
               <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />
             </SidebarMenuButton>
@@ -345,12 +322,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-primary/20">
             {item.children.map((child: any, index: number) => {
               const isChildActive = currentPath === child.href;
+              const ChildIcon = child.icon;
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <SidebarMenuSubButton isActive={isChildActive} asChild className={cn("h-9 font-bold transition-all hover:bg-blue-50/50 hover:translate-x-[-4px]", isChildActive && "bg-blue-100/50 text-primary shadow-sm")}>
+                   <SidebarMenuSubButton isActive={isChildActive} asChild>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-2">
-                                {child.icon && <child.icon className="h-4 w-4" strokeWidth={2.2} />}
+                                {ChildIcon && <ChildIcon className="h-4 w-4" strokeWidth={2.2} />}
                                 <span>{child.label}</span>
                             </div>
                         </Link>
