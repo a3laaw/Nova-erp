@@ -4,12 +4,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, collectionGroup, orderBy, where, doc, getDoc, runTransaction, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, where, doc, runTransaction, serverTimestamp, limit } from 'firebase/firestore';
 import type { Client, ClientTransaction, Account, ContractTemplate } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { InlineSearchList, type SearchOption } from '@/components/ui/inline-search-list';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { 
     FileSignature, 
     User, 
@@ -18,13 +18,15 @@ import {
     CheckCircle2, 
     AlertCircle,
     Calculator,
-    LayoutGrid
+    LayoutGrid,
+    Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -124,7 +126,6 @@ export default function DirectContractPage() {
 
                 const txRef = doc(firestore, `clients/${selectedClientId}/transactions/${selectedTxId}`);
                 
-                // 1. تحديث المعاملة بالعقد
                 transaction_fs.update(txRef, {
                     status: 'in-progress',
                     contract: cleanFirestoreData({
@@ -137,10 +138,8 @@ export default function DirectContractPage() {
                     })
                 });
 
-                // 2. تحديث حالة العميل
                 transaction_fs.update(doc(firestore, 'clients', selectedClientId), { status: 'contracted' });
 
-                // 3. إنشاء القيد المحاسبي
                 if (!revenueAccSnap.empty && !clientAccSnap.empty) {
                     const newJeRef = doc(collection(firestore, 'journalEntries'));
                     transaction_fs.set(newJeRef, {
@@ -178,11 +177,11 @@ export default function DirectContractPage() {
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-emerald-50">
                 <CardHeader className="pb-8">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-emerald-100 rounded-2xl text-emerald-700 shadow-inner">
+                        <div className="p-3 bg-[#1B4D3E]/10 rounded-2xl text-[#1B4D3E] shadow-inner">
                             <FileSignature className="h-8 w-8" />
                         </div>
                         <div>
-                            <CardTitle className="text-3xl font-black text-emerald-900">توقيع عقد مباشر</CardTitle>
+                            <CardTitle className="text-3xl font-black text-[#1B4D3E]">توقيع عقد مباشر</CardTitle>
                             <CardDescription className="text-base font-medium">ربط مالي وقانوني فوري للمعاملات المعتمدة بدون الحاجة لمسودة عرض سعر.</CardDescription>
                         </div>
                     </div>
@@ -193,7 +192,7 @@ export default function DirectContractPage() {
                 <CardContent className="p-8 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">
-                            <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-emerald-600"/> العميل / المالك *</Label>
+                            <Label className="font-bold flex items-center gap-2"><User className="h-4 w-4 text-[#1B4D3E]"/> العميل / المالك *</Label>
                             <InlineSearchList 
                                 value={selectedClientId} 
                                 onSelect={setSelectedClientId} 
@@ -202,7 +201,7 @@ export default function DirectContractPage() {
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-bold flex items-center gap-2"><LayoutGrid className="h-4 w-4 text-emerald-600"/> المعاملة المستهدفة *</Label>
+                            <Label className="font-bold flex items-center gap-2"><LayoutGrid className="h-4 w-4 text-[#1B4D3E]"/> المعاملة المستهدفة *</Label>
                             <InlineSearchList 
                                 value={selectedTxId} 
                                 onSelect={setSelectedTxId} 
@@ -216,7 +215,7 @@ export default function DirectContractPage() {
                     <Separator />
 
                     <div className="grid gap-2">
-                        <Label className="font-black text-emerald-700">تحميل بيانات العقد من نموذج جاهز</Label>
+                        <Label className="font-black text-[#1B4D3E]">تحميل بيانات العقد من نموذج جاهز</Label>
                         <InlineSearchList 
                             value={selectedTemplateId} 
                             onSelect={handleTemplateSelect} 
@@ -228,17 +227,17 @@ export default function DirectContractPage() {
                     {clauses.length > 0 && (
                         <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
                             <div className="flex justify-between items-center">
-                                <h3 className="text-lg font-black flex items-center gap-2 text-foreground"><Calculator className="h-5 w-5 text-emerald-600"/> ترتيب الدفعات المالية</h3>
+                                <h3 className="text-lg font-black flex items-center gap-2 text-foreground"><Calculator className="h-5 w-5 text-[#1B4D3E]"/> ترتيب الدفعات المالية</h3>
                                 {financialsType === 'fixed' ? (
-                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 font-black">نظام المبالغ الثابتة</Badge>
+                                    <Badge variant="outline" className="bg-emerald-50 text-[#1B4D3E] border-[#1B4D3E]/20 font-black">نظام المبالغ الثابتة</Badge>
                                 ) : (
                                     <div className="flex items-center gap-3 bg-emerald-50 p-2 rounded-xl border border-emerald-100">
-                                        <Label className="text-xs font-black text-emerald-800">إجمالي العقد التقديري:</Label>
+                                        <Label className="text-xs font-black text-[#1B4D3E]">إجمالي العقد التقديري:</Label>
                                         <Input 
                                             type="number" 
                                             value={totalContractValue} 
                                             onChange={e => setTotalContractValue(Number(e.target.value))} 
-                                            className="w-32 h-8 font-mono font-black text-center"
+                                            className="w-32 h-8 font-mono font-black text-center border-[#1B4D3E]/20"
                                         />
                                     </div>
                                 )}
@@ -267,7 +266,7 @@ export default function DirectContractPage() {
                                                             else newC[i].percentage = Number(e.target.value);
                                                             setClauses(newC);
                                                         }} 
-                                                        className="text-center font-black text-xl text-emerald-700 border-none shadow-none"
+                                                        className="text-center font-black text-xl text-[#1B4D3E] border-none shadow-none"
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -279,7 +278,7 @@ export default function DirectContractPage() {
                                     <TableFooter className="bg-emerald-50">
                                         <TableRow className="h-16">
                                             <TableCell className="text-right px-12 font-black text-lg">المجموع الحالي للبنود:</TableCell>
-                                            <TableCell className={cn("text-center font-mono text-2xl font-black", financialsType === 'percentage' && currentTotal !== 100 ? "text-red-600" : "text-emerald-700")}>
+                                            <TableCell className={cn("text-center font-mono text-2xl font-black", financialsType === 'percentage' && currentTotal !== 100 ? "text-red-600" : "text-[#1B4D3E]")}>
                                                 {financialsType === 'fixed' ? formatCurrency(currentTotal) : `${currentTotal}%`}
                                             </TableCell>
                                             <TableCell />
@@ -305,7 +304,8 @@ export default function DirectContractPage() {
                     <Button 
                         onClick={handleSaveContract} 
                         disabled={isSaving || !selectedTxId || (financialsType === 'percentage' && currentTotal !== 100)}
-                        className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-emerald-200 gap-3 min-w-[300px]"
+                        style={{ backgroundColor: '#1B4D3E' }}
+                        className="h-14 px-16 rounded-2xl font-black text-xl text-white shadow-2xl shadow-emerald-200 gap-3 min-w-[300px] hover:brightness-110 transition-all"
                     >
                         {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
                         اعتماد العقد المباشر
