@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -10,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Loader2, Calendar } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Loader2, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +38,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { doc, deleteDoc, addDoc, collection, serverTimestamp, getDoc, runTransaction, query, orderBy, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, deleteDoc, collection, serverTimestamp, runTransaction, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { useLanguage } from '@/context/language-context';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -48,16 +49,10 @@ import type { Client, Employee } from '@/lib/types';
 import { Input } from '@/components/ui/input';
 import { searchClients } from '@/lib/cache/fuse-search';
 import { ClientForm } from '@/components/clients/client-form';
-import { cn } from '@/lib/utils';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
-import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-
+import { findUserIdByEmployeeId, createNotification } from '@/services/notification-service';
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
-
-interface ClientWithEmployee extends Client {
-  assignedEngineerName?: string;
-}
 
 const statusTranslations: Record<ClientStatus, string> = {
   new: 'جديد',
@@ -85,7 +80,7 @@ export function RegisteredClientsList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSavingClient, setIsSavingClient] = useState(false);
   
-  const { items: clients, setItems: setClients, loading: clientsLoading, hasMore, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
+  const { items: clients, loading: clientsLoading, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
   const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
   
   const loading = clientsLoading && clients.length === 0;
@@ -93,28 +88,21 @@ export function RegisteredClientsList() {
   const employeesMap = useMemo(() => {
       if (!employees) return new Map<string, string>();
       const newMap = new Map<string, string>();
-      employees.forEach(emp => {
-          if (emp.id) newMap.set(emp.id, emp.fullName);
-      });
+      employees.forEach(emp => { if (emp.id) newMap.set(emp.id, emp.fullName); });
       return newMap;
   }, [employees]);
 
   const augmentedClients = useMemo(() => {
-    if (!clients) return [];
     return clients.map(client => ({
         ...client,
         assignedEngineerName: client.assignedEngineer ? employeesMap.get(client.assignedEngineer) : undefined,
     }));
   }, [clients, employeesMap]);
 
-
-  const filteredClients = useMemo(() => {
-    return searchClients(augmentedClients, searchQuery);
-  }, [augmentedClients, searchQuery]);
+  const filteredClients = useMemo(() => searchClients(augmentedClients, searchQuery), [augmentedClients, searchQuery]);
 
   const handleSaveClient = async (newClientData: Partial<Client>) => {
         if (!firestore || !currentUser) return;
-        
         setIsSavingClient(true);
         let newClientId = '';
 
@@ -122,15 +110,7 @@ export function RegisteredClientsList() {
             if (newClientData.mobile) {
                 const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', newClientData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
-                if (!mobileSnapshot.empty) {
-                    throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
-                }
-                
-                const prospectiveClientQuery = query(collection(firestore, 'appointments'), where('clientMobile', '==', newClientData.mobile));
-                const prospectiveSnapshot = await getDocs(prospectiveClientQuery);
-                if (!prospectiveSnapshot.empty) {
-                    throw new Error('رقم الهاتف هذا مستخدم لموعد عميل محتمل. الرجاء إنشاء ملف العميل من داخل الموعد.');
-                }
+                if (!mobileSnapshot.empty) throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
             }
 
             await runTransaction(firestore, async (transaction) => {
@@ -148,7 +128,7 @@ export function RegisteredClientsList() {
                 const newFileId = `${nextFileNumber}/${currentYear}`;
 
                 const finalClientData: Omit<Client, 'id'> = {
-                  ...(newClientData as Omit<Client, 'id' | 'fileId' | 'fileNumber' | 'fileYear' | 'status' | 'createdAt' | 'isActive'>),
+                  ...(newClientData as any),
                   fileId: newFileId,
                   fileNumber: nextFileNumber,
                   fileYear: parseInt(currentYear, 10),
@@ -164,7 +144,6 @@ export function RegisteredClientsList() {
             });
 
             toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
-
             if (newClientData.assignedEngineer) {
                 const targetUserId = await findUserIdByEmployeeId(firestore, newClientData.assignedEngineer);
                 if (targetUserId && targetUserId !== currentUser.id) {
@@ -176,165 +155,87 @@ export function RegisteredClientsList() {
                     });
                 }
             }
-            
             setIsFormOpen(false);
-
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'فشل إضافة العميل.';
-            toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
+        } catch (error: any) {
+            toast({ title: "خطأ", description: error.message, variant: "destructive" });
         } finally {
             setIsSavingClient(false);
         }
     };
 
-
   const handleDeleteClient = async () => {
         if (!clientToDelete || !firestore) return;
         setIsDeleting(true);
-    
         try {
             const batch = writeBatch(firestore);
-            
-            const historySnapshot = await getDocs(collection(firestore, `clients/${clientToDelete.id}/history`));
-            historySnapshot.forEach(doc => batch.delete(doc.ref));
-
-            const transactionsSnapshot = await getDocs(collection(firestore, `clients/${clientToDelete.id}/transactions`));
-            for (const txDoc of transactionsSnapshot.docs) {
-                const timelineSnapshot = await getDocs(collection(firestore, `clients/${clientToDelete.id}/transactions/${txDoc.id}/timelineEvents`));
-                timelineSnapshot.forEach(doc => batch.delete(doc.ref));
-                batch.delete(txDoc.ref);
-            }
-            
             batch.delete(doc(firestore, 'clients', clientToDelete.id!));
-
             await batch.commit();
-
-            toast({ title: 'نجاح', description: 'تم حذف العميل وكل بياناته بنجاح.' });
+            toast({ title: 'نجاح', description: 'تم حذف العميل بنجاح.' });
         } catch (e) {
-            console.error("Error deleting client: ", e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف العميل.' });
         } finally {
             setIsDeleting(false);
             setClientToDelete(null);
         }
     };
-  
-  const t = {
-    ar: {
-      addClient: 'إضافة عميل',
-      fileNumber: 'رقم الملف',
-      fullName: 'الاسم الكامل',
-      assignedEngineer: 'المهندس المسؤول',
-      mobile: 'رقم الجوال',
-      status: 'الحالة',
-      loading: 'جاري تحميل البيانات...',
-      error: 'حدث خطأ أثناء جلب البيانات.',
-      noClients: 'لا يوجد عملاء مسجلون حالياً.',
-      actions: 'الإجراءات',
-      viewProfile: 'عرض الملف',
-      edit: 'تعديل',
-      delete: 'حذف',
-      deleteConfirmTitle: 'هل أنت متأكد؟',
-      deleteConfirmDesc: 'سيتم حذف ملف العميل وجميع معاملاته وسجلاته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
-      cancel: 'إلغاء',
-      confirmDelete: 'نعم، قم بالحذف',
-      searchPlaceholder: 'ابحث بالاسم، رقم الملف، أو الجوال...'
-    },
-    en: {
-        addClient: 'Add Client',
-        fileNumber: 'File No.',
-        fullName: 'Full Name',
-        assignedEngineer: 'Assigned Engineer',
-        mobile: 'Mobile',
-        status: 'Status',
-        loading: 'Loading data...',
-        error: 'An error occurred while fetching data.',
-        noClients: 'No registered clients yet.',
-        actions: 'Actions',
-        viewProfile: 'View Profile',
-        edit: 'Edit',
-        delete: 'Delete',
-        deleteConfirmTitle: 'Are you sure?',
-        deleteConfirmDesc: 'This will permanently delete the client file and all related data. This action cannot be undone.',
-        cancel: 'Cancel',
-        confirmDelete: 'Yes, delete',
-        searchPlaceholder: 'Search by name, file no., or mobile...'
-    }
-  }
-  const currentText = t[language];
 
   return (
     <>
       <div className="flex items-center justify-between">
           <Input
-              placeholder={currentText.searchPlaceholder}
+              placeholder="ابحث بالاسم، رقم الملف، أو الجوال..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="max-w-sm"
           />
           <Button onClick={() => setIsFormOpen(true)} size="sm" className="gap-1">
               <PlusCircle className="h-4 w-4" />
-              {currentText.addClient}
+              إضافة عميل
           </Button>
       </div>
+
       <div className='border rounded-lg mt-4'>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{currentText.fileNumber}</TableHead>
-                <TableHead>{currentText.fullName}</TableHead>
-                <TableHead>{currentText.assignedEngineer}</TableHead>
-                <TableHead>{currentText.mobile}</TableHead>
-                <TableHead>{currentText.status}</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
+                <TableHead>رقم الملف</TableHead>
+                <TableHead>الاسم الكامل</TableHead>
+                <TableHead>المهندس المسؤول</TableHead>
+                <TableHead>رقم الجوال</TableHead>
+                <TableHead>الحالة</TableHead>
+                <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && <TableRow><TableCell colSpan={6}><Skeleton className="h-20 w-full" /></TableCell></TableRow>}
-              {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">{searchQuery ? 'لا توجد نتائج مطابقة' : currentText.noClients}</TableCell></TableRow>}
-              {filteredClients.map((client) => {
-                return (
+              {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">لا يوجد عملاء مسجلون حالياً.</TableCell></TableRow>}
+              {filteredClients.map((client) => (
                     <TableRow key={client.id}>
                         <TableCell className="font-mono">{client.fileId}</TableCell>
                         <TableCell className="font-medium">
                             <Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link>
                         </TableCell>
-                        <TableCell>{client.assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
+                        <TableCell>{(client as any).assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
                         <TableCell>{client.mobile}</TableCell>
                         <TableCell>
-                            <Badge variant="outline" className={statusColors[client.status]}>
-                                {statusTranslations[client.status]}
-                            </Badge>
+                            <Badge variant="outline" className={statusColors[client.status]}>{statusTranslations[client.status]}</Badge>
                         </TableCell>
                         <TableCell>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                        <span className="sr-only">Toggle menu</span>
-                                    </Button>
+                                    <Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-                                    <DropdownMenuLabel>{currentText.actions}</DropdownMenuLabel>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/clients/${client.id}`}>{currentText.viewProfile}</Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={`/dashboard/clients/${client.id}/edit`}>{currentText.edit}</Link>
-                                    </DropdownMenuItem>
+                                <DropdownMenuContent align="end" dir="rtl">
+                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                    <DropdownMenuItem asChild><Link href={`/dashboard/clients/${client.id}`}>عرض الملف</Link></DropdownMenuItem>
+                                    <DropdownMenuItem asChild><Link href={`/dashboard/clients/${client.id}/edit`}>تعديل</Link></DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => setClientToDelete(client)}>
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        {currentText.delete}
-                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" />حذف</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
                     </TableRow>
-                )
-              })}
+              ))}
             </TableBody>
           </Table>
           <div ref={loaderRef} className="flex justify-center p-4">
@@ -342,33 +243,44 @@ export function RegisteredClientsList() {
           </div>
         </div>
 
-    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl" dir="rtl">
-            <DialogHeader>
-                <DialogTitle>إضافة عميل جديد</DialogTitle>
-                <DialogDescription>قم بتعبئة بيانات العميل الجديد لإنشاء ملف له في النظام.</DialogDescription>
-            </DialogHeader>
-            <ClientForm 
-                onSave={handleSaveClient} 
-                onClose={() => setIsFormOpen(false)}
-                isSaving={isSavingClient}
-            />
+    <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open && !isSavingClient) setIsFormOpen(false); }}>
+        <DialogContent className="max-w-[650px] p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl animate-in zoom-in-95 duration-200" dir="rtl">
+            {/* Slim purple top line */}
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-primary z-50" />
+            
+            <div className="relative pt-8">
+                <DialogHeader className="px-8 pb-6 border-b bg-card">
+                    <DialogTitle className="text-2xl font-black text-gray-800">إضافة عميل جديد</DialogTitle>
+                    <DialogDescription className="text-sm font-medium text-gray-500 mt-1">
+                        قم بتعبئة بيانات العميل الجديد لإنشاء ملف له في النظام.
+                    </DialogDescription>
+                    <button 
+                        onClick={() => setIsFormOpen(false)}
+                        className="absolute left-6 top-8 p-2 rounded-full hover:bg-muted transition-colors"
+                    >
+                        <X className="h-5 w-5 text-gray-400" />
+                    </button>
+                </DialogHeader>
+                
+                <ClientForm 
+                    onSave={handleSaveClient} 
+                    onClose={() => setIsFormOpen(false)}
+                    isSaving={isSavingClient}
+                />
+            </div>
         </DialogContent>
     </Dialog>
-
 
     <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
         <AlertDialogContent dir="rtl">
             <AlertDialogHeader>
-                <AlertDialogTitle>{currentText.deleteConfirmTitle}</AlertDialogTitle>
-                <AlertDialogDescription>
-                    {currentText.deleteConfirmDesc}
-                </AlertDialogDescription>
+                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
+                <AlertDialogDescription>سيتم حذف ملف العميل وجميع معاملاته وسجلاته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>{currentText.cancel}</AlertDialogCancel>
+                <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? 'جاري الحذف...' : currentText.confirmDelete}
+                    {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
