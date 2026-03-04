@@ -26,6 +26,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
     AlertDialog,
     AlertDialogAction,
     AlertDialogCancel,
@@ -37,7 +44,7 @@ import {
 } from "../ui/alert-dialog";
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useBranding } from '@/context/branding-context';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -46,6 +53,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import type { Account, PaymentMethod } from '@/lib/types';
 import { useSubscription } from '@/hooks/use-subscription';
 import { InlineSearchList } from '../ui/inline-search-list';
+import { formatCurrency } from '@/lib/utils';
 
 function PaymentMethodForm({
     isOpen,
@@ -83,8 +91,7 @@ function PaymentMethodForm({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const expenseAccount = accounts.find(a => a.id === expenseAccountId);
-        if (!name || !value || !expenseAccountId || !expenseAccount) {
-            alert('Please fill all fields');
+        if (!name || value === '' || !expenseAccountId || !expenseAccount) {
             return;
         }
         onSave({
@@ -276,5 +283,3 @@ export function PaymentMethodsManager() {
         </Card>
     );
 }
-
-    
