@@ -48,6 +48,24 @@
     --sidebar-border: 262 20% 90%;
     --sidebar-ring: 262 83% 58%;
   }
+
+  /* Purple Salmon Theme Override */
+  [data-theme='purple-salmon'] {
+    --primary: 263 70% 50%; /* #6d28d9 */
+    --primary-foreground: 0 0% 100%;
+    
+    --accent: 356 94% 92%; /* #fed7da */
+    --accent-foreground: 263 70% 20%;
+    
+    --secondary: 356 94% 92%;
+    --secondary-foreground: 263 70% 20%;
+    
+    --sidebar-accent: 356 94% 92%;
+    --sidebar-accent-foreground: 263 70% 20%;
+    --sidebar-primary: 263 70% 50%;
+    
+    --ring: 263 70% 50%;
+  }
 }
 
 @layer base {

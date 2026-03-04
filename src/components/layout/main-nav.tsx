@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -237,7 +236,7 @@ const navItems = {
 };
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden p-3 text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-purple-50 hover:text-purple-700 hover:cursor-pointer rounded-[0.5rem] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-semibold data-[active=true]:border-r-4 data-[active=true]:border-purple-600 group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden p-3 text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-accent/30 hover:text-primary hover:cursor-pointer rounded-[0.5rem] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-r-4 data-[active=true]:border-primary group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -329,15 +328,15 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           </CollapsibleTrigger>
         </SidebarMenuItem>
         <CollapsibleContent>
-          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-purple-200">
+          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-primary/20">
             {item.children.map((child: any) => {
               const isChildActive = currentPath === child.href;
               const ChildIcon = child.icon;
               return (
                 <SidebarMenuSubItem key={child.href}>
                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "flex h-12 min-w-0 w-full justify-start -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-3 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-purple-50 hover:text-purple-700",
-                        "data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-bold data-[active=true]:border-r-4 data-[active=true]:border-purple-600"
+                        "flex h-12 min-w-0 w-full justify-start -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-3 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-accent/20 hover:text-primary",
+                        "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:border-r-4 data-[active=true]:border-primary"
                    )}>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-3">
@@ -369,7 +368,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     <>
       <SidebarHeader className="p-4 mb-2">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-md border border-purple-100 bg-white" />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-md border border-primary/10 bg-white" />
             <div className="flex flex-col">
               <span className="text-xl font-black tracking-tight text-foreground leading-tight">{branding?.company_name || 'Nova ERP'}</span>
               <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Purple Suite</span>
@@ -388,9 +387,9 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-purple-100 bg-purple-50/20">
+      <SidebarFooter className="p-4 border-t border-primary/10 bg-primary/5">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-white border border-purple-100 shadow-sm group hover:bg-purple-50 transition-all">
+            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-white border border-primary/10 shadow-sm group hover:bg-primary/5 transition-all">
                 <Avatar className="h-10 w-10 border-2 border-primary/10 transition-all group-hover:border-primary/30">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-primary/5 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>

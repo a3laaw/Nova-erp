@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Languages, Calendar, LogOut } from 'lucide-react';
+import { Languages, Calendar, LogOut, Palette } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -14,6 +14,7 @@ import { useBranding } from '@/context/branding-context';
 import { Logo } from './logo';
 import { Skeleton } from '../ui/skeleton';
 import { UpdateIndicator } from '@/context/sync-context';
+import { useAppTheme } from '@/context/theme-context';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +35,7 @@ interface HeaderProps {
 export function Header({ currentUser, onLogout, className }: HeaderProps) {
     const { toggleLanguage } = useLanguage();
     const { branding, loading: brandingLoading } = useBranding();
+    const { theme, toggleTheme } = useAppTheme();
 
     return (
         <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6", className)}>
@@ -55,6 +57,15 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
+                <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={toggleTheme} 
+                    title="تبديل الثيم"
+                    className={cn(theme === 'purple-salmon' && "border-primary text-primary")}
+                >
+                    <Palette className="h-4 w-4" />
+                </Button>
                 <Button variant="outline" size="icon" asChild>
                   <Link href="/dashboard/appointments">
                     <Calendar className="h-4 w-4" />

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { LanguageProvider, useLanguage } from '@/context/language-context';
@@ -7,6 +6,7 @@ import { SyncStatusProvider } from '@/context/sync-context';
 import { useEffect } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { AuthProvider } from '@/context/auth-context';
+import { ThemeProvider } from '@/context/theme-context';
 
 // This component consumes the language context and updates the DOM.
 function LanguageManager({ children }: { children: React.ReactNode }) {
@@ -24,15 +24,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <FirebaseProvider>
             <BrandingProvider>
-                <LanguageProvider>
-                    <SyncStatusProvider>
-                        <AuthProvider>
-                            <LanguageManager>
-                                {children}
-                            </LanguageManager>
-                        </AuthProvider>
-                    </SyncStatusProvider>
-                </LanguageProvider>
+                <ThemeProvider>
+                    <LanguageProvider>
+                        <SyncStatusProvider>
+                            <AuthProvider>
+                                <LanguageManager>
+                                    {children}
+                                </LanguageManager>
+                            </AuthProvider>
+                        </SyncStatusProvider>
+                    </LanguageProvider>
+                </ThemeProvider>
             </BrandingProvider>
         </FirebaseProvider>
     );

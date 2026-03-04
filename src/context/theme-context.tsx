@@ -1,0 +1,51 @@
+'use client';
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+type Theme = 'default' | 'purple-salmon';
+
+interface ThemeContextType {
+  theme: Theme;
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+  const [theme, setTheme] = useState<Theme>('default');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('app-theme') as Theme;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'default' ? 'purple-salmon' : 'default';
+    setTheme(newTheme);
+    localStorage.setItem('app-theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
+
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+export const useAppTheme = () => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useAppTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
