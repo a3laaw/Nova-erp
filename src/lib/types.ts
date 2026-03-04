@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
  */
@@ -170,7 +169,7 @@ export interface ClientTransaction extends BaseEntity {
     clientId: string;
     transactionType: string;
     description?: string;
-    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
+    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold' | 'cancelled';
     assignedEngineerId?: string | null;
     transactionTypeId?: string;
     stages?: any[];
@@ -184,6 +183,7 @@ export interface ClientTransaction extends BaseEntity {
         specs?: TechnicalSpecifications; 
     };
     boqId?: string;
+    projectId?: string;
 }
 
 export interface Employee extends BaseEntity {

@@ -1,29 +1,38 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardContent,
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, FileText, ArrowRightLeft, FileSignature } from 'lucide-react';
+import { PlusCircle, FileText, ArrowRightLeft, FileSignature, Search, Phone, User, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ConstructionContractsList } from '@/components/construction/construction-contracts-list';
+import { DateInput } from '@/components/ui/date-input';
 
 /**
  * صفحة العقود المبرمة (مركز العمليات):
- * تم تنظيف الصفحة من مكتبة القوالب (Templates) بناءً على طلب المستخدم،
- * حيث تدار القوالب الآن من قسم الإعدادات / القوائم المرجعية.
- * الصفحة الآن مخصصة فقط لبدء مسار التعاقد (عرض سعر أو عقد مباشر).
+ * تم تحديث الصفحة لتشمل سجل العقود الموقعة مع فلاتر البحث المتقدمة.
  */
 export default function ContractsPage() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [phoneQuery, setPhoneQuery] = useState('');
+  const [contractNo, setContractNo] = useState('');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+
   return (
-    <div className="space-y-8" dir="rtl">
+    <div className="space-y-10" dir="rtl">
+      {/* مسارات العمل السريعة */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* مسار عرض السعر */}
           <Card className="rounded-[2rem] border-none shadow-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white overflow-hidden group hover:scale-[1.02] transition-transform">
               <CardHeader className="relative z-10">
                   <div className="flex justify-between items-start">
@@ -46,7 +55,6 @@ export default function ContractsPage() {
               </div>
           </Card>
 
-          {/* مسار العقد المباشر */}
           <Card className="rounded-[2rem] border-none shadow-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white overflow-hidden group hover:scale-[1.02] transition-transform">
               <CardHeader className="relative z-10">
                   <div className="flex justify-between items-start">
@@ -69,6 +77,69 @@ export default function ContractsPage() {
               </div>
           </Card>
       </div>
+
+      {/* سجل العقود الموقعة */}
+      <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-card">
+        <CardHeader className="bg-muted/10 border-b pb-8 px-8">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl text-primary"><FileSignature className="h-6 w-6"/></div>
+                <div>
+                    <CardTitle className="text-2xl font-black">سجل العقود الموقعة</CardTitle>
+                    <CardDescription className="text-base font-medium">متابعة كافة العقود القانونية والمالية المرتبطة بالعملاء.</CardDescription>
+                </div>
+            </div>
+        </CardHeader>
+        <CardContent className="p-8 space-y-8">
+            {/* واجهة الفلاتر المتقدمة */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 bg-muted/30 p-6 rounded-3xl border-2 border-dashed">
+                <div className="grid gap-2">
+                    <Label className="font-bold flex items-center gap-2"><User className="h-3.5 w-3.5 text-primary"/> اسم العميل</Label>
+                    <Input 
+                        placeholder="ابحث بالاسم..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-background rounded-xl h-10"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label className="font-bold flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-primary"/> رقم الهاتف</Label>
+                    <Input 
+                        placeholder="ابحث بالجوال..." 
+                        value={phoneQuery}
+                        onChange={(e) => setPhoneQuery(e.target.value)}
+                        className="bg-background rounded-xl h-10"
+                        dir="ltr"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label className="font-bold flex items-center gap-2"># رقم العقد</Label>
+                    <Input 
+                        placeholder="رقم العقد..." 
+                        value={contractNo}
+                        onChange={(e) => setContractNo(e.target.value)}
+                        className="bg-background rounded-xl h-10 font-mono"
+                    />
+                </div>
+                <div className="grid gap-2 lg:col-span-2">
+                    <Label className="font-bold flex items-center gap-2"><Calendar className="h-3.5 w-3.5 text-primary"/> نطاق تاريخ العقد</Label>
+                    <div className="flex items-center gap-2">
+                        <DateInput value={dateFrom} onChange={setDateFrom} className="flex-1" />
+                        <span className="text-muted-foreground">إلى</span>
+                        <DateInput value={dateTo} onChange={setDateTo} className="flex-1" />
+                    </div>
+                </div>
+            </div>
+
+            {/* الجدول الزمني للعقود */}
+            <ConstructionContractsList 
+                searchQuery={searchQuery}
+                phoneQuery={phoneQuery}
+                contractNo={contractNo}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+            />
+        </CardContent>
+      </Card>
     </div>
   )
 }
