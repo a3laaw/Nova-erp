@@ -57,9 +57,11 @@ const departmentOptions = ['الكهرباء', 'الصحي', 'الإنشائي',
 
 const parseTime = (timeStr: string): { hours: number, minutes: number } | null => {
   const [hours, minutes] = timeStr.split(':').map(Number);
-  if (isNaN(hours) || isNaN(minutes)) return null;
+  if (isNaN(hours) || !isValidNumber(minutes)) return null;
   return { hours, minutes };
 };
+
+function isValidNumber(n: any) { return typeof n === 'number' && !isNaN(n); }
 
 const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
@@ -77,7 +79,6 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
     return slots;
 };
 
-// مصفوفة أيام الأسبوع المتوافقة مع getDay() (0 = الأحد)
 const weekDays = [
     { id: 'Sunday', label: 'الأحد' },
     { id: 'Monday', label: 'الاثنين' },

@@ -44,7 +44,7 @@ const defaultRamadanSchedule = {
     appointment_buffer_time: 15,
 };
 
-// الترتيب المتوافق مع getDay()
+// الترتيب المتوافق مع getDay() (0 = الأحد)
 const weekDays = [
     { id: 'Sunday', label: 'الأحد' },
     { id: 'Monday', label: 'الاثنين' },
