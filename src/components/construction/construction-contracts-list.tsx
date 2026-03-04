@@ -24,6 +24,7 @@ import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 interface ConstructionContractsListProps {
   searchQuery?: string;
   contractNo?: string;
+  statusFilter?: string;
   dateFrom?: Date;
   dateTo?: Date;
 }
@@ -36,7 +37,7 @@ const statusMap: Record<string, { label: string, color: string }> = {
     'new': { label: 'مسودة', color: 'bg-gray-100 text-gray-800 border-gray-200' },
 };
 
-export function ConstructionContractsList({ searchQuery, contractNo, dateFrom, dateTo }: ConstructionContractsListProps) {
+export function ConstructionContractsList({ searchQuery, contractNo, statusFilter = 'all', dateFrom, dateTo }: ConstructionContractsListProps) {
   const { firestore } = useFirebase();
 
   // جلب كافة المعاملات التي تحتوي على عقد مالي
@@ -74,15 +75,20 @@ export function ConstructionContractsList({ searchQuery, contractNo, dateFrom, d
 
   const filteredContracts = useMemo(() => {
     return contractsData.filter(c => {
-        // منطق البحث الموحد: فحص الاسم أو الهاتف أو نوع المعاملة في حقل واحد
+        // 1. بحث ذكي بالاسم أو الهاتف أو النوع
         const searchLower = searchQuery?.toLowerCase() || '';
         const matchesSearch = !searchQuery || 
             c.clientName.toLowerCase().includes(searchLower) || 
             c.clientPhone.includes(searchQuery) ||
             c.transactionType.toLowerCase().includes(searchLower);
 
+        // 2. فلترة برقم العقد
         const matchesNo = !contractNo || c.transactionNumber.toLowerCase().includes(contractNo.toLowerCase());
         
+        // 3. فلترة بالحالة
+        const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+
+        // 4. فلترة بالتاريخ
         let matchesDate = true;
         if (dateFrom && dateTo) {
             const contractDate = toFirestoreDate(c.createdAt);
@@ -94,9 +100,9 @@ export function ConstructionContractsList({ searchQuery, contractNo, dateFrom, d
             }
         }
 
-        return matchesSearch && matchesNo && matchesDate;
+        return matchesSearch && matchesNo && matchesStatus && matchesDate;
     });
-  }, [contractsData, searchQuery, contractNo, dateFrom, dateTo]);
+  }, [contractsData, searchQuery, contractNo, statusFilter, dateFrom, dateTo]);
 
   if (txLoading || projectsLoading) return (
     <div className="space-y-4">

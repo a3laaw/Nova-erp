@@ -10,7 +10,7 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, FileText, ArrowRightLeft, FileSignature, Search, Phone, User, Calendar } from 'lucide-react';
+import { PlusCircle, FileText, ArrowRightLeft, FileSignature, Search, Phone, User, Calendar, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -18,14 +18,22 @@ import { Label } from '@/components/ui/label';
 import { ConstructionContractsList } from '@/components/construction/construction-contracts-list';
 import { DateInput } from '@/components/ui/date-input';
 import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 /**
  * صفحة العقود الموقعة:
- * تم دمج البحث بالاسم والهاتف في خانة واحدة ذكية لسهولة الاستخدام.
+ * تم تحديثها بإضافة فلتر "حالة العقد" ونظام البحث الموحد الذكي.
  */
 export default function ContractsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [contractNo, setContractNo] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -94,13 +102,13 @@ export default function ContractsPage() {
           </CardHeader>
           <CardContent className="p-8 space-y-8">
               {/* واجهة الفلاتر الموحدة */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-muted/20 p-8 rounded-[2rem] border-2 border-dashed border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 bg-muted/20 p-8 rounded-[2rem] border-2 border-dashed border-gray-200">
                   <div className="grid gap-2 lg:col-span-1">
                       <Label className="font-bold flex items-center gap-2 text-gray-700">
-                        بحث (الاسم أو الهاتف) <Search className="h-4 w-4 text-primary opacity-70"/>
+                        بحث ذكي <Search className="h-4 w-4 text-primary opacity-70"/>
                       </Label>
                       <Input 
-                          placeholder="اكتب اسم العميل أو رقم هاتفه..." 
+                          placeholder="الاسم أو الهاتف..." 
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="bg-white rounded-xl h-11 shadow-sm border-gray-100 focus:shadow-md focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
@@ -114,6 +122,23 @@ export default function ContractsPage() {
                           onChange={(e) => setContractNo(e.target.value)}
                           className="bg-white rounded-xl h-11 font-mono shadow-sm border-gray-100 focus:shadow-md focus:border-primary/40 focus:ring-1 focus:ring-primary/20 transition-all"
                       />
+                  </div>
+                  <div className="grid gap-2">
+                      <Label className="font-bold flex items-center gap-2 text-gray-700">
+                        حالة العقد <Filter className="h-4 w-4 text-primary opacity-70"/>
+                      </Label>
+                      <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="bg-white rounded-xl h-11 shadow-sm border-gray-100">
+                            <SelectValue placeholder="اختر الحالة..." />
+                        </SelectTrigger>
+                        <SelectContent dir="rtl">
+                            <SelectItem value="all">كل الحالات</SelectItem>
+                            <SelectItem value="in-progress">فعال (قيد التنفيذ)</SelectItem>
+                            <SelectItem value="on-hold">متوقف مؤقتاً</SelectItem>
+                            <SelectItem value="completed">مكتمل ومسلم</SelectItem>
+                            <SelectItem value="cancelled">ملغي</SelectItem>
+                        </SelectContent>
+                      </Select>
                   </div>
                   <div className="grid gap-2 lg:col-span-2">
                       <Label className="font-bold flex items-center gap-2 text-gray-700">
@@ -131,6 +156,7 @@ export default function ContractsPage() {
               <ConstructionContractsList 
                   searchQuery={searchQuery}
                   contractNo={contractNo}
+                  statusFilter={statusFilter}
                   dateFrom={dateFrom}
                   dateTo={dateTo}
               />
