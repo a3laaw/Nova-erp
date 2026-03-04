@@ -44,6 +44,7 @@ import {
   Truck,
   Landmark,
   Warehouse,
+  Building2,
   ArrowLeftRight,
   Ban,
   Package,
@@ -68,7 +69,8 @@ import {
   LogOut,
   UserX,
   ShoppingBag,
-  FileStack
+  FileStack,
+  FileStack as FileStackIcon // Aliasing to be safe
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
