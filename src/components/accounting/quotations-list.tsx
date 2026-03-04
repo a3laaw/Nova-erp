@@ -11,15 +11,13 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, orderBy } from 'firebase/firestore';
 import type { Quotation } from '@/lib/types';
 import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { FileText, MoreHorizontal, Eye, Pencil, Trash2, Search, User } from 'lucide-react';
+import { FileText, Eye, Pencil, Trash2, User } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
-import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -43,25 +41,22 @@ const statusMap: Record<string, { label: string, color: string }> = {
 
 export function QuotationsList({ searchQuery, dateFrom, dateTo, statusFilter = 'all' }: QuotationsListProps) {
   const { firestore } = useFirebase();
-  const router = useRouter();
   const { toast } = useToast();
   
   const [itemToDelete, setItemToDelete] = useState<Quotation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const quotationsQueryConstraints = useMemo(() => [orderBy('date', 'desc')], []);
-  const { data: quotations, loading, error } = useSubscription<Quotation>(firestore, 'quotations', quotationsQueryConstraints);
+  const { data: quotations, loading } = useSubscription<Quotation>(firestore, 'quotations', quotationsQueryConstraints);
 
   const filteredQuotations = useMemo(() => {
     let results = quotations.filter(quotation => {
         const quotationDate = toFirestoreDate(quotation.date);
-        
         const matchesStatus = statusFilter === 'all' || quotation.status === statusFilter;
         let matchesDate = true;
         if (dateFrom && dateTo && quotationDate) {
             matchesDate = quotationDate >= dateFrom && quotationDate <= dateTo;
         }
-        
         return matchesStatus && matchesDate;
     });
 

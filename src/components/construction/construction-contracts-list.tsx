@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { FileSignature, User, Eye, Pencil, Phone, Target, Calendar } from 'lucide-react';
+import { User, Eye, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -30,10 +30,10 @@ interface ConstructionContractsListProps {
 }
 
 const statusMap: Record<string, { label: string, color: string }> = {
-    'in-progress': { label: 'فعال (Active)', color: 'bg-[#ECFDF5] text-[#14453D] border-[#14453D]/20' }, // Emerald Green
-    'on-hold': { label: 'معلق (Pending)', color: 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]' }, // Amber
-    'cancelled': { label: 'ملغي (Closed)', color: 'bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]' }, // Soft Red
-    'completed': { label: 'مكتمل (Closed)', color: 'bg-[#F0F9FF] text-[#2E5BCC] border-[#BAE6FD]' }, // Steel Blue
+    'in-progress': { label: 'فعال (Active)', color: 'bg-[#ECFDF5] text-[#14453D] border-[#14453D]/20' },
+    'on-hold': { label: 'معلق (Pending)', color: 'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]' },
+    'cancelled': { label: 'ملغي (Closed)', color: 'bg-[#FEF2F2] text-[#DC2626] border-[#FECACA]' },
+    'completed': { label: 'مكتمل (Closed)', color: 'bg-[#F0F9FF] text-[#2E5BCC] border-[#BAE6FD]' },
     'new': { label: 'مسودة (Draft)', color: 'bg-[#F3F4F6] text-[#374151] border-[#E5E7EB]' },
 };
 
@@ -67,7 +67,6 @@ export function ConstructionContractsList({ searchQuery, contractNo, statusFilte
             ...tx,
             clientName: client?.nameAr || '...',
             clientPhone: client?.mobile || '',
-            hasTechnicalProject: !!tx.projectId || projects.some(p => p.linkedTransactionId === tx.id)
           };
       });
   }, [rawTransactions, projects, clients]);
@@ -102,7 +101,6 @@ export function ConstructionContractsList({ searchQuery, contractNo, statusFilte
     <div className="space-y-4">
         <Skeleton className="h-16 w-full rounded-2xl" />
         <Skeleton className="h-16 w-full rounded-2xl" />
-        <Skeleton className="h-16 w-full rounded-2xl" />
     </div>
   );
 
@@ -123,11 +121,8 @@ export function ConstructionContractsList({ searchQuery, contractNo, statusFilte
         <TableBody className="before:block before:h-2">
           {filteredContracts.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-48 text-center">
-                <div className="flex flex-col items-center justify-center gap-3 text-muted-foreground opacity-40">
-                  <FileSignature className="h-12 w-12" />
-                  <p className="font-bold">لا توجد نتائج تطابق فلاتر البحث المحددة.</p>
-                </div>
+              <TableCell colSpan={7} className="h-48 text-center text-muted-foreground opacity-40">
+                لا توجد عقود مسجلة تطابق البحث.
               </TableCell>
             </TableRow>
           ) : (
@@ -153,12 +148,8 @@ export function ConstructionContractsList({ searchQuery, contractNo, statusFilte
                 <TableCell className="font-bold text-foreground/80">
                     {contract.transactionType}
                 </TableCell>
-                <TableCell className="text-center">
-                    <div className="flex flex-col items-center">
-                        <span className="font-mono text-xs font-bold text-muted-foreground">
-                            {toFirestoreDate(contract.createdAt) ? format(toFirestoreDate(contract.createdAt)!, 'dd/MM/yyyy') : '-'}
-                        </span>
-                    </div>
+                <TableCell className="text-center font-mono text-xs font-bold text-muted-foreground">
+                    {toFirestoreDate(contract.createdAt) ? format(toFirestoreDate(contract.createdAt)!, 'dd/MM/yyyy') : '-'}
                 </TableCell>
                 <TableCell className="text-left font-mono font-black text-[#2E5BCC] text-lg">
                   {formatCurrency(contract.contract?.totalAmount || 0)}
