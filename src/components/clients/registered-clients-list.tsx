@@ -244,12 +244,12 @@ export function RegisteredClientsList() {
         </div>
 
     <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open && !isSavingClient) setIsFormOpen(false); }}>
-        <DialogContent className="max-w-[650px] p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl animate-in zoom-in-95 duration-200" dir="rtl">
+        <DialogContent className="max-w-[650px] p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl animate-in zoom-in-95 duration-200 h-[90vh] flex flex-col" dir="rtl">
             {/* Slim purple top line */}
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-primary z-50" />
             
-            <div className="relative pt-8">
-                <DialogHeader className="px-8 pb-6 border-b bg-card">
+            <div className="relative pt-8 flex flex-col h-full">
+                <DialogHeader className="px-8 pb-6 border-b bg-card flex-shrink-0">
                     <DialogTitle className="text-2xl font-black text-gray-800">إضافة عميل جديد</DialogTitle>
                     <DialogDescription className="text-sm font-medium text-gray-500 mt-1">
                         قم بتعبئة بيانات العميل الجديد لإنشاء ملف له في النظام.
@@ -262,11 +262,13 @@ export function RegisteredClientsList() {
                     </button>
                 </DialogHeader>
                 
-                <ClientForm 
-                    onSave={handleSaveClient} 
-                    onClose={() => setIsFormOpen(false)}
-                    isSaving={isSavingClient}
-                />
+                <div className="flex-1 overflow-hidden">
+                    <ClientForm 
+                        onSave={handleSaveClient} 
+                        onClose={() => setIsFormOpen(false)}
+                        isSaving={isSavingClient}
+                    />
+                </div>
             </div>
         </DialogContent>
     </Dialog>

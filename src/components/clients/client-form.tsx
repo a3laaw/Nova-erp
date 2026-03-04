@@ -146,7 +146,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8">
                 <p className="text-[11px] text-muted-foreground font-medium">الحقول المميزة بالنجمة (<span className="text-destructive">*</span>) إلزامية</p>
 
                 {/* Section 1: Basic Information */}
@@ -251,7 +251,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                 </section>
             </div>
 
-            <div className="p-6 bg-gray-50 border-t flex justify-end gap-3 rounded-b-[2rem]">
+            <div className="p-6 bg-gray-50 border-t flex justify-end gap-3 rounded-b-[2rem] flex-shrink-0">
                 <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="text-primary bg-primary/5 hover:bg-primary/10 rounded-xl px-6 h-12 font-bold gap-2">
                     <ArrowRight className="h-4 w-4" /> إلغاء
                 </Button>
