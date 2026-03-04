@@ -244,6 +244,7 @@ export interface AuditLog extends BaseEntity { changeType: 'SalaryChange' | 'Job
 export interface PaymentMethod {
     id: string;
     name: string;
+    commissionType: 'percentage' | 'fixed' | 'both';
     fixedFee: number;
     percentageFee: number;
     expenseAccountId: string;

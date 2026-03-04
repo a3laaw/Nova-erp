@@ -42,7 +42,7 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "../ui/alert-dialog";
+} from "@/components/ui/alert-dialog";
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { useBranding } from '@/context/branding-context';
@@ -55,6 +55,7 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function PaymentMethodForm({
     isOpen,
@@ -71,6 +72,7 @@ function PaymentMethodForm({
 }) {
     const isEditing = !!method;
     const [name, setName] = useState('');
+    const [commissionType, setCommissionType] = useState<PaymentMethod['commissionType']>('percentage');
     const [fixedFee, setFixedFee] = useState<number | string>('0');
     const [percentageFee, setPercentageFee] = useState<number | string>('0');
     const [expenseAccountId, setExpenseAccountId] = useState('');
@@ -78,11 +80,13 @@ function PaymentMethodForm({
     useEffect(() => {
         if (method) {
             setName(method.name);
+            setCommissionType(method.commissionType || 'percentage');
             setFixedFee(method.fixedFee || 0);
             setPercentageFee(method.percentageFee || 0);
             setExpenseAccountId(method.expenseAccountId);
         } else {
             setName('');
+            setCommissionType('percentage');
             setFixedFee('0');
             setPercentageFee('0');
             setExpenseAccountId('');
@@ -95,11 +99,17 @@ function PaymentMethodForm({
         if (!name || !expenseAccountId || !expenseAccount) {
             return;
         }
+        
+        // تصفير الحقول غير المستخدمة بناءً على النوع
+        const finalFixedFee = (commissionType === 'fixed' || commissionType === 'both') ? Number(fixedFee) : 0;
+        const finalPercentageFee = (commissionType === 'percentage' || commissionType === 'both') ? Number(percentageFee) : 0;
+
         onSave({
             id: method?.id || new Date().toISOString(),
             name,
-            fixedFee: Number(fixedFee) || 0,
-            percentageFee: Number(percentageFee) || 0,
+            commissionType,
+            fixedFee: finalFixedFee,
+            percentageFee: finalPercentageFee,
             expenseAccountId,
             expenseAccountName: expenseAccount.name,
         });
@@ -125,18 +135,37 @@ function PaymentMethodForm({
                             <Label htmlFor="name" className="font-bold">اسم الطريقة (مثال: K-Net, Visa) *</Label>
                             <Input id="name" value={name} onChange={e => setName(e.target.value)} required placeholder="K-Net" className="h-11 rounded-xl" />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="fixedFee" className="font-bold">عمولة ثابتة (د.ك)</Label>
-                                <Input id="fixedFee" type="number" step="any" value={fixedFee} onChange={e => setFixedFee(e.target.value)} placeholder="0.000" className="h-11 font-mono text-lg rounded-xl" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="percentageFee" className="font-bold">عمولة نسبة (%)</Label>
-                                <Input id="percentageFee" type="number" step="any" value={percentageFee} onChange={e => setPercentageFee(e.target.value)} placeholder="0%" className="h-11 font-mono text-lg rounded-xl" />
-                            </div>
-                        </div>
+
                         <div className="grid gap-2">
-                            <Label htmlFor="expenseAccountId" className="font-bold">حساب مصروف العمولات *</Label>
+                            <Label className="font-bold">نوع العمولة المستقطعة *</Label>
+                            <Select value={commissionType} onValueChange={(v: any) => setCommissionType(v)}>
+                                <SelectTrigger className="h-11 rounded-xl">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="percentage">نسبة مئوية (%)</SelectItem>
+                                    <SelectItem value="fixed">مبلغ ثابت (د.ك)</SelectItem>
+                                    <SelectItem value="both">كلاهما (مبلغ + نسبة)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {(commissionType === 'fixed' || commissionType === 'both') && (
+                            <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+                                <Label htmlFor="fixedFee" className="font-bold text-primary">المبلغ الثابت المستقطع (د.ك)</Label>
+                                <Input id="fixedFee" type="number" step="any" value={fixedFee} onChange={e => setFixedFee(e.target.value)} placeholder="0.000" className="h-11 font-mono text-lg rounded-xl border-primary/20 bg-primary/5" />
+                            </div>
+                        )}
+
+                        {(commissionType === 'percentage' || commissionType === 'both') && (
+                            <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
+                                <Label htmlFor="percentageFee" className="font-bold text-primary">النسبة المئوية المستقطعة (%)</Label>
+                                <Input id="percentageFee" type="number" step="any" value={percentageFee} onChange={e => setPercentageFee(e.target.value)} placeholder="0%" className="h-11 font-mono text-lg rounded-xl border-primary/20 bg-primary/5" />
+                            </div>
+                        )}
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="expenseAccountId" className="font-bold">حساب مصروف العمولات البنكية *</Label>
                              <InlineSearchList 
                                 value={expenseAccountId} 
                                 onSelect={setExpenseAccountId} 
@@ -220,7 +249,7 @@ export function PaymentMethodsManager() {
                 <div className="flex justify-between items-center">
                     <div>
                         <CardTitle className="text-xl font-black">إدارة طرق الدفع والعمولات البنكية</CardTitle>
-                        <CardDescription>حدد طرق التحصيل والعمولات (ثابتة أو نسبية) التي يخصمها البنك تلقائياً من الإيداعات.</CardDescription>
+                        <CardDescription>حدد طرق التحصيل والعمولات التي يخصمها البنك تلقائياً من الإيداعات.</CardDescription>
                     </div>
                     <Button onClick={() => { setEditingMethod(null); setIsFormOpen(true); }} className="h-10 rounded-xl font-bold gap-2">
                         <PlusCircle className="h-4 w-4" /> إضافة طريقة دفع
@@ -233,31 +262,31 @@ export function PaymentMethodsManager() {
                         <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead className="px-6 font-bold">اسم الطريقة</TableHead>
-                                <TableHead className="text-center font-bold">عمولة ثابتة</TableHead>
-                                <TableHead className="text-center font-bold">عمولة مئوية</TableHead>
+                                <TableHead className="text-center font-bold">العمولة المستقطعة</TableHead>
                                 <TableHead className="font-bold">حساب المصروف</TableHead>
-                                <TableHead className="w-[80px]"><span className="sr-only">الإجراءات</span></TableHead>
+                                <TableHead className="w-[80px] text-center"><span className="sr-only">الإجراءات</span></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? <TableRow><TableCell colSpan={5} className="p-8"><Skeleton className="h-10 w-full"/></TableCell></TableRow>
-                            : methods.length === 0 ? <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">لم يتم إضافة طرق دفع بعد.</TableCell></TableRow>
+                            {loading ? <TableRow><TableCell colSpan={4} className="p-8"><Skeleton className="h-10 w-full"/></TableCell></TableRow>
+                            : methods.length === 0 ? <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">لم يتم إضافة طرق دفع بعد.</TableCell></TableRow>
                             : methods.map(method => (
                                 <TableRow key={method.id} className="hover:bg-muted/30 transition-colors h-16">
                                     <TableCell className="px-6 font-black text-primary text-lg">{method.name}</TableCell>
                                     <TableCell className="text-center">
-                                        {method.fixedFee > 0 ? (
-                                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 font-mono font-black text-sm">
-                                                {formatCurrency(method.fixedFee)}
-                                            </Badge>
-                                        ) : <span className="text-muted-foreground opacity-30">-</span>}
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        {method.percentageFee > 0 ? (
-                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-mono font-black text-sm">
-                                                {method.percentageFee}%
-                                            </Badge>
-                                        ) : <span className="text-muted-foreground opacity-30">-</span>}
+                                        <div className="flex flex-col items-center gap-1">
+                                            {method.percentageFee > 0 && (
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-mono font-black">
+                                                    {method.percentageFee}%
+                                                </Badge>
+                                            )}
+                                            {method.fixedFee > 0 && (
+                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-mono font-black">
+                                                    {formatCurrency(method.fixedFee)}
+                                                </Badge>
+                                            )}
+                                            {method.fixedFee === 0 && method.percentageFee === 0 && <span className="text-muted-foreground opacity-30">-</span>}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-xs font-bold text-muted-foreground">{method.expenseAccountName}</TableCell>
                                     <TableCell>
