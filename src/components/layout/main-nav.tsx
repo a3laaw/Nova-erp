@@ -24,62 +24,50 @@ import {
   Home,
   Briefcase,
   Users,
-  Calendar,
-  Wallet,
-  Warehouse,
-  Settings,
-  Handshake,
-  FileText,
-  ChevronDown,
-  ShoppingCart,
-  LogOut,
-  LineChart,
-  Construction,
   Search,
-  FileCheck,
-  Building2,
-  Building,
-  ArrowLeftRight,
-  Ban,
+  LineChart,
+  FileSignature,
+  FileText,
+  ClipboardList,
+  Construction,
+  MapPin,
+  LayoutGrid,
   ArrowUpFromLine,
   Clock,
   Hourglass,
-  UserX,
-  ShoppingBag,
-  ClipboardList,
   HardHat,
+  FileCheck,
+  Coins,
+  DollarSign,
+  ShoppingCart,
+  SearchCode,
+  Truck,
+  Landmark,
+  Warehouse,
+  ArrowLeftRight,
+  Ban,
+  Package,
   Network,
   BookOpen,
   ArrowDownLeft,
   ArrowUpRight,
-  Receipt,
-  BarChart,
+  CalendarClock,
+  Scale,
   TrendingUp,
-  Landmark,
+  PieChart,
+  Handshake,
   CalendarX,
   Banknote,
   FileBarChart,
-  SearchCode,
-  Truck,
+  Settings,
   Settings2,
-  FileSignature,
+  Building,
   Tags,
-  PieChart,
-  History,
-  DollarSign,
-  Store,
-  FileStack,
-  Coins,
-  Calculator,
-  RotateCcw,
-  LayoutGrid,
-  MapPin,
-  Scale,
-  Package,
-  Landmark as BankIcon,
-  CalendarClock,
   ShieldCheck,
-  CircleHelp
+  ChevronDown,
+  LogOut,
+  UserX,
+  ShoppingBag
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -93,13 +81,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { cva } from 'class-variance-authority';
 
 const navItems = {
   ar: [
@@ -178,7 +163,7 @@ const navItems = {
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: SearchCode },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
-        { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: BankIcon },
+        { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: Landmark },
       ]
     },
 
@@ -248,6 +233,28 @@ const navItems = {
   ]
 };
 
+const sidebarMenuButtonVariants = cva(
+  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden p-3 text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-purple-50 hover:text-purple-700 hover:cursor-pointer rounded-[0.5rem] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-semibold data-[active=true]:border-r-4 data-[active=true]:border-purple-600 group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "",
+        outline:
+          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+      },
+      size: {
+        default: "h-11",
+        sm: "h-9 text-xs",
+        lg: "h-14 group-data-[collapsible=icon]:!p-0",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile, state: sidebarState } = useSidebar();
   const Icon = item.icon;
@@ -260,7 +267,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     const isActive = currentPath === item.href;
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label}>
+        <SidebarMenuButton isActive={isActive} asChild tooltip={item.label} className={cn(sidebarMenuButtonVariants())}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             {Icon && <Icon className="size-5" strokeWidth={2.5} />}
             <span className={cn("group-data-[state=collapsed]:hidden")}>{item.label}</span>
@@ -278,7 +285,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
         <SidebarMenuItem>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label}>
+              <SidebarMenuButton as="button" isActive={isActive} tooltip={item.label} className={cn(sidebarMenuButtonVariants())}>
                 {Icon && <Icon className="size-5" strokeWidth={2.5} />}
                 <span className="sr-only">{item.label}</span>
               </SidebarMenuButton>
@@ -286,7 +293,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <DropdownMenuContent side="right" align="start" sideOffset={5} className="w-56" dir="rtl">
               <DropdownMenuLabel>{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {item.children.map((child: any, index: number) => {
+              {item.children.map((child: any) => {
                 const ChildIcon = child.icon;
                 return (
                   <DropdownMenuItem key={child.href} asChild>
@@ -309,7 +316,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={false}>
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="h-11 w-full justify-between pr-2">
+            <SidebarMenuButton as="button" isActive={isActive} className={cn(sidebarMenuButtonVariants(), "justify-between")}>
               <div className='flex items-center gap-2'>
                 {Icon && <Icon className="size-5" strokeWidth={2.5} />}
                 <span className={cn("group-data-[state=collapsed]:hidden")}>{item.label}</span>
@@ -319,13 +326,16 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           </CollapsibleTrigger>
         </SidebarMenuItem>
         <CollapsibleContent>
-          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-primary/20">
-            {item.children.map((child: any, index: number) => {
+          <SidebarMenuSub className="border-r-2 border-l-0 ml-0 mr-4 pr-2 space-y-1 mt-1 border-purple-200">
+            {item.children.map((child: any) => {
               const isChildActive = currentPath === child.href;
               const ChildIcon = child.icon;
               return (
                 <SidebarMenuSubItem key={child.href}>
-                   <SidebarMenuSubButton isActive={isChildActive} asChild>
+                   <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
+                        "flex h-9 min-w-0 w-full justify-start -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-3 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-purple-50 hover:text-purple-700",
+                        "data-[active=true]:bg-purple-100 data-[active=true]:text-purple-800 data-[active=true]:font-bold data-[active=true]:border-r-4 data-[active=true]:border-purple-600"
+                   )}>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-2">
                                 {ChildIcon && <ChildIcon className="h-4 w-4" strokeWidth={2.2} />}
@@ -356,10 +366,10 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
     <>
       <SidebarHeader className="p-4 mb-2">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-md border border-border bg-white" />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-md border border-purple-100 bg-white" />
             <div className="flex flex-col">
               <span className="text-xl font-black tracking-tight text-foreground leading-tight">{branding?.company_name || 'Nova ERP'}</span>
-              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Pulse Suite</span>
+              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">Purple Suite</span>
             </div>
         </div>
       </SidebarHeader>
@@ -375,9 +385,9 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-border bg-muted/20">
+      <SidebarFooter className="p-4 border-t border-purple-100 bg-purple-50/20">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-white border border-border shadow-sm group hover:bg-muted/30 transition-all">
+            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-white border border-purple-100 shadow-sm group hover:bg-purple-50 transition-all">
                 <Avatar className="h-10 w-10 border-2 border-primary/10 transition-all group-hover:border-primary/30">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-primary/5 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
