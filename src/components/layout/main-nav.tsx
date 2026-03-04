@@ -70,7 +70,7 @@ import {
   UserX,
   ShoppingBag,
   FileStack,
-  FileStack as FileStackIcon // Aliasing to be safe
+  Wallet
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
