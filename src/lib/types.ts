@@ -195,6 +195,7 @@ export interface Employee extends BaseEntity {
     status: 'active' | 'terminated' | 'on-leave';
     department?: string;
     jobTitle?: string;
+    workTeam?: string;          // حقل فريق العمل الجديد
     basicSalary: number;
     housingAllowance?: number;
     transportAllowance?: number;

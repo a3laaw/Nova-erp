@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2 } from 'lucide-react';
+import { Save, X, Loader2, Users } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +40,17 @@ const commonNationalities = [
 
 const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n }));
 
+// ✨ محرك دمج رموز الفرق
+const getDeptPrefix = (deptName: string) => {
+    if (!deptName) return 'G';
+    const name = deptName.toLowerCase();
+    if (name.includes('كهرباء')) return 'E';
+    if (name.includes('صحي') || name.includes('ميكانيك')) return 'M';
+    if (name.includes('إنشائي') || name.includes('هيكل') || name.includes('بناء')) return 'C';
+    if (name.includes('معماري')) return 'A';
+    if (name.includes('خارجية')) return 'L';
+    return 'G';
+};
 
 export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false, employeeNumber = null }: EmployeeFormProps) {
     const { firestore } = useFirebase();
@@ -48,6 +60,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [formData, setFormData] = useState({
         fullName: '', nameEn: '', civilId: '', mobile: '',
         hireDate: new Date(), department: '', jobTitle: '',
+        workTeam: '', // حقل الفريق
         contractType: 'permanent' as Employee['contractType'], basicSalary: '',
         housingAllowance: '', transportAllowance: '',
         salaryPaymentType: 'cash' as Employee['salaryPaymentType'],
@@ -77,6 +90,20 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const isDayLaborer = formData.contractType === 'day_laborer';
     const isSimpleLayout = isDayLaborer;
 
+    // ✨ منطق ظهور اختيار الفريق (عامل أو عامل يومية)
+    const showTeamSelection = useMemo(() => {
+        return formData.jobTitle === 'عامل' || formData.contractType === 'day_laborer';
+    }, [formData.jobTitle, formData.contractType]);
+
+    // ✨ توليد خيارات الفريق بناءً على القسم
+    const teamOptions = useMemo(() => {
+        const prefix = getDeptPrefix(formData.department);
+        return Array.from({ length: 10 }, (_, i) => {
+            const code = `${prefix}${i + 1}`;
+            return { value: code, label: code };
+        });
+    }, [formData.department]);
+
     const showStandardSalary = useMemo(() => {
         if (formData.contractType === 'percentage' || 
             formData.contractType === 'day_laborer') {
@@ -102,6 +129,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 hireDate: toFirestoreDate(initialData.hireDate) || new Date(),
                 department: initialData.department || '',
                 jobTitle: initialData.jobTitle || '',
+                workTeam: (initialData as any).workTeam || '',
                 contractType: initialData.contractType || 'permanent',
                 basicSalary: String(initialData.basicSalary || ''),
                 housingAllowance: String(initialData.housingAllowance || ''),
@@ -168,7 +196,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setRefDataLoading(true);
             try {
                 const deptsQuery = query(collection(firestore, 'departments'));
-                const deptsSnapshot = await getDocs(deptsQuery);
+                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
+                
+                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
                 const fetchedDepartments = deptsSnapshot.docs
                     .map(doc => ({ id: doc.id, ...doc.data() } as Department))
@@ -176,19 +206,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 fetchedDepartments.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
                 setDepartments(fetchedDepartments);
-                
-                const jobsPromises = fetchedDepartments.map(dept => getDocs(query(collection(firestore, `departments/${dept.id}/jobs`))));
-                const jobsSnapshots = await Promise.all(jobsPromises);
 
-                const fetchedJobs: (Job & { departmentId: string })[] = [];
-                jobsSnapshots.forEach((jobsSnap, index) => {
-                    const departmentId = fetchedDepartments[index].id;
-                    jobsSnap.forEach(doc => {
-                        fetchedJobs.push({ id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string });
-                    });
-                });
+                const fetchedJobs = jobsSnapshot.docs.map(doc => {
+                    const departmentId = doc.ref.parent.parent!.id;
+                    return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
+                }).filter(job => job && job.name);
                 
-                setJobs(fetchedJobs.filter(job => job && job.name));
+                setJobs(fetchedJobs);
 
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
@@ -215,6 +239,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const newFormData = { ...formData, [id]: value };
         if (id === 'department') {
             newFormData.jobTitle = ''; // Reset job title when department changes
+            newFormData.workTeam = ''; // Reset team when department changes
         }
         setFormData(newFormData);
     };
@@ -250,6 +275,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             mobile: formData.mobile,
             contractType: formData.contractType,
         };
+
+        if (showTeamSelection) {
+            (dataToSave as any).workTeam = formData.workTeam;
+        }
 
         if (isSimpleLayout) {
             dataToSave.department = 'عمالة خارجية';
@@ -383,6 +412,31 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                         disabled={refDataLoading || !formData.department}
                                     />
                                 </div>
+                                
+                                {/* ✨ اختيار فريق العمل الشرطي */}
+                                {showTeamSelection && (
+                                    <div className="grid gap-1.5 animate-in fade-in slide-in-from-top-2">
+                                        <Label htmlFor="workTeam" className="font-bold text-primary flex items-center gap-2">
+                                            <Users className="h-4 w-4" /> فريق العمل (الرمز التشغيلي)
+                                        </Label>
+                                        <Select value={formData.workTeam} onValueChange={(v) => handleSelectChange('workTeam', v)} dir="rtl">
+                                            <SelectTrigger id="workTeam" className="border-primary/20 bg-primary/5">
+                                                <SelectValue placeholder={!formData.department ? "حدد القسم أولاً" : "اختر الفريق..."} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {teamOptions.map(opt => (
+                                                    <SelectItem key={opt.value} value={opt.value}>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="outline" className="font-mono">{opt.value}</Badge>
+                                                            <span>فريق {formData.department} {opt.value.replace(/\D/g, '')}</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
                                 <div className="grid gap-1.5">
                                     <Label>الرقم الوظيفي</Label>
                                     <Input value={employeeNumber || ''} disabled readOnly />
