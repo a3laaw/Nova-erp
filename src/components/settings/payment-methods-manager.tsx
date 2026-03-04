@@ -55,6 +55,7 @@ import type { Account, PaymentMethod } from '@/lib/types';
 import { useSubscription } from '@/hooks/use-subscription';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { formatCurrency, cn } from '@/lib/utils';
+import { Badge } from '../ui/badge';
 
 function PaymentMethodForm({
     isOpen,
@@ -300,7 +301,7 @@ export function PaymentMethodsManager() {
                         <AlertDialogTitle className="text-xl font-black">تأكيد حذف طريقة الدفع؟</AlertDialogTitle>
                         <AlertDialogDescription>سيتم حذف الطريقة "{methodToDelete?.name}" من الخيارات المتاحة عند التحصيل.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="gap-2">
+                    <AlertDialogFooter>
                         <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">نعم، حذف</AlertDialogAction>
                     </AlertDialogFooter>
