@@ -79,6 +79,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'schedules': 'مراجعة الجداول الزمنية',
     'field-visits': 'الزيارات الميدانية',
     'contracts': 'عروض الأسعار والعقود',
+    'workStages': 'سير العمل مكتب هندسي',
   },
   en: {
     dashboard: 'Dashboard',
@@ -133,6 +134,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'schedules': 'Review Timelines',
     'field-visits': 'Field Visits',
     'contracts': 'Quotations & Contracts',
+    'workStages': 'Engineering Office Workflow',
   },
 };
 

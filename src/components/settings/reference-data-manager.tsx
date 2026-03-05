@@ -650,17 +650,24 @@ function ManagerView({
         if (!firestore) return;
         setIsImporting(true);
         try {
-            const deptsSnapshot = await getDocs(query(collection(firestore, 'departments')));
+            const typesSnapshot = await getDocs(query(collection(firestore, 'transactionTypes')));
             const allNewStagesByName = new Map<string, { id: string, ref: any }>();
-            const allDeptsToProcess: { deptDoc: any; stages: any[] }[] = [];
+            const allTypesToProcess: { typeDoc: any; stages: any[] }[] = [];
 
-            for (const deptDoc of deptsSnapshot.docs) {
-                const deptName = deptDoc.data().name;
-                const stagesForDept = defaultWorkStages[deptName as keyof typeof defaultWorkStages];
-                if (stagesForDept) {
-                    allDeptsToProcess.push({ deptDoc, stages: stagesForDept });
-                    for (const stage of stagesForDept) {
-                        const newStageRef = doc(collection(firestore, `departments/${deptDoc.id}/workStages`));
+            for (const typeDoc of typesSnapshot.docs) {
+                const typeName = typeDoc.data().name;
+                // Note: defaultWorkStages are currently keyed by department in the mock data
+                // For a true implementation, we'd map these to relevant transaction types.
+                // Here we'll try to find any matching stages.
+                const matchedStages = Object.values(defaultWorkStages).find((stages, idx) => {
+                    const deptName = Object.keys(defaultWorkStages)[idx];
+                    return typeName.includes(deptName) || deptName.includes(typeName);
+                });
+
+                if (matchedStages) {
+                    allTypesToProcess.push({ typeDoc, stages: matchedStages });
+                    for (const stage of matchedStages) {
+                        const newStageRef = doc(collection(firestore, `transactionTypes/${typeDoc.id}/workStages`));
                         allNewStagesByName.set(stage.name, { id: newStageRef.id, ref: newStageRef });
                     }
                 }
@@ -671,7 +678,7 @@ function ManagerView({
             const allExistingStagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages')));
             allExistingStagesSnap.forEach(docSnap => batch.delete(docSnap.ref));
 
-            for (const { stages } of allDeptsToProcess) {
+            for (const { stages } of allTypesToProcess) {
                 for (const stage of stages) {
                     const { nextStageNames, allowedDuringStagesNames, ...stageData } = stage as any;
                     const newStageInfo = allNewStagesByName.get(stage.name);
@@ -690,7 +697,7 @@ function ManagerView({
 
             await batch.commit();
             
-            toast({ title: 'نجاح', description: 'تم استيراد/تحديث مراحل العمل الافتراضية لجميع الأقسام.' });
+            toast({ title: 'نجاح', description: 'تم استيراد مراحل العمل الموحدة لجميع أنواع المعاملات.' });
             fetchSecondaryItems();
         } catch (e) {
             console.error(e);
@@ -1208,7 +1215,7 @@ function ManagerView({
                         <AlertDialogTitle>تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
                         <AlertDialogDescription>
                         {secondaryCollectionName === 'workStages' 
-                                ? 'سيتم مسح جميع مراحل العمل الحالية واستبدالها بالقائمة الافتراضية لجميع الأقسام.'
+                                ? 'سيتم مسح جميع مراحل العمل الحالية واستبدالها بالقائمة الافتراضية لجميع أنواع المعاملات.'
                                 : `سيؤدي هذا الإجراء إلى مسح جميع ${primaryTitle} الحالية واستبدالها بالقائمة الافتراضية. لا يمكن التراجع عن هذا الإجراء.`
                         }
                         </AlertDialogDescription>
@@ -1488,11 +1495,11 @@ export function ReferenceDataManager() {
 
     if (view === 'workStages') {
         return <ManagerView
-            primaryTitle="أقسام العمل"
-            primarySingularTitle="قسم"
-            primaryCollectionName="departments"
-            secondaryTitle="مراحل العمل"
-            secondarySingularTitle="مرحلة عمل"
+            primaryTitle="أنواع المعاملات"
+            primarySingularTitle="نوع معاملة"
+            primaryCollectionName="transactionTypes"
+            secondaryTitle="مراحل سير العمل"
+            secondarySingularTitle="مرحلة"
             secondaryCollectionName="workStages"
             icon={<Workflow className="h-full w-full" />}
             disablePrimaryActions={true}
@@ -1587,7 +1594,7 @@ export function ReferenceDataManager() {
                     loading={loadingCounts} 
                 />
                  <StatCard 
-                    title="مراحل المكاتب" 
+                    title="سير العمل مكتب هندسي" 
                     count={counts.workStages} 
                     icon={<Workflow className="h-full w-full" />} 
                     onNavigate={() => setView('workStages')} 
