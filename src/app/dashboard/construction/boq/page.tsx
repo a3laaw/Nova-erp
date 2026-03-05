@@ -16,7 +16,7 @@ export default function BoqLibraryPage() {
                         <div>
                             <CardTitle className="text-2xl font-black">مكتبة جداول الكميات (BOQ)</CardTitle>
                             <CardDescription className="text-base font-medium">
-                                إدارة بنود الحصر والتسعير المرجعية للمشاريع الإنشائية.
+                                إدارة بنود الحصر والتسعير المرجعية للمشاريع الإنشائية لتوحيد المعايير.
                             </CardDescription>
                         </div>
                     </div>

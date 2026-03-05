@@ -2,7 +2,7 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Building2, ArrowUpFromLine } from 'lucide-react';
+import { PlusCircle, ArrowUpFromLine } from 'lucide-react';
 import Link from 'next/link';
 import { MaterialIssueList } from '@/components/warehouse/material-issue-list';
 
@@ -21,7 +21,7 @@ export default function MaterialIssuesPage() {
                                 <CardDescription className="text-base font-medium">تحميل تكلفة المواد على مواقع العمل وربطها بمراكز الربحية.</CardDescription>
                             </div>
                         </div>
-                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-orange-100">
+                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-orange-100 bg-orange-600 hover:bg-orange-700">
                             <Link href="/dashboard/warehouse/material-issue/new">
                                 <PlusCircle className="ml-2 h-5 w-5" />
                                 إذن صرف جديد
