@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -11,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, Trash2, Loader2, X } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Loader2, X, Search, User } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,6 +50,7 @@ import { searchClients } from '@/lib/cache/fuse-search';
 import { ClientForm } from '@/components/clients/client-form';
 import { useInfiniteScroll } from '@/lib/hooks/use-infinite-scroll';
 import { findUserIdByEmployeeId, createNotification } from '@/services/notification-service';
+import { cn } from '@/lib/utils';
 
 type ClientStatus = 'new' | 'contracted' | 'cancelled' | 'reContracted';
 
@@ -69,7 +69,6 @@ const statusColors: Record<ClientStatus, string> = {
 };
 
 export function RegisteredClientsList() {
-  const { language } = useLanguage();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
@@ -81,14 +80,13 @@ export function RegisteredClientsList() {
   const [isSavingClient, setIsSavingClient] = useState(false);
   
   const { items: clients, loading: clientsLoading, loaderRef, loadingMore } = useInfiniteScroll<Client>('clients');
-  const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+  const { data: employees } = useSubscription<Employee>(firestore, 'employees');
   
   const loading = clientsLoading && clients.length === 0;
 
   const employeesMap = useMemo(() => {
-      if (!employees) return new Map<string, string>();
       const newMap = new Map<string, string>();
-      employees.forEach(emp => { if (emp.id) newMap.set(emp.id, emp.fullName); });
+      (employees || []).forEach(emp => { if (emp.id) newMap.set(emp.id, emp.fullName); });
       return newMap;
   }, [employees]);
 
@@ -180,62 +178,78 @@ export function RegisteredClientsList() {
     };
 
   return (
-    <>
-      <div className="flex items-center justify-between">
-          <Input
-              placeholder="ابحث بالاسم، رقم الملف، أو الجوال..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-sm"
-          />
-          <Button onClick={() => setIsFormOpen(true)} size="sm" className="gap-1">
-              <PlusCircle className="h-4 w-4" />
-              إضافة عميل
-          </Button>
-      </div>
+    <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner no-print">
+            <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
+                <Input
+                    placeholder="ابحث بالاسم أو رقم الملف..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold"
+                />
+            </div>
+            <Button onClick={() => setIsFormOpen(true)} className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-primary/20">
+                <PlusCircle className="h-5 w-5" />
+                إضافة عميل جديد
+            </Button>
+        </div>
 
-      <div className='border rounded-lg mt-4'>
+        <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>رقم الملف</TableHead>
-                <TableHead>الاسم الكامل</TableHead>
-                <TableHead>المهندس المسؤول</TableHead>
-                <TableHead>رقم الجوال</TableHead>
-                <TableHead>الحالة</TableHead>
-                <TableHead><span className="sr-only">Actions</span></TableHead>
+            <TableHeader className="bg-[#F8F9FE]">
+              <TableRow className="border-none">
+                <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم الملف</TableHead>
+                <TableHead className="font-black text-[#7209B7]">الاسم الكامل</TableHead>
+                <TableHead className="font-black text-[#7209B7]">المهندس المسؤول</TableHead>
+                <TableHead className="font-black text-[#7209B7]">رقم الجوال</TableHead>
+                <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
+                <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading && <TableRow><TableCell colSpan={6}><Skeleton className="h-20 w-full" /></TableCell></TableRow>}
-              {!loading && filteredClients.length === 0 && <TableRow><TableCell colSpan={6} className="text-center h-24">لا يوجد عملاء مسجلون حالياً.</TableCell></TableRow>}
-              {filteredClients.map((client) => (
-                    <TableRow key={client.id}>
-                        <TableCell className="font-mono">{client.fileId}</TableCell>
-                        <TableCell className="font-medium">
-                            <Link href={`/dashboard/clients/${client.id}`} className="hover:underline">{client.nameAr}</Link>
-                        </TableCell>
-                        <TableCell>{(client as any).assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
-                        <TableCell>{client.mobile}</TableCell>
+              {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <TableRow key={i}><TableCell colSpan={6} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+                  ))
+              ) : filteredClients.length === 0 ? (
+                  <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد ملفات عملاء مسجلة حالياً.</TableCell></TableRow>
+              ) : (
+                filteredClients.map((client) => (
+                    <TableRow key={client.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
+                        <TableCell className="px-8 font-mono font-black text-primary text-sm">{client.fileId}</TableCell>
                         <TableCell>
-                            <Badge variant="outline" className={statusColors[client.status]}>{statusTranslations[client.status]}</Badge>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#F8F9FE] rounded-full group-hover:bg-white transition-colors">
+                                    <User className="h-4 w-4 text-[#7209B7]" />
+                                </div>
+                                <Link href={`/dashboard/clients/${client.id}`} className="font-black text-gray-800 hover:underline">{client.nameAr}</Link>
+                            </div>
                         </TableCell>
+                        <TableCell className="font-medium text-xs text-gray-600">{client.assignedEngineerName || <span className="text-muted-foreground">غير مسند</span>}</TableCell>
+                        <TableCell dir="ltr" className="text-right font-mono text-xs opacity-60">{client.mobile}</TableCell>
                         <TableCell>
+                            <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[client.status])}>
+                                {statusTranslations[client.status]}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20 transition-all"><MoreHorizontal className="h-4 w-4" /></Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" dir="rtl">
-                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
+                                    <DropdownMenuLabel>إجراءات الملف</DropdownMenuLabel>
                                     <DropdownMenuItem asChild><Link href={`/dashboard/clients/${client.id}`}>عرض الملف</Link></DropdownMenuItem>
                                     <DropdownMenuItem asChild><Link href={`/dashboard/clients/${client.id}/edit`}>تعديل</Link></DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}><Trash2 className="mr-2 h-4 w-4" />حذف</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive focus:bg-destructive/10" onClick={() => setClientToDelete(client)}><Trash2 className="ml-2 h-4 w-4" />حذف نهائي</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
                     </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
           <div ref={loaderRef} className="flex justify-center p-4">
@@ -243,50 +257,31 @@ export function RegisteredClientsList() {
           </div>
         </div>
 
-    <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open && !isSavingClient) setIsFormOpen(false); }}>
-        <DialogContent className="max-w-[650px] p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl animate-in zoom-in-95 duration-200 h-[90vh] flex flex-col" dir="rtl">
-            {/* Slim purple top line */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-primary z-50" />
-            
-            <div className="relative pt-8 flex flex-col h-full">
-                <DialogHeader className="px-8 pb-6 border-b bg-card flex-shrink-0">
-                    <DialogTitle className="text-2xl font-black text-gray-800">إضافة عميل جديد</DialogTitle>
-                    <DialogDescription className="text-sm font-medium text-gray-500 mt-1">
-                        قم بتعبئة بيانات العميل الجديد لإنشاء ملف له في النظام.
-                    </DialogDescription>
-                    <button 
-                        onClick={() => setIsFormOpen(false)}
-                        className="absolute left-6 top-8 p-2 rounded-full hover:bg-muted transition-colors"
-                    >
-                        <X className="h-5 w-5 text-gray-400" />
-                    </button>
-                </DialogHeader>
-                
-                <div className="flex-1 overflow-hidden">
-                    <ClientForm 
-                        onSave={handleSaveClient} 
-                        onClose={() => setIsFormOpen(false)}
-                        isSaving={isSavingClient}
-                    />
+        <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open && !isSavingClient) setIsFormOpen(false); }}>
+            <DialogContent className="max-w-[650px] p-0 overflow-hidden rounded-[2rem] border-none shadow-2xl h-[90vh] flex flex-col" dir="rtl">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-primary z-50" />
+                <div className="relative pt-8 flex flex-col h-full">
+                    <DialogHeader className="px-8 pb-6 border-b bg-card">
+                        <DialogTitle className="text-2xl font-black text-gray-800">إضافة عميل جديد</DialogTitle>
+                        <DialogDescription className="text-sm font-medium text-gray-500 mt-1">إنشاء ملف فني ومالي جديد للعميل في النظام.</DialogDescription>
+                        <button onClick={() => setIsFormOpen(false)} className="absolute left-6 top-8 p-2 rounded-full hover:bg-muted transition-colors"><X className="h-5 w-5 text-gray-400" /></button>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-hidden">
+                        <ClientForm onSave={handleSaveClient} onClose={() => setIsFormOpen(false)} isSaving={isSavingClient} />
+                    </div>
                 </div>
-            </div>
-        </DialogContent>
-    </Dialog>
+            </DialogContent>
+        </Dialog>
 
-    <AlertDialog open={!!clientToDelete} onOpenChange={(open) => !open && setClientToDelete(null)}>
-        <AlertDialogContent dir="rtl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
-                <AlertDialogDescription>سيتم حذف ملف العميل وجميع معاملاته وسجلاته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-    </>
+        <AlertDialog open={!!clientToDelete} onOpenChange={() => setClientToDelete(null)}>
+            <AlertDialogContent dir="rtl" className="rounded-3xl">
+                <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف النهائي؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف ملف العميل وجميع معاملاته وسجلاته المالية بشكل دائم ومسح القيد المالي المرتبط.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter className="gap-2">
+                    <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteClient} disabled={isDeleting} className="bg-destructive rounded-xl">نعم، حذف</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    </div>
   );
 }

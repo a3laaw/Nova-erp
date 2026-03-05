@@ -38,12 +38,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
 import { useToast } from '@/hooks/use-toast';
 import { toFirestoreDate } from '@/services/date-converter';
 
@@ -75,25 +69,22 @@ export function ProspectiveClientsList() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [clientToUnfollow, setClientToUnfollow] = useState<ProspectiveClient | null>(null);
-  const [clientToDelete, setClientToDelete] = useState<ProspectiveClient | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState<'active' | 'cancelled'>('active');
 
   const prospectiveQuery = useMemo(() => [where('clientMobile', '>', '')], []);
   const { data: prospectiveAppointments, loading: appointmentsLoading } = useSubscription<Appointment>(firestore, 'appointments', prospectiveQuery);
-  const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+  const { data: employees } = useSubscription<Employee>(firestore, 'employees');
   
   const engineersMap = useMemo(() => {
-    if (!employees) return new Map();
     const newMap = new Map<string, string>();
-    employees.forEach(e => { if(e.id) newMap.set(e.id, e.fullName) });
+    (employees || []).forEach(e => { if(e.id) newMap.set(e.id, e.fullName) });
     return newMap;
   }, [employees]);
 
   const prospectiveClients = useMemo(() => {
-    if (!prospectiveAppointments) return [];
     const clientsMap = new Map<string, { appointments: Appointment[] }>();
-    prospectiveAppointments.forEach(appt => {
+    (prospectiveAppointments || []).forEach(appt => {
       if (!appt.clientMobile) return;
       if (!clientsMap.has(appt.clientMobile)) clientsMap.set(appt.clientMobile, { appointments: [] });
       clientsMap.get(appt.clientMobile)!.appointments.push(appt);
@@ -140,7 +131,7 @@ export function ProspectiveClientsList() {
       return filter === 'active' ? searchFiltered.filter(c => c.status !== 'cancelled-visit') : searchFiltered.filter(c => c.status === 'cancelled-visit');
   }, [prospectiveClients, searchQuery, filter]);
 
-  const loading = appointmentsLoading || employeesLoading;
+  const loading = appointmentsLoading;
   
   const handleConfirmUnfollow = async () => {
     if (!clientToUnfollow || !firestore) return;
@@ -157,7 +148,25 @@ export function ProspectiveClientsList() {
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white/50 p-4 rounded-[2rem] border shadow-inner">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner no-print">
+            <div className="flex bg-muted p-1 rounded-2xl border shadow-inner shrink-0">
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setFilter('active')}
+                    className={cn("rounded-xl px-6 h-9 font-black transition-all", filter === 'active' && "bg-white shadow-md text-[#7209B7]")}
+                >
+                    متابعات نشطة
+                </Button>
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setFilter('cancelled')}
+                    className={cn("rounded-xl px-6 h-9 font-black transition-all", filter === 'cancelled' && "bg-white shadow-md text-[#7209B7]")}
+                >
+                    متابعات ملغاة
+                </Button>
+            </div>
             <div className="relative w-full md:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
                 <Input
@@ -166,24 +175,6 @@ export function ProspectiveClientsList() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold"
                 />
-            </div>
-            <div className="flex bg-muted p-1 rounded-2xl border shadow-inner">
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setFilter('active')}
-                    className={cn("rounded-xl px-6 h-9 font-bold transition-all", filter === 'active' && "bg-white shadow-md text-primary")}
-                >
-                    متابعات نشطة
-                </Button>
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setFilter('cancelled')}
-                    className={cn("rounded-xl px-6 h-9 font-bold transition-all", filter === 'cancelled' && "bg-white shadow-md text-primary")}
-                >
-                    متابعات ملغاة
-                </Button>
             </div>
         </div>
 
@@ -204,7 +195,7 @@ export function ProspectiveClientsList() {
                             <TableRow key={i}><TableCell colSpan={5} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
                         ))
                     ) : filteredClients.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold">لا يوجد عملاء محتملون للمتابعة.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold italic">لا يوجد عملاء محتملون للمتابعة.</TableCell></TableRow>
                     ) : (
                         filteredClients.map(client => (
                             <TableRow key={client.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-20">
@@ -212,7 +203,7 @@ export function ProspectiveClientsList() {
                                 <TableCell dir="ltr" className="text-right font-mono font-bold opacity-60">{client.mobile}</TableCell>
                                 <TableCell>
                                     <div className="font-bold text-xs">{format(client.lastAppointmentDate, "PPP", { locale: ar })}</div>
-                                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1"><Users className="h-2 w-2"/> {client.engineerName}</div>
+                                    <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1 font-bold"><Users className="h-2 w-2"/> {client.engineerName}</div>
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[client.status])}>
@@ -238,7 +229,6 @@ export function ProspectiveClientsList() {
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             {filter === 'active' && <DropdownMenuItem className="text-orange-600" onClick={() => setClientToUnfollow(client)}><Trash2 className="ml-2 h-4 w-4" /> إلغاء المتابعة</DropdownMenuItem>}
-                                            <DropdownMenuItem className="text-destructive" onClick={() => setClientToDelete(client)}><Trash2 className="ml-2 h-4 w-4" /> حذف نهائي</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>

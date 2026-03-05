@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Trash2, Edit, Loader2, Calendar } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit, Loader2, Calendar, Search } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,7 @@ import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
 import { DateInput } from '../ui/date-input';
+import { cn } from '@/lib/utils';
 
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
@@ -63,36 +64,33 @@ interface EmployeesTableProps {
     searchQuery: string;
 }
 
-export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
+export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
     
-    // CHANGED: Default filter is now 'active'
     const [statusFilter, setStatusFilter] = useState('active');
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [serviceDurationFilter, setServiceDurationFilter] = useState('all');
+    const [internalSearchQuery, setInternalSearchQuery] = useState('');
     
-    const employeesQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [orderBy('createdAt', 'desc')];
-    }, [firestore]);
+    const combinedSearch = externalSearchQuery || internalSearchQuery;
 
-    const { data: employees, loading, error } = useSubscription<Employee>(firestore, 'employees', employeesQuery || []);
+    const employeesQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
+    const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees', employeesQuery);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
     const [isTerminating, setIsTerminating] = useState(false);
     const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination' | null>(null);
 
     const departmentOptions = useMemo(() => {
-        if (!employees) return [];
-        const depts = new Set(employees.map(emp => emp.department).filter(Boolean));
+        const depts = new Set((employees || []).map(emp => emp.department).filter(Boolean));
         return Array.from(depts);
     }, [employees]);
 
 
     const filteredEmployees = useMemo(() => {
         const today = new Date();
-        let filtered = employees;
+        let filtered = employees || [];
 
         if (statusFilter !== 'all') {
             filtered = filtered.filter(emp => emp.status === statusFilter);
@@ -106,194 +104,133 @@ export function EmployeesTable({ searchQuery }: EmployeesTableProps) {
             filtered = filtered.filter(emp => {
                 const hireDate = toFirestoreDate(emp.hireDate);
                 if (!hireDate) return false;
-
                 const yearsOfService = differenceInYears(today, hireDate);
-
                 switch (serviceDurationFilter) {
-                    case '1-3':
-                        return yearsOfService >= 1 && yearsOfService < 3;
-                    case '3-6':
-                        return yearsOfService >= 3 && yearsOfService < 6;
-                    case '6-10':
-                        return yearsOfService >= 6 && yearsOfService < 10;
-                    case '10+':
-                        return yearsOfService >= 10;
-                    default:
-                        return true;
+                    case '1-3': return yearsOfService >= 1 && yearsOfService < 3;
+                    case '3-6': return yearsOfService >= 3 && yearsOfService < 6;
+                    case '6-10': return yearsOfService >= 6 && yearsOfService < 10;
+                    case '10+': return yearsOfService >= 10;
+                    default: return true;
                 }
             });
         }
         
-        return searchEmployees(filtered, searchQuery);
-    }, [employees, searchQuery, statusFilter, departmentFilter, serviceDurationFilter]);
+        return searchEmployees(filtered, combinedSearch);
+    }, [employees, combinedSearch, statusFilter, departmentFilter, serviceDurationFilter]);
 
     const formatDate = (dateValue: any) => {
         const date = toFirestoreDate(dateValue);
-        if (!date) return '-';
-        return format(date, 'dd/MM/yyyy');
+        return date ? format(date, 'dd/MM/yyyy') : '-';
     };
 
-    const handleTerminateClick = (employee: Employee) => {
-        setEmployeeToTerminate(employee);
-    };
-
-    const handleTerminationConfirm = async () => {
-        if (!employeeToTerminate || !terminationReason || !firestore) {
-             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تحديد سبب إنهاء الخدمة.' });
-             return;
-        };
+    const handleTerminateConfirm = async () => {
+        if (!employeeToTerminate || !terminationReason || !firestore) return;
         setIsTerminating(true);
         try {
             const employeeRef = doc(firestore, 'employees', employeeToTerminate.id!);
-            await updateDoc(employeeRef, {
-                status: 'terminated',
-                terminationDate: new Date(),
-                terminationReason: terminationReason
-            });
-            toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف بنجاح.'});
-        } catch (error) {
-            console.error("Error terminating employee:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إنهاء خدمة الموظف.' });
-        } finally {
-            setIsTerminating(false);
-            setEmployeeToTerminate(null);
-            setTerminationReason(null);
-        }
+            await updateDoc(employeeRef, { status: 'terminated', terminationDate: new Date(), terminationReason: terminationReason });
+            toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف.'});
+        } finally { setIsTerminating(false); setEmployeeToTerminate(null); setTerminationReason(null); }
     };
 
     return (
-        <>
-            <div className="flex flex-wrap gap-4 mb-4 p-4 bg-muted/50 rounded-lg">
-                <div className="grid gap-2">
-                    <Label htmlFor="status-filter">الحالة</Label>
+        <div className="space-y-6">
+            <div className="flex flex-col lg:flex-row justify-between items-center gap-4 bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner no-print">
+                <div className="flex flex-wrap gap-2 items-center flex-grow">
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger id="status-filter" className="w-full sm:w-[180px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
+                        <SelectTrigger className="w-32 h-9 text-xs bg-white rounded-xl"><SelectValue placeholder="الحالة"/></SelectTrigger>
+                        <SelectContent dir="rtl">
                             <SelectItem value="all">الكل</SelectItem>
-                            {Object.entries(statusTranslations).map(([key, value]) => (
-                                <SelectItem key={key} value={key}>{value}</SelectItem>
-                            ))}
+                            {Object.entries(statusTranslations).map(([key, value]) => (<SelectItem key={key} value={key}>{value}</SelectItem>))}
                         </SelectContent>
                     </Select>
-                </div>
-                 <div className="grid gap-2">
-                    <Label htmlFor="department-filter">القسم</Label>
                     <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-                        <SelectTrigger id="department-filter" className="w-full sm:w-[180px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">الكل</SelectItem>
-                            {departmentOptions.map(dept => (
-                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                            ))}
+                        <SelectTrigger className="w-40 h-9 text-xs bg-white rounded-xl"><SelectValue placeholder="القسم"/></SelectTrigger>
+                        <SelectContent dir="rtl">
+                            <SelectItem value="all">كل الأقسام</SelectItem>
+                            {departmentOptions.map(dept => (<SelectItem key={dept} value={dept}>{dept}</SelectItem>))}
                         </SelectContent>
                     </Select>
                 </div>
-                 <div className="grid gap-2">
-                    <Label htmlFor="service-duration-filter">مدة الخدمة</Label>
-                    <Select value={serviceDurationFilter} onValueChange={setServiceDurationFilter}>
-                        <SelectTrigger id="service-duration-filter" className="w-full sm:w-[180px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">الكل</SelectItem>
-                            <SelectItem value="1-3">من 1-3 سنوات</SelectItem>
-                            <SelectItem value="3-6">من 3-6 سنوات</SelectItem>
-                            <SelectItem value="6-10">من 6-10 سنوات</SelectItem>
-                            <SelectItem value="10+">أكثر من 10 سنوات</SelectItem>
-                        </SelectContent>
-                    </Select>
+                <div className="relative w-full md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
+                    <Input
+                        placeholder="ابحث بالاسم أو الرقم..."
+                        value={internalSearchQuery}
+                        onChange={(e) => setInternalSearchQuery(e.target.value)}
+                        className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold"
+                    />
                 </div>
             </div>
 
-            <div className="border rounded-lg">
+            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>الاسم الكامل</TableHead>
-                            <TableHead>الرقم الوظيفي</TableHead>
-                            <TableHead>القسم</TableHead>
-                            <TableHead>تاريخ التعيين</TableHead>
-                            <TableHead>الحالة</TableHead>
-                            <TableHead><span className="sr-only">الإجراءات</span></TableHead>
+                    <TableHeader className="bg-[#F8F9FE]">
+                        <TableRow className="border-none">
+                            <TableHead className="px-8 py-5 font-black text-[#7209B7]">الاسم الكامل</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">الرقم الوظيفي</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">القسم</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">تاريخ التعيين</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
+                            <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {loading && Array.from({ length: 5 }).map((_, i) => (
-                            <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-                        ))}
-                        {!loading && filteredEmployees.length === 0 && (
-                            <TableRow><TableCell colSpan={6} className="h-24 text-center">
-                                {searchQuery ? 'لا توجد نتائج تطابق البحث.' : 'لا يوجد موظفون لعرضهم.'}
-                            </TableCell></TableRow>
+                        {loading ? (
+                            Array.from({ length: 3 }).map((_, i) => (
+                                <TableRow key={i}><TableCell colSpan={6} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+                            ))
+                        ) : filteredEmployees.length === 0 ? (
+                            <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد سجلات موظفين مطابقة.</TableCell></TableRow>
+                        ) : (
+                            filteredEmployees.map((employee) => (
+                                <TableRow key={employee.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
+                                    <TableCell className="px-8 font-black text-gray-800">
+                                        <Link href={`/dashboard/hr/employees/${employee.id}`} className="hover:underline">{employee.fullName}</Link>
+                                    </TableCell>
+                                    <TableCell className="font-mono font-bold opacity-60 text-xs">{employee.employeeNumber}</TableCell>
+                                    <TableCell className="font-medium text-xs">{employee.department}</TableCell>
+                                    <TableCell className="font-bold text-xs opacity-60">{formatDate(employee.hireDate)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[employee.status])}>
+                                            {statusTranslations[employee.status]}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
+                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}`}><Edit className="ml-2 h-4 w-4" /> عرض الملف</Link></DropdownMenuItem>
+                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link></DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                {employee.status !== 'terminated' && (
+                                                    <DropdownMenuItem onClick={() => setEmployeeToTerminate(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))
                         )}
-                        {!loading && filteredEmployees.map((employee) => (
-                            <TableRow key={employee.id}>
-                                <TableCell className="font-medium">
-                                    <Link href={`/dashboard/hr/employees/${employee.id}`} className="hover:underline">
-                                        {employee.fullName}
-                                    </Link>
-                                </TableCell>
-                                <TableCell className="font-mono">{employee.employeeNumber}</TableCell>
-                                <TableCell>{employee.department}</TableCell>
-                                <TableCell>{formatDate(employee.hireDate)}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={statusColors[employee.status]}>
-                                        {statusTranslations[employee.status]}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                                <span className="sr-only">Toggle menu</span>
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" dir="rtl">
-                                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                            <DropdownMenuItem asChild>
-                                                <Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link>
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            {employee.status !== 'terminated' && (
-                                                <DropdownMenuItem onClick={() => handleTerminateClick(employee)} className="text-destructive focus:text-destructive">إنهاء الخدمة</DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))}
                     </TableBody>
                 </Table>
             </div>
 
             <AlertDialog open={!!employeeToTerminate} onOpenChange={() => setEmployeeToTerminate(null)}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد إنهاء الخدمة</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيتم تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى "منتهية خدمته" وتجميد حسابه.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="mt-4 space-y-2">
-                         <Label>الرجاء تحديد سبب إنهاء الخدمة:</Label>
-                         <div className="flex gap-4">
-                            <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')}>استقالة</Button>
-                            <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')}>إنهاء خدمات</Button>
-                        </div>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader><AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle><AlertDialogDescription>هل أنت متأكد من تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى منتهية خدمته؟</AlertDialogDescription></AlertDialogHeader>
+                    <div className="flex gap-4 justify-center py-4">
+                        <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')} className="rounded-xl">استقالة</Button>
+                        <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')} className="rounded-xl">إنهاء خدمات</Button>
                     </div>
-                    <AlertDialogFooter className='mt-4'>
-                        <AlertDialogCancel disabled={isTerminating}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleTerminationConfirm} disabled={!terminationReason || isTerminating} className="bg-destructive hover:bg-destructive/90">
-                            {isTerminating ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالإنهاء'}
-                        </AlertDialogAction>
+                    <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleTerminateConfirm} disabled={!terminationReason || isTerminating} className="bg-destructive rounded-xl">تأكيد الإنهاء</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </div>
     );
 }
