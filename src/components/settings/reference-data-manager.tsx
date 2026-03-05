@@ -870,7 +870,7 @@ function ManagerView({
                         </div>
                     )}
                     <ScrollArea className={cn("border rounded-md", isRecursiveView ? "h-[500px]" : "h-72")}>
-                        {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : primaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
+                        {loadingPrimary ? <div className='p-4 text-center'><Loader2 className="animate-spin mx-auto" /></div> : filteredPrimaryItems.length === 0 ? <p className='text-center text-muted-foreground p-4'>لا توجد بيانات</p> : (
                         isRecursiveView ? (
                             <div className="p-2">
                                 {recursiveTree.map(node => (
@@ -1514,7 +1514,10 @@ export function ReferenceDataManager() {
             icon={<Workflow className="h-full w-full" />}
             disablePrimaryActions={true}
             onBack={() => setView('dashboard')}
-            primaryFilter={(item) => item.activityType === 'استشارات هندسية' || item.activityType === 'consulting'}
+            primaryFilter={(item) => {
+                const act = item.activityType || '';
+                return act.includes('استشارات') || act.includes('إستشارات') || act === 'consulting';
+            }}
         />
     }
     
@@ -1648,3 +1651,4 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
+
