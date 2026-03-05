@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import { 
     Wallet, 
     ArrowDownLeft, 
@@ -14,7 +13,8 @@ import {
     AlertCircle,
     FileText,
     PieChart,
-    ArrowRight
+    ArrowRight,
+    PlusCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -33,8 +33,6 @@ const StatCard = ({ title, value, icon, description, colorClass, loading }: any)
         </CardContent>
     </Card>
 );
-
-import { cn } from '@/lib/utils';
 
 export default function AccountingDashboardPage() {
     const { journalEntries, accounts, loading } = useAnalyticalData();
@@ -185,5 +183,3 @@ function QuickLink({ href, label }: { href: string, label: string }) {
         </Link>
     );
 }
-
-import { PlusCircle } from 'lucide-react';

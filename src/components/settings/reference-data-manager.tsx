@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -28,7 +27,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Building, FileText, ArrowRight, Workflow, Globe, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen, GitBranch, LayoutGrid } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen, GitBranch, LayoutGrid, Building, FileText, Globe, Workflow } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -1327,7 +1326,7 @@ function UnifiedTransactionTypeManager({ onBack, companyActivityTypes, loadingCo
                         placeholder="ابحث بالاسم أو نوع النشاط..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="max-w-sm"
+                        className="max-sm"
                     />
                     <Button size="sm" onClick={() => openDialog()}><PlusCircle className="ml-2 h-4 w-4" /> إضافة نوع جديد</Button>
                 </div>
@@ -1651,4 +1650,3 @@ export function ReferenceDataManager() {
         </Card>
     );
 }
-
