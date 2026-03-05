@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X, Loader2, Users } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,7 +96,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [formData.jobTitle, formData.contractType]);
 
     // ✨ محرك توليد الرموز الثنائية الذكي
-    // الـ L يثبت لعمال اليومية فقط، لتمييزهم عن العمال الثابتين
     const teamOptions = useMemo(() => {
         const deptPrefix = getDeptPrefix(formData.department);
         const finalPrefix = formData.contractType === 'day_laborer' ? `L${deptPrefix}` : deptPrefix;
@@ -286,7 +285,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         if (isSimpleLayout) {
             dataToSave.department = formData.department || 'عمالة خارجية';
             dataToSave.jobTitle = 'عامل يومية';
-            dataToSave.civilId = formData.civilId || '000000000000';
+            // FIXED: Do not default to Zeros, keep it empty if not provided to avoid duplication error.
+            dataToSave.civilId = formData.civilId || ''; 
             dataToSave.hireDate = formData.hireDate;
             dataToSave.basicSalary = 0;
 
@@ -394,6 +394,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <Label htmlFor="department-dl">القسم (التخصص)</Label>
                                 <InlineSearchList value={formData.department} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder="اختر قسم اليومية..." />
                             </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="civilId-dl">الرقم المدني (اختياري)</Label>
+                                <Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" placeholder="أدخل الرقم المدني إن وجد" />
+                            </div>
                             {isDayLaborer && (
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="dailyRate">اليومية (د.ك) <span className="text-destructive">*</span></Label>
@@ -426,7 +430,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </section>
                 )}
 
-                {/* ✨ اختيار فريق العمل الترميز الثنائي الذكي (L + الحرف) */}
                 {showTeamSelection && (
                     <section className="space-y-4 p-4 border rounded-lg bg-primary/5 animate-in fade-in slide-in-from-top-2">
                         <div className="grid gap-1.5">
