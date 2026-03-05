@@ -6,10 +6,10 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto rounded-xl border border-border">
+  <div className="relative w-full overflow-auto">
     <table
       ref={ref}
-      className={cn("w-full caption-bottom text-sm", className)}
+      className={cn("w-full caption-bottom text-sm border-separate border-spacing-y-0", className)}
       {...props}
     />
   </div>
@@ -20,7 +20,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("bg-muted/50 text-muted-foreground border-b border-border", className)} {...props} />
+  <thead ref={ref} className={cn("bg-[#F8F9FE] dark:bg-muted/50 text-muted-foreground", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 
@@ -58,7 +58,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b border-border transition-colors hover:bg-muted/30 data-[state=selected]:bg-muted",
+      "border-b border-border transition-all duration-200 hover:bg-[#F3E8FF]/30 dark:hover:bg-primary/5 data-[state=selected]:bg-muted",
       className
     )}
     {...props}
@@ -73,7 +73,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-right align-middle font-black text-xs uppercase tracking-wider text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-14 px-4 text-right align-middle font-black text-[11px] uppercase tracking-wider text-[#7209B7] dark:text-primary-foreground/70 [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -87,7 +87,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle font-medium [&:has([role=checkbox])]:pr-0", className)}
+    className={cn("p-4 align-middle font-bold text-gray-700 dark:text-foreground/90 [&:has([role=checkbox])]:pr-0", className)}
     {...props}
   />
 ))
