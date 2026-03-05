@@ -167,6 +167,7 @@ function ManagerView({
   subcontractorTypesLoading,
   transactionTypes,
   transactionTypesLoading,
+  primaryFilter,
 }: {
   primaryTitle: string;
   primarySingularTitle: string;
@@ -183,6 +184,7 @@ function ManagerView({
   subcontractorTypesLoading?: boolean;
   transactionTypes?: TransactionType[];
   transactionTypesLoading?: boolean;
+  primaryFilter?: (item: any) => boolean;
 }) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -241,13 +243,21 @@ function ManagerView({
 
   const filteredPrimaryItems = useMemo(() => {
     let items = primaryItems;
+    
+    // Apply hardcoded dept filter
     if (primaryCollectionName === 'departments') {
         if (departmentActivityFilter !== 'all') {
             items = items.filter(item => (item as any).activityTypes?.includes(departmentActivityFilter));
         }
     }
+
+    // Apply optional prop filter
+    if (primaryFilter) {
+        items = items.filter(primaryFilter);
+    }
+
     return items;
-  }, [primaryItems, primaryCollectionName, departmentActivityFilter]);
+  }, [primaryItems, primaryCollectionName, departmentActivityFilter, primaryFilter]);
 
 
   const isWorkStageView = secondaryCollectionName === 'workStages';
@@ -325,13 +335,13 @@ function ManagerView({
   };
   
   useEffect(() => {
-    const primaryExists = selectedPrimary && primaryItems.some(p => p.id === selectedPrimary.id);
-    if (!primaryExists && primaryItems.length > 0) {
-      setSelectedPrimary(primaryItems[0]);
-    } else if (primaryItems.length === 0) {
+    const primaryExists = selectedPrimary && filteredPrimaryItems.some(p => p.id === selectedPrimary.id);
+    if (!primaryExists && filteredPrimaryItems.length > 0) {
+      setSelectedPrimary(filteredPrimaryItems[0]);
+    } else if (filteredPrimaryItems.length === 0) {
       setSelectedPrimary(null);
     }
-  }, [primaryItems, selectedPrimary]);
+  }, [filteredPrimaryItems, selectedPrimary]);
 
   useEffect(() => {
     fetchSecondaryItems();
@@ -1504,6 +1514,7 @@ export function ReferenceDataManager() {
             icon={<Workflow className="h-full w-full" />}
             disablePrimaryActions={true}
             onBack={() => setView('dashboard')}
+            primaryFilter={(item) => item.activityType === 'consulting'}
         />
     }
     
