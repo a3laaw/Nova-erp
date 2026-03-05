@@ -26,25 +26,32 @@ export default function WarehousesPage() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Card>
-                <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="space-y-1">
-                        <CardTitle className="text-2xl font-black flex items-center gap-3 text-foreground">
-                            <Building2 className="text-primary h-7 w-7" />
-                            إدارة المستودعات والأفرع
-                        </CardTitle>
-                        <CardDescription>تعريف أماكن التخزين الرئيسية، الأفرع، ومخازن المواقع التابعة للمشاريع.</CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => router.back()}>
-                            <ArrowRight className="ml-2 h-4 w-4" /> العودة
-                        </Button>
-                        <Button onClick={handleAdd} className="font-bold gap-2">
-                            <PlusCircle className="h-4 w-4" /> إضافة مستودع/فرع
-                        </Button>
+            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-indigo-50 dark:from-card dark:to-card">
+                <CardHeader className="pb-8 px-8 border-b">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-indigo-600/10 rounded-2xl text-indigo-600 shadow-inner">
+                                <Building2 className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-2xl font-black">إدارة المستودعات والأفرع</CardTitle>
+                                <CardDescription className="text-base font-medium">تعريف أماكن التخزين، الأفرع، ومخازن المواقع التابعة للمشاريع.</CardDescription>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="ghost" onClick={() => router.back()} className="rounded-xl font-bold">
+                                <ArrowRight className="ml-2 h-4 w-4" /> العودة
+                            </Button>
+                            <Button onClick={handleAdd} className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-indigo-100">
+                                <PlusCircle className="h-5 w-5" /> إضافة مستودع جديد
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
-                <CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+                <CardContent className="pt-8">
                     <WarehouseList onEdit={handleEdit} />
                 </CardContent>
             </Card>
