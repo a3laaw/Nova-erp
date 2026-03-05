@@ -1514,7 +1514,7 @@ export function ReferenceDataManager() {
             icon={<Workflow className="h-full w-full" />}
             disablePrimaryActions={true}
             onBack={() => setView('dashboard')}
-            primaryFilter={(item) => item.activityType === 'consulting'}
+            primaryFilter={(item) => item.activityType === 'استشارات هندسية' || item.activityType === 'consulting'}
         />
     }
     
