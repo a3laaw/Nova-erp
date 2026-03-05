@@ -1,30 +1,49 @@
+
 import { NextResponse } from 'next/server';
-import { ai } from '@/ai/genkit';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @fileOverview مسار تشخيصي للتحقق من حالة اتصال Vertex AI في منطقة us-central1.
+ * @fileOverview مسار تشخيصي محدث للتحقق من حالة اتصال الذكاء الاصطناعي.
+ * يستخدم المكتبة الرسمية المباشرة لضمان استقرار الفحص.
+ * ملاحظة للمدير: تأكد من تفعيل "Vertex AI API" في Google Cloud Console.
  */
+
+const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
+
 export async function GET() {
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    return NextResponse.json({ 
+      success: false, 
+      error: "API Key missing",
+      details: "يرجى التأكد من إضافة GOOGLE_GENAI_API_KEY في ملف الـ .env"
+    }, { status: 500 });
+  }
+
   try {
-    const response = await ai.generate({
-      model: 'vertexai/gemini-1.5-flash',
-      prompt: 'Hello, are you active in us-central1?',
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    // نستخدم فلاش 1.5 لسرعة الفحص وتوفير التكلفة
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const result = await model.generateContent("Hello, are you active and ready to process ERP commands?");
+    const response = await result.response;
+    const text = response.text();
 
     return NextResponse.json({ 
       success: true,
-      status: 'Vertex AI is Active',
-      region: 'us-central1',
+      status: 'AI Engine is Active',
+      engine: 'Google Generative AI (Direct SDK)',
       model: 'gemini-1.5-flash',
-      response: response.text,
-      help: 'إذا واجهت أي مشاكل، تأكد من تفعيل Vertex AI API في مشروع Google Cloud الخاص بك.'
+      aiResponse: text,
+      setupTip: 'إذا كنت تستخدم بيئة Vertex AI في الإنتاج، تأكد من تفعيل Vertex AI API من Google Cloud Console.'
     });
   } catch (error: any) {
-    console.error("Test AI Error:", error);
+    console.error("Test AI Diagnostic Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: error.message,
-        details: 'تأكد من إعداد صلاحيات الخدمة (Service Account) أو ADC بشكل صحيح للوصول إلى Vertex AI.'
+        details: 'تأكد من صلاحية مفتاح الـ API وتفعيل الخدمات اللازمة في كونسول جوجل.'
     }, { status: 500 });
   }
 }
