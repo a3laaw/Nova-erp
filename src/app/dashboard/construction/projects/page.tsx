@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -23,11 +22,6 @@ import { Input } from '@/components/ui/input';
 import { ProjectsList } from '@/components/construction/projects-list';
 import { cn } from '@/lib/utils';
 
-/**
- * لوحة المشاريع التنفيذية:
- * تم تبسيطها لتكون مركزة فقط على إدارة المشاريع القائمة في المواقع.
- * عروض الأسعار والعقود تم نقلها إلى الأقسام المخصصة لها في القائمة الجانبية.
- */
 export default function ExecutiveProjectsPage() {
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -70,7 +64,7 @@ export default function ExecutiveProjectsPage() {
 
             {/* Projects Content */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
+                <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
                     <CardHeader className="bg-muted/10 border-b">
                         <div className="flex items-center justify-between">
                             <div>

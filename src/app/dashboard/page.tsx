@@ -17,9 +17,8 @@ import {
     TrendingUp,
     LayoutGrid,
     PlusCircle,
-    AlertTriangle,
     ShieldAlert,
-    Landmark
+    History
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { useSubscription, useFirebase } from '@/firebase';
@@ -31,8 +30,8 @@ import { DataAnomalyAlert } from '@/components/dashboard/data-anomaly-alert';
 import { TaskPrioritization } from '@/components/dashboard/task-prioritization';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import type { RecurringObligation, Account } from '@/lib/types';
-import { isPast, addDays } from 'date-fns';
+import type { RecurringObligation } from '@/lib/types';
+import { addDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
 export default function DashboardPage() {
@@ -44,7 +43,6 @@ export default function DashboardPage() {
   const liquidityAlert = useMemo(() => {
     if (loading || !obligations) return null;
 
-    // 1. حساب رصيد البنك الحالي
     const bankAccountIds = accounts.filter(a => a.code.startsWith('110103')).map(a => a.id);
     const bankBalance = journalEntries
         .filter(e => e.status === 'posted')
@@ -52,7 +50,6 @@ export default function DashboardPage() {
         .filter(l => bankAccountIds.includes(l.accountId))
         .reduce((sum, l) => sum + (l.debit || 0) - (l.credit || 0), 0);
 
-    // 2. حساب الالتزامات المستحقة خلال الـ 48 ساعة القادمة
     const horizon = addDays(new Date(), 2);
     const upcomingObs = obligations.filter(ob => {
         const dueDate = toFirestoreDate(ob.dueDate);
@@ -87,9 +84,41 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10" dir="rtl">
+        {/* الترويسة الرئيسية للنظام */}
+        <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+            <CardHeader className="pb-8 px-8">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                    <div className="space-y-1 text-center lg:text-right">
+                        <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3">
+                            <LayoutGrid className="text-primary h-8 w-8" />
+                            لوحة التحكم المركزية
+                        </CardTitle>
+                        <CardDescription className="text-base font-medium">
+                            مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
+                        </CardDescription>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2">
+                            <Link href="/dashboard/notifications">
+                                <History className="h-5 w-5" />
+                                سجل التنبيهات
+                            </Link>
+                        </Button>
+                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-primary/20">
+                            <Link href="/dashboard/clients/new">
+                                <PlusCircle className="h-5 w-5" />
+                                إضافة عميل جديد
+                            </Link>
+                        </Button>
+                    </div>
+                </div>
+            </CardHeader>
+        </Card>
+
         {/* نظام التنبيه الاستباقي لعجز السيولة */}
         {liquidityAlert && (
-            <Card className="border-none shadow-2xl bg-gradient-to-br from-red-600 to-red-800 text-white rounded-[2.5rem] overflow-hidden animate-pulse">
+            <Card className="border-none shadow-2xl bg-gradient-to-br from-red-600 to-red-800 text-white rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-500">
                 <CardHeader className="pb-2">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
@@ -104,17 +133,17 @@ export default function DashboardPage() {
                         <Badge variant="outline" className="text-white border-white/40 font-black">إدارة المخاطر</Badge>
                     </div>
                 </CardHeader>
-                <CardContent className="pt-4 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="space-y-1 text-center md:text-right">
+                <CardContent className="pt-4 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-right">
+                    <div className="space-y-1">
                         <p className="text-xs uppercase font-bold opacity-70">رصيد البنك الحالي</p>
                         <p className="text-3xl font-black font-mono">{formatCurrency(liquidityAlert.bankBalance)}</p>
                     </div>
                     <div className="h-12 w-px bg-white/20 hidden md:block" />
-                    <div className="space-y-1 text-center md:text-right">
+                    <div className="space-y-1">
                         <p className="text-xs uppercase font-bold opacity-70">المطلوب سداده</p>
                         <p className="text-3xl font-black font-mono">{formatCurrency(liquidityAlert.totalUpcoming)}</p>
                     </div>
-                    <div className="bg-white/10 p-4 rounded-3xl border border-white/20 text-center">
+                    <div className="bg-white/10 p-4 rounded-3xl border border-white/20">
                         <p className="text-xs font-bold mb-1">العجز المتوقع</p>
                         <p className="text-2xl font-black text-yellow-300 font-mono">{formatCurrency(liquidityAlert.shortfall)}</p>
                     </div>
@@ -130,7 +159,7 @@ export default function DashboardPage() {
 
         <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
             <div className="grid gap-6 md:grid-cols-2 xl:col-span-3">
-                <Card className="border-none shadow-sm bg-gradient-to-br from-white to-blue-50/50 rounded-3xl">
+                <Card className="border-none shadow-sm bg-white rounded-3xl hover-lift">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
                             إجمالي التدفقات الداخلة
@@ -143,16 +172,14 @@ export default function DashboardPage() {
                                 {formatCurrency(stats?.totalRevenue || 0)}
                             </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">
-                            بناءً على القيود المرحلة في النظام
-                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">بناءً على القيود المرحلة</p>
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-gradient-to-br from-white to-orange-50/50 rounded-3xl">
+                <Card className="border-none shadow-sm bg-white rounded-3xl hover-lift">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
-                            المواقع النشطة (قيد التنفيذ)
+                            المواقع النشطة
                         </CardTitle>
                         <Briefcase className="h-5 w-5 text-orange-600 opacity-50" />
                     </CardHeader>
@@ -162,13 +189,11 @@ export default function DashboardPage() {
                                 {stats?.activeProjectsCount}
                             </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">
-                            مواقع تخضع للإشراف واللوجستيات حالياً
-                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">مواقع تخضع للإشراف حالياً</p>
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm rounded-3xl">
+                <Card className="border-none shadow-sm bg-white rounded-3xl hover-lift">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">قاعدة بيانات العملاء</CardTitle>
                         <Users className="h-5 w-5 text-muted-foreground opacity-50" />
@@ -179,21 +204,19 @@ export default function DashboardPage() {
                                 {stats?.totalClientsCount}
                             </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">
-                            إجمالي الملفات المسجلة في النظام
-                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">إجمالي الملفات المسجلة</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-none shadow-sm bg-primary text-primary-foreground rounded-3xl">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold opacity-80">كشف يوميات المواقع</CardTitle>
+                        <CardTitle className="text-sm font-bold opacity-80 text-white">كشف يوميات المواقع</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-sm font-bold leading-relaxed mb-4">
+                        <div className="text-sm font-bold leading-relaxed mb-4 text-white/90">
                             تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.
                         </div>
-                        <Button asChild variant="secondary" className="w-full font-black rounded-xl">
+                        <Button asChild variant="secondary" className="w-full font-black rounded-xl h-10">
                             <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
                         </Button>
                     </CardContent>

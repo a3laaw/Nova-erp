@@ -19,71 +19,74 @@ export default function ClientsPage() {
     const searchParams = useSearchParams();
     const [view, setView] = useState<'registered' | 'prospective'>('registered');
 
-    // Handle initial view and changes from URL params (e.g., ?view=prospective)
     useEffect(() => {
         const viewParam = searchParams.get('view');
-        if (viewParam === 'prospective') {
-            setView('prospective');
-        } else if (viewParam === 'registered') {
-            setView('registered');
-        }
+        if (viewParam === 'prospective') setView('prospective');
+        else if (viewParam === 'registered') setView('registered');
     }, [searchParams]);
 
     return (
-        <Card dir="rtl" className="border-none shadow-sm overflow-hidden">
-            <CardHeader className="flex flex-col md:flex-row items-center justify-between gap-4 border-b bg-muted/10 pb-6 px-6">
-                <div className="space-y-1">
-                    <CardTitle className="text-2xl font-black flex items-center gap-2">
+        <div className="space-y-6" dir="rtl">
+            <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+                <CardHeader className="pb-8 px-8">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                        <div className="space-y-1 text-center lg:text-right">
+                            <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3">
+                                {view === 'registered' ? (
+                                    <Users className="text-primary h-8 w-8" />
+                                ) : (
+                                    <UserSearch className="text-orange-600 h-8 w-8" />
+                                )}
+                                {view === 'registered' ? 'إدارة ملفات العملاء' : 'متابعة العملاء المحتملين'}
+                            </CardTitle>
+                            <CardDescription className="text-base font-medium">
+                                {view === 'registered' 
+                                    ? 'مركز التحكم في بيانات العملاء المتعاقدين وملفاتهم الفنية.' 
+                                    : 'تتبع زوار المكتب والزيارات الأولية لتحويلهم إلى تعاقدات رسمية.'}
+                            </CardDescription>
+                        </div>
+                        
+                        <div className="flex bg-muted p-1.5 rounded-[1.5rem] border shadow-inner">
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setView('registered')}
+                                className={cn(
+                                    "rounded-xl px-8 h-10 font-bold transition-all gap-2", 
+                                    view === 'registered' && "shadow-md bg-white hover:bg-white text-primary dark:bg-primary dark:text-white"
+                                )}
+                            >
+                                <Users className="h-4 w-4" />
+                                الملفات المسجلة
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setView('prospective')}
+                                className={cn(
+                                    "rounded-xl px-8 h-10 font-bold transition-all gap-2", 
+                                    view === 'prospective' && "shadow-md bg-white hover:bg-white text-orange-600 dark:bg-orange-600 dark:text-white"
+                                )}
+                            >
+                                <UserSearch className="h-4 w-4" />
+                                العملاء المحتملون
+                            </Button>
+                        </div>
+                    </div>
+                </CardHeader>
+            </Card>
+
+            <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+                <CardContent className="pt-8">
+                    <div className="transition-all duration-500 animate-in fade-in zoom-in-95">
                         {view === 'registered' ? (
-                            <Users className="text-primary h-6 w-6" />
+                            <RegisteredClientsList />
                         ) : (
-                            <UserSearch className="text-orange-600 h-6 w-6" />
+                            <ProspectiveClientsList />
                         )}
-                        {view === 'registered' ? 'إدارة ملفات العملاء' : 'متابعة العملاء المحتملين'}
-                    </CardTitle>
-                    <CardDescription className="text-sm font-medium">
-                        {view === 'registered' 
-                            ? 'عرض وإدارة بيانات العملاء الذين لديهم ملفات رسمية وعقود.' 
-                            : 'تتبع الأشخاص المهتمين الذين قاموا بزيارات أولية ولم يفتحوا ملفات بعد.'}
-                    </CardDescription>
-                </div>
-                
-                <div className="flex bg-muted p-1 rounded-xl border shadow-inner">
-                    <Button 
-                        variant={view === 'registered' ? 'default' : 'ghost'} 
-                        size="sm" 
-                        onClick={() => setView('registered')}
-                        className={cn(
-                            "rounded-lg px-6 font-bold transition-all gap-2", 
-                            view === 'registered' && "shadow-sm bg-white hover:bg-white text-primary dark:bg-primary dark:text-white"
-                        )}
-                    >
-                        <Users className="h-4 w-4" />
-                        الملفات المسجلة
-                    </Button>
-                    <Button 
-                        variant={view === 'prospective' ? 'default' : 'ghost'} 
-                        size="sm" 
-                        onClick={() => setView('prospective')}
-                        className={cn(
-                            "rounded-lg px-6 font-bold transition-all gap-2", 
-                            view === 'prospective' && "shadow-sm bg-white hover:bg-white text-orange-600 dark:bg-orange-600 dark:text-white"
-                        )}
-                    >
-                        <UserSearch className="h-4 w-4" />
-                        العملاء المحتملون
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="pt-6 px-6">
-                <div className="transition-all duration-300 animate-in fade-in zoom-in-95">
-                    {view === 'registered' ? (
-                        <RegisteredClientsList />
-                    ) : (
-                        <ProspectiveClientsList />
-                    )}
-                </div>
-            </CardContent>
-        </Card>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
     );
 }
