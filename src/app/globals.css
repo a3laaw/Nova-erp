@@ -7,64 +7,47 @@
 
 @layer base {
   :root {
-    /* Elegant Purple (Barbell) Light Theme */
-    --background: 258 100% 98%; /* #f8f5ff */
-    --foreground: 244 47% 20%; /* #1e1b4b */
+    /* Nova ERP Purple Suite - Minimalist SaaS Theme */
+    --background: 0 0% 98%; /* Soft Greyish White */
+    --foreground: 244 47% 15%; /* Deep Slate */
     
     --card: 0 0% 100%;
-    --card-foreground: 244 47% 20%;
+    --card-foreground: 244 47% 15%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 244 47% 20%;
+    --popover-foreground: 244 47% 15%;
     
-    --primary: 262 83% 58%; /* #7c3aed */
+    --primary: 262 83% 58%; /* Vibrant Purple #7C3AED */
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 262 83% 95%;
+    --secondary: 262 83% 96%; /* Very Faint Lavender */
     --secondary-foreground: 262 70% 30%;
     
-    --muted: 262 20% 92%;
-    --muted-foreground: 244 10% 40%;
+    --muted: 240 5% 96%; /* Very Soft Grey */
+    --muted-foreground: 240 5% 45%;
     
-    --accent: 262 83% 92%;
+    --accent: 262 83% 94%;
     --accent-foreground: 262 70% 30%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 262 20% 90%;
-    --input: 262 20% 90%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
     --ring: 262 83% 58%;
     
-    --radius: 0.75rem;
+    /* Uniform Corner Radius */
+    --radius: 1rem; /* 16px */
 
-    /* Sidebar Variables */
+    /* Streamlined Sidebar Variables */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 244 10% 40%;
+    --sidebar-foreground: 244 10% 30%;
     --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 83% 96%;
-    --sidebar-accent-foreground: 262 70% 30%;
-    --sidebar-border: 262 20% 90%;
+    --sidebar-accent: 262 83% 97%;
+    --sidebar-accent-foreground: 262 83% 58%;
+    --sidebar-border: 240 6% 95%;
     --sidebar-ring: 262 83% 58%;
-  }
-
-  /* Purple Salmon Theme Override */
-  [data-theme='purple-salmon'] {
-    --primary: 263 70% 50%; /* #6d28d9 */
-    --primary-foreground: 0 0% 100%;
-    
-    --accent: 356 94% 92%; /* #fed7da */
-    --accent-foreground: 263 70% 20%;
-    
-    --secondary: 356 94% 92%;
-    --secondary-foreground: 263 70% 20%;
-    
-    --sidebar-accent: 356 94% 92%;
-    --sidebar-accent-foreground: 263 70% 20%;
-    --sidebar-primary: 263 70% 50%;
-    
-    --ring: 263 70% 50%;
   }
 }
 
@@ -81,15 +64,20 @@
 
 @layer utilities {
     .glass-surface {
-        @apply bg-white/80 backdrop-blur-md border border-purple-100 shadow-xl;
+        @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm;
     }
     
     .hover-lift {
-        @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:scale-[1.01];
+        @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
     }
 
     [data-sidebar="sidebar"] {
-        @apply border-l border-border bg-white shadow-sm !important;
+        @apply border-l border-sidebar-border bg-white shadow-sm !important;
+    }
+
+    /* Table Customizations */
+    .table-header-lavender {
+        @apply bg-[#F3E8FF]/40 text-[#7209B7] font-black uppercase text-[11px] tracking-wider;
     }
 
     input[type=number]::-webkit-inner-spin-button,
@@ -97,39 +85,14 @@
       -webkit-appearance: none;
       margin: 0;
     }
-    input[type=number] {
-      -moz-appearance: textfield;
-    }
-
+    
     @media print {
         .no-print { display: none !important; }
         main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
-        .printable-wrapper { box-shadow: none !important; border: none !important; }
     }
 }
 
-/* Fix for dropdown/popover click issues */
-[data-radix-popper-content-wrapper] {
-  z-index: 99999 !important;
-  pointer-events: auto !important;
-}
-
-[role="listbox"],
-[role="menu"],
-[role="dialog"],
-[data-state="open"][data-radix-select-content],
-[data-state="open"][data-radix-popover-content] {
-  pointer-events: auto !important;
-  z-index: 99999 !important;
-}
-
-[role="option"],
-[role="menuitem"],
-[cmdk-item] {
-  cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-.radix-themes {
-  pointer-events: auto !important;
+/* Global Transition for smoother SPA feel */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 }
