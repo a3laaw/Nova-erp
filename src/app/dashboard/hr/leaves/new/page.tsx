@@ -16,10 +16,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Upload, AlertCircle } from 'lucide-react';
+import { Loader2, Save, Upload, AlertCircle, Sparkles, Clock } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, addDoc, serverTimestamp, query, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays, calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -29,7 +29,9 @@ import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-
+import { toFirestoreDate } from '@/services/date-converter';
+import { format, formatDistanceToNow } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 export default function NewLeaveRequestPage() {
     const { firestore } = useFirebase();
@@ -48,6 +50,10 @@ export default function NewLeaveRequestPage() {
     const [notes, setNotes] = useState('');
     const [passportReceived, setPassportReceived] = useState(false);
     
+    // ✨ محرك جلب آخر إجازة (Decision Support)
+    const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
+    const [loadingContext, setLoadingContext] = useState(false);
+
     // --- Double-Save Guard System ---
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
@@ -57,6 +63,39 @@ export default function NewLeaveRequestPage() {
             setSelectedEmployeeId(currentUser.employeeId);
         }
     }, [currentUser]);
+
+    // ✨ محرك جلب السياق عند اختيار موظف
+    useEffect(() => {
+        if (!firestore || !selectedEmployeeId) {
+            setLastLeaveInfo(null);
+            return;
+        }
+
+        const fetchLastLeave = async () => {
+            setLoadingContext(true);
+            try {
+                const q = query(
+                    collection(firestore, 'leaveRequests'),
+                    where('employeeId', '==', selectedEmployeeId),
+                    where('status', 'in', ['approved', 'on-leave', 'returned']),
+                    orderBy('endDate', 'desc'),
+                    limit(1)
+                );
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    setLastLeaveInfo({ id: snap.docs[0].id, ...snap.docs[0].data() } as LeaveRequest);
+                } else {
+                    setLastLeaveInfo(null);
+                }
+            } catch (e) {
+                console.error("Context fetch failed:", e);
+            } finally {
+                setLoadingContext(false);
+            }
+        };
+
+        fetchLastLeave();
+    }, [firestore, selectedEmployeeId]);
 
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
@@ -69,8 +108,6 @@ export default function NewLeaveRequestPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        // 1. Prevent duplicate submission via ref
         if (savingRef.current) return;
 
         if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
@@ -96,7 +133,6 @@ export default function NewLeaveRequestPage() {
             }
         }
 
-        // 2. Activate saving state and ref
         savingRef.current = true;
         setIsSaving(true);
 
@@ -116,15 +152,9 @@ export default function NewLeaveRequestPage() {
             };
 
             await addDoc(collection(firestore, 'leaveRequests'), newRequest);
-            
             toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
-            
-            // 3. Immediate redirect
             router.push('/dashboard/hr/leaves');
-            router.refresh();
-
         } catch (error) {
-            // Re-enable on error
             savingRef.current = false;
             setIsSaving(false);
             const message = error instanceof Error ? error.message : "فشل حفظ الطلب.";
@@ -136,7 +166,7 @@ export default function NewLeaveRequestPage() {
         <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
                  <CardHeader className="bg-primary/5 pb-8 border-b">
-                    <CardTitle className="text-2xl font-black">طلب إجازة جديد</CardTitle>
+                    <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>
                     <CardDescription className="text-base">
                       سيتم إرسال الطلب للموافقة من قبل مدير النظام أو قسم الموارد البشرية.
                     </CardDescription>
@@ -155,6 +185,20 @@ export default function NewLeaveRequestPage() {
                         />
                       </div>
                     )}
+
+                    {/* ✨ عرض سياق القرار الذكي عند الإنشاء */}
+                    {lastLeaveInfo && (
+                        <Alert className="rounded-2xl border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-2 duration-500">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                            <AlertTitle className="text-primary font-black text-sm">سياق القرار (HR Insights)</AlertTitle>
+                            <AlertDescription className="mt-1 text-xs font-bold leading-relaxed">
+                                كانت آخر إجازة لهذا الموظف من نوع <strong>{lastLeaveInfo.leaveType === 'Annual' ? 'سنوية' : 'مرضية/طارئة'}</strong>، 
+                                انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
+                                أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong> تقريباً.
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
                         <Label htmlFor="leaveType" className="font-bold">نوع الإجازة <span className="text-destructive">*</span></Label>

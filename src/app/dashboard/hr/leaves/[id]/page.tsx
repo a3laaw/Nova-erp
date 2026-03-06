@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -124,7 +123,6 @@ export default function LeaveRequestDetailsPage() {
         });
     };
 
-    // ✨ محرك بدء الإجازة مع التاريخ الفعلي والتحقق من البيانات
     const handleStartLeave = async () => {
         if (!leaveRequest || !firestore || !actualDate || !leaveRequest.id) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'تأكد من اختيار التاريخ وتوفر بيانات الموظف.' });
@@ -133,28 +131,20 @@ export default function LeaveRequestDetailsPage() {
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            
-            // التحقق من وجود الموظف
             const empRef = doc(firestore, 'employees', leaveRequest.employeeId);
-            const empSnap = await getDocs(query(collection(firestore, 'employees'), where('__name__', '==', leaveRequest.employeeId), limit(1)));
-            if (empSnap.empty) throw new Error("الموظف غير موجود في النظام.");
-
             batch.update(doc(firestore, 'leaveRequests', leaveRequest.id), { 
                 status: 'on-leave',
                 actualStartDate: Timestamp.fromDate(actualDate)
             });
             batch.update(empRef, { status: 'on-leave' });
-            
             await batch.commit();
             toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف.' });
             setIsStartDialogOpen(false);
         } catch (e: any) {
-            console.error("Start leave error:", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل بدء الإجازة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل بدء الإجازة.' });
         } finally { setIsProcessing(false); }
     };
 
-    // ✨ محرك العودة للعمل مع التاريخ الفعلي والتحقق من البيانات
     const handleReturnToWork = async () => {
         if (!leaveRequest || !firestore || !actualDate || !leaveRequest.id) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'البيانات المطلوبة للعودة غير متوفرة.' });
@@ -169,11 +159,10 @@ export default function LeaveRequestDetailsPage() {
             });
             batch.update(doc(firestore, 'employees', leaveRequest.employeeId), { status: 'active' });
             await batch.commit();
-            toast({ title: 'تمت العودة', description: 'تم تسجيل عودة الموظف للعمل وإغلاق الملف.' });
+            toast({ title: 'تمت المباشرة', description: 'تم تسجيل عودة الموظف للعمل وإغلاق الملف.' });
             setIsReturnDialogOpen(false);
         } catch (e: any) {
-            console.error("Return work error:", e);
-            toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل العودة للعمل.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة للعمل.' });
         } finally { setIsProcessing(false); }
     };
 
@@ -204,14 +193,12 @@ export default function LeaveRequestDetailsPage() {
                 <div className="flex gap-3">
                     {leaveRequest.status === 'approved' && (
                         <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl font-black gap-2">
-                            <PlaneTakeoff className="h-4 w-4"/>
-                            تسجيل مغادرة الموظف
+                            <PlaneTakeoff className="h-4 w-4"/> تسجيل مغادرة الموظف
                         </Button>
                     )}
                     {leaveRequest.status === 'on-leave' && (
                         <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 rounded-xl font-black gap-2">
-                            <Home className="h-4 w-4"/>
-                            إشعار عودة للعمل
+                            <Home className="h-4 w-4"/> إشعار عودة للعمل
                         </Button>
                     )}
                     <Button onClick={handlePrint} variant="outline" className="bg-white shadow-sm rounded-xl font-bold gap-2">

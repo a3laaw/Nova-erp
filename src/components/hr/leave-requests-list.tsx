@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -75,9 +74,9 @@ export function LeaveRequestsList() {
   const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-  // ✨ سياق القرار الذكي للـ HR
+  // ✨ سياق القرار الذكي للـ HR (Smart Context)
   const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
-  const [loadingContext, setLoadingHistory] = useState(false);
+  const [loadingContext, setLoadingContext] = useState(false);
 
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: leaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
@@ -94,14 +93,14 @@ export function LeaveRequestsList() {
     }
 
     const fetchContext = async () => {
-        setLoadingHistory(true);
+        setLoadingContext(true);
         try {
             const q = query(
                 collection(firestore, 'leaveRequests'),
                 where('employeeId', '==', targetReq.employeeId),
                 where('status', 'in', ['approved', 'on-leave', 'returned']),
                 orderBy('endDate', 'desc'),
-                limit(5)
+                limit(1)
             );
             const snap = await getDocs(q);
             const filtered = snap.docs
@@ -111,9 +110,9 @@ export function LeaveRequestsList() {
             if (filtered.length > 0) setLastLeaveInfo(filtered[0]);
             else setLastLeaveInfo(null);
         } catch (e) {
-            console.error(e);
+            console.error("Error fetching context:", e);
         } finally {
-            setLoadingHistory(false);
+            setLoadingContext(false);
         }
     };
 
@@ -347,7 +346,7 @@ export function LeaveRequestsList() {
 
   const handleStartLeave = async () => {
     if (!requestToStart || !firestore || !actualDate) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات المطلوبة لتسجيل المغادرة غير متوفرة.' });
+        toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'البيانات المطلوبة لتسجيل المغادرة غير متوفرة.' });
         return;
     }
     setIsProcessingAction(true);
@@ -382,7 +381,7 @@ export function LeaveRequestsList() {
 
   const handleReturnToWork = async () => {
     if (!requestToReturn || !firestore || !actualDate) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات المطلوبة لتسجيل العودة غير متوفرة.' });
+        toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'البيانات المطلوبة لتسجيل العودة غير متوفرة.' });
         return;
     }
     setIsProcessingAction(true);
@@ -491,7 +490,7 @@ export function LeaveRequestsList() {
                                     {req.status === 'pending' && (
                                         <>
                                             <DropdownMenuItem onClick={() => setRequestToApprove(req)} className="text-green-600 gap-2 font-bold">
-                                                <Check className="h-4 w-4" /> موافقة
+                                                <CheckCircle className="h-4 w-4" /> موافقة
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => setRequestToReject(req)} className="text-red-600 gap-2 font-bold">
                                                 <X className="h-4 w-4" /> رفض الطلب
@@ -596,6 +595,7 @@ export function LeaveRequestsList() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
 
+            {/* ✨ عرض سياق القرار الذكي في نافذة الموافقة */}
             {lastLeaveInfo && (
                 <div className="mt-4 p-4 border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl space-y-2 animate-in zoom-in-95">
                     <p className="text-xs font-black text-primary flex items-center gap-2 uppercase tracking-widest">
@@ -603,7 +603,8 @@ export function LeaveRequestsList() {
                     </p>
                     <p className="text-xs font-bold leading-relaxed text-slate-700">
                         كان الموظف في إجازة <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong> 
-                        انتهت منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong>.
+                        انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
+                        أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong>.
                     </p>
                 </div>
             )}
