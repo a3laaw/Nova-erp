@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, getDocs, where, limit } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, getDocs, where, limit, Timestamp } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -131,8 +131,8 @@ export function LeaveRequestsList() {
     try {
         await deleteDoc(doc(firestore, 'leaveRequests', requestToDelete.id!));
         toast({ title: 'نجاح', description: 'تم حذف طلب الإجازة بنجاح.' });
-    } catch (e) {
-        console.error("Error deleting leave request:", e);
+    } catch (error) {
+        console.error("Error deleting leave request:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف طلب الإجازة.' });
     } finally {
         setIsDeleting(false);
@@ -147,7 +147,7 @@ export function LeaveRequestsList() {
     const batch = writeBatch(firestore);
 
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToApprove.id);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToApprove.id!);
         batch.update(leaveRef, {
             status: 'approved',
             approvedBy: currentUser.id,
@@ -199,7 +199,7 @@ export function LeaveRequestsList() {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id!);
         await updateDoc(leaveRef, {
             status: 'rejected',
             rejectionReason: rejectionReason,
@@ -234,7 +234,7 @@ export function LeaveRequestsList() {
     const batch = writeBatch(firestore);
 
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoApproval.id);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoApproval.id!);
         batch.update(leaveRef, { status: 'pending' });
 
         const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
@@ -276,7 +276,7 @@ export function LeaveRequestsList() {
     if (!requestToUndoRejection || !firestore) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoRejection.id);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoRejection.id!);
         await updateDoc(leaveRef, { status: 'pending', rejectionReason: null });
         toast({ title: 'نجاح', description: 'تم التراجع عن الرفض.' });
     } catch (e) {
@@ -329,7 +329,7 @@ export function LeaveRequestsList() {
         };
         batch.set(payslipRef, payslipData);
         
-        const leaveRef = doc(firestore, 'leaveRequests', requestToPay.id);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToPay.id!);
         batch.update(leaveRef, { isSalaryPaid: true });
 
         await batch.commit();
@@ -345,26 +345,34 @@ export function LeaveRequestsList() {
     }
   };
 
-  // ✨ محرك المغادرة وبدء الإجازة (مع مرونة التاريخ الفعلي)
   const handleStartLeave = async () => {
-    if (!requestToStart || !firestore || !actualDate) return;
+    if (!requestToStart || !firestore || !actualDate) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات المطلوبة لتسجيل المغادرة غير متوفرة.' });
+        return;
+    }
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
         
-        // 1. تحديث حالة الطلب مع تخزين تاريخ المغادرة الفعلي
-        batch.update(doc(firestore, 'leaveRequests', requestToStart.id), { 
+        const requestRef = doc(firestore, 'leaveRequests', requestToStart.id!);
+        const employeeRef = doc(firestore, 'employees', requestToStart.employeeId);
+
+        // التأكد من وجود الموظف قبل التحديث
+        const empSnap = await getDocs(query(collection(firestore, 'employees'), where('__name__', '==', requestToStart.employeeId), limit(1)));
+        if (empSnap.empty) throw new Error("الموظف غير موجود في النظام.");
+
+        batch.update(requestRef, { 
             status: 'on-leave',
             actualStartDate: Timestamp.fromDate(actualDate)
         });
         
-        // 2. تحديث حالة الموظف
-        batch.update(doc(firestore, 'employees', requestToStart.employeeId), { status: 'on-leave' });
+        batch.update(employeeRef, { status: 'on-leave' });
         
         await batch.commit();
         toast({ title: 'تم تسجيل المغادرة', description: `تم توثيق مغادرة الموظف بتاريخ ${format(actualDate, 'dd/MM/yyyy')}.` });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل بدء الإجازة.' });
+    } catch (e: any) {
+        console.error("Start leave error:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل بدء الإجازة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToStart(null);
@@ -372,26 +380,30 @@ export function LeaveRequestsList() {
     }
   };
 
-  // ✨ محرك العودة ومباشرة العمل (مع مرونة التاريخ الفعلي)
   const handleReturnToWork = async () => {
-    if (!requestToReturn || !firestore || !actualDate) return;
+    if (!requestToReturn || !firestore || !actualDate) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات المطلوبة لتسجيل العودة غير متوفرة.' });
+        return;
+    }
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
         
-        // 1. إغلاق ملف الإجازة مع تخزين تاريخ المباشرة الفعلي
-        batch.update(doc(firestore, 'leaveRequests', requestToReturn.id), { 
+        const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id!);
+        const employeeRef = doc(firestore, 'employees', requestToReturn.employeeId);
+
+        batch.update(requestRef, { 
             status: 'returned',
             actualReturnDate: Timestamp.fromDate(actualDate)
         });
         
-        // 2. إعادة تفعيل الموظف
-        batch.update(doc(firestore, 'employees', requestToReturn.employeeId), { status: 'active' });
+        batch.update(employeeRef, { status: 'active' });
         
         await batch.commit();
         toast({ title: 'تمت المباشرة', description: `تم توثيق عودة الموظف للعمل بتاريخ ${format(actualDate, 'dd/MM/yyyy')}.` });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة للعمل.' });
+    } catch (e: any) {
+        console.error("Return to work error:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل العودة للعمل.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToReturn(null);
@@ -457,7 +469,7 @@ export function LeaveRequestsList() {
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent dir="rtl" className="rounded-xl">
+                        <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
                             <DropdownMenuLabel>إجراءات الطلب</DropdownMenuLabel>
                              {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                                 <>
@@ -570,7 +582,6 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ✨ باقي النوافذ كما هي... */}
       <AlertDialog open={!!requestToApprove} onOpenChange={() => setRequestToApprove(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl max-w-lg">
             <AlertDialogHeader>

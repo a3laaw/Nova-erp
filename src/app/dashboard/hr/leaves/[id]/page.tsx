@@ -124,32 +124,46 @@ export default function LeaveRequestDetailsPage() {
         });
     };
 
-    // ✨ محرك بدء الإجازة مع التاريخ الفعلي
+    // ✨ محرك بدء الإجازة مع التاريخ الفعلي والتحقق من البيانات
     const handleStartLeave = async () => {
-        if (!leaveRequest || !firestore || !actualDate) return;
+        if (!leaveRequest || !firestore || !actualDate || !leaveRequest.id) {
+            toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'تأكد من اختيار التاريخ وتوفر بيانات الموظف.' });
+            return;
+        }
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { 
+            
+            // التحقق من وجود الموظف
+            const empRef = doc(firestore, 'employees', leaveRequest.employeeId);
+            const empSnap = await getDocs(query(collection(firestore, 'employees'), where('__name__', '==', leaveRequest.employeeId), limit(1)));
+            if (empSnap.empty) throw new Error("الموظف غير موجود في النظام.");
+
+            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id), { 
                 status: 'on-leave',
                 actualStartDate: Timestamp.fromDate(actualDate)
             });
-            batch.update(doc(firestore, 'employees', leaveRequest.employeeId), { status: 'on-leave' });
+            batch.update(empRef, { status: 'on-leave' });
+            
             await batch.commit();
             toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف.' });
             setIsStartDialogOpen(false);
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ' });
+        } catch (e: any) {
+            console.error("Start leave error:", e);
+            toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل بدء الإجازة.' });
         } finally { setIsProcessing(false); }
     };
 
-    // ✨ محرك العودة للعمل مع التاريخ الفعلي
+    // ✨ محرك العودة للعمل مع التاريخ الفعلي والتحقق من البيانات
     const handleReturnToWork = async () => {
-        if (!leaveRequest || !firestore || !actualDate) return;
+        if (!leaveRequest || !firestore || !actualDate || !leaveRequest.id) {
+            toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'البيانات المطلوبة للعودة غير متوفرة.' });
+            return;
+        }
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { 
+            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id), { 
                 status: 'returned',
                 actualReturnDate: Timestamp.fromDate(actualDate)
             });
@@ -157,14 +171,15 @@ export default function LeaveRequestDetailsPage() {
             await batch.commit();
             toast({ title: 'تمت العودة', description: 'تم تسجيل عودة الموظف للعمل وإغلاق الملف.' });
             setIsReturnDialogOpen(false);
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ' });
+        } catch (e: any) {
+            console.error("Return work error:", e);
+            toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل العودة للعمل.' });
         } finally { setIsProcessing(false); }
     };
 
-    const loading = leaveLoading || employeeLoading || brandingLoading;
+    const loadingStatus = leaveLoading || employeeLoading || brandingLoading;
 
-    if (loading) {
+    if (loadingStatus) {
         return (
             <div className="p-8 max-w-4xl mx-auto space-y-8" dir="rtl">
                 <Skeleton className="h-64 w-full rounded-[2.5rem]" />
@@ -293,7 +308,7 @@ export default function LeaveRequestDetailsPage() {
                         <div className="space-y-3">
                             <h4 className="font-black text-gray-700 flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/> مبررات طلب الإجازة:</h4>
                             <p className="p-6 border-2 border-dashed rounded-3xl bg-muted/10 min-h-[100px] leading-relaxed">
-                                {leaveRequest.notes || 'لم يتم إدخال ملاحظات إضافية.'}
+                                {leaveRequest.notes || 'لم يتم إدخل ملاحظات إضافية.'}
                             </p>
                         </div>
                         
@@ -340,7 +355,6 @@ export default function LeaveRequestDetailsPage() {
                 </div>
             </div>
 
-            {/* ✨ نافذة تسجيل المغادرة التاريخية */}
             <AlertDialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl">
                     <AlertDialogHeader>
@@ -367,7 +381,6 @@ export default function LeaveRequestDetailsPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* ✨ نافذة إشعار العودة التاريخي */}
             <AlertDialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl">
                     <AlertDialogHeader>
