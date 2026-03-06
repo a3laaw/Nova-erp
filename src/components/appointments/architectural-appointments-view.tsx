@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, deleteDoc, doc, updateDoc, writeBatch, getDoc, collectionGroup, orderBy, limit } from 'firebase/firestore';
+import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, doc, updateDoc, writeBatch, getDoc, orderBy, limit } from 'firebase/firestore';
 import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -34,12 +34,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Appointment, Client, Employee } from '@/lib/types';
+import type { Appointment, Client, Employee, WorkStage } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
-import { useAuth } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context'; // CORRECT: Import from context to get the user object
 import { Textarea } from '@/components/ui/textarea';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
@@ -53,7 +53,6 @@ const generateTimeSlots = (start: string, end: string, slotDuration: number, buf
         const startTime = parse(start, 'HH:mm', new Date());
         const endTime = parse(end, 'HH:mm', new Date());
         
-        // حماية: إذا كان وقت النهاية قبل أو يساوي وقت البداية، لا تولد أي خانات
         if (!isValid(startTime) || !isValid(endTime) || startTime >= endTime) {
             return [];
         }
@@ -114,7 +113,6 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
     } catch (error) { console.error("Reconciliation failed:", error); }
 }
 
-// مصفوفة أيام الأسبوع (0 = الأحد)
 const weekDays = [
     { id: 'Sunday', label: 'الأحد' },
     { id: 'Monday', label: 'الاثنين' },
@@ -125,7 +123,7 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-export function ArchitecturalAppointmentsView() {
+export default function ArchitecturalAppointmentsView() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { user: currentUser } = useAuth();
@@ -284,7 +282,6 @@ export function ArchitecturalAppointmentsView() {
                                         ) : (
                                             <div className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" onClick={() => {
                                                 const apptDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
-                                                // ✨ السماح للادمن بحجز مواعيد في الماضي مؤقتاً
                                                 if (isPast(apptDate) && currentUser?.role !== 'Admin') return toast({ title: 'لا يمكن الحجز في الماضي' });
                                                 setDialogData({ isEditing: false, engineerId: eng.id, engineerName: eng.fullName, appointmentDate: apptDate });
                                                 setIsDialogOpen(true);
@@ -370,7 +367,6 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         try {
             const appointmentDateTime = dialogData.appointmentDate;
             
-            // ✨ السماح للادمن بحجز مواعيد في الماضي مؤقتاً
             if (isPast(appointmentDateTime) && currentUser?.role !== 'Admin') {
                 toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.'});
                 setIsSaving(false); return;

@@ -95,7 +95,7 @@ const weekDays = [
     { id: 'Saturday', label: 'السبت' },
 ];
 
-export function RoomBookingCalendar() {
+export default function RoomBookingCalendar() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();

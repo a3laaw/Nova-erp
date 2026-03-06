@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, Home } from 'lucide-react';
 
 const ArchitecturalAppointmentsView = dynamic(
-    () => import('@/components/appointments/architectural-appointments-view').then(mod => mod.ArchitecturalAppointmentsView),
+    () => import('@/components/appointments/architectural-appointments-view'),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-3xl animate-pulse" />,
         ssr: false 
@@ -26,7 +26,7 @@ const ArchitecturalAppointmentsView = dynamic(
 );
 
 const RoomBookingCalendar = dynamic(
-    () => import('@/components/appointments/room-booking-calendar').then(mod => mod.RoomBookingCalendar),
+    () => import('@/components/appointments/room-booking-calendar'),
     { 
         loading: () => <Skeleton className="h-[500px] w-full rounded-3xl animate-pulse" />,
         ssr: false 

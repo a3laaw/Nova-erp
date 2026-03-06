@@ -6,8 +6,7 @@ import './globals.css';
 
 /**
  * @fileOverview Root layout for Nova ERP.
- * TRIGGER REBUILD: 2026-02-20 - Solving Build Code 51 and ChunkLoadErrors.
- * This file has been modified to force a clean re-bundle of the application assets.
+ * TRIGGER REBUILD: 2026-03-05 - Fixing ChunkLoadError and manifest inconsistencies.
  */
 
 const tajawal = Tajawal({ 
