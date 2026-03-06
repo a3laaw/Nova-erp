@@ -50,8 +50,8 @@ const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
 export function LeaveRequestsList() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
-  const { toast } = useToast();
   const router = useRouter();
+  const { toast } = useToast();
   
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -108,7 +108,7 @@ export function LeaveRequestsList() {
     };
 
     fetchContext();
-  }, [firestore, requestToApprove, requestToReject, id]);
+  }, [firestore, requestToApprove, requestToReject]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
