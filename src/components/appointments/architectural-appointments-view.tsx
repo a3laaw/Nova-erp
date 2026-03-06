@@ -200,7 +200,8 @@ export function ArchitecturalAppointmentsView() {
             setEngineers(arch);
         });
         getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))).then(snap => {
-            setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
+            const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
+            setClients(clientsList);
         });
     }, [firestore]);
     
@@ -283,7 +284,8 @@ export function ArchitecturalAppointmentsView() {
                                         ) : (
                                             <div className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" onClick={() => {
                                                 const apptDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
-                                                if (isPast(apptDate)) return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                                // ✨ السماح للادمن بحجز مواعيد في الماضي مؤقتاً
+                                                if (isPast(apptDate) && currentUser?.role !== 'Admin') return toast({ title: 'لا يمكن الحجز في الماضي' });
                                                 setDialogData({ isEditing: false, engineerId: eng.id, engineerName: eng.fullName, appointmentDate: apptDate });
                                                 setIsDialogOpen(true);
                                             }} />
@@ -366,8 +368,16 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         e.preventDefault();
         setIsSaving(true);
         try {
+            const appointmentDateTime = dialogData.appointmentDate;
+            
+            // ✨ السماح للادمن بحجز مواعيد في الماضي مؤقتاً
+            if (isPast(appointmentDateTime) && currentUser?.role !== 'Admin') {
+                toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.'});
+                setIsSaving(false); return;
+            }
+
             if (isNewClient) {
-                const newAppt = { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false };
+                const newAppt = { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false };
                 await addDoc(collection(firestore, 'appointments'), newAppt);
             } else {
                 const client = clients.find((c: any) => c.id === selectedClientId);
@@ -377,7 +387,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
                 const existing = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 const visitCount = existing.length + 1;
                 const newApptRef = doc(collection(firestore, 'appointments'));
-                batch.set(newApptRef, { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false });
+                batch.set(newApptRef, { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false });
                 await batch.commit();
             }
             toast({ title: 'نجاح', description: 'تم حفظ الموعد.' });
