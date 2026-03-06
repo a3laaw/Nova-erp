@@ -101,7 +101,7 @@ export default function NewLeaveRequestPage() {
 
     const leaveDuration = useMemo(() => {
         if (!startDate || !endDate) return { totalDays: 0, workingDays: 0 };
-        return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
+        return calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || [], publicHolidays);
     }, [startDate, endDate, branding, publicHolidays]);
 
     const employeeOptions = useMemo(() => (employees || []).map(e => ({ value: e.id!, label: e.fullName })), [employees]);
