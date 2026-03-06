@@ -1,5 +1,3 @@
-// ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
-// IMPROVED: تحقق رصيد قبل التقديم
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -117,33 +115,34 @@ export default function NewLeaveRequestPage() {
     };
     
     return (
-        <Card className="max-w-2xl mx-auto" dir="rtl">
+        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
-                 <CardHeader>
-                    <CardTitle>طلب إجازة جديد</CardTitle>
-                    <CardDescription>
+                 <CardHeader className="bg-primary/5 pb-8 border-b">
+                    <CardTitle className="text-2xl font-black">طلب إجازة جديد</CardTitle>
+                    <CardDescription className="text-base">
                       سيتم إرسال الطلب للموافقة من قبل مدير النظام أو قسم الموارد البشرية.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-8 space-y-6">
                      {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                       <div className="grid gap-2">
-                        <Label htmlFor="employee">الموظف <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="employee" className="font-bold">الموظف <span className="text-destructive">*</span></Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
                             placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
                             disabled={loading}
+                            className="h-11 rounded-xl"
                         />
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType">نوع الإجازة <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="leaveType" className="font-bold">نوع الإجازة <span className="text-destructive">*</span></Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)}>
-                            <SelectTrigger id="leaveType"><SelectValue/></SelectTrigger>
-                            <SelectContent>
+                            <SelectTrigger id="leaveType" className="h-11 rounded-xl"><SelectValue/></SelectTrigger>
+                            <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
                                 <SelectItem value="Sick">مرضية</SelectItem>
                                 <SelectItem value="Emergency">طارئة</SelectItem>
@@ -152,36 +151,37 @@ export default function NewLeaveRequestPage() {
                         </Select>
                       </div>
                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate">من تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={startDate} onChange={setStartDate} required />
+                        <Label htmlFor="startDate" className="font-bold">من تاريخ <span className="text-destructive">*</span></Label>
+                        <DateInput value={startDate} onChange={setStartDate} className="h-11 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate">إلى تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={endDate} onChange={setEndDate} required />
+                        <Label htmlFor="endDate" className="font-bold">إلى تاريخ <span className="text-destructive">*</span></Label>
+                        <DateInput value={endDate} onChange={setEndDate} className="h-11 rounded-xl" />
                       </div>
                     </div>
                     {leaveDuration.totalDays > 0 && (
-                      <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-                        <p>إجمالي الأيام: <strong>{leaveDuration.totalDays}</strong> أيام</p>
-                        <p>أيام العمل الفعلية: <strong>{leaveDuration.workingDays}</strong> أيام عمل</p>
+                      <div className="text-sm text-primary font-bold p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
+                        <p>إجمالي الأيام: <span className="text-lg font-black">{leaveDuration.totalDays}</span></p>
+                        <Separator orientation="vertical" className="h-6" />
+                        <p>أيام العمل الفعلية: <span className="text-lg font-black">{leaveDuration.workingDays}</span></p>
                       </div>
                     )}
                      <div className="grid gap-2">
-                      <Label htmlFor="notes">السبب / ملاحظات <span className="text-destructive">*</span></Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required />
+                      <Label htmlFor="notes" className="font-bold">السبب / ملاحظات <span className="text-destructive">*</span></Label>
+                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl" />
                     </div>
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
                         <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} />
-                        <Label htmlFor="passportReceived">استلام جواز السفر</Label>
+                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer">هل تم استلام جواز السفر من الموظف؟</Label>
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                     <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading}>
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                        {isSaving ? 'جاري الإرسال...' : 'إرسال الطلب'}
+                <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
+                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
+                    <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />}
+                        {isSaving ? 'جاري الإرسال...' : 'إرسال طلب الإجازة'}
                     </Button>
                 </CardFooter>
             </form>
