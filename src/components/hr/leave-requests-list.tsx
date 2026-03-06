@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, getDocs, where, limit, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getDocs, where, limit, Timestamp, getDoc } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -100,7 +100,7 @@ export function LeaveRequestsList() {
 
   const loading = loadingLeaves || loadingEmployees;
 
-  // جلب سياق القرار الذكي
+  // ✨ جلب سياق القرار الذكي (HR Insights)
   useEffect(() => {
     const targetReq = requestToApprove || requestToReject;
     if (!firestore || !targetReq?.employeeId) {
@@ -148,6 +148,7 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
+  // دالة الحذف والترميم التلقائي للطلبات المعلقة
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -176,6 +177,7 @@ export function LeaveRequestsList() {
             }
         }
 
+        // البحث عن الطلبات المعلقة لإعادة الحسبة آلياً
         const pendingQuery = query(
             collection(firestore, 'leaveRequests'),
             where('employeeId', '==', employee.id),
@@ -478,6 +480,7 @@ export function LeaveRequestsList() {
         </Table>
       </div>
       
+      {/* نافذة حذف الطلب */}
       <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
@@ -502,6 +505,7 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
     </AlertDialog>
 
+      {/* نافذة الموافقة */}
       <AlertDialog open={!!requestToApprove} onOpenChange={() => setRequestToApprove(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl max-w-lg">
             <AlertDialogHeader>
@@ -559,6 +563,7 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* نافذة الرفض */}
       <AlertDialog open={!!requestToReject} onOpenChange={() => setRequestToReject(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
@@ -577,6 +582,32 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ✨ نافذة التراجع عن الموافقة (تم إصلاحها) ✨ */}
+      <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-orange-50 rounded-2xl text-orange-600 shadow-inner">
+                        <Undo2 className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">تراجع عن الموافقة</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium leading-relaxed">
+                    هل أنت متأكد من التراجع عن الموافقة على طلب <strong>{requestToUndoApproval?.employeeName}</strong>؟
+                    <br/><br/>
+                    سيتم إعادة الطلب لحالة "معلق" واسترداد الأيام المخصومة لرصيد الموظف آلياً.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-black px-10 shadow-lg shadow-orange-100">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، تراجع عن الموافقة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* نافذة تسجيل المغادرة */}
       <AlertDialog open={!!requestToStart} onOpenChange={() => setRequestToStart(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
@@ -601,6 +632,7 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* نافذة تسجيل العودة */}
       <AlertDialog open={!!requestToReturn} onOpenChange={() => setRequestToReturn(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
