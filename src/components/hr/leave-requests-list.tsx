@@ -1,5 +1,3 @@
-// ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
-// IMPROVED: إضافة "سياق القرار الذكي" داخل نافذة الموافقة السريعة
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -15,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -110,7 +108,7 @@ export function LeaveRequestsList() {
     };
 
     fetchContext();
-  }, [firestore, requestToApprove, requestToReject]);
+  }, [firestore, requestToApprove, requestToReject, id]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
