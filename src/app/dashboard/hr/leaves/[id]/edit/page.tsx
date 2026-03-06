@@ -1,7 +1,6 @@
-// ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Card,
@@ -18,10 +17,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, X } from 'lucide-react';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, doc, updateDoc, query } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -50,14 +49,17 @@ export default function EditLeaveRequestPage() {
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [notes, setNotes] = useState('');
     const [passportReceived, setPassportReceived] = useState(false);
+    
+    // --- Double-Save Guard System ---
     const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
 
     useEffect(() => {
         if (leaveRequest) {
             setSelectedEmployeeId(leaveRequest.employeeId);
             setLeaveType(leaveRequest.leaveType);
-            setStartDate(toFirestoreDate(leaveRequest.startDate));
-            setEndDate(toFirestoreDate(leaveRequest.endDate));
+            setStartDate(toFirestoreDate(leaveRequest.startDate) || undefined);
+            setEndDate(toFirestoreDate(leaveRequest.endDate) || undefined);
             setNotes(leaveRequest.notes || '');
             setPassportReceived(leaveRequest.passportReceived || false);
         }
@@ -74,6 +76,9 @@ export default function EditLeaveRequestPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (savingRef.current) return;
+
         if (!firestore || !currentUser || !id || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
             return;
@@ -85,7 +90,9 @@ export default function EditLeaveRequestPage() {
             return;
         }
 
+        savingRef.current = true;
         setIsSaving(true);
+        
         try {
             const leaveRef = doc(firestore, 'leaveRequests', id);
             await updateDoc(leaveRef, {
@@ -99,18 +106,20 @@ export default function EditLeaveRequestPage() {
                 notes: notes,
                 passportReceived: passportReceived
             });
+            
             toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
             router.push('/dashboard/hr/leaves');
+            router.refresh();
         } catch (error) {
+            savingRef.current = false;
+            setIsSaving(false);
             const message = error instanceof Error ? error.message : "فشل تعديل الطلب.";
             toast({ variant: 'destructive', title: 'خطأ', description: message });
-        } finally {
-            setIsSaving(false);
         }
     };
     
     if (loading) {
-        return <Card className="max-w-2xl mx-auto"><CardContent><Skeleton className="h-96 w-full" /></CardContent></Card>
+        return <Card className="max-w-2xl mx-auto"><CardContent className="p-8"><Skeleton className="h-96 w-full rounded-2xl" /></CardContent></Card>
     }
 
     if (!leaveRequest) {
@@ -118,33 +127,34 @@ export default function EditLeaveRequestPage() {
     }
 
     return (
-        <Card className="max-w-2xl mx-auto" dir="rtl">
+        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
-                 <CardHeader>
-                    <CardTitle>تعديل طلب إجازة</CardTitle>
-                    <CardDescription>
+                 <CardHeader className="bg-primary/5 pb-8 border-b">
+                    <CardTitle className="text-2xl font-black">تعديل طلب إجازة</CardTitle>
+                    <CardDescription className="text-base">
                       تعديل بيانات طلب الإجازة للموظف: {leaveRequest.employeeName}.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-8 space-y-6">
                      {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                       <div className="grid gap-2">
-                        <Label htmlFor="employee">الموظف</Label>
+                        <Label htmlFor="employee" className="font-bold">الموظف</Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
                             placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
-                            disabled={loading}
+                            disabled={loading || isSaving}
+                            className="h-11 rounded-xl"
                         />
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType">نوع الإجازة</Label>
-                        <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)}>
-                            <SelectTrigger id="leaveType"><SelectValue/></SelectTrigger>
-                            <SelectContent>
+                        <Label htmlFor="leaveType" className="font-bold">نوع الإجازة</Label>
+                        <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
+                            <SelectTrigger id="leaveType" className="h-11 rounded-xl"><SelectValue/></SelectTrigger>
+                            <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
                                 <SelectItem value="Sick">مرضية</SelectItem>
                                 <SelectItem value="Emergency">طارئة</SelectItem>
@@ -153,36 +163,36 @@ export default function EditLeaveRequestPage() {
                         </Select>
                       </div>
                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate">من تاريخ</Label>
-                        <DateInput value={startDate} onChange={setStartDate} required />
+                        <Label htmlFor="startDate" className="font-bold">من تاريخ</Label>
+                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate">إلى تاريخ</Label>
-                        <DateInput value={endDate} onChange={setEndDate} required />
+                        <Label htmlFor="endDate" className="font-bold">إلى تاريخ</Label>
+                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                     </div>
                     {leaveDuration.totalDays > 0 && (
-                      <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
-                        <p>إجمالي الأيام: <strong>{leaveDuration.totalDays}</strong> أيام</p>
-                        <p>أيام العمل الفعلية: <strong>{leaveDuration.workingDays}</strong> أيام عمل</p>
+                      <div className="text-sm text-primary font-bold p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
+                        <p>إجمالي الأيام: <span className="text-lg font-black">{leaveDuration.totalDays}</span></p>
+                        <p>أيام العمل الفعلية: <span className="text-lg font-black">{leaveDuration.workingDays}</span></p>
                       </div>
                     )}
                      <div className="grid gap-2">
-                      <Label htmlFor="notes">السبب / ملاحظات</Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required />
+                      <Label htmlFor="notes" className="font-bold">السبب / ملاحظات</Label>
+                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl" disabled={isSaving} />
                     </div>
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                        <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} />
-                        <Label htmlFor="passportReceived">تم استلام جواز السفر</Label>
+                    <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
+                        <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
+                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer">تم استلام جواز السفر</Label>
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                     <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading}>
+                <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
+                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
+                    <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                        {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                        {isSaving ? 'جاري الحفظ والتحويل...' : 'حفظ التعديلات'}
                     </Button>
                 </CardFooter>
             </form>

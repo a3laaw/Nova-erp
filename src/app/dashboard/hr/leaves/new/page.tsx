@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 
 
 export default function NewLeaveRequestPage() {
@@ -46,7 +47,10 @@ export default function NewLeaveRequestPage() {
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [notes, setNotes] = useState('');
     const [passportReceived, setPassportReceived] = useState(false);
+    
+    // --- Double-Save Guard System ---
     const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
 
     useEffect(() => {
         if (currentUser && currentUser.role !== 'Admin' && currentUser.role !== 'HR') {
@@ -65,6 +69,10 @@ export default function NewLeaveRequestPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // 1. Prevent duplicate submission via ref
+        if (savingRef.current) return;
+
         if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
             return;
@@ -88,7 +96,10 @@ export default function NewLeaveRequestPage() {
             }
         }
 
+        // 2. Activate saving state and ref
+        savingRef.current = true;
         setIsSaving(true);
+
         try {
             const newRequest = {
                 employeeId: selectedEmployeeId,
@@ -103,14 +114,21 @@ export default function NewLeaveRequestPage() {
                 status: 'pending' as const,
                 createdAt: serverTimestamp(),
             };
+
             await addDoc(collection(firestore, 'leaveRequests'), newRequest);
+            
             toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
+            
+            // 3. Immediate redirect
             router.push('/dashboard/hr/leaves');
+            router.refresh();
+
         } catch (error) {
+            // Re-enable on error
+            savingRef.current = false;
+            setIsSaving(false);
             const message = error instanceof Error ? error.message : "فشل حفظ الطلب.";
             toast({ variant: 'destructive', title: 'خطأ', description: message });
-        } finally {
-            setIsSaving(false);
         }
     };
     
@@ -132,7 +150,7 @@ export default function NewLeaveRequestPage() {
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
                             placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
-                            disabled={loading}
+                            disabled={loading || isSaving}
                             className="h-11 rounded-xl"
                         />
                       </div>
@@ -140,7 +158,7 @@ export default function NewLeaveRequestPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
                         <Label htmlFor="leaveType" className="font-bold">نوع الإجازة <span className="text-destructive">*</span></Label>
-                        <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)}>
+                        <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
                             <SelectTrigger id="leaveType" className="h-11 rounded-xl"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
@@ -154,11 +172,11 @@ export default function NewLeaveRequestPage() {
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
                         <Label htmlFor="startDate" className="font-bold">من تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={startDate} onChange={setStartDate} className="h-11 rounded-xl" />
+                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="endDate" className="font-bold">إلى تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={endDate} onChange={setEndDate} className="h-11 rounded-xl" />
+                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                     </div>
                     {leaveDuration.totalDays > 0 && (
@@ -170,10 +188,10 @@ export default function NewLeaveRequestPage() {
                     )}
                      <div className="grid gap-2">
                       <Label htmlFor="notes" className="font-bold">السبب / ملاحظات <span className="text-destructive">*</span></Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl" />
+                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl" disabled={isSaving} />
                     </div>
                     <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
-                        <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} />
+                        <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
                         <Label htmlFor="passportReceived" className="font-bold cursor-pointer">هل تم استلام جواز السفر من الموظف؟</Label>
                     </div>
                 </CardContent>
@@ -181,7 +199,7 @@ export default function NewLeaveRequestPage() {
                      <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
                     <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                         {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />}
-                        {isSaving ? 'جاري الإرسال...' : 'إرسال طلب الإجازة'}
+                        {isSaving ? 'جاري الحفظ والتحويل...' : 'إرسال طلب الإجازة'}
                     </Button>
                 </CardFooter>
             </form>
