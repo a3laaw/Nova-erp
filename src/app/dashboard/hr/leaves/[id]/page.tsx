@@ -63,6 +63,7 @@ export default function LeaveRequestDetailsPage() {
 
     const [lastApprovedLeave, setLastApprovedLeave] = useState<LeaveRequest | null>(null);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [hasCheckedHistory, setHasCheckedHistory] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     
     const [isStartDialogOpen, setIsStartDialogOpen] = useState(false);
@@ -95,7 +96,10 @@ export default function LeaveRequestDetailsPage() {
 
                 if (filtered.length > 0) {
                     setLastApprovedLeave(filtered[0]);
+                } else {
+                    setLastApprovedLeave(null);
                 }
+                setHasCheckedHistory(true);
             } catch (e) {
                 console.error("Error fetching leave history:", e);
             } finally {
@@ -195,25 +199,35 @@ export default function LeaveRequestDetailsPage() {
             </div>
 
             <div className="max-w-4xl mx-auto space-y-6">
-                {lastApprovedLeave && (
-                    <Alert className="rounded-[2rem] border-2 border-primary/20 bg-primary/5 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-                        <Sparkles className="h-5 w-5 text-primary" />
-                        <AlertTitle className="text-primary font-black text-lg">سياق القرار الذكي (HR Assistant)</AlertTitle>
-                        <AlertDescription className="mt-2 text-foreground/80 leading-relaxed">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                                <p className="font-medium">
-                                    كان الموظف في إجازة <strong>{leaveTypeTranslations[lastApprovedLeave.leaveType]}</strong> 
-                                    انتهت بتاريخ <strong>{format(toFirestoreDate(lastApprovedLeave.endDate)!, 'dd/MM/yyyy')}</strong>.
-                                </p>
-                                <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border shadow-sm">
-                                    <Clock className="h-3 w-3 text-primary" />
-                                    <span className="text-xs font-black text-primary">
-                                        منذ {formatDistanceToNow(toFirestoreDate(lastApprovedLeave.endDate)!, { locale: ar })}
-                                    </span>
+                {!loadingHistory && hasCheckedHistory && (
+                    lastApprovedLeave ? (
+                        <Alert className="rounded-[2rem] border-2 border-primary/20 bg-primary/5 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
+                            <Sparkles className="h-5 w-5 text-primary" />
+                            <AlertTitle className="text-primary font-black text-lg">سياق القرار الذكي (HR Assistant)</AlertTitle>
+                            <AlertDescription className="mt-2 text-foreground/80 leading-relaxed">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                    <p className="font-medium">
+                                        كان الموظف في إجازة <strong>{leaveTypeTranslations[lastApprovedLeave.leaveType]}</strong> 
+                                        انتهت بتاريخ <strong>{format(toFirestoreDate(lastApprovedLeave.endDate)!, 'dd/MM/yyyy')}</strong>.
+                                    </p>
+                                    <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-full border shadow-sm">
+                                        <Clock className="h-3 w-3 text-primary" />
+                                        <span className="text-xs font-black text-primary">
+                                            منذ {formatDistanceToNow(toFirestoreDate(lastApprovedLeave.endDate)!, { locale: ar })}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        </AlertDescription>
-                    </Alert>
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <Alert className="rounded-[2rem] border-2 border-slate-200 bg-slate-50 shadow-sm animate-in fade-in">
+                            <History className="h-5 w-5 text-slate-400" />
+                            <AlertTitle className="text-slate-600 font-black">سجل الموظف</AlertTitle>
+                            <AlertDescription className="mt-1 text-slate-500 italic font-medium">
+                                هذا الموظف لم يسبق له الخروج في إجازة مسجلة بالنظام من قبل.
+                            </AlertDescription>
+                        </Alert>
+                    )
                 )}
 
                 <div id="printable-leave-form" className="bg-white dark:bg-card p-8 sm:p-12 rounded-[2.5rem] shadow-xl print:shadow-none print:border-none border">
@@ -307,15 +321,15 @@ export default function LeaveRequestDetailsPage() {
                     <footer className="pt-20 space-y-16">
                         <div className="grid grid-cols-3 gap-8 text-center text-[10px] font-black uppercase text-muted-foreground">
                             <div className="space-y-12">
-                                <p className="text-foreground border-b-2 border-foreground pb-2">توقيع الموظف</p>
+                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">توقيع الموظف</p>
                                 <div className="pt-2 border-t border-dashed">التاريخ والاعتماد</div>
                             </div>
                             <div className="space-y-12">
-                                <p className="text-foreground border-b-2 border-foreground pb-2">المدير المباشر</p>
+                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">المدير المباشر</p>
                                 <div className="pt-2 border-t border-dashed">الموافقة الفنية</div>
                             </div>
                             <div className="space-y-12">
-                                <p className="text-foreground border-b-2 border-foreground pb-2">الموارد البشرية</p>
+                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">الموارد البشرية</p>
                                 <div className="pt-2 border-t border-dashed">التدقيق المالي</div>
                             </div>
                         </div>

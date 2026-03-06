@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calculator } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calculator, History } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -75,6 +75,7 @@ export function LeaveRequestsList() {
 
   const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
   const [loadingContext, setLoadingContext] = useState(false);
+  const [hasCheckedContext, setHasCheckedContext] = useState(false);
 
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: leaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
@@ -86,6 +87,7 @@ export function LeaveRequestsList() {
     const targetReq = requestToApprove || requestToReject;
     if (!firestore || !targetReq?.employeeId) {
         setLastLeaveInfo(null);
+        setHasCheckedContext(false);
         return;
     }
 
@@ -106,6 +108,8 @@ export function LeaveRequestsList() {
 
             if (filtered.length > 0) setLastLeaveInfo(filtered[0]);
             else setLastLeaveInfo(null);
+            
+            setHasCheckedContext(true);
         } catch (e) {
             console.error("Error fetching context:", e);
         } finally {
@@ -220,7 +224,7 @@ export function LeaveRequestsList() {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'permissionRequests', requestToReject.id!);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id!);
         await updateDoc(leaveRef, {
             status: 'rejected',
             rejectionReason: rejectionReason,
@@ -592,16 +596,23 @@ export function LeaveRequestsList() {
                 </div>
             </div>
 
-            {lastLeaveInfo && (
+            {!loadingContext && hasCheckedContext && (
                 <div className="mt-4 p-4 border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl space-y-2 animate-in zoom-in-95">
                     <p className="text-xs font-black text-primary flex items-center gap-2 uppercase tracking-widest">
                         <Sparkles className="h-3 w-3"/> سياق القرار (HR Insights)
                     </p>
-                    <p className="text-xs font-bold leading-relaxed text-slate-700">
-                        كان الموظف في إجازة <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong> 
-                        انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
-                        أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong>.
-                    </p>
+                    {lastLeaveInfo ? (
+                        <p className="text-xs font-bold leading-relaxed text-slate-700">
+                            كان الموظف في إجازة <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong> 
+                            انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
+                            أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong>.
+                        </p>
+                    ) : (
+                        <p className="text-xs font-bold text-slate-500 italic flex items-center gap-2">
+                            <History className="h-3 w-3" />
+                            هذا الموظف لم يسبق له الخروج في إجازة مسجلة بالنظام من قبل.
+                        </p>
+                    )}
                 </div>
             )}
 

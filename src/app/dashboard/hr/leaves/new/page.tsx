@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator, Info, History } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -53,6 +53,7 @@ export default function NewLeaveRequestPage() {
     
     const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
     const [loadingContext, setLoadingContext] = useState(false);
+    const [hasCheckedContext, setHasCheckedContext] = useState(false);
 
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
@@ -66,6 +67,7 @@ export default function NewLeaveRequestPage() {
     useEffect(() => {
         if (!firestore || !selectedEmployeeId) {
             setLastLeaveInfo(null);
+            setHasCheckedContext(false);
             return;
         }
 
@@ -85,6 +87,7 @@ export default function NewLeaveRequestPage() {
                 } else {
                     setLastLeaveInfo(null);
                 }
+                setHasCheckedContext(true);
             } catch (e) {
                 console.error("Context fetch failed:", e);
             } finally {
@@ -185,16 +188,26 @@ export default function NewLeaveRequestPage() {
                       </div>
                     )}
 
-                    {lastLeaveInfo && (
-                        <Alert className="rounded-2xl border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-2 duration-500">
-                            <Sparkles className="h-5 w-5 text-primary" />
-                            <AlertTitle className="text-primary font-black text-sm">سياق القرار (HR Insights)</AlertTitle>
-                            <AlertDescription className="mt-1 text-xs font-bold leading-relaxed">
-                                كانت آخر إجازة لهذا الموظف من نوع <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong>، 
-                                انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
-                                أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong> تقريباً.
-                            </AlertDescription>
-                        </Alert>
+                    {!loadingContext && hasCheckedContext && selectedEmployeeId && (
+                        lastLeaveInfo ? (
+                            <Alert className="rounded-2xl border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-2 duration-500">
+                                <Sparkles className="h-5 w-5 text-primary" />
+                                <AlertTitle className="text-primary font-black text-sm">سياق القرار (HR Insights)</AlertTitle>
+                                <AlertDescription className="mt-1 text-xs font-bold leading-relaxed">
+                                    كانت آخر إجازة لهذا الموظف من نوع <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong>، 
+                                    انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
+                                    أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong> تقريباً.
+                                </AlertDescription>
+                            </Alert>
+                        ) : (
+                            <Alert className="rounded-2xl border-2 border-slate-200 bg-slate-50 animate-in fade-in">
+                                <History className="h-5 w-5 text-slate-400" />
+                                <AlertTitle className="text-slate-600 font-bold text-xs">سجل الموظف</AlertTitle>
+                                <AlertDescription className="text-xs text-slate-500 font-medium italic">
+                                    هذا الموظف لم يسبق له الخروج في إجازة مسجلة بالنظام من قبل.
+                                </AlertDescription>
+                            </Alert>
+                        )
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
