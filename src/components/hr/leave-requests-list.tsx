@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calendar } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calendar, Calculator } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -43,10 +43,10 @@ const statusColors: Record<LeaveRequest['status'], string> = {
 };
 
 const statusTranslations: Record<LeaveRequest['status'], string> = {
-  pending: 'تحت المراجعة',
+  pending: 'معلق',
   approved: 'موافق عليه',
   rejected: 'مرفوض',
-  'on-leave': 'في إجازة حالياً',
+  'on-leave': 'في إجازة',
   'returned': 'عاد للعمل',
 };
 
@@ -66,7 +66,6 @@ export function LeaveRequestsList() {
   const [requestToApprove, setRequestToApprove] = useState<LeaveRequest | null>(null);
   const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
   const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
-  const [requestToUndoRejection, setRequestToUndoRejection] = useState<LeaveRequest | null>(null);
   const [requestToPay, setRequestToPay] = useState<LeaveRequest | null>(null);
   const [requestToStart, setRequestToStart] = useState<LeaveRequest | null>(null);
   const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
@@ -125,7 +124,7 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
-  // 🛡️ دالة الحذف المحدثة (تتضمن استرداد الرصيد)
+  // 🛡️ دالة الحذف المحدثة (تتضمن استرداد الجزء المخصوم من الرصيد)
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -133,14 +132,14 @@ export function LeaveRequestsList() {
         const batch = writeBatch(firestore);
         const leaveRef = doc(firestore, 'leaveRequests', requestToDelete.id!);
 
-        // إذا كانت الإجازة مخصومة من الرصيد، يجب استردادها أولاً
         if (['approved', 'on-leave', 'returned'].includes(requestToDelete.status)) {
             const employee = employees.find(e => e.id === requestToDelete.employeeId);
             if (employee) {
                 const employeeRef = doc(firestore, 'employees', employee.id!);
-                const daysToRestore = requestToDelete.workingDays || requestToDelete.days || 0;
-                let employeeUpdate: any = {};
+                // استرداد فقط الأيام التي تم خصمها فعلياً من الرصيد (الإجمالي - بدون راتب)
+                const daysToRestore = (requestToDelete.workingDays || 0) - (requestToDelete.unpaidDays || 0);
                 
+                let employeeUpdate: any = {};
                 if (requestToDelete.leaveType === 'Annual') {
                     employeeUpdate.annualLeaveUsed = Math.max(0, (employee.annualLeaveUsed || 0) - daysToRestore);
                 } else if (requestToDelete.leaveType === 'Sick') {
@@ -157,7 +156,7 @@ export function LeaveRequestsList() {
 
         batch.delete(leaveRef);
         await batch.commit();
-        toast({ title: 'نجاح الحذف', description: 'تم حذف الطلب واسترداد الرصيد المخصوم للموظف.' });
+        toast({ title: 'نجاح الحذف', description: 'تم حذف الطلب واسترداد الأرصدة المخصومة.' });
     } catch (error) {
         console.error("Error deleting leave request:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف طلب الإجازة.' });
@@ -184,32 +183,33 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToApprove.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const daysToDeduct = requestToApprove.workingDays || requestToApprove.days || 0;
+            // خصم فقط الأيام المدفوعة (الإجمالي - بدون راتب)
+            const daysToDeduct = (requestToApprove.workingDays || 0) - (requestToApprove.unpaidDays || 0);
+            
             let employeeUpdate: Partial<Employee> = {};
             
-            switch (requestToApprove.leaveType) {
-                case 'Annual':
-                    employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) + daysToDeduct;
-                    break;
-                case 'Sick':
-                    employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) + daysToDeduct;
-                    break;
-                case 'Emergency':
-                     employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) + daysToDeduct;
-                    break;
+            if (requestToApprove.leaveType === 'Annual') {
+                employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) + daysToDeduct;
+            } else if (requestToApprove.leaveType === 'Sick') {
+                employeeUpdate.sickLeaveUsed = (employee.sickLeaveUsed || 0) + daysToDeduct;
+            } else if (requestToApprove.leaveType === 'Emergency') {
+                employeeUpdate.emergencyLeaveUsed = (employee.emergencyLeaveUsed || 0) + daysToDeduct;
             }
-            batch.update(employeeRef, employeeUpdate);
+            
+            if (Object.keys(employeeUpdate).length > 0) {
+                batch.update(employeeRef, employeeUpdate);
+            }
         }
 
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تمت الموافقة على طلب الإجازة وخصم الرصيد.' });
+        toast({ title: 'نجاح', description: 'تمت الموافقة على طلب الإجازة وخصم الرصيد المتاح.' });
 
         const targetUserId = await findUserIdByEmployeeId(firestore, requestToApprove.employeeId);
-        if (targetUserId && targetUserId !== currentUser.id) {
+        if (targetUserId) {
             await createNotification(firestore, {
                 userId: targetUserId,
                 title: 'تحديث على طلب الإجازة',
-                body: `تمت الموافقة على طلب الإجازة (${leaveTypeTranslations[requestToApprove.leaveType]}) من ${formatDate(requestToApprove.startDate)}.`,
+                body: `تمت الموافقة على طلب الإجازة. تم احتساب ${(requestToApprove.workingDays || 0) - (requestToApprove.unpaidDays || 0)} أيام من رصيدك و ${requestToApprove.unpaidDays || 0} أيام بدون راتب.`,
                 link: '/dashboard/hr/leaves'
             });
         }
@@ -234,16 +234,6 @@ export function LeaveRequestsList() {
             approvedAt: serverTimestamp()
         });
         toast({ title: 'تم الرفض', description: 'تم رفض طلب الإجازة بنجاح.' });
-        
-        const targetUserId = await findUserIdByEmployeeId(firestore, requestToReject.employeeId);
-        if (targetUserId && targetUserId !== currentUser.id) {
-            await createNotification(firestore, {
-                userId: targetUserId,
-                title: 'تحديث على طلب الإجازة',
-                body: `تم رفض طلب الإجازة الذي قدمته. السبب: ${rejectionReason}`,
-                link: '/dashboard/hr/leaves'
-            });
-        }
     } catch (e) {
         console.error("Error rejecting leave:", e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في رفض طلب الإجازة.' });
@@ -254,7 +244,6 @@ export function LeaveRequestsList() {
     }
   };
 
-  // 🛡️ دالة التراجع المحدثة (استرداد دقيق للرصيد)
   const handleUndoApproval = async () => {
     if (!requestToUndoApproval || !firestore || !currentUser) return;
 
@@ -268,48 +257,28 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            const daysToRevert = requestToUndoApproval.workingDays || requestToUndoApproval.days || 0;
+            const daysToRevert = (requestToUndoApproval.workingDays || 0) - (requestToUndoApproval.unpaidDays || 0);
             let employeeUpdate: any = {};
             
-            switch (requestToUndoApproval.leaveType) {
-                case 'Annual':
-                    employeeUpdate.annualLeaveUsed = Math.max(0, (employee.annualLeaveUsed || 0) - daysToRevert);
-                    break;
-                case 'Sick':
-                    employeeUpdate.sickLeaveUsed = Math.max(0, (employee.sickLeaveUsed || 0) - daysToRevert);
-                    break;
-                case 'Emergency':
-                     employeeUpdate.emergencyLeaveUsed = Math.max(0, (employee.emergencyLeaveUsed || 0) - daysToRevert);
-                    break;
+            if (requestToUndoApproval.leaveType === 'Annual') {
+                employeeUpdate.annualLeaveUsed = Math.max(0, (employee.annualLeaveUsed || 0) - daysToRevert);
+            } else if (requestToUndoApproval.leaveType === 'Sick') {
+                employeeUpdate.sickLeaveUsed = Math.max(0, (employee.sickLeaveUsed || 0) - daysToRevert);
+            } else if (requestToUndoApproval.leaveType === 'Emergency') {
+                employeeUpdate.emergencyLeaveUsed = Math.max(0, (employee.emergencyLeaveUsed || 0) - daysToRevert);
             }
 
             batch.update(employeeRef, employeeUpdate);
         }
 
         await batch.commit();
-        toast({ title: 'تم التراجع', description: 'تمت إعادة حالة الطلب واسترداد الرصيد للموظف.' });
+        toast({ title: 'تم التراجع', description: 'تمت إعادة حالة الطلب واسترداد الرصيد المخصوم.' });
     } catch (e) {
         console.error("Error undoing approval:", e);
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التراجع عن الموافقة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToUndoApproval(null);
-    }
-  };
-  
-   const handleUndoRejection = async () => {
-    if (!requestToUndoRejection || !firestore) return;
-    setIsProcessingAction(true);
-    try {
-        const reqRef = doc(firestore, 'leaveRequests', requestToUndoRejection.id!);
-        await updateDoc(reqRef, { status: 'pending', rejectionReason: null });
-        toast({ title: 'نجاح', description: 'تم التراجع عن الرفض.' });
-    } catch (e) {
-        console.error("Error undoing rejection:", e);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل التراجع عن الرفض.' });
-    } finally {
-        setIsProcessingAction(false);
-        setRequestToUndoRejection(null);
     }
   };
   
@@ -323,10 +292,11 @@ export function LeaveRequestsList() {
 
         const fullSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
         const dailyRate = fullSalary > 0 ? fullSalary / 26 : 0;
-        const leaveSalary = dailyRate * (requestToPay.workingDays || 0);
+        // صرف الراتب فقط للأيام المخصومة من الرصيد (المدفوعة)
+        const paidDays = (requestToPay.workingDays || 0) - (requestToPay.unpaidDays || 0);
+        const leaveSalary = dailyRate * paidDays;
 
         const batch = writeBatch(firestore);
-
         const payslipId = `leave-${requestToPay.id}`;
         const payslipRef = doc(firestore, 'payroll', payslipId);
 
@@ -337,20 +307,12 @@ export function LeaveRequestsList() {
             month: toFirestoreDate(requestToPay.startDate)!.getMonth() + 1,
             type: 'Leave',
             leaveRequestId: requestToPay.id,
-            earnings: {
-                basicSalary: leaveSalary,
-                housingAllowance: 0,
-                transportAllowance: 0,
-                commission: 0,
-            },
-            deductions: {
-                absenceDeduction: 0,
-                otherDeductions: 0,
-            },
+            earnings: { basicSalary: leaveSalary, housingAllowance: 0, transportAllowance: 0, commission: 0 },
+            deductions: { absenceDeduction: 0, otherDeductions: 0 },
             netSalary: leaveSalary,
             status: 'draft',
             createdAt: serverTimestamp(),
-            notes: `راتب إجازة ${leaveTypeTranslations[requestToPay.leaveType]} من ${formatDate(requestToPay.startDate)} إلى ${formatDate(requestToPay.endDate)}`,
+            notes: `راتب إجازة ${leaveTypeTranslations[requestToPay.leaveType]} (${paidDays} يوم مدفوع) من ${formatDate(requestToPay.startDate)}`,
         };
         batch.set(payslipRef, payslipData);
         
@@ -358,12 +320,10 @@ export function LeaveRequestsList() {
         batch.update(leaveRef, { isSalaryPaid: true });
 
         await batch.commit();
+        toast({ title: 'نجاح', description: `تم إنشاء كشف راتب لـ ${paidDays} يوم إجازة.` });
 
-        toast({ title: 'نجاح', description: 'تم إنشاء كشف راتب الإجازة بنجاح.' });
-
-    } catch (error) {
-        const msg = error instanceof Error ? error.message : 'فشل صرف راتب الإجازة.';
-        toast({ variant: 'destructive', title: 'خطأ', description: msg });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'خطأ', description: error.message });
     } finally {
         setIsProcessingAction(false);
         setRequestToPay(null);
@@ -437,7 +397,7 @@ export function LeaveRequestsList() {
               <TableHead className="px-8 py-5 font-black text-[#7209B7]">اسم الموظف</TableHead>
               <TableHead className="font-black text-[#7209B7]">نوع الإجازة</TableHead>
               <TableHead className="font-black text-[#7209B7]">الفترة</TableHead>
-              <TableHead className="font-black text-[#7209B7]">الأيام</TableHead>
+              <TableHead className="font-black text-[#7209B7]">الأيام (مدفوع / بدون)</TableHead>
               <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
               <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
             </TableRow>
@@ -465,7 +425,12 @@ export function LeaveRequestsList() {
                         <span>{formatDate(req.endDate)}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-black">{req.workingDays} يوم عمل</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                        <span className="font-black">{(req.workingDays || 0) - (req.unpaidDays || 0)} يوم</span>
+                        {req.unpaidDays! > 0 && <span className="text-[10px] text-orange-600 font-bold">+{req.unpaidDays} بدون راتب</span>}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[req.status])}>
                         {statusTranslations[req.status]}
@@ -508,11 +473,6 @@ export function LeaveRequestsList() {
                                     {req.status === 'approved' && (
                                         <DropdownMenuItem onClick={() => setRequestToUndoApproval(req)} className="text-orange-600 gap-2">
                                             <Undo2 className="h-4 w-4" /> تراجع عن الموافقة
-                                        </DropdownMenuItem>
-                                    )}
-                                     {req.status === 'rejected' && (
-                                        <DropdownMenuItem onClick={() => setRequestToUndoRejection(req)} className="gap-2">
-                                            <Undo2 className="h-4 w-4" /> تراجع عن الرفض
                                         </DropdownMenuItem>
                                     )}
                                      <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/leaves/${req.id}/edit`)} className="gap-2">
@@ -622,9 +582,23 @@ export function LeaveRequestsList() {
                     <AlertDialogTitle className="text-2xl font-black">تأكيد الموافقة</AlertDialogTitle>
                 </div>
                 <AlertDialogDescription className="text-base font-medium">
-                    هل أنت متأكد من موافقتك على طلب إجازة <strong>{requestToApprove?.employeeName}</strong>؟ سيتم خصم الأيام من رصيده آلياً.
+                    هل أنت متأكد من موافقتك على طلب إجازة <strong>{requestToApprove?.employeeName}</strong>؟ سيتم خصم الأيام المدفوعة فقط من رصيده آلياً.
                 </AlertDialogDescription>
             </AlertDialogHeader>
+
+            <div className="mt-4 p-6 bg-muted/20 rounded-[2rem] border-2 border-dashed space-y-4">
+                <h4 className="font-black text-sm flex items-center gap-2 text-primary"><Calculator className="h-4 w-4"/> ملخص الحسبة المالية للطلب:</h4>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                    <div className="bg-white p-3 rounded-2xl shadow-sm">
+                        <p className="text-[10px] font-bold text-green-700 uppercase">خصم رصيد</p>
+                        <p className="text-xl font-black">{(requestToApprove?.workingDays || 0) - (requestToApprove?.unpaidDays || 0)} يوم</p>
+                    </div>
+                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-orange-100">
+                        <p className="text-[10px] font-bold text-orange-700 uppercase">بدون راتب</p>
+                        <p className="text-xl font-black">{requestToApprove?.unpaidDays || 0} يوم</p>
+                    </div>
+                </div>
+            </div>
 
             {lastLeaveInfo && (
                 <div className="mt-4 p-4 border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl space-y-2 animate-in zoom-in-95">
@@ -678,7 +652,7 @@ export function LeaveRequestsList() {
             <AlertDialogHeader>
                 <AlertDialogTitle>تأكيد صرف راتب الإجازة</AlertDialogTitle>
                 <AlertDialogDescription>
-                    سيتم إنشاء كشف راتب إجازة مسودة للموظف بناءً على عدد أيام الإجازة المعتمدة. هل تود المتابعة؟
+                    سيتم إنشاء كشف راتب إجازة مسودة للموظف بناءً على عدد الأيام المدفوعة فقط. هل تود المتابعة؟
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2">
@@ -693,34 +667,22 @@ export function LeaveRequestsList() {
       <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
-                <AlertDialogTitle className="text-xl font-black text-orange-700">تراجع واسترداد رصيد</AlertDialogTitle>
-                <AlertDialogDescription className="text-base font-medium">
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-orange-50 rounded-2xl text-orange-600 shadow-inner">
+                        <Undo2 className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black text-orange-700">تراجع واسترداد رصيد</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium leading-relaxed">
                     هل أنت متأكد من التراجع عن الموافقة على طلب إجازة <strong>{requestToUndoApproval?.employeeName}</strong>؟ 
                     <br/><br/>
-                    سيقوم النظام بإعادة الحالة إلى "معلق" و<strong>استرداد الأيام المخصومة</strong> وإرجاعها لرصيد الموظف آلياً.
+                    سيقوم النظام بإعادة الحالة إلى "معلق" و<strong>استرداد الأيام المخصومة فعلياً</strong> وإرجاعها لرصيد الموظف آلياً.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-6 gap-2">
                 <AlertDialogCancel className="rounded-xl font-bold" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-black px-10">
+                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-black px-10 shadow-lg shadow-orange-100">
                     {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد التراجع والاسترداد'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!requestToUndoRejection} onOpenChange={() => setRequestToUndoRejection(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-3xl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>تراجع عن الرفض</AlertDialogTitle>
-                <AlertDialogDescription>
-                    هل أنت متأكد من التراجع عن رفض طلب إجازة <strong>{requestToUndoRejection?.employeeName}</strong>؟ سيتم إعادة الحالة إلى "معلق".
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
-                <AlertDialogCancel className="rounded-xl font-bold" disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUndoRejection} disabled={isProcessingAction} className="bg-primary hover:bg-primary/90 rounded-xl font-black">
-                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد التراجع'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

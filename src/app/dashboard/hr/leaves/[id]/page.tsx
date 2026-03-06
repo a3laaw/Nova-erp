@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -8,7 +9,7 @@ import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2 } from 'lucide-react';
+import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -21,7 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -107,20 +109,7 @@ export default function LeaveRequestDetailsPage() {
     }, [firestore, leaveRequest?.employeeId, id]);
 
     const handlePrint = () => {
-        const element = document.getElementById('printable-leave-form');
-        if (!element || !leaveRequest) return;
-        
-        import('html2pdf.js').then(module => {
-            const html2pdf = module.default;
-            const opt = {
-                margin: 0.5,
-                filename: `leave_request_${leaveRequest.employeeName}_${leaveRequest.id}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-            };
-            html2pdf().from(element).set(opt).save();
-        });
+        window.print();
     };
 
     const handleStartLeave = async () => {
@@ -291,6 +280,25 @@ export default function LeaveRequestDetailsPage() {
                                 </div>
                             </div>
                         </section>
+
+                        {/* ✨ تفصيل التقسيم المرن في النموذج المطبوع */}
+                        {leaveRequest.leaveType === 'Annual' && (leaveRequest.unpaidDays || 0) > 0 && (
+                            <section className="bg-orange-50 border-2 border-orange-200 p-6 rounded-3xl space-y-3">
+                                <h4 className="font-black text-orange-800 flex items-center gap-2">
+                                    <Calculator className="h-5 w-5" /> تفصيل خصم الأيام (عجز رصيد):
+                                </h4>
+                                <div className="grid grid-cols-2 gap-8 text-center">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-orange-700 uppercase">مخصوم من الرصيد السنوي</p>
+                                        <p className="text-2xl font-black text-orange-900">{(leaveRequest.workingDays || 0) - (leaveRequest.unpaidDays || 0)} <span className="text-sm">يوم</span></p>
+                                    </div>
+                                    <div className="space-y-1 border-r border-orange-200">
+                                        <p className="text-[10px] font-bold text-red-700 uppercase">إجازة بدون راتب</p>
+                                        <p className="text-2xl font-black text-red-800">{leaveRequest.unpaidDays} <span className="text-sm">يوم</span></p>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
                         
                         <div className="space-y-3">
                             <h4 className="font-black text-gray-700 flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/> مبررات طلب الإجازة:</h4>
@@ -298,23 +306,6 @@ export default function LeaveRequestDetailsPage() {
                                 {leaveRequest.notes || 'لم يتم إدخل ملاحظات إضافية.'}
                             </p>
                         </div>
-                        
-                        <section className="p-8 bg-primary/5 rounded-[2.5rem] border-2 border-primary/10 shadow-inner">
-                            <h4 className="font-black text-primary mb-6 text-center text-lg">تحليل رصيد الإجازة السنوية</h4>
-                            <div className="flex flex-col sm:flex-row justify-around items-center gap-8 text-center">
-                                <div className="space-y-1">
-                                    <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">الرصيد قبل الطلب</p>
-                                    <p className="font-black text-4xl text-foreground font-mono">{calculateAnnualLeaveBalance(employee, new Date())}</p>
-                                </div>
-                                <div className="h-12 w-px bg-primary/20 hidden sm:block"></div>
-                                <div className="space-y-1">
-                                    <p className="text-xs font-black text-primary uppercase tracking-widest">الرصيد المتبقي المتوقع</p>
-                                    <p className="font-black text-4xl text-primary font-mono">
-                                        {calculateAnnualLeaveBalance(employee, new Date()) - (leaveRequest.leaveType === 'Annual' ? leaveRequest.workingDays || 0 : 0)}
-                                    </p>
-                                </div>
-                            </div>
-                        </section>
                     </main>
                     
                     <footer className="pt-20 space-y-16">

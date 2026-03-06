@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -16,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Upload, AlertCircle, Sparkles, Clock } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator, ArrowDownCircle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -99,10 +100,23 @@ export default function NewLeaveRequestPage() {
 
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
-    const leaveDuration = useMemo(() => {
-        if (!startDate || !endDate) return { totalDays: 0, workingDays: 0 };
-        return calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || [], publicHolidays);
-    }, [startDate, endDate, branding, publicHolidays]);
+    // ✨ محرك تحليل الرصيد والتقسيم المرن (Flex Balance Engine)
+    const leaveAnalysis = useMemo(() => {
+        if (!startDate || !endDate) return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
+        
+        const days = calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
+        const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
+        
+        if (!selectedEmployee || leaveType !== 'Annual') {
+            return { ...days, paidDays: days.workingDays, unpaidDays: 0 };
+        }
+
+        const currentBalance = calculateAnnualLeaveBalance(selectedEmployee, new Date());
+        const paidDays = Math.min(days.workingDays, currentBalance);
+        const unpaidDays = Math.max(0, days.workingDays - paidDays);
+
+        return { ...days, paidDays, unpaidDays };
+    }, [startDate, endDate, branding, publicHolidays, employees, selectedEmployeeId, leaveType]);
 
     const employeeOptions = useMemo(() => (employees || []).map(e => ({ value: e.id!, label: e.fullName })), [employees]);
 
@@ -120,18 +134,6 @@ export default function NewLeaveRequestPage() {
              toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموظف.' });
             return;
         }
-        
-        if (leaveType === 'Annual') {
-            const currentBalance = calculateAnnualLeaveBalance(selectedEmployee, new Date());
-            if (currentBalance < leaveDuration.workingDays) {
-                toast({
-                    variant: 'destructive',
-                    title: 'رصيد غير كافٍ',
-                    description: `رصيد الإجازات المتبقي للموظف (${currentBalance} أيام) لا يكفي لتغطية هذه الإجازة (${leaveDuration.workingDays} أيام عمل).`
-                });
-                return;
-            }
-        }
 
         savingRef.current = true;
         setIsSaving(true);
@@ -143,8 +145,9 @@ export default function NewLeaveRequestPage() {
                 leaveType: leaveType,
                 startDate: startDate,
                 endDate: endDate,
-                days: leaveDuration.totalDays,
-                workingDays: leaveDuration.workingDays,
+                days: leaveAnalysis.totalDays,
+                workingDays: leaveAnalysis.workingDays,
+                unpaidDays: leaveAnalysis.unpaidDays, // حفظ الأيام بدون راتب
                 notes: notes,
                 passportReceived: passportReceived,
                 status: 'pending' as const,
@@ -174,14 +177,14 @@ export default function NewLeaveRequestPage() {
                 <CardContent className="p-8 space-y-6">
                      {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                       <div className="grid gap-2">
-                        <Label htmlFor="employee" className="font-bold">الموظف <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="employee" className="font-bold text-gray-700">الموظف <span className="text-destructive">*</span></Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
                             placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
                             disabled={loading || isSaving}
-                            className="h-11 rounded-xl"
+                            className="h-12 rounded-xl"
                         />
                       </div>
                     )}
@@ -192,7 +195,7 @@ export default function NewLeaveRequestPage() {
                             <Sparkles className="h-5 w-5 text-primary" />
                             <AlertTitle className="text-primary font-black text-sm">سياق القرار (HR Insights)</AlertTitle>
                             <AlertDescription className="mt-1 text-xs font-bold leading-relaxed">
-                                كانت آخر إجازة لهذا الموظف من نوع <strong>{lastLeaveInfo.leaveType === 'Annual' ? 'سنوية' : 'مرضية/طارئة'}</strong>، 
+                                كانت آخر إجازة لهذا الموظف من نوع <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong>، 
                                 انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
                                 أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong> تقريباً.
                             </AlertDescription>
@@ -201,9 +204,9 @@ export default function NewLeaveRequestPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType" className="font-bold">نوع الإجازة <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="leaveType" className="font-bold text-gray-700">نوع الإجازة <span className="text-destructive">*</span></Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
-                            <SelectTrigger id="leaveType" className="h-11 rounded-xl"><SelectValue/></SelectTrigger>
+                            <SelectTrigger id="leaveType" className="h-12 rounded-xl"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
                                 <SelectItem value="Sick">مرضية</SelectItem>
@@ -215,35 +218,64 @@ export default function NewLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-bold">من تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
+                        <Label htmlFor="startDate" className="font-bold text-gray-700">من تاريخ <span className="text-destructive">*</span></Label>
+                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-12 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-bold">إلى تاريخ <span className="text-destructive">*</span></Label>
-                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
+                        <Label htmlFor="endDate" className="font-bold text-gray-700">إلى تاريخ <span className="text-destructive">*</span></Label>
+                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-12 rounded-xl" />
                       </div>
                     </div>
-                    {leaveDuration.totalDays > 0 && (
-                      <div className="text-sm text-primary font-bold p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
-                        <p>إجمالي الأيام: <span className="text-lg font-black">{leaveDuration.totalDays}</span></p>
-                        <Separator orientation="vertical" className="h-6" />
-                        <p>أيام العمل الفعلية: <span className="text-lg font-black">{leaveDuration.workingDays}</span></p>
+
+                    {/* ✨ تحليل التقسيم المرن للأيام */}
+                    {leaveAnalysis.totalDays > 0 && (
+                      <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="text-sm font-bold p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col sm:flex-row justify-around gap-4 text-center">
+                            <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground tracking-widest">إجمالي الأيام</p>
+                                <p className="text-2xl font-black">{leaveAnalysis.totalDays} يوم</p>
+                            </div>
+                            <Separator orientation="vertical" className="h-10 hidden sm:block mx-4" />
+                            <div className="space-y-1">
+                                <p className="text-[10px] uppercase text-muted-foreground tracking-widest">أيام العمل الفعلية</p>
+                                <p className="text-2xl font-black text-primary">{leaveAnalysis.workingDays} يوم</p>
+                            </div>
+                        </div>
+
+                        {leaveType === 'Annual' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="p-4 rounded-2xl bg-green-50 border border-green-100 flex flex-col items-center gap-1">
+                                    <Label className="text-[10px] font-black text-green-700 uppercase">خصم من الرصيد</Label>
+                                    <p className="text-2xl font-black text-green-800 font-mono">{leaveAnalysis.paidDays} <span className="text-sm font-bold">يوم</span></p>
+                                </div>
+                                <div className={cn(
+                                    "p-4 rounded-2xl border flex flex-col items-center gap-1 transition-all",
+                                    leaveAnalysis.unpaidDays > 0 ? "bg-orange-50 border-orange-200 animate-pulse" : "bg-muted/30 border-muted opacity-40"
+                                )}>
+                                    <Label className={cn("text-[10px] font-black uppercase", leaveAnalysis.unpaidDays > 0 ? "text-orange-700" : "text-muted-foreground")}>بدون راتب (عجز رصيد)</Label>
+                                    <p className={cn("text-2xl font-black font-mono", leaveAnalysis.unpaidDays > 0 ? "text-orange-800" : "text-muted-foreground")}>
+                                        {leaveAnalysis.unpaidDays} <span className="text-sm font-bold">يوم</span>
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                       </div>
                     )}
+
                      <div className="grid gap-2">
-                      <Label htmlFor="notes" className="font-bold">السبب / ملاحظات <span className="text-destructive">*</span></Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl" disabled={isSaving} />
+                      <Label htmlFor="notes" className="font-bold text-gray-700">السبب / ملاحظات <span className="text-destructive">*</span></Label>
+                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2" placeholder="اشرح سبب طلب الإجازة..." disabled={isSaving} />
                     </div>
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
+                    <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-2xl border">
                         <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
-                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer">هل تم استلام جواز السفر من الموظف؟</Label>
+                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer text-gray-700">هل تم استلام جواز السفر من الموظف؟</Label>
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
                      <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
-                        {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />}
-                        {isSaving ? 'جاري الحفظ والتحويل...' : 'إرسال طلب الإجازة'}
+                    <Button type="submit" disabled={isSaving || loading} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[280px]">
+                        {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6" />}
+                        {isSaving ? 'جاري الحفظ...' : 'إرسال طلب الإجازة'}
                     </Button>
                 </CardFooter>
             </form>
