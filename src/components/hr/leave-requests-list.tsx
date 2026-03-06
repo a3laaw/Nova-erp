@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
