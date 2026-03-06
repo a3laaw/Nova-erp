@@ -34,6 +34,13 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn, formatCurrency } from '@/lib/utils';
 
+const leaveTypeTranslations: Record<string, string> = {
+    'Annual': 'سنوية',
+    'Sick': 'مرضية',
+    'Emergency': 'طارئة',
+    'Unpaid': 'بدون أجر'
+};
+
 export default function NewLeaveRequestPage() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -64,7 +71,7 @@ export default function NewLeaveRequestPage() {
         }
     }, [currentUser]);
 
-    // ✨ محرك جلب السياق الذكي المطور (تجنب مشاكل الفهرسة عبر الفرز البرمجي)
+    // جلب سياق القرار الذكي (آخر إجازة)
     useEffect(() => {
         if (!firestore || !selectedEmployeeId) {
             setLastLeaveInfo(null);
@@ -75,7 +82,6 @@ export default function NewLeaveRequestPage() {
         const fetchLastLeave = async () => {
             setLoadingContext(true);
             try {
-                // نكتفي بفلترة الموظف برمجياً لضمان عدم توقف الاستعلام بسبب نقص الفهارس المركبة
                 const q = query(
                     collection(firestore, 'leaveRequests'),
                     where('employeeId', '==', selectedEmployeeId)
@@ -174,7 +180,7 @@ export default function NewLeaveRequestPage() {
     };
     
     return (
-        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
                  <CardHeader className="bg-primary/5 pb-8 border-b">
                     <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>

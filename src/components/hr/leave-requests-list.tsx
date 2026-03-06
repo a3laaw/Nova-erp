@@ -100,7 +100,7 @@ export function LeaveRequestsList() {
 
   const loading = loadingLeaves || loadingEmployees;
 
-  // جلب سياق القرار (آخر إجازة) عند محاولة المراجعة
+  // جلب سياق القرار الذكي
   useEffect(() => {
     const targetReq = requestToApprove || requestToReject;
     if (!firestore || !targetReq?.employeeId) {
