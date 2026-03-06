@@ -1,11 +1,11 @@
 // ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
-// IMPROVED: Changed dialog to page navigation for new/edit actions.
+// IMPROVED: إضافة "سياق القرار الذكي" داخل نافذة الموافقة السريعة
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, addDoc, where, limit, getDocs } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -15,11 +15,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -43,6 +43,10 @@ const statusTranslations: Record<LeaveRequest['status'], string> = {
   pending: 'معلق',
   approved: 'موافق عليه',
   rejected: 'مرفوض',
+};
+
+const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
+    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
 };
 
 export function LeaveRequestsList() {
@@ -63,12 +67,50 @@ export function LeaveRequestsList() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-  
+  // ✨ سياق القرار الذكي للـ HR
+  const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
+  const [loadingContext, setLoadingHistory] = useState(false);
+
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: leaveRequests, loading: loadingLeaves } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
   const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
 
   const loading = loadingLeaves || loadingEmployees;
+
+  // جلب آخر إجازة عند الرغبة في الموافقة لتوفير سياق للـ HR
+  useEffect(() => {
+    const targetReq = requestToApprove || requestToReject;
+    if (!firestore || !targetReq?.employeeId) {
+        setLastLeaveInfo(null);
+        return;
+    }
+
+    const fetchContext = async () => {
+        setLoadingHistory(true);
+        try {
+            const q = query(
+                collection(firestore, 'leaveRequests'),
+                where('employeeId', '==', targetReq.employeeId),
+                where('status', '==', 'approved'),
+                orderBy('endDate', 'desc'),
+                limit(5)
+            );
+            const snap = await getDocs(q);
+            const filtered = snap.docs
+                .map(d => ({ id: d.id, ...d.data() } as LeaveRequest))
+                .filter(l => l.id !== targetReq.id);
+
+            if (filtered.length > 0) setLastLeaveInfo(filtered[0]);
+            else setLastLeaveInfo(null);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    fetchContext();
+  }, [firestore, requestToApprove, requestToReject]);
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
@@ -264,6 +306,9 @@ export function LeaveRequestsList() {
             leaveRequestId: requestToPay.id,
             earnings: {
                 basicSalary: leaveSalary,
+                housingAllowance: 0,
+                transportAllowance: 0,
+                commission: 0,
             },
             deductions: {
                 absenceDeduction: 0,
@@ -295,122 +340,158 @@ export function LeaveRequestsList() {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <Button asChild>
+      <div className="flex justify-end mb-6">
+        <Button asChild className="h-11 px-8 rounded-xl font-black gap-2 shadow-lg shadow-primary/20">
           <Link href="/dashboard/hr/leaves/new">
-            <PlusCircle className="ml-2 h-4 w-4" />
-            طلب إجازة جديد
+            <PlusCircle className="h-5 w-5" />
+            تقديم طلب إجازة جديد
           </Link>
         </Button>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>اسم الموظف</TableHead>
-              <TableHead>نوع الإجازة</TableHead>
-              <TableHead>الفترة</TableHead>
-              <TableHead>الأيام</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>الإجراءات</TableHead>
+          <TableHeader className="bg-[#F8F9FE]">
+            <TableRow className="border-none">
+              <TableHead className="px-8 py-5 font-black text-[#7209B7]">اسم الموظف</TableHead>
+              <TableHead className="font-black text-[#7209B7]">نوع الإجازة</TableHead>
+              <TableHead className="font-black text-[#7209B7]">الفترة</TableHead>
+              <TableHead className="font-black text-[#7209B7]">الأيام</TableHead>
+              <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
+              <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
-            ))}
-            {!loading && leaveRequests.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد طلبات إجازة.</TableCell></TableRow>
-            )}
-            {!loading && leaveRequests.map(req => (
-              <TableRow key={req.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/dashboard/hr/leaves/${req.id}`)}>
-                <TableCell className="font-medium">{req.employeeName}</TableCell>
-                <TableCell>{req.leaveType}</TableCell>
-                <TableCell>{formatDate(req.startDate)} - {formatDate(req.endDate)}</TableCell>
-                <TableCell>{req.workingDays} يوم عمل</TableCell>
-                <TableCell><Badge variant="outline" className={statusColors[req.status]}>{statusTranslations[req.status]}</Badge></TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}><TableCell colSpan={6} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+              ))
+            ) : leaveRequests.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد طلبات إجازة مسجلة.</TableCell></TableRow>
+            ) : (
+              leaveRequests.map(req => (
+                <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16 cursor-pointer" onClick={() => router.push(`/dashboard/hr/leaves/${req.id}`)}>
+                  <TableCell className="px-8 font-black text-gray-800">{req.employeeName}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-bold px-3">
+                        {leaveTypeTranslations[req.leaveType]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs opacity-60">
+                    <div className="flex items-center gap-1">
+                        <span>{formatDate(req.startDate)}</span>
+                        <ArrowRight className="h-3 w-3 mx-1 rotate-180" />
+                        <span>{formatDate(req.endDate)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-black">{req.workingDays} يوم عمل</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[req.status])}>
+                        {statusTranslations[req.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent dir="rtl">
-                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                        <DropdownMenuContent dir="rtl" className="rounded-xl">
+                            <DropdownMenuLabel>إجراءات الطلب</DropdownMenuLabel>
                              {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                                 <>
                                     {req.status === 'approved' && !req.isSalaryPaid && (
-                                        <DropdownMenuItem onClick={() => setRequestToPay(req)}>
-                                            <Banknote className="ml-2 h-4 w-4" /> صرف راتب الإجازة
+                                        <DropdownMenuItem onClick={() => setRequestToPay(req)} className="gap-2">
+                                            <Banknote className="h-4 w-4" /> صرف راتب الإجازة
                                         </DropdownMenuItem>
                                     )}
                                     {req.status === 'pending' && (
                                         <>
-                                            <DropdownMenuItem onClick={() => setRequestToApprove(req)} className="text-green-600 focus:text-green-700 focus:bg-green-50">
-                                                <Check className="ml-2 h-4 w-4" /> موافقة
+                                            <DropdownMenuItem onClick={() => setRequestToApprove(req)} className="text-green-600 gap-2 font-bold">
+                                                <Check className="h-4 w-4" /> موافقة
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => setRequestToReject(req)} className="text-red-600 focus:text-red-700 focus:bg-red-50">
-                                                <X className="ml-2 h-4 w-4" /> رفض
+                                            <DropdownMenuItem onClick={() => setRequestToReject(req)} className="text-red-600 gap-2 font-bold">
+                                                <X className="h-4 w-4" /> رفض الطلب
                                             </DropdownMenuItem>
                                         </>
                                     )}
                                     {req.status === 'approved' && (
-                                        <DropdownMenuItem onClick={() => setRequestToUndoApproval(req)} className="text-orange-600 focus:text-orange-700 focus:bg-orange-50">
-                                            <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الموافقة
+                                        <DropdownMenuItem onClick={() => setRequestToUndoApproval(req)} className="text-orange-600 gap-2">
+                                            <Undo2 className="h-4 w-4" /> تراجع عن الموافقة
                                         </DropdownMenuItem>
                                     )}
                                      {req.status === 'rejected' && (
-                                        <DropdownMenuItem onClick={() => setRequestToUndoRejection(req)}>
-                                            <Undo2 className="ml-2 h-4 w-4" /> تراجع عن الرفض
+                                        <DropdownMenuItem onClick={() => setRequestToUndoRejection(req)} className="gap-2">
+                                            <Undo2 className="h-4 w-4" /> تراجع عن الرفض
                                         </DropdownMenuItem>
                                     )}
-                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/leaves/${req.id}/edit`)}>
-                                        <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                     <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/leaves/${req.id}/edit`)} className="gap-2">
+                                        <Pencil className="h-4 w-4" /> تعديل البيانات
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                 </>
                             )}
                             
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
-                                <Trash2 className="ml-2 h-4 w-4" /> حذف
+                            <DropdownMenuItem className="text-destructive gap-2" onClick={() => setRequestToDelete(req)}>
+                                <Trash2 className="h-4 w-4" /> حذف الطلب
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
       
+      {/* ✨ نافذة الموافقة الذكية (Approval with Context) */}
       <AlertDialog open={!!requestToApprove} onOpenChange={() => setRequestToApprove(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl max-w-lg">
             <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد الموافقة</AlertDialogTitle>
-                <AlertDialogDescription>
-                    هل أنت متأكد من موافقتك على طلب الإجازة للموظف "{requestToApprove?.employeeName}"؟ سيتم تحديث رصيد إجازاته.
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-green-50 rounded-2xl text-green-600 shadow-inner">
+                        <CheckCircle className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">تأكيد الموافقة</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">
+                    هل أنت متأكد من موافقتك على طلب إجازة <strong>{requestToApprove?.employeeName}</strong>؟ سيتم خصم الأيام من رصيده آلياً.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmApproval} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700">
-                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، موافقة'}
+
+            {/* عرض سياق القرار الذكي داخل النافذة */}
+            {lastLeaveInfo && (
+                <div className="mt-4 p-4 border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl space-y-2 animate-in zoom-in-95">
+                    <p className="text-xs font-black text-primary flex items-center gap-2 uppercase tracking-widest">
+                        <Sparkles className="h-3 w-3"/> سياق القرار (HR Insights)
+                    </p>
+                    <p className="text-xs font-bold leading-relaxed text-slate-700">
+                        كان الموظف في إجازة <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong> 
+                        انتهت منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong>.
+                    </p>
+                </div>
+            )}
+
+            <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmApproval} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700 rounded-xl font-black px-10 shadow-lg shadow-green-100">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، موافقة'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
        <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
                 <AlertDialogTitle>تأكيد التراجع عن الموافقة</AlertDialogTitle>
                 <AlertDialogDescription>
-                    هل أنت متأكد من رغبتك في التراجع عن الموافقة؟ سيتم إعادة الطلب إلى حالة "معلق" وإعادة أيام الإجازة لرصيد الموظف.
+                    سيتم إعادة الطلب إلى حالة "معلق" وإعادة أيام الإجازة لرصيد الموظف. هل تود المتابعة؟
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700">
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-bold">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، تراجع'}
                 </AlertDialogAction>
             </AlertDialogFooter>
@@ -418,16 +499,16 @@ export function LeaveRequestsList() {
       </AlertDialog>
 
        <AlertDialog open={!!requestToUndoRejection} onOpenChange={() => setRequestToUndoRejection(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
                 <AlertDialogTitle>تأكيد التراجع عن الرفض</AlertDialogTitle>
                 <AlertDialogDescription>
                     سيتم إعادة الطلب إلى حالة "معلق" ليتم مراجعته مرة أخرى.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUndoRejection} disabled={isProcessingAction}>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoRejection} disabled={isProcessingAction} className="rounded-xl font-bold">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، تراجع'}
                 </AlertDialogAction>
             </AlertDialogFooter>
@@ -435,9 +516,9 @@ export function LeaveRequestsList() {
       </AlertDialog>
 
       <AlertDialog open={!!requestToReject} onOpenChange={() => setRequestToReject(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد الرفض</AlertDialogTitle>
+                <AlertDialogTitle className="text-red-700">تأكيد الرفض</AlertDialogTitle>
                 <AlertDialogDescription>
                     الرجاء ذكر سبب رفض طلب الإجازة للموظف "{requestToReject?.employeeName}".
                 </AlertDialogDescription>
@@ -447,11 +528,12 @@ export function LeaveRequestsList() {
                     placeholder="اكتب سبب الرفض هنا..."
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
+                    className="rounded-2xl border-2"
                 />
             </div>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmRejection} disabled={!rejectionReason.trim() || isProcessingAction}>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmRejection} disabled={!rejectionReason.trim() || isProcessingAction} className="bg-red-600 hover:bg-red-700 rounded-xl font-bold">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'تأكيد الرفض'}
                 </AlertDialogAction>
             </AlertDialogFooter>
@@ -459,32 +541,38 @@ export function LeaveRequestsList() {
       </AlertDialog>
       
        <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
-                <AlertDialogDescription>
-                    هل أنت متأكد من رغبتك في حذف طلب الإجازة الخاص بـ "{requestToDelete?.employeeName}"؟ لا يمكن التراجع عن هذا الإجراء.
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-red-50 rounded-2xl text-red-600 shadow-inner">
+                        <AlertCircle className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">حذف الطلب نهائياً</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">
+                    هل أنت متأكد من حذف طلب إجازة <strong>{requestToDelete?.employeeName}</strong>؟ لا يمكن التراجع عن هذا الإجراء.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالحذف'}
+            <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold" disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-10">
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، احذف الطلب'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+
      <AlertDialog open={!!requestToPay} onOpenChange={() => setRequestToPay(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
                 <AlertDialogTitle>تأكيد صرف راتب الإجازة</AlertDialogTitle>
                 <AlertDialogDescription>
-                    سيتم إنشاء كشف راتب إجازة مسودة للموظف. هل تود المتابعة؟
+                    سيتم إنشاء كشف راتب إجازة مسودة للموظف بناءً على عدد أيام الإجازة المعتمدة. هل تود المتابعة؟
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmLeavePayment} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700">
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmLeavePayment} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700 rounded-xl font-bold">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالصرف'}
                 </AlertDialogAction>
             </AlertDialogFooter>
