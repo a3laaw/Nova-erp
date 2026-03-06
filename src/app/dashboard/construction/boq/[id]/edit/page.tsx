@@ -26,17 +26,17 @@ export default function EditBoqPage() {
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)}>
-      <BoqForm
-        onClose={onClose}
-        isSaving={isSaving}
-        isEditing={true}
-        control={form.control}
-        register={form.register}
-        setValue={form.setValue}
-        watch={form.watch}
-        errors={form.formState.errors}
-      />
-    </form>
+    <BoqForm
+      onClose={onClose}
+      isSaving={isSaving}
+      isEditing={true}
+      control={form.control}
+      register={form.register}
+      setValue={form.setValue}
+      watch={form.watch}
+      errors={form.formState.errors}
+      handleSubmit={form.handleSubmit}
+      onSubmit={onSubmit}
+    />
   );
 }

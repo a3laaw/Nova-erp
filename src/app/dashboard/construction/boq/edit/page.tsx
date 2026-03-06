@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
-import { collection, doc, updateDoc, writeBatch, serverTimestamp, getDocs, query } from 'firebase/firestore';
+import { collection, doc, updateDoc, writeBatch, serverTimestamp, getDocs, query, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BoqForm, boqFormSchema, type BoqFormValues } from '@/components/construction/boq/boq-form';
@@ -10,6 +10,8 @@ import { cleanFirestoreData } from '@/lib/utils';
 import type { Boq, BoqItem } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 export default function EditBoqPage() {
     const router = useRouter();
@@ -18,10 +20,14 @@ export default function EditBoqPage() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    const [initialData, setInitialData] = useState<Partial<BoqFormValues> | null>(null);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [initialItems, setInitialItems] = useState<BoqItem[]>([]);
+
+    const form = useForm<BoqFormValues>({
+        resolver: zodResolver(boqFormSchema),
+        defaultValues: { items: [] }
+    });
 
     useEffect(() => {
         if (!firestore || !id) return;
@@ -46,11 +52,23 @@ export default function EditBoqPage() {
                 const boqItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem));
                 
                 setInitialItems(boqItems);
-                setInitialData({
+                form.reset({
                     name: boqData.name,
-                    clientName: boqData.clientName,
+                    clientName: boqData.clientName || '',
                     status: boqData.status,
-                    items: boqItems.map(item => ({...item, id: item.id!})),
+                    items: boqItems.map(item => ({
+                        uid: item.id!,
+                        description: item.description || '',
+                        unit: item.unit || '',
+                        quantity: item.quantity ?? 0,
+                        sellingUnitPrice: item.sellingUnitPrice ?? 0,
+                        parentId: item.parentId ?? null,
+                        level: item.level ?? 0,
+                        isHeader: item.isHeader ?? false,
+                        itemId: item.itemId || '',
+                        notes: item.notes || '',
+                        itemNumber: item.itemNumber || '',
+                    })),
                 });
             } catch(e) {
                 console.error(e);
@@ -60,7 +78,7 @@ export default function EditBoqPage() {
             }
         };
         fetchData();
-    }, [firestore, id, router, toast]);
+    }, [firestore, id, router, toast, form]);
 
     const handleSave = async (data: BoqFormValues) => {
         if (!firestore || !id) return;
@@ -71,39 +89,32 @@ export default function EditBoqPage() {
             
             const totalValue = data.items.reduce((sum, item) => {
                 if (item.isHeader) return sum;
-                const isLumpSum = item.unit === 'مقطوعية';
-                const quantity = isLumpSum ? 1 : (item.quantity || 0);
-                return sum + (quantity * (item.sellingUnitPrice || 0));
+                return sum + (item.quantity * item.sellingUnitPrice);
             }, 0);
 
-            batch.update(boqRef, {
+            await updateDoc(boqRef, {
                 name: data.name,
-                clientName: data.clientName,
+                clientName: data.clientName || null,
                 status: data.status,
                 totalValue,
                 itemCount: data.items.length,
+                updatedAt: serverTimestamp(),
             });
 
-            const originalItemIds = new Set(initialItems.map(item => item.id));
-            const currentItemIds = new Set(data.items.map(item => item.id));
-
-            for (const originalItem of initialItems) {
-                if (!currentItemIds.has(originalItem.id!)) {
-                    batch.delete(doc(firestore, `boqs/${id}/items`, originalItem.id!));
+            const currentUids = new Set(data.items.map(i => i.uid));
+            initialItems.forEach(item => {
+                if (!currentUids.has(item.id!)) {
+                    batch.delete(doc(firestore, `boqs/${id}/items`, item.id!));
                 }
-            }
+            });
 
-            for (const item of data.items) {
-                const itemRef = originalItemIds.has(item.id)
-                    ? doc(firestore, `boqs/${id}/items`, item.id)
-                    : doc(collection(firestore, `boqs/${id}/items`));
-                
-                const { id: clientSideId, ...itemData } = item;
-                batch.set(itemRef, cleanFirestoreData(itemData), { merge: true });
-            }
+            data.items.forEach((item) => {
+                const { uid, ...itemData } = item;
+                const itemRef = doc(firestore, `boqs/${id}/items`, uid);
+                batch.set(itemRef, cleanFirestoreData(itemData));
+            });
 
             await batch.commit();
-
             toast({ title: 'نجاح', description: 'تم تحديث جدول الكميات بنجاح.' });
             router.push(`/dashboard/construction/boq/${id}`);
 
@@ -117,25 +128,25 @@ export default function EditBoqPage() {
 
     if (loading) {
         return (
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                </CardHeader>
-                <CardContent>
-                    <div className="flex justify-center items-center h-64">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center h-screen gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg font-medium animate-pulse">جاري تحميل البيانات...</p>
+            </div>
         );
     }
 
     return (
         <BoqForm 
-            initialData={initialData}
-            onSave={handleSave}
             onClose={() => router.push(`/dashboard/construction/boq/${id}`)}
             isSaving={isSaving}
+            isEditing={true}
+            control={form.control}
+            register={form.register}
+            setValue={form.setValue}
+            watch={form.watch}
+            errors={form.formState.errors}
+            handleSubmit={form.handleSubmit}
+            onSubmit={handleSave}
         />
     );
 }
