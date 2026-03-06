@@ -3,12 +3,12 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, limit, getDocs, updateDoc, writeBatch, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, where, getDocs, writeBatch, Timestamp, serverTimestamp } from 'firebase/firestore';
 import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle, Calculator } from 'lucide-react';
+import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle, Calculator, FileCheck } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -22,7 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { cn, formatCurrency } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -184,6 +184,13 @@ export default function LeaveRequestDetailsPage() {
                 </Button>
                 
                 <div className="flex gap-3">
+                    {leaveRequest.status === 'returned' && (
+                        <Button asChild variant="outline" className="bg-white shadow-sm rounded-xl font-bold gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                            <Link href={`/dashboard/hr/leaves/${leaveRequest.id}/print-return`}>
+                                <FileCheck className="h-4 w-4" /> طباعة إشعار العودة
+                            </Link>
+                        </Button>
+                    )}
                     {leaveRequest.status === 'approved' && (
                         <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl font-black gap-2">
                             <PlaneTakeoff className="h-4 w-4"/> تسجيل مغادرة الموظف
@@ -195,7 +202,7 @@ export default function LeaveRequestDetailsPage() {
                         </Button>
                     )}
                     <Button onClick={handlePrint} variant="outline" className="bg-white shadow-sm rounded-xl font-bold gap-2">
-                        <Printer className="h-4 w-4"/> طباعة النموذج
+                        <Printer className="h-4 w-4"/> طباعة طلب الإجازة
                     </Button>
                 </div>
             </div>
@@ -352,7 +359,7 @@ export default function LeaveRequestDetailsPage() {
                             <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
                                 <Home className="h-6 w-6" />
                             </div>
-                            <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
+                            <AlertDialogTitle className="text-2xl font-black">إشعار عودة للعمل</AlertDialogTitle>
                         </div>
                         <AlertDialogDescription className="text-base font-medium">يرجى تحديد التاريخ الذي باشر فيه الموظف عمله فعلياً.</AlertDialogDescription>
                     </AlertDialogHeader>

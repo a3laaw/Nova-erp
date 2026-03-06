@@ -8,7 +8,7 @@ import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus } from 'lucide-react';
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus, FileCheck } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInDays } from 'date-fns';
@@ -97,10 +97,27 @@ export default function EmployeeProfilePage() {
     return (
         <div className="space-y-6">
             <Tabs defaultValue="profile" dir="rtl">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
-                    <TabsTrigger value="audit">سجل التدقيق</TabsTrigger>
-                </TabsList>
+                <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <TabsList className="grid w-full md:w-80 grid-cols-2">
+                        <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
+                        <TabsTrigger value="audit">سجل التدقيق</TabsTrigger>
+                    </TabsList>
+                    
+                    <div className="flex gap-2">
+                        <Button asChild variant="outline" className="bg-white shadow-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold gap-2 rounded-xl">
+                            <Link href={`/dashboard/hr/employees/${id}/print-commencement`}>
+                                <FileCheck className="h-4 w-4" /> طباعة إشعار المباشرة
+                            </Link>
+                        </Button>
+                        <Button variant="ghost" onClick={() => router.push('/dashboard/hr/employees')}><ArrowRight className="ml-2 h-4"/> عودة</Button>
+                        <Button asChild>
+                            <Link href={`/dashboard/hr/employees/${id}/edit`}>
+                                <Edit className="ml-2 h-4"/> تعديل
+                            </Link>
+                        </Button>
+                    </div>
+                </div>
+
                 <TabsContent value="profile">
                     <Card>
                         <CardHeader>
@@ -108,14 +125,6 @@ export default function EmployeeProfilePage() {
                                 <div>
                                     <CardTitle className="text-2xl">{employee.fullName}</CardTitle>
                                     <CardDescription>{employee.jobTitle} - {employee.department}</CardDescription>
-                                </div>
-                                <div className="flex gap-2">
-                                     <Button variant="outline" onClick={() => router.push('/dashboard/hr/employees')}><ArrowRight className="ml-2 h-4"/> عودة</Button>
-                                     <Button asChild>
-                                        <Link href={`/dashboard/hr/employees/${id}/edit`}>
-                                            <Edit className="ml-2 h-4"/> تعديل
-                                        </Link>
-                                     </Button>
                                 </div>
                             </div>
                         </CardHeader>
