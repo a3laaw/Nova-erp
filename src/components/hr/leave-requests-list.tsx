@@ -275,8 +275,8 @@ export function LeaveRequestsList() {
     if (!requestToUndoRejection || !firestore) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoRejection.id!);
-        await updateDoc(leaveRef, { status: 'pending', rejectionReason: null });
+        const reqRef = doc(firestore, 'leaveRequests', requestToUndoRejection.id!);
+        await updateDoc(reqRef, { status: 'pending', rejectionReason: null });
         toast({ title: 'نجاح', description: 'تم التراجع عن الرفض.' });
     } catch (e) {
         console.error("Error undoing rejection:", e);
@@ -352,26 +352,19 @@ export function LeaveRequestsList() {
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
-        
         const requestRef = doc(firestore, 'leaveRequests', requestToStart.id!);
         const employeeRef = doc(firestore, 'employees', requestToStart.employeeId);
-
-        // التأكد من وجود الموظف قبل التحديث
-        const empSnap = await getDocs(query(collection(firestore, 'employees'), where('__name__', '==', requestToStart.employeeId), limit(1)));
-        if (empSnap.empty) throw new Error("الموظف غير موجود في النظام.");
 
         batch.update(requestRef, { 
             status: 'on-leave',
             actualStartDate: Timestamp.fromDate(actualDate)
         });
-        
         batch.update(employeeRef, { status: 'on-leave' });
         
         await batch.commit();
         toast({ title: 'تم تسجيل المغادرة', description: `تم توثيق مغادرة الموظف بتاريخ ${format(actualDate, 'dd/MM/yyyy')}.` });
     } catch (e: any) {
-        console.error("Start leave error:", e);
-        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل بدء الإجازة.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل بدء الإجازة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToStart(null);
@@ -387,7 +380,6 @@ export function LeaveRequestsList() {
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
-        
         const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id!);
         const employeeRef = doc(firestore, 'employees', requestToReturn.employeeId);
 
@@ -395,14 +387,12 @@ export function LeaveRequestsList() {
             status: 'returned',
             actualReturnDate: Timestamp.fromDate(actualDate)
         });
-        
         batch.update(employeeRef, { status: 'active' });
         
         await batch.commit();
         toast({ title: 'تمت المباشرة', description: `تم توثيق عودة الموظف للعمل بتاريخ ${format(actualDate, 'dd/MM/yyyy')}.` });
     } catch (e: any) {
-        console.error("Return to work error:", e);
-        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل تسجيل العودة للعمل.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة للعمل.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToReturn(null);
@@ -677,6 +667,40 @@ export function LeaveRequestsList() {
                 <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmLeavePayment} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700 rounded-xl font-bold">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Banknote className="ml-2 h-4 w-4" />} نعم، قم بالصرف
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تراجع عن الموافقة</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من التراجع عن الموافقة على طلب إجازة <strong>{requestToUndoApproval?.employeeName}</strong>؟ سيتم إعادة الحالة إلى "معلق" واسترداد الأيام المخصومة لرصيد الموظف.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-black">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد التراجع'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!requestToUndoRejection} onOpenChange={() => setRequestToUndoRejection(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle>تراجع عن الرفض</AlertDialogTitle>
+                <AlertDialogDescription>
+                    هل أنت متأكد من التراجع عن رفض طلب إجازة <strong>{requestToUndoRejection?.employeeName}</strong>؟ سيتم إعادة الحالة إلى "معلق".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold" disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUndoRejection} disabled={isProcessingAction} className="bg-primary hover:bg-primary/90 rounded-xl font-black">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد التراجع'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
