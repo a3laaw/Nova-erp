@@ -1,17 +1,15 @@
 
-// ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
-// IMPROVED: إضافة بطاقة "سياق القرار الذكي" لعرض آخر إجازة للموظف
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, limit, getDocs, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, collection, query, where, orderBy, limit, getDocs, updateDoc, writeBatch, Timestamp, serverTimestamp } from 'firebase/firestore';
 import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon } from 'lucide-react';
+import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -21,6 +19,10 @@ import { Badge } from '@/components/ui/badge';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DateInput } from '@/components/ui/date-input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -62,6 +64,10 @@ export default function LeaveRequestDetailsPage() {
     const [lastApprovedLeave, setLastApprovedLeave] = useState<LeaveRequest | null>(null);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
+    
+    const [isStartDialogOpen, setIsStartDialogOpen] = useState(false);
+    const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
+    const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
 
     const leaveRequestRef = useMemo(() => firestore && id ? doc(firestore, 'leaveRequests', id) : null, [firestore, id]);
     const { data: leaveRequest, loading: leaveLoading } = useDocument<LeaveRequest>(firestore, leaveRequestRef?.path || null);
@@ -73,7 +79,7 @@ export default function LeaveRequestDetailsPage() {
     useEffect(() => {
         if (!firestore || !leaveRequest?.employeeId) return;
 
-        const fetchLastLeave = async () => {
+        const fetchContext = async () => {
             setLoadingHistory(true);
             try {
                 const q = query(
@@ -86,7 +92,7 @@ export default function LeaveRequestDetailsPage() {
                 const snap = await getDocs(q);
                 const filtered = snap.docs
                     .map(d => ({ id: d.id, ...d.data() } as LeaveRequest))
-                    .filter(l => l.id !== id); // استبعاد الطلب الحالي
+                    .filter(l => l.id !== id);
 
                 if (filtered.length > 0) {
                     setLastApprovedLeave(filtered[0]);
@@ -118,31 +124,39 @@ export default function LeaveRequestDetailsPage() {
         });
     };
 
-    // ✨ محرك بدء الإجازة
+    // ✨ محرك بدء الإجازة مع التاريخ الفعلي
     const handleStartLeave = async () => {
-        if (!leaveRequest || !firestore) return;
+        if (!leaveRequest || !firestore || !actualDate) return;
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { status: 'on-leave' });
+            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { 
+                status: 'on-leave',
+                actualStartDate: Timestamp.fromDate(actualDate)
+            });
             batch.update(doc(firestore, 'employees', leaveRequest.employeeId), { status: 'on-leave' });
             await batch.commit();
             toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف.' });
+            setIsStartDialogOpen(false);
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ' });
         } finally { setIsProcessing(false); }
     };
 
-    // ✨ محرك العودة للعمل
+    // ✨ محرك العودة للعمل مع التاريخ الفعلي
     const handleReturnToWork = async () => {
-        if (!leaveRequest || !firestore) return;
+        if (!leaveRequest || !firestore || !actualDate) return;
         setIsProcessing(true);
         try {
             const batch = writeBatch(firestore);
-            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { status: 'returned' });
+            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { 
+                status: 'returned',
+                actualReturnDate: Timestamp.fromDate(actualDate)
+            });
             batch.update(doc(firestore, 'employees', leaveRequest.employeeId), { status: 'active' });
             await batch.commit();
             toast({ title: 'تمت العودة', description: 'تم تسجيل عودة الموظف للعمل وإغلاق الملف.' });
+            setIsReturnDialogOpen(false);
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ' });
         } finally { setIsProcessing(false); }
@@ -174,14 +188,14 @@ export default function LeaveRequestDetailsPage() {
                 
                 <div className="flex gap-3">
                     {leaveRequest.status === 'approved' && (
-                        <Button onClick={handleStartLeave} disabled={isProcessing} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl font-black gap-2">
-                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlaneTakeoff className="h-4 w-4"/>}
+                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl font-black gap-2">
+                            <PlaneTakeoff className="h-4 w-4"/>
                             تسجيل مغادرة الموظف
                         </Button>
                     )}
                     {leaveRequest.status === 'on-leave' && (
-                        <Button onClick={handleReturnToWork} disabled={isProcessing} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 rounded-xl font-black gap-2">
-                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Home className="h-4 w-4"/>}
+                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 rounded-xl font-black gap-2">
+                            <Home className="h-4 w-4"/>
                             إشعار عودة للعمل
                         </Button>
                     )}
@@ -325,6 +339,60 @@ export default function LeaveRequestDetailsPage() {
                     </footer>
                 </div>
             </div>
+
+            {/* ✨ نافذة تسجيل المغادرة التاريخية */}
+            <AlertDialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen}>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 shadow-inner">
+                                <PlaneTakeoff className="h-6 w-6" />
+                            </div>
+                            <AlertDialogTitle className="text-2xl font-black">تسجيل مغادرة الموظف</AlertDialogTitle>
+                        </div>
+                        <AlertDialogDescription className="text-base font-medium">
+                            يرجى تحديد التاريخ الذي غادر فيه الموظف العمل فعلياً.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4 space-y-2">
+                        <Label className="font-bold pr-1">تاريخ المغادرة الفعلي:</Label>
+                        <DateInput value={actualDate} onChange={setActualDate} />
+                    </div>
+                    <AlertDialogFooter className="mt-2 gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleStartLeave} disabled={isProcessing || !actualDate} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black px-10 shadow-lg shadow-blue-100">
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد المغادرة'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* ✨ نافذة إشعار العودة التاريخي */}
+            <AlertDialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
+                                <Home className="h-6 w-6" />
+                            </div>
+                            <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
+                        </div>
+                        <AlertDialogDescription className="text-base font-medium">
+                            يرجى تحديد التاريخ الذي باشر فيه الموظف عمله فعلياً.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-4 space-y-2">
+                        <Label className="font-bold pr-1">تاريخ المباشرة الفعلي:</Label>
+                        <DateInput value={actualDate} onChange={setActualDate} />
+                    </div>
+                    <AlertDialogFooter className="mt-2 gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleReturnToWork} disabled={isProcessing || !actualDate} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-black px-10 shadow-lg shadow-indigo-100">
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد العودة'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

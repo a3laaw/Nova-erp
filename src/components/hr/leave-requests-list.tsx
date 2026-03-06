@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, addDoc, where, limit, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, getDocs, where, limit } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calendar } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -30,6 +30,8 @@ import { createNotification, findUserIdByEmployeeId } from '@/services/notificat
 import { formatCurrency, cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { DateInput } from '../ui/date-input';
+import { Label } from '../ui/label';
 
 
 const statusColors: Record<LeaveRequest['status'], string> = {
@@ -70,6 +72,7 @@ export function LeaveRequestsList() {
   const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
 
   const [rejectionReason, setRejectionReason] = useState('');
+  const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // ✨ سياق القرار الذكي للـ HR
@@ -294,7 +297,7 @@ export function LeaveRequestsList() {
         if (!employee) throw new Error("لم يتم العثور على بيانات الموظف.");
 
         const fullSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-        const dailyRate = fullSalary / 26;
+        const dailyRate = fullSalary > 0 ? fullSalary / 26 : 0;
         const leaveSalary = dailyRate * (requestToPay.workingDays || 0);
 
         const batch = writeBatch(firestore);
@@ -342,49 +345,57 @@ export function LeaveRequestsList() {
     }
   };
 
-  // ✨ محرك المغادرة وبدء الإجازة
+  // ✨ محرك المغادرة وبدء الإجازة (مع مرونة التاريخ الفعلي)
   const handleStartLeave = async () => {
-    if (!requestToStart || !firestore) return;
+    if (!requestToStart || !firestore || !actualDate) return;
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
         
-        // 1. تحديث حالة الطلب
-        batch.update(doc(firestore, 'leaveRequests', requestToStart.id), { status: 'on-leave' });
+        // 1. تحديث حالة الطلب مع تخزين تاريخ المغادرة الفعلي
+        batch.update(doc(firestore, 'leaveRequests', requestToStart.id), { 
+            status: 'on-leave',
+            actualStartDate: Timestamp.fromDate(actualDate)
+        });
         
-        // 2. تحديث حالة الموظف لتعطيل استحقاق الرواتب العادية وتغيير حالته في اللوحات
+        // 2. تحديث حالة الموظف
         batch.update(doc(firestore, 'employees', requestToStart.employeeId), { status: 'on-leave' });
         
         await batch.commit();
-        toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف وتحديث حالته في النظام.' });
+        toast({ title: 'تم تسجيل المغادرة', description: `تم توثيق مغادرة الموظف بتاريخ ${format(actualDate, 'dd/MM/yyyy')}.` });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل بدء الإجازة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToStart(null);
+        setActualDate(new Date());
     }
   };
 
-  // ✨ محرك العودة ومباشرة العمل
+  // ✨ محرك العودة ومباشرة العمل (مع مرونة التاريخ الفعلي)
   const handleReturnToWork = async () => {
-    if (!requestToReturn || !firestore) return;
+    if (!requestToReturn || !firestore || !actualDate) return;
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
         
-        // 1. إغلاق ملف الإجازة
-        batch.update(doc(firestore, 'leaveRequests', requestToReturn.id), { status: 'returned' });
+        // 1. إغلاق ملف الإجازة مع تخزين تاريخ المباشرة الفعلي
+        batch.update(doc(firestore, 'leaveRequests', requestToReturn.id), { 
+            status: 'returned',
+            actualReturnDate: Timestamp.fromDate(actualDate)
+        });
         
         // 2. إعادة تفعيل الموظف
         batch.update(doc(firestore, 'employees', requestToReturn.employeeId), { status: 'active' });
         
         await batch.commit();
-        toast({ title: 'تمت العودة', description: 'تم تسجيل مباشرة عمل الموظف وإغلاق ملف الإجازة.' });
+        toast({ title: 'تمت المباشرة', description: `تم توثيق عودة الموظف للعمل بتاريخ ${format(actualDate, 'dd/MM/yyyy')}.` });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة للعمل.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToReturn(null);
+        setActualDate(new Date());
     }
   };
 
@@ -451,12 +462,12 @@ export function LeaveRequestsList() {
                              {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                                 <>
                                     {req.status === 'approved' && (
-                                        <DropdownMenuItem onClick={() => setRequestToStart(req)} className="gap-2 text-blue-600 font-bold">
+                                        <DropdownMenuItem onClick={() => { setActualDate(toFirestoreDate(req.startDate) || new Date()); setRequestToStart(req); }} className="gap-2 text-blue-600 font-bold">
                                             <PlaneTakeoff className="h-4 w-4" /> تسجيل مغادرة
                                         </DropdownMenuItem>
                                     )}
                                     {req.status === 'on-leave' && (
-                                        <DropdownMenuItem onClick={() => setRequestToReturn(req)} className="gap-2 text-indigo-600 font-bold">
+                                        <DropdownMenuItem onClick={() => { setActualDate(toFirestoreDate(req.endDate) || new Date()); setRequestToReturn(req); }} className="gap-2 text-indigo-600 font-bold">
                                             <Home className="h-4 w-4" /> تسجيل عودة للعمل
                                         </DropdownMenuItem>
                                     )}
@@ -505,7 +516,61 @@ export function LeaveRequestsList() {
         </Table>
       </div>
       
-      {/* ✨ نافذة الموافقة الذكية (Approval with Context) */}
+      {/* ✨ نافذة تسجيل المغادرة التاريخية */}
+      <AlertDialog open={!!requestToStart} onOpenChange={() => setRequestToStart(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 shadow-inner">
+                        <PlaneTakeoff className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">تسجيل مغادرة الموظف</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">
+                    يرجى تحديد التاريخ الذي غادر فيه الموظف <strong>{requestToStart?.employeeName}</strong> العمل فعلياً.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+                <Label className="font-bold pr-1">تاريخ المغادرة الفعلي:</Label>
+                <DateInput value={actualDate} onChange={setActualDate} />
+            </div>
+            <AlertDialogFooter className="mt-2 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleStartLeave} disabled={isProcessingAction || !actualDate} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black px-10 shadow-lg shadow-blue-100">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد المغادرة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ✨ نافذة إشعار العودة التاريخي */}
+      <AlertDialog open={!!requestToReturn} onOpenChange={() => setRequestToReturn(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
+                        <Home className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">
+                    يرجى تحديد التاريخ الذي باشر فيه الموظف <strong>{requestToReturn?.employeeName}</strong> عمله فعلياً.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+                <Label className="font-bold pr-1">تاريخ المباشرة الفعلي:</Label>
+                <DateInput value={actualDate} onChange={setActualDate} />
+            </div>
+            <AlertDialogFooter className="mt-2 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReturnToWork} disabled={isProcessingAction || !actualDate} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-black px-10 shadow-lg shadow-indigo-100">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد العودة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ✨ باقي النوافذ كما هي... */}
       <AlertDialog open={!!requestToApprove} onOpenChange={() => setRequestToApprove(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl max-w-lg">
             <AlertDialogHeader>
@@ -520,7 +585,6 @@ export function LeaveRequestsList() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
 
-            {/* عرض سياق القرار الذكي داخل النافذة */}
             {lastLeaveInfo && (
                 <div className="mt-4 p-4 border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl space-y-2 animate-in zoom-in-95">
                     <p className="text-xs font-black text-primary flex items-center gap-2 uppercase tracking-widest">
@@ -537,40 +601,6 @@ export function LeaveRequestsList() {
                 <AlertDialogCancel className="rounded-xl font-bold" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmApproval} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700 rounded-xl font-black px-10 shadow-lg shadow-green-100">
                     {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، موافقة'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-       <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-3xl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد التراجع عن الموافقة</AlertDialogTitle>
-                <AlertDialogDescription>
-                    سيتم إعادة الطلب إلى حالة "معلق" وإعادة أيام الإجازة لرصيد الموظف. هل تود المتابعة؟
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
-                <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUndoApproval} disabled={isProcessingAction} className="bg-orange-600 hover:bg-orange-700 rounded-xl font-bold">
-                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، تراجع'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-       <AlertDialog open={!!requestToUndoRejection} onOpenChange={() => setRequestToUndoRejection(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-3xl">
-            <AlertDialogHeader>
-                <AlertDialogTitle>تأكيد التراجع عن الرفض</AlertDialogTitle>
-                <AlertDialogDescription>
-                    سيتم إعادة الطلب إلى حالة "معلق" ليتم مراجعته مرة أخرى.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
-                <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleUndoRejection} disabled={isProcessingAction} className="rounded-xl font-bold">
-                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، تراجع'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
@@ -635,50 +665,6 @@ export function LeaveRequestsList() {
                 <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmLeavePayment} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700 rounded-xl font-bold">
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Banknote className="ml-2 h-4 w-4" />} نعم، قم بالصرف
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!requestToStart} onOpenChange={() => setRequestToStart(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-3xl">
-            <AlertDialogHeader>
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 shadow-inner">
-                        <PlaneTakeoff className="h-6 w-6" />
-                    </div>
-                    <AlertDialogTitle className="text-2xl font-black">تسجيل مغادرة الموظف</AlertDialogTitle>
-                </div>
-                <AlertDialogDescription className="text-base font-medium">
-                    هل غادر الموظف <strong>{requestToStart?.employeeName}</strong> العمل اليوم؟ سيتم تغيير حالته في النظام إلى "في إجازة".
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="mt-6 gap-2">
-                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleStartLeave} disabled={isProcessingAction} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black px-10">
-                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد المغادرة'}
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!requestToReturn} onOpenChange={() => setRequestToReturn(null)}>
-        <AlertDialogContent dir="rtl" className="rounded-3xl">
-            <AlertDialogHeader>
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
-                        <Home className="h-6 w-6" />
-                    </div>
-                    <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
-                </div>
-                <AlertDialogDescription className="text-base font-medium">
-                    هل باشر الموظف <strong>{requestToReturn?.employeeName}</strong> عمله اليوم؟ سيتم إغلاق ملف الإجازة وإعادته لحالة "نشط".
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter className="mt-6 gap-2">
-                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleReturnToWork} disabled={isProcessingAction} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-black px-10">
-                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد العودة والانتظام'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
