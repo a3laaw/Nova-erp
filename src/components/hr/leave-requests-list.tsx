@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -13,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -35,12 +36,16 @@ const statusColors: Record<LeaveRequest['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   approved: 'bg-green-100 text-green-800 border-green-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
+  'on-leave': 'bg-blue-100 text-blue-800 border-blue-200',
+  'returned': 'bg-indigo-100 text-indigo-800 border-indigo-200',
 };
 
 const statusTranslations: Record<LeaveRequest['status'], string> = {
   pending: 'معلق',
   approved: 'موافق عليه',
   rejected: 'مرفوض',
+  'on-leave': 'في إجازة (مغادر)',
+  'returned': 'عاد للعمل (مكتمل)',
 };
 
 const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
@@ -61,6 +66,8 @@ export function LeaveRequestsList() {
   const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
   const [requestToUndoRejection, setRequestToUndoRejection] = useState<LeaveRequest | null>(null);
   const [requestToPay, setRequestToPay] = useState<LeaveRequest | null>(null);
+  const [requestToStart, setRequestToStart] = useState<LeaveRequest | null>(null);
+  const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
 
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
@@ -89,7 +96,7 @@ export function LeaveRequestsList() {
             const q = query(
                 collection(firestore, 'leaveRequests'),
                 where('employeeId', '==', targetReq.employeeId),
-                where('status', '==', 'approved'),
+                where('status', 'in', ['approved', 'on-leave', 'returned']),
                 orderBy('endDate', 'desc'),
                 limit(5)
             );
@@ -335,6 +342,52 @@ export function LeaveRequestsList() {
     }
   };
 
+  // ✨ محرك المغادرة وبدء الإجازة
+  const handleStartLeave = async () => {
+    if (!requestToStart || !firestore) return;
+    setIsProcessingAction(true);
+    try {
+        const batch = writeBatch(firestore);
+        
+        // 1. تحديث حالة الطلب
+        batch.update(doc(firestore, 'leaveRequests', requestToStart.id), { status: 'on-leave' });
+        
+        // 2. تحديث حالة الموظف لتعطيل استحقاق الرواتب العادية وتغيير حالته في اللوحات
+        batch.update(doc(firestore, 'employees', requestToStart.employeeId), { status: 'on-leave' });
+        
+        await batch.commit();
+        toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف وتحديث حالته في النظام.' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل بدء الإجازة.' });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToStart(null);
+    }
+  };
+
+  // ✨ محرك العودة ومباشرة العمل
+  const handleReturnToWork = async () => {
+    if (!requestToReturn || !firestore) return;
+    setIsProcessingAction(true);
+    try {
+        const batch = writeBatch(firestore);
+        
+        // 1. إغلاق ملف الإجازة
+        batch.update(doc(firestore, 'leaveRequests', requestToReturn.id), { status: 'returned' });
+        
+        // 2. إعادة تفعيل الموظف
+        batch.update(doc(firestore, 'employees', requestToReturn.employeeId), { status: 'active' });
+        
+        await batch.commit();
+        toast({ title: 'تمت العودة', description: 'تم تسجيل مباشرة عمل الموظف وإغلاق ملف الإجازة.' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة للعمل.' });
+    } finally {
+        setIsProcessingAction(false);
+        setRequestToReturn(null);
+    }
+  };
+
 
   return (
     <>
@@ -397,6 +450,16 @@ export function LeaveRequestsList() {
                             <DropdownMenuLabel>إجراءات الطلب</DropdownMenuLabel>
                              {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
                                 <>
+                                    {req.status === 'approved' && (
+                                        <DropdownMenuItem onClick={() => setRequestToStart(req)} className="gap-2 text-blue-600 font-bold">
+                                            <PlaneTakeoff className="h-4 w-4" /> تسجيل مغادرة
+                                        </DropdownMenuItem>
+                                    )}
+                                    {req.status === 'on-leave' && (
+                                        <DropdownMenuItem onClick={() => setRequestToReturn(req)} className="gap-2 text-indigo-600 font-bold">
+                                            <Home className="h-4 w-4" /> تسجيل عودة للعمل
+                                        </DropdownMenuItem>
+                                    )}
                                     {req.status === 'approved' && !req.isSalaryPaid && (
                                         <DropdownMenuItem onClick={() => setRequestToPay(req)} className="gap-2">
                                             <Banknote className="h-4 w-4" /> صرف راتب الإجازة
@@ -571,7 +634,51 @@ export function LeaveRequestsList() {
             <AlertDialogFooter className="gap-2">
                 <AlertDialogCancel className="rounded-xl" disabled={isProcessingAction}>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleConfirmLeavePayment} disabled={isProcessingAction} className="bg-green-600 hover:bg-green-700 rounded-xl font-bold">
-                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالصرف'}
+                    {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Banknote className="ml-2 h-4 w-4" />} نعم، قم بالصرف
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!requestToStart} onOpenChange={() => setRequestToStart(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 shadow-inner">
+                        <PlaneTakeoff className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">تسجيل مغادرة الموظف</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">
+                    هل غادر الموظف <strong>{requestToStart?.employeeName}</strong> العمل اليوم؟ سيتم تغيير حالته في النظام إلى "في إجازة".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleStartLeave} disabled={isProcessingAction} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black px-10">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد المغادرة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!requestToReturn} onOpenChange={() => setRequestToReturn(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
+                        <Home className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">
+                    هل باشر الموظف <strong>{requestToReturn?.employeeName}</strong> عمله اليوم؟ سيتم إغلاق ملف الإجازة وإعادته لحالة "نشط".
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReturnToWork} disabled={isProcessingAction} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-black px-10">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد العودة والانتظام'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

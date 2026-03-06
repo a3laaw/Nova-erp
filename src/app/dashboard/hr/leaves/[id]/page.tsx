@@ -1,3 +1,4 @@
+
 // ADDED: نظام إجازات إلكتروني هجين مع طباعة نموذج ورقي للتوقيع اليدوي
 // IMPROVED: إضافة بطاقة "سياق القرار الذكي" لعرض آخر إجازة للموظف
 'use client';
@@ -5,12 +6,12 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, collection, query, where, orderBy, limit, getDocs, updateDoc, writeBatch } from 'firebase/firestore';
 import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock } from 'lucide-react';
+import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -19,16 +20,21 @@ import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
 
 const statusColors: Record<LeaveRequest['status'], string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  approved: 'bg-green-100 text-green-800',
-  rejected: 'bg-red-100 text-red-800',
+  pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  approved: 'bg-green-100 text-green-800 border-green-200',
+  rejected: 'bg-red-100 text-red-800 border-red-200',
+  'on-leave': 'bg-blue-100 text-blue-800 border-blue-200',
+  'returned': 'bg-indigo-100 text-indigo-800 border-indigo-200',
 };
 const statusTranslations: Record<LeaveRequest['status'], string> = {
   pending: 'تحت المراجعة',
-  approved: 'موافق عليه',
+  approved: 'موافق عليه (بانتظار المغادرة)',
   rejected: 'مرفوض',
+  'on-leave': 'في إجازة حالياً',
+  'returned': 'عاد للعمل',
 };
 const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
@@ -48,12 +54,14 @@ function InfoRow({ label, value, icon }: { label: string, value: string | React.
 export default function LeaveRequestDetailsPage() {
     const params = useParams();
     const router = useRouter();
+    const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
     const { firestore } = useFirebase();
     const { branding, loading: brandingLoading } = useBranding();
 
     const [lastApprovedLeave, setLastApprovedLeave] = useState<LeaveRequest | null>(null);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const leaveRequestRef = useMemo(() => firestore && id ? doc(firestore, 'leaveRequests', id) : null, [firestore, id]);
     const { data: leaveRequest, loading: leaveLoading } = useDocument<LeaveRequest>(firestore, leaveRequestRef?.path || null);
@@ -71,9 +79,9 @@ export default function LeaveRequestDetailsPage() {
                 const q = query(
                     collection(firestore, 'leaveRequests'),
                     where('employeeId', '==', leaveRequest.employeeId),
-                    where('status', '==', 'approved'),
+                    where('status', 'in', ['approved', 'on-leave', 'returned']),
                     orderBy('endDate', 'desc'),
-                    limit(2) // نأخذ 2 للتأكد أننا لا نعرض الطلب الحالي إذا كان معتمداً بالفعل
+                    limit(5)
                 );
                 const snap = await getDocs(q);
                 const filtered = snap.docs
@@ -90,7 +98,7 @@ export default function LeaveRequestDetailsPage() {
             }
         };
 
-        fetchLastLeave();
+        fetchContext();
     }, [firestore, leaveRequest?.employeeId, id]);
 
     const handlePrint = () => {
@@ -108,6 +116,36 @@ export default function LeaveRequestDetailsPage() {
             };
             html2pdf().from(element).set(opt).save();
         });
+    };
+
+    // ✨ محرك بدء الإجازة
+    const handleStartLeave = async () => {
+        if (!leaveRequest || !firestore) return;
+        setIsProcessing(true);
+        try {
+            const batch = writeBatch(firestore);
+            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { status: 'on-leave' });
+            batch.update(doc(firestore, 'employees', leaveRequest.employeeId), { status: 'on-leave' });
+            await batch.commit();
+            toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ' });
+        } finally { setIsProcessing(false); }
+    };
+
+    // ✨ محرك العودة للعمل
+    const handleReturnToWork = async () => {
+        if (!leaveRequest || !firestore) return;
+        setIsProcessing(true);
+        try {
+            const batch = writeBatch(firestore);
+            batch.update(doc(firestore, 'leaveRequests', leaveRequest.id!), { status: 'returned' });
+            batch.update(doc(firestore, 'employees', leaveRequest.employeeId), { status: 'active' });
+            await batch.commit();
+            toast({ title: 'تمت العودة', description: 'تم تسجيل عودة الموظف للعمل وإغلاق الملف.' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ' });
+        } finally { setIsProcessing(false); }
     };
 
     const loading = leaveLoading || employeeLoading || brandingLoading;
@@ -129,15 +167,28 @@ export default function LeaveRequestDetailsPage() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <div className="no-print flex justify-between items-center bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner">
+            <div className="no-print flex flex-col md:flex-row justify-between items-center bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner gap-4">
                  <Button variant="ghost" onClick={() => router.back()} className="font-bold gap-2 rounded-xl">
                     <ArrowRight className="h-4 w-4"/> عودة للقائمة
                 </Button>
-                {leaveRequest.status === 'approved' && (
-                    <Button onClick={handlePrint} className="bg-primary shadow-lg shadow-primary/20 rounded-xl font-bold gap-2">
+                
+                <div className="flex gap-3">
+                    {leaveRequest.status === 'approved' && (
+                        <Button onClick={handleStartLeave} disabled={isProcessing} className="bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-100 rounded-xl font-black gap-2">
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlaneTakeoff className="h-4 w-4"/>}
+                            تسجيل مغادرة الموظف
+                        </Button>
+                    )}
+                    {leaveRequest.status === 'on-leave' && (
+                        <Button onClick={handleReturnToWork} disabled={isProcessing} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 rounded-xl font-black gap-2">
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Home className="h-4 w-4"/>}
+                            إشعار عودة للعمل
+                        </Button>
+                    )}
+                    <Button onClick={handlePrint} variant="outline" className="bg-white shadow-sm rounded-xl font-bold gap-2">
                         <Printer className="h-4 w-4"/> طباعة النموذج للتوقيع
                     </Button>
-                )}
+                </div>
             </div>
 
             <div className="max-w-4xl mx-auto space-y-6">
@@ -175,8 +226,8 @@ export default function LeaveRequestDetailsPage() {
                         <div className="text-left">
                             <h2 className="text-3xl font-black text-primary tracking-tighter">طلب إجازة رسمي</h2>
                             <p className="text-muted-foreground font-mono text-sm mt-1 uppercase tracking-widest">Leave Request Form</p>
-                            <Badge variant="outline" className="mt-2 px-4 py-1 border-2 border-primary/20 font-black">
-                                ID: {leaveRequest.id?.substring(0,8).toUpperCase()}
+                            <Badge variant="outline" className={cn("mt-2 px-4 py-1 border-2 font-black", statusColors[leaveRequest.status])}>
+                                {statusTranslations[leaveRequest.status]}
                             </Badge>
                         </div>
                     </header>
@@ -185,7 +236,7 @@ export default function LeaveRequestDetailsPage() {
                         <section className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-muted/20 p-8 rounded-3xl border">
                             <div className="space-y-4">
                                 <InfoRow label="اسم الموظف" value={<span className="font-black text-lg">{leaveRequest.employeeName}</span>} icon={<User className="h-5 w-5 text-primary"/>}/>
-                                <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-bold">{employee.employeeNumber || '-'}</span>} icon={<Badge variant="secondary" className="h-4">#</Badge>}/>
+                                <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-bold">{employee.employeeNumber || '-'}</span>} icon={<BadgeIcon className="h-4 w-4 text-primary"/>}/>
                             </div>
                             <div className="space-y-4">
                                 <InfoRow label="القسم" value={<span className="font-bold">{employee.department}</span>} icon={<Briefcase className="h-5 w-5 text-primary"/>}/>
