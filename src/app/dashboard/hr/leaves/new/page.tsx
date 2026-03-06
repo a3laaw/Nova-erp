@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, Info, History } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -32,7 +32,7 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 export default function NewLeaveRequestPage() {
     const { firestore } = useFirebase();
@@ -64,6 +64,7 @@ export default function NewLeaveRequestPage() {
         }
     }, [currentUser]);
 
+    // ✨ محرك جلب السياق الذكي المطور (تجنب مشاكل الفهرسة عبر الفرز البرمجي)
     useEffect(() => {
         if (!firestore || !selectedEmployeeId) {
             setLastLeaveInfo(null);
@@ -74,16 +75,24 @@ export default function NewLeaveRequestPage() {
         const fetchLastLeave = async () => {
             setLoadingContext(true);
             try {
+                // نكتفي بفلترة الموظف برمجياً لضمان عدم توقف الاستعلام بسبب نقص الفهارس المركبة
                 const q = query(
                     collection(firestore, 'leaveRequests'),
-                    where('employeeId', '==', selectedEmployeeId),
-                    where('status', 'in', ['approved', 'on-leave', 'returned']),
-                    orderBy('endDate', 'desc'),
-                    limit(1)
+                    where('employeeId', '==', selectedEmployeeId)
                 );
                 const snap = await getDocs(q);
-                if (!snap.empty) {
-                    setLastLeaveInfo({ id: snap.docs[0].id, ...snap.docs[0].data() } as LeaveRequest);
+                
+                const history = snap.docs
+                    .map(d => ({ id: d.id, ...d.data() } as LeaveRequest))
+                    .filter(l => ['approved', 'on-leave', 'returned'].includes(l.status))
+                    .sort((a, b) => {
+                        const dateB = toFirestoreDate(b.endDate)?.getTime() || 0;
+                        const dateA = toFirestoreDate(a.endDate)?.getTime() || 0;
+                        return dateB - dateA;
+                    });
+
+                if (history.length > 0) {
+                    setLastLeaveInfo(history[0]);
                 } else {
                     setLastLeaveInfo(null);
                 }
