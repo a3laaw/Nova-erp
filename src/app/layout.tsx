@@ -4,7 +4,12 @@ import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
-// تم تحديث هذا الملف لإجبار النظام على إعادة بناء الحزم البرمجية (Force Re-bundle) وحل خطأ ChunkLoadError.
+/**
+ * @fileOverview Root layout for Nova ERP.
+ * TRIGGER REBUILD: 2026-02-20 - Solving Build Code 51 and ChunkLoadErrors.
+ * This file has been modified to force a clean re-bundle of the application assets.
+ */
+
 const tajawal = Tajawal({ 
     subsets: ['arabic', 'latin'],
     weight: ['400', '500', '700', '800'],
