@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, getDocs, where, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, serverTimestamp, getDocs, where, limit, Timestamp, getDoc } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -13,7 +13,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calculator, History } from 'lucide-react';
+import { 
+  PlusCircle, 
+  MoreHorizontal, 
+  Trash2, 
+  Loader2, 
+  X, 
+  Pencil, 
+  Undo2, 
+  Banknote, 
+  Sparkles, 
+  Clock, 
+  AlertCircle, 
+  CheckCircle, 
+  ArrowRight, 
+  PlaneTakeoff, 
+  Home, 
+  Calculator, 
+  History 
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -27,11 +45,11 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { formatCurrency, cn } from '@/lib/utils';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DateInput } from '../ui/date-input';
 import { Label } from '../ui/label';
-
 
 const statusColors: Record<LeaveRequest['status'], string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -83,6 +101,7 @@ export function LeaveRequestsList() {
 
   const loading = loadingLeaves || loadingEmployees;
 
+  // محرك جلب السياق الذكي
   useEffect(() => {
     const targetReq = requestToApprove || requestToReject;
     if (!firestore || !targetReq?.employeeId) {
@@ -125,40 +144,83 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
+  /**
+   * ✨ محرك الترميم التلقائي للأرصدة والطلبات المعلقة
+   */
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
     try {
         const batch = writeBatch(firestore);
         const leaveRef = doc(firestore, 'leaveRequests', requestToDelete.id!);
+        const employee = employees.find(e => e.id === requestToDelete.employeeId);
 
+        if (!employee) {
+            batch.delete(leaveRef);
+            await batch.commit();
+            toast({ title: 'نجاح', description: 'تم حذف الطلب.' });
+            return;
+        }
+
+        const employeeRef = doc(firestore, 'employees', employee.id!);
+        let currentUsedBalance = employee.annualLeaveUsed || 0;
+
+        // 1. إذا كانت الإجازة المحذوفة مخصومة بالفعل من الرصيد، قم باستردادها
         if (['approved', 'on-leave', 'returned'].includes(requestToDelete.status)) {
-            const employee = employees.find(e => e.id === requestToDelete.employeeId);
-            if (employee) {
-                const employeeRef = doc(firestore, 'employees', employee.id!);
-                const daysToRestore = (requestToDelete.workingDays || 0) - (requestToDelete.unpaidDays || 0);
-                
-                let employeeUpdate: any = {};
+            const daysToRestore = (requestToDelete.workingDays || 0) - (requestToDelete.unpaidDays || 0);
+            if (daysToRestore > 0) {
                 if (requestToDelete.leaveType === 'Annual') {
-                    employeeUpdate.annualLeaveUsed = Math.max(0, (employee.annualLeaveUsed || 0) - daysToRestore);
-                } else if (requestToDelete.leaveType === 'Sick') {
-                    employeeUpdate.sickLeaveUsed = Math.max(0, (employee.sickLeaveUsed || 0) - daysToRestore);
-                } else if (requestToDelete.leaveType === 'Emergency') {
-                    employeeUpdate.emergencyLeaveUsed = Math.max(0, (employee.emergencyLeaveUsed || 0) - daysToRestore);
-                }
-                
-                if (Object.keys(employeeUpdate).length > 0) {
-                    batch.update(employeeRef, employeeUpdate);
+                    currentUsedBalance = Math.max(0, currentUsedBalance - daysToRestore);
+                    batch.update(employeeRef, { annualLeaveUsed: currentUsedBalance });
                 }
             }
         }
 
+        // 2. ✨ الجزء الذكي: إعادة حساب كافة الطلبات المعلقة (Pending) لهذا الموظف
+        // بمجرد توفر رصيد جديد، قد تتحول أيام "بدون راتب" في الطلبات المعلقة إلى "من الرصيد"
+        const pendingQuery = query(
+            collection(firestore, 'leaveRequests'),
+            where('employeeId', '==', employee.id),
+            where('status', '==', 'pending'),
+            where('leaveType', '==', 'Annual')
+        );
+        const pendingSnap = await getDocs(pendingQuery);
+        
+        // ترتيب يدوي للطلبات المعلقة حسب تاريخ البدء لضمان عدالة التوزيع
+        const pendingRequests = pendingSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as LeaveRequest))
+            .sort((a, b) => toFirestoreDate(a.startDate)!.getTime() - toFirestoreDate(b.startDate)!.getTime());
+
+        // محاكاة الرصيد المتاح حالياً بعد الاسترداد
+        const tempEmployeeState = { ...employee, annualLeaveUsed: currentUsedBalance };
+        
+        pendingRequests.forEach(req => {
+            const availableBalance = calculateAnnualLeaveBalance(tempEmployeeState, new Date());
+            const workingDays = req.workingDays || 0;
+            
+            const newPaidDays = Math.min(workingDays, availableBalance);
+            const newUnpaidDays = Math.max(0, workingDays - newPaidDays);
+
+            // تحديث الطلب المعلق آلياً ليعكس الرصيد الجديد المتوفر
+            batch.update(doc(firestore, 'leaveRequests', req.id!), {
+                unpaidDays: newUnpaidDays
+            });
+
+            // تحديث الحالة الوهمية للاستمرار في توزيع الرصيد على الطلبات التالية (إن وجدت)
+            tempEmployeeState.annualLeaveUsed += newPaidDays;
+        });
+
+        // 3. تنفيذ الحذف النهائي
         batch.delete(leaveRef);
+        
         await batch.commit();
-        toast({ title: 'نجاح الحذف', description: 'تم حذف الطلب واسترداد الأرصدة المخصومة.' });
+        toast({ 
+            title: 'ترميم الأرصدة ناجح', 
+            description: `تم حذف الطلب، استرداد الرصيد، وإعادة توزيع الأيام على ${pendingRequests.length} طلبات معلقة آلياً.` 
+        });
     } catch (error) {
-        console.error("Error deleting leave request:", error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف طلب الإجازة.' });
+        console.error("Critical: Failure in Balance Restoration Engine", error);
+        toast({ variant: 'destructive', title: 'خطأ تقني', description: 'فشل في عملية ترميم الأرصدة.' });
     } finally {
         setIsDeleting(false);
         setRequestToDelete(null);
@@ -504,13 +566,13 @@ export function LeaveRequestsList() {
                 <AlertDialogDescription className="text-base font-medium leading-relaxed">
                     أنت على وشك حذف طلب إجازة <strong>{requestToDelete?.employeeName}</strong>. 
                     <br/><br/>
-                    <span className="font-black text-red-600 underline">ملاحظة هامة:</span> بما أن الطلب بحالة <strong>{statusTranslations[requestToDelete?.status || 'pending']}</strong>، سيقوم النظام تلقائياً باسترداد الأيام المخصومة وإرجاعها لرصيد الموظف قبل الحذف.
+                    <span className="font-black text-red-600 underline">ملاحظة هامة:</span> بما أن الطلب بحالة <strong>{statusTranslations[requestToDelete?.status || 'pending']}</strong>، سيقوم النظام تلقائياً باسترداد الأيام المخصومة، وإعادة توزيعها على الطلبات المعلقة الأخرى لتصحيح وضعها المالي آلياً.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-6 gap-2">
                 <AlertDialogCancel className="rounded-xl font-bold" disabled={isDeleting}>إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-10">
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : 'أفهم، قم بالحذف والاسترداد'}
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : 'أفهم، قم بالحذف والترميم'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
