@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -17,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, ArrowDownCircle } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -33,6 +32,7 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 export default function NewLeaveRequestPage() {
     const { firestore } = useFirebase();
@@ -51,11 +51,9 @@ export default function NewLeaveRequestPage() {
     const [notes, setNotes] = useState('');
     const [passportReceived, setPassportReceived] = useState(false);
     
-    // ✨ محرك جلب آخر إجازة (Decision Support)
     const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
     const [loadingContext, setLoadingContext] = useState(false);
 
-    // --- Double-Save Guard System ---
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
@@ -65,7 +63,6 @@ export default function NewLeaveRequestPage() {
         }
     }, [currentUser]);
 
-    // ✨ محرك جلب السياق عند اختيار موظف
     useEffect(() => {
         if (!firestore || !selectedEmployeeId) {
             setLastLeaveInfo(null);
@@ -100,7 +97,6 @@ export default function NewLeaveRequestPage() {
 
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
-    // ✨ محرك تحليل الرصيد والتقسيم المرن (Flex Balance Engine)
     const leaveAnalysis = useMemo(() => {
         if (!startDate || !endDate) return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
         
@@ -147,7 +143,7 @@ export default function NewLeaveRequestPage() {
                 endDate: endDate,
                 days: leaveAnalysis.totalDays,
                 workingDays: leaveAnalysis.workingDays,
-                unpaidDays: leaveAnalysis.unpaidDays, // حفظ الأيام بدون راتب
+                unpaidDays: leaveAnalysis.unpaidDays,
                 notes: notes,
                 passportReceived: passportReceived,
                 status: 'pending' as const,
@@ -189,7 +185,6 @@ export default function NewLeaveRequestPage() {
                       </div>
                     )}
 
-                    {/* ✨ عرض سياق القرار الذكي عند الإنشاء */}
                     {lastLeaveInfo && (
                         <Alert className="rounded-2xl border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-2 duration-500">
                             <Sparkles className="h-5 w-5 text-primary" />
@@ -227,7 +222,6 @@ export default function NewLeaveRequestPage() {
                       </div>
                     </div>
 
-                    {/* ✨ تحليل التقسيم المرن للأيام */}
                     {leaveAnalysis.totalDays > 0 && (
                       <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
                         <div className="text-sm font-bold p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col sm:flex-row justify-around gap-4 text-center">

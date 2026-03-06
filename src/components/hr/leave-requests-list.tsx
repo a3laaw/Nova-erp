@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -14,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calendar, Calculator } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Undo2, Banknote, Sparkles, Clock, AlertCircle, CheckCircle, ArrowRight, PlaneTakeoff, Home, Calculator } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
@@ -74,7 +73,6 @@ export function LeaveRequestsList() {
   const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
-  // ✨ سياق القرار الذكي للـ HR (Smart Context)
   const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
   const [loadingContext, setLoadingContext] = useState(false);
 
@@ -84,7 +82,6 @@ export function LeaveRequestsList() {
 
   const loading = loadingLeaves || loadingEmployees;
 
-  // ✨ جلب سياق آخر إجازة عند الرغبة في الموافقة/الرفض لتوفير سياق للـ HR
   useEffect(() => {
     const targetReq = requestToApprove || requestToReject;
     if (!firestore || !targetReq?.employeeId) {
@@ -124,7 +121,6 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
-  // 🛡️ دالة الحذف المحدثة (تتضمن استرداد الجزء المخصوم من الرصيد)
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -136,7 +132,6 @@ export function LeaveRequestsList() {
             const employee = employees.find(e => e.id === requestToDelete.employeeId);
             if (employee) {
                 const employeeRef = doc(firestore, 'employees', employee.id!);
-                // استرداد فقط الأيام التي تم خصمها فعلياً من الرصيد (الإجمالي - بدون راتب)
                 const daysToRestore = (requestToDelete.workingDays || 0) - (requestToDelete.unpaidDays || 0);
                 
                 let employeeUpdate: any = {};
@@ -183,7 +178,6 @@ export function LeaveRequestsList() {
         const employee = employees.find(e => e.id === requestToApprove.employeeId);
         if (employee) {
             const employeeRef = doc(firestore, 'employees', employee.id!);
-            // خصم فقط الأيام المدفوعة (الإجمالي - بدون راتب)
             const daysToDeduct = (requestToApprove.workingDays || 0) - (requestToApprove.unpaidDays || 0);
             
             let employeeUpdate: Partial<Employee> = {};
@@ -226,7 +220,7 @@ export function LeaveRequestsList() {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id!);
+        const leaveRef = doc(firestore, 'permissionRequests', requestToReject.id!);
         await updateDoc(leaveRef, {
             status: 'rejected',
             rejectionReason: rejectionReason,
@@ -292,7 +286,6 @@ export function LeaveRequestsList() {
 
         const fullSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
         const dailyRate = fullSalary > 0 ? fullSalary / 26 : 0;
-        // صرف الراتب فقط للأيام المخصومة من الرصيد (المدفوعة)
         const paidDays = (requestToPay.workingDays || 0) - (requestToPay.unpaidDays || 0);
         const leaveSalary = dailyRate * paidDays;
 
@@ -495,7 +488,6 @@ export function LeaveRequestsList() {
         </Table>
       </div>
       
-      {/* ⚠️ نافذة الحذف المحدثة */}
       <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>

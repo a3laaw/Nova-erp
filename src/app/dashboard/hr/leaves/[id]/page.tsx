@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -9,7 +8,7 @@ import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle } from 'lucide-react';
+import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle, Calculator } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -76,7 +75,6 @@ export default function LeaveRequestDetailsPage() {
     const employeeRef = useMemo(() => firestore && leaveRequest?.employeeId ? doc(firestore, 'employees', leaveRequest.employeeId) : null, [firestore, leaveRequest?.employeeId]);
     const { data: employee, loading: employeeLoading } = useDocument<Employee>(firestore, employeeRef?.path || null);
 
-    // ✨ محرك جلب "آخر إجازة معتمدة" لتوفير سياق القرار للـ HR
     useEffect(() => {
         if (!firestore || !leaveRequest?.employeeId) return;
 
@@ -197,7 +195,6 @@ export default function LeaveRequestDetailsPage() {
             </div>
 
             <div className="max-w-4xl mx-auto space-y-6">
-                {/* ✨ بطاقة سياق القرار الذكي (HR Context Card) */}
                 {lastApprovedLeave && (
                     <Alert className="rounded-[2rem] border-2 border-primary/20 bg-primary/5 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
                         <Sparkles className="h-5 w-5 text-primary" />
@@ -281,7 +278,6 @@ export default function LeaveRequestDetailsPage() {
                             </div>
                         </section>
 
-                        {/* ✨ تفصيل التقسيم المرن في النموذج المطبوع */}
                         {leaveRequest.leaveType === 'Annual' && (leaveRequest.unpaidDays || 0) > 0 && (
                             <section className="bg-orange-50 border-2 border-orange-200 p-6 rounded-3xl space-y-3">
                                 <h4 className="font-black text-orange-800 flex items-center gap-2">
