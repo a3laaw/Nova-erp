@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -18,7 +19,7 @@ import {
     LayoutGrid,
     PlusCircle,
     ShieldAlert,
-    History
+    BellRing
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { useSubscription, useFirebase } from '@/firebase';
@@ -101,7 +102,7 @@ export default function DashboardPage() {
                     <div className="flex flex-wrap items-center justify-center gap-3">
                         <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2">
                             <Link href="/dashboard/notifications">
-                                <History className="h-5 w-5" />
+                                <BellRing className="h-5 w-5" />
                                 سجل التنبيهات
                             </Link>
                         </Button>
