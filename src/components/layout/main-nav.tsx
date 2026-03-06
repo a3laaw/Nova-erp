@@ -225,7 +225,7 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile, state: sidebarState } = useSidebar();
+  const { setOpenMobile } = useSidebar();
   const Icon = item.icon;
 
   if (item.roles && !item.roles.includes(userRole)) {
@@ -238,8 +238,21 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label}>
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
-            {Icon && <Icon className={cn("size-5", isActive ? "text-primary" : "text-muted-foreground")} strokeWidth={isActive ? 2.5 : 2} />}
-            <span className={cn(isActive ? "font-bold text-primary" : "font-medium")}>{item.label}</span>
+            {Icon && (
+              <Icon 
+                className={cn(
+                  "size-8 shrink-0 transition-colors", 
+                  isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
+                )} 
+                strokeWidth={isActive ? 2.5 : 2} 
+              />
+            )}
+            <span className={cn(
+              "font-medium transition-colors",
+              isActive ? "text-[#6d28d9] font-bold text-base" : "text-gray-900 text-base group-hover:text-[#6d28d9]"
+            )}>
+              {item.label}
+            </span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -255,10 +268,26 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <CollapsibleTrigger asChild>
             <SidebarMenuButton as="button" isActive={isActive} className="justify-between">
               <div className='flex items-center gap-3'>
-                {Icon && <Icon className={cn("size-5", isActive ? "text-primary" : "text-muted-foreground")} strokeWidth={isActive ? 2.5 : 2} />}
-                <span className={cn("group-data-[state=collapsed]:hidden", isActive ? "font-bold text-primary" : "font-bold")}>{item.label}</span>
+                {Icon && (
+                  <Icon 
+                    className={cn(
+                      "size-8 shrink-0 transition-colors", 
+                      isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
+                    )} 
+                    strokeWidth={isActive ? 2.5 : 2} 
+                  />
+                )}
+                <span className={cn(
+                  "font-medium transition-colors text-base",
+                  isActive ? "text-[#6d28d9] font-bold" : "text-gray-900 group-hover:text-[#6d28d9]"
+                )}>
+                  {item.label}
+                </span>
               </div>
-              <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180 group-data-[state=collapsed]:hidden opacity-50" />
+              <ChevronDown className={cn(
+                "h-4 w-4 transition-transform group-data-[state=open]:rotate-180 opacity-50",
+                isActive ? "text-[#6d28d9]" : "text-[#374151]"
+              )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
         </SidebarMenuItem>
@@ -272,8 +301,21 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                    <SidebarMenuSubButton isActive={isChildActive} asChild>
                         <Link href={child.href} onClick={() => setOpenMobile(false)}>
                             <div className="flex items-center gap-3">
-                                {ChildIcon && <ChildIcon className={cn("size-4 ml-1", isChildActive ? "text-primary" : "text-muted-foreground")} strokeWidth={isChildActive ? 2.5 : 2} />}
-                                <span className={cn("group-data-[state=collapsed]:hidden", isChildActive ? "font-bold" : "font-medium")}>{child.label}</span>
+                                {ChildIcon && (
+                                  <ChildIcon 
+                                    className={cn(
+                                      "size-8 shrink-0 transition-colors", 
+                                      isChildActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
+                                    )} 
+                                    strokeWidth={isChildActive ? 2.5 : 2} 
+                                  />
+                                )}
+                                <span className={cn(
+                                  "font-medium transition-colors text-sm",
+                                  isChildActive ? "text-[#6d28d9] font-bold" : "text-gray-800 group-hover:text-[#6d28d9]"
+                                )}>
+                                  {child.label}
+                                </span>
                             </div>
                         </Link>
                     </SidebarMenuSubButton>
@@ -289,7 +331,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   return null;
 }
 
-export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
+export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
   const pathname = usePathname();
   const { language } = useLanguage();
   const { branding } = useBranding();
@@ -330,9 +372,6 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
                     <p className="text-sm font-black text-foreground truncate">{currentUser.fullName}</p>
                     <p className="text-[9px] text-muted-foreground truncate font-bold uppercase tracking-wider">{currentUser.role}</p>
                 </div>
-                <button className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive group-data-[state=collapsed]:hidden flex items-center justify-center transition-all active:scale-90" onClick={onLogout} title="تسجيل الخروج">
-                    <LogOut className="h-4 w-4"/>
-                </button>
             </div>
         </div>
       </SidebarFooter>

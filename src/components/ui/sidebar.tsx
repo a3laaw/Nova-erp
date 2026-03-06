@@ -502,7 +502,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden p-3 text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-muted hover:text-foreground hover:cursor-pointer rounded-[var(--radius)] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-sm data-[active=true]:border-r-4 data-[active=true]:border-primary group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden text-start text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-in-out hover:bg-muted hover:text-foreground hover:cursor-pointer rounded-[var(--radius)] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white data-[active=true]:text-[#6d28d9] data-[active=true]:font-bold data-[active=true]:shadow-sm data-[active=true]:border-r-4 data-[active=true]:border-[#6d28d9] group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -511,8 +511,8 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-11",
-        sm: "h-9 text-xs",
+        default: "h-auto py-4 px-6",
+        sm: "h-9 text-xs py-2 px-4",
         lg: "h-14 group-data-[collapsible=icon]:!p-0",
       },
     },
@@ -616,7 +616,7 @@ const SidebarMenuBadge = React.forwardRef<
     data-sidebar="menu-badge"
     className={cn(
       "absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-sidebar-foreground select-none pointer-events-none",
-      "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
+      "peer-hover:text-sidebar-accent-foreground peer-data-[active=true]:text-sidebar-accent-foreground",
       "peer-data-[size=sm]/menu-button:top-1",
       "peer-data-[size=default]/menu-button:top-1.5",
       "peer-data-[size=lg]/menu-button:top-2.5",
@@ -702,10 +702,9 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex h-9 min-w-0 w-full justify-start -translate-x-px items-center gap-2 overflow-hidden rounded-lg px-3 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-muted hover:text-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-        "data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-sm",
+        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-lg py-4 px-6 text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-all duration-200 hover:bg-muted hover:text-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-8 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+        "data-[active=true]:bg-white data-[active=true]:text-[#6d28d9] data-[active=true]:font-bold data-[active=true]:shadow-sm",
         size === "sm" && "text-xs",
-        size === "md" && "text-sm",
         "group-data-[collapsible=icon]:hidden",
         className
       )}
