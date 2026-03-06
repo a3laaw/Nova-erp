@@ -80,6 +80,7 @@ export function InlineSearchList({
                 <CommandItem
                   key={option.value}
                   value={option.label + (option.searchKey || '')}
+                  onMouseDown={(e) => e.preventDefault()}
                   onSelect={() => {
                     onSelect(option.value === value ? "" : option.value);
                     setOpen(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -199,13 +199,13 @@ export default function EmployeeProfilePage() {
                                  </div>
                                   <div className="flex gap-4 mt-6">
                                      <Button asChild>
-                                        <Link href="/dashboard/hr/leaves">
+                                        <Link href={`/dashboard/hr/leaves/new?employeeId=${id}`}>
                                             <CalendarIcon className="ml-2 h-4 w-4" />
                                             تقديم طلب إجازة
                                         </Link>
                                      </Button>
                                       <Button asChild variant="outline">
-                                        <Link href="/dashboard/hr/permissions">
+                                        <Link href={`/dashboard/hr/permissions?employeeId=${id}`}>
                                             <CalendarPlus className="ml-2 h-4 w-4" />
                                             تقديم طلب استئذان
                                         </Link>

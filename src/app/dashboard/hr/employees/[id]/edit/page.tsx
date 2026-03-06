@@ -8,7 +8,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Save, X } from 'lucide-react';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -41,6 +46,21 @@ export default function EditEmployeePage() {
         if (!firestore || !currentUser || !id || !employee) return;
         
         setIsSaving(true);
+
+        if (updatedData.iban && updatedData.iban.trim() !== '') {
+            const ibanQuery = query(
+                collection(firestore, 'employees'),
+                where('iban', '==', updatedData.iban.trim())
+            );
+            const ibanSnapshot = await getDocs(ibanQuery);
+            const ibanDuplicates = ibanSnapshot.docs.filter(d => d.id !== id);
+            if (ibanDuplicates.length > 0) {
+                toast({ variant: 'destructive', title: 'خطأ', description: 'رقم الـ IBAN هذا مسجل بالفعل لموظف آخر.' });
+                setIsSaving(false);
+                return;
+            }
+        }
+
         const batch = writeBatch(firestore);
         const employeeRefDoc = doc(firestore, 'employees', id);
 
@@ -152,6 +172,20 @@ export default function EditEmployeePage() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-destructive">فشل تحميل بيانات الموظف أو أنه غير موجود.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (employee.status === 'terminated') {
+        return (
+            <Card dir="rtl" className="max-w-4xl mx-auto">
+                <CardHeader>
+                    <CardTitle>غير مسموح</CardTitle>
+                    <CardDescription>لا يمكن تعديل بيانات موظف منتهي الخدمة.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button variant="outline" onClick={() => router.back()}>عودة</Button>
                 </CardContent>
             </Card>
         );

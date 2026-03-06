@@ -61,7 +61,8 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
   }, [isOpen, isEditing, permissionToEdit, currentUser]);
 
-  const employeeOptions = useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
+  const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
+  const employeeOptions = useMemo(() => activeEmployees.map(e => ({ value: e.id!, label: e.fullName })), [activeEmployees]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,14 +73,13 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     
     setIsSaving(true);
     try {
-      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
-      if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار.');
+      const selectedEmployee = activeEmployees.find(e => e.id === selectedEmployeeId);
+      if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار أو أنه غير نشط.');
       
       if (!isEditing) {
         const startOfMonthDate = startOfMonth(date);
         const endOfMonthDate = endOfMonth(date);
         
-        // Query for requests within the month for this employee
         const permissionsQuery = query(
             collection(firestore, 'permissionRequests'),
             where('employeeId', '==', selectedEmployeeId),
@@ -88,13 +88,11 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         );
         const permissionsSnapshot = await getDocs(permissionsQuery);
 
-        // Check 1: Monthly limit of APPROVED requests
         const approvedCountInMonth = permissionsSnapshot.docs.filter(doc => doc.data().status === 'approved').length;
         if (approvedCountInMonth >= 3) {
             throw new Error('لقد استنفذ الموظف الحد الأقصى للاستئذانات الموافق عليها (3) لهذا الشهر.');
         }
         
-        // Check 2: Existence of ANY request on the same day
         const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
         const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
         
@@ -193,7 +191,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             </Alert>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+            <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
               {isEditing ? 'حفظ التعديلات' : 'إرسال الطلب'}

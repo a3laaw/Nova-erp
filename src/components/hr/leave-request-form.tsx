@@ -12,7 +12,7 @@ import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
 import { Loader2, Save, Upload } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, addDoc, serverTimestamp, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -74,7 +74,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
       setLoadingRefs(true);
       try {
         const [empSnap, holidaySnap] = await Promise.all([
-          getDocs(query(collection(firestore, 'employees'))),
+          getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
           getDocs(query(collection(firestore, 'holidays')))
         ]);
         setEmployees(empSnap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));

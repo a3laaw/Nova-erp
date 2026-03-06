@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, updateDoc, where } from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { useSearchParams } from 'next/navigation';
 
 
 const statusColors: Record<PermissionRequest['status'], string> = {
@@ -50,6 +51,7 @@ export function PermissionRequestsList() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [requestToEdit, setRequestToEdit] = useState<PermissionRequest | null>(null);
@@ -61,10 +63,17 @@ export function PermissionRequestsList() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
+  useEffect(() => {
+    const employeeId = searchParams.get('employeeId');
+    if (employeeId) {
+        setIsFormOpen(true);
+    }
+  }, [searchParams]);
+
   
   const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: permissionRequests, loading: loadingRequests } = useSubscription<PermissionRequest>(firestore, 'permissionRequests', queryConstraints);
-  const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
+  const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
   const loading = loadingRequests || loadingEmployees;
 

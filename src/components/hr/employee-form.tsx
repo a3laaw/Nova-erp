@@ -40,7 +40,6 @@ const commonNationalities = [
 
 const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n }));
 
-// ✨ محرك استخراج رمز القسم للفرق
 const getDeptPrefix = (deptName: string) => {
     if (!deptName) return 'G';
     const name = deptName.toLowerCase();
@@ -90,12 +89,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const isDayLaborer = formData.contractType === 'day_laborer';
     const isSimpleLayout = isDayLaborer;
 
-    // ✨ منطق ظهور اختيار فريق العمل المحدث (للمسمى عامل أو لنوع العقد عامل اليومية في أي قسم)
     const showTeamSelection = useMemo(() => {
         return formData.jobTitle === 'عامل' || formData.contractType === 'day_laborer';
     }, [formData.jobTitle, formData.contractType]);
 
-    // ✨ محرك توليد الرموز الثنائية الذكي
     const teamOptions = useMemo(() => {
         const deptPrefix = getDeptPrefix(formData.department);
         const finalPrefix = formData.contractType === 'day_laborer' ? `L${deptPrefix}` : deptPrefix;
@@ -121,6 +118,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const generalHours = branding?.work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
         const defaultEndTime = generalHours?.evening_end_time || '17:00';
+
+        if (!initialData && !branding) return;
 
         if (initialData) {
             setFormData({
@@ -155,13 +154,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setShowHousingAllowance(!!initialData.housingAllowance && initialData.housingAllowance > 0);
             setShowTransportAllowance(!!initialData.transportAllowance && initialData.transportAllowance > 0);
         } else {
-             setFormData(prev => ({
+            setFormData(prev => ({
                 ...prev,
-                fullName: initialData?.fullName || '',
-                mobile: initialData?.mobile || '',
                 workStartTime: defaultStartTime,
                 workEndTime: defaultEndTime,
-             }));
+            }));
             setShowHousingAllowance(false);
             setShowTransportAllowance(false);
         }
@@ -263,6 +260,17 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
+        // التحقق من رقم الهاتف
+        if (formData.mobile && formData.mobile.replace(/\D/g, '').length !== 8) {
+            toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'رقم الهاتف يجب أن يكون 8 أرقام بالضبط.' });
+            return;
+        }
+        // التحقق من الرقم المدني (للموظف غير البسيط فقط)
+        if (!isSimpleLayout && formData.civilId && formData.civilId.replace(/\D/g, '').length !== 12) {
+            toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'الرقم المدني يجب أن يكون 12 رقماً بالضبط.' });
+            return;
+        }
+
         if (!formData.fullName || !formData.mobile) {
             toast({ variant: 'destructive', title: 'خطأ في الإدخال', description: 'الرجاء تعبئة اسم الموظف بالعربية ورقم الجوال.' });
             return;
@@ -285,7 +293,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         if (isSimpleLayout) {
             dataToSave.department = formData.department || 'عمالة خارجية';
             dataToSave.jobTitle = 'عامل يومية';
-            // FIXED: Do not default to Zeros, keep it empty if not provided to avoid duplication error.
             dataToSave.civilId = formData.civilId || ''; 
             dataToSave.hireDate = formData.hireDate;
             dataToSave.basicSalary = 0;

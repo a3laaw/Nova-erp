@@ -25,7 +25,7 @@ import { calculateWorkingDays, calculateAnnualLeaveBalance } from '@/services/le
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useSubscription } from '@/hooks/use-subscription';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
@@ -46,8 +46,9 @@ export default function NewLeaveRequestPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
-    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     const { data: publicHolidays, loading: holidaysLoading } = useSubscription<Holiday>(firestore, 'holidays');
     const { branding, loading: brandingLoading } = useBranding();
 
@@ -66,10 +67,13 @@ export default function NewLeaveRequestPage() {
     const savingRef = useRef(false);
 
     useEffect(() => {
-        if (currentUser && currentUser.role !== 'Admin' && currentUser.role !== 'HR') {
+        const employeeIdFromUrl = searchParams.get('employeeId');
+        if (employeeIdFromUrl) {
+            setSelectedEmployeeId(employeeIdFromUrl);
+        } else if (currentUser && currentUser.role !== 'Admin' && currentUser.role !== 'HR') {
             setSelectedEmployeeId(currentUser.employeeId);
         }
-    }, [currentUser]);
+    }, [currentUser, searchParams]);
 
     // جلب سياق القرار الذكي (آخر إجازة)
     useEffect(() => {

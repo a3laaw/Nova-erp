@@ -1,5 +1,3 @@
-
-          
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
@@ -74,6 +72,13 @@ export default function NewEmployeePage() {
                     throw new Error('الرقم المدني هذا مسجل بالفعل لموظف آخر.');
                 }
             }
+            if (newEmployeeData.iban && newEmployeeData.iban.trim() !== '') {
+                const ibanQuery = query(collection(firestore, 'employees'), where('iban', '==', newEmployeeData.iban.trim()));
+                const ibanSnapshot = await getDocs(ibanQuery);
+                if (!ibanSnapshot.empty) {
+                    throw new Error('رقم الـ IBAN هذا مسجل بالفعل لموظف آخر.');
+                }
+            }
 
             await runTransaction(firestore, async (transaction) => {
                 const employeeCounterRef = doc(firestore, 'counters', 'employees');
@@ -108,7 +113,6 @@ export default function NewEmployeePage() {
 
                 const newEmployeeRef = doc(collection(firestore, 'employees'));
                 newEmployeeId = newEmployeeRef.id;
-                // FIXED: Use cleanFirestoreData to prevent 'undefined' values from being sent.
                 transaction.set(newEmployeeRef, cleanFirestoreData(finalEmployeeData));
             });
 
@@ -160,6 +164,3 @@ export default function NewEmployeePage() {
         </Card>
     );
 }
-
-          
-      

@@ -133,6 +133,21 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
         } finally { setIsTerminating(false); setEmployeeToTerminate(null); setTerminationReason(null); }
     };
 
+    const handleReactivate = async (employee: Employee) => {
+        if (!firestore) return;
+        try {
+            const employeeRef = doc(firestore, 'employees', employee.id!);
+            await updateDoc(employeeRef, {
+                status: 'active',
+                terminationReason: null,
+                terminationDate: null,
+            });
+            toast({ title: 'نجاح', description: `تم إعادة ${employee.fullName} للخدمة بنجاح.` });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الموظف.' });
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col lg:flex-row justify-between items-center gap-4 bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner no-print">
@@ -202,11 +217,14 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                                                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
+                                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                                                 <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}`}><Edit className="ml-2 h-4 w-4" /> عرض الملف</Link></DropdownMenuItem>
                                                 <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link></DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                {employee.status !== 'terminated' && (
+                                                {employee.status !== 'terminated' ? (
                                                     <DropdownMenuItem onClick={() => setEmployeeToTerminate(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
+                                                ) : (
+                                                    <DropdownMenuItem onClick={() => handleReactivate(employee)}>إعادة للخدمة</DropdownMenuItem>
                                                 )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
