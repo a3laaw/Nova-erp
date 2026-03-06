@@ -45,10 +45,10 @@ const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
 
 function InfoRow({ label, value, icon }: { label: string, value: string | React.ReactNode, icon: React.ReactNode }) {
     return (
-        <div className="flex gap-4">
-            <div className="text-muted-foreground">{icon}</div>
-            <div className="font-semibold">{label}:</div>
-            <div>{value}</div>
+        <div className="flex gap-4 text-sm">
+            <div className="text-muted-foreground shrink-0">{icon}</div>
+            <div className="font-semibold w-24 shrink-0">{label}:</div>
+            <div className="break-words">{value}</div>
         </div>
     )
 }
@@ -84,15 +84,17 @@ export default function LeaveRequestDetailsPage() {
             try {
                 const q = query(
                     collection(firestore, 'leaveRequests'),
-                    where('employeeId', '==', leaveRequest.employeeId),
-                    where('status', 'in', ['approved', 'on-leave', 'returned']),
-                    orderBy('endDate', 'desc'),
-                    limit(5)
+                    where('employeeId', '==', leaveRequest.employeeId)
                 );
                 const snap = await getDocs(q);
                 const filtered = snap.docs
                     .map(d => ({ id: d.id, ...d.data() } as LeaveRequest))
-                    .filter(l => l.id !== id);
+                    .filter(l => l.id !== id && ['approved', 'on-leave', 'returned'].includes(l.status))
+                    .sort((a, b) => {
+                        const dateB = toFirestoreDate(b.endDate)?.getTime() || 0;
+                        const dateA = toFirestoreDate(a.endDate)?.getTime() || 0;
+                        return dateB - dateA;
+                    });
 
                 if (filtered.length > 0) {
                     setLastApprovedLeave(filtered[0]);
@@ -116,7 +118,7 @@ export default function LeaveRequestDetailsPage() {
 
     const handleStartLeave = async () => {
         if (!leaveRequest || !firestore || !actualDate || !leaveRequest.id) {
-            toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'تأكد من اختيار التاريخ وتوفر بيانات الموظف.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير كافية.' });
             return;
         }
         setIsProcessing(true);
@@ -129,16 +131,16 @@ export default function LeaveRequestDetailsPage() {
             });
             batch.update(empRef, { status: 'on-leave' });
             await batch.commit();
-            toast({ title: 'بدأت الإجازة', description: 'تم تسجيل مغادرة الموظف.' });
+            toast({ title: 'تم تسجيل المغادرة', description: 'تم توثيق مغادرة الموظف بنجاح.' });
             setIsStartDialogOpen(false);
         } catch (e: any) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل بدء الإجازة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في تحديث الحالة.' });
         } finally { setIsProcessing(false); }
     };
 
     const handleReturnToWork = async () => {
         if (!leaveRequest || !firestore || !actualDate || !leaveRequest.id) {
-            toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'البيانات المطلوبة للعودة غير متوفرة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير كافية.' });
             return;
         }
         setIsProcessing(true);
@@ -153,7 +155,7 @@ export default function LeaveRequestDetailsPage() {
             toast({ title: 'تمت المباشرة', description: 'تم تسجيل عودة الموظف للعمل وإغلاق الملف.' });
             setIsReturnDialogOpen(false);
         } catch (e: any) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة للعمل.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تسجيل العودة.' });
         } finally { setIsProcessing(false); }
     };
 
@@ -193,7 +195,7 @@ export default function LeaveRequestDetailsPage() {
                         </Button>
                     )}
                     <Button onClick={handlePrint} variant="outline" className="bg-white shadow-sm rounded-xl font-bold gap-2">
-                        <Printer className="h-4 w-4"/> طباعة النموذج للتوقيع
+                        <Printer className="h-4 w-4"/> طباعة النموذج
                     </Button>
                 </div>
             </div>
@@ -292,28 +294,10 @@ export default function LeaveRequestDetailsPage() {
                             </div>
                         </section>
 
-                        {leaveRequest.leaveType === 'Annual' && (leaveRequest.unpaidDays || 0) > 0 && (
-                            <section className="bg-orange-50 border-2 border-orange-200 p-6 rounded-3xl space-y-3">
-                                <h4 className="font-black text-orange-800 flex items-center gap-2">
-                                    <Calculator className="h-5 w-5" /> تفصيل خصم الأيام (عجز رصيد):
-                                </h4>
-                                <div className="grid grid-cols-2 gap-8 text-center">
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-bold text-orange-700 uppercase">مخصوم من الرصيد السنوي</p>
-                                        <p className="text-2xl font-black text-orange-900">{(leaveRequest.workingDays || 0) - (leaveRequest.unpaidDays || 0)} <span className="text-sm">يوم</span></p>
-                                    </div>
-                                    <div className="space-y-1 border-r border-orange-200">
-                                        <p className="text-[10px] font-bold text-red-700 uppercase">إجازة بدون راتب</p>
-                                        <p className="text-2xl font-black text-red-800">{leaveRequest.unpaidDays} <span className="text-sm">يوم</span></p>
-                                    </div>
-                                </div>
-                            </section>
-                        )}
-                        
                         <div className="space-y-3">
                             <h4 className="font-black text-gray-700 flex items-center gap-2"><FileText className="h-4 w-4 text-primary"/> مبررات طلب الإجازة:</h4>
                             <p className="p-6 border-2 border-dashed rounded-3xl bg-muted/10 min-h-[100px] leading-relaxed">
-                                {leaveRequest.notes || 'لم يتم إدخل ملاحظات إضافية.'}
+                                {leaveRequest.notes || 'لم يتم إدخال ملاحظات إضافية.'}
                             </p>
                         </div>
                     </main>
@@ -333,12 +317,6 @@ export default function LeaveRequestDetailsPage() {
                                 <div className="pt-2 border-t border-dashed">التدقيق المالي</div>
                             </div>
                         </div>
-                        <div className="border-t-4 border-double pt-8 text-center">
-                            <p className="font-black text-sm text-foreground">اعتماد المدير العام / المفوض بالتوقيع</p>
-                            <div className="mt-12 w-1/3 mx-auto border-t-2 border-dashed border-primary pt-2 text-muted-foreground font-bold">
-                                الختم الرسمي للشركة
-                            </div>
-                        </div>
                     </footer>
                 </div>
             </div>
@@ -352,9 +330,7 @@ export default function LeaveRequestDetailsPage() {
                             </div>
                             <AlertDialogTitle className="text-2xl font-black">تسجيل مغادرة الموظف</AlertDialogTitle>
                         </div>
-                        <AlertDialogDescription className="text-base font-medium">
-                            يرجى تحديد التاريخ الذي غادر فيه الموظف العمل فعلياً.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-medium">يرجى تحديد التاريخ الفعلي لمغادرة الموظف لبدء الإجازة.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4 space-y-2">
                         <Label className="font-bold pr-1">تاريخ المغادرة الفعلي:</Label>
@@ -378,9 +354,7 @@ export default function LeaveRequestDetailsPage() {
                             </div>
                             <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
                         </div>
-                        <AlertDialogDescription className="text-base font-medium">
-                            يرجى تحديد التاريخ الذي باشر فيه الموظف عمله فعلياً.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-medium">يرجى تحديد التاريخ الذي باشر فيه الموظف عمله فعلياً.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-4 space-y-2">
                         <Label className="font-bold pr-1">تاريخ المباشرة الفعلي:</Label>

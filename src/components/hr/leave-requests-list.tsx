@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
-import type { LeaveRequest, Employee, Payslip } from '@/lib/types';
+import type { LeaveRequest, Employee } from '@/lib/types';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -83,7 +83,6 @@ export function LeaveRequestsList() {
   const [requestToApprove, setRequestToApprove] = useState<LeaveRequest | null>(null);
   const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
   const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
-  const [requestToPay, setRequestToPay] = useState<LeaveRequest | null>(null);
   const [requestToStart, setRequestToStart] = useState<LeaveRequest | null>(null);
   const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
 
@@ -101,7 +100,7 @@ export function LeaveRequestsList() {
 
   const loading = loadingLeaves || loadingEmployees;
 
-  // ✨ محرك جلب السياق الذكي المطور (تجنب مشاكل الفهرسة عبر الفرز البرمجي)
+  // جلب سياق القرار (آخر إجازة) عند محاولة المراجعة
   useEffect(() => {
     const targetReq = requestToApprove || requestToReject;
     if (!firestore || !targetReq?.employeeId) {
@@ -113,7 +112,6 @@ export function LeaveRequestsList() {
     const fetchContext = async () => {
         setLoadingContext(true);
         try {
-            // نكتفي بفلترة الموظف برمجياً لضمان عدم توقف الاستعلام بسبب نقص الفهارس المركبة
             const q = query(
                 collection(firestore, 'leaveRequests'),
                 where('employeeId', '==', targetReq.employeeId)
@@ -150,9 +148,6 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
-  /**
-   * ✨ محرك الترميم التلقائي للأرصدة والطلبات المعلقة
-   */
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -171,7 +166,6 @@ export function LeaveRequestsList() {
         const employeeRef = doc(firestore, 'employees', employee.id!);
         let currentUsedBalance = employee.annualLeaveUsed || 0;
 
-        // 1. إذا كانت الإجازة المحذوفة مخصومة بالفعل من الرصيد، قم باستردادها
         if (['approved', 'on-leave', 'returned'].includes(requestToDelete.status)) {
             const daysToRestore = (requestToDelete.workingDays || 0) - (requestToDelete.unpaidDays || 0);
             if (daysToRestore > 0) {
@@ -182,7 +176,6 @@ export function LeaveRequestsList() {
             }
         }
 
-        // 2. ✨ الجزء الذكي: إعادة حساب كافة الطلبات المعلقة (Pending) لهذا الموظف
         const pendingQuery = query(
             collection(firestore, 'leaveRequests'),
             where('employeeId', '==', employee.id),
@@ -209,9 +202,9 @@ export function LeaveRequestsList() {
 
         batch.delete(leaveRef);
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تم حذف الطلب وترميم الأرصدة والطلبات المعلقة.' });
+        toast({ title: 'نجاح', description: 'تم حذف الطلب وترميم الأرصدة تلقائياً.' });
     } catch (error) {
-        toast({ variant: 'destructive', title: 'خطأ تقني', description: 'فشل في عملية ترميم الأرصدة.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الطلب.' });
     } finally {
         setIsDeleting(false);
         setRequestToDelete(null);
@@ -320,7 +313,10 @@ export function LeaveRequestsList() {
   };
   
   const handleStartLeave = async () => {
-    if (!requestToStart || !firestore || !actualDate) return;
+    if (!requestToStart || !firestore || !actualDate) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير كافية لتسجيل المغادرة.' });
+        return;
+    }
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
@@ -344,7 +340,10 @@ export function LeaveRequestsList() {
   };
 
   const handleReturnToWork = async () => {
-    if (!requestToReturn || !firestore || !actualDate) return;
+    if (!requestToReturn || !firestore || !actualDate) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير كافية لتسجيل العودة.' });
+        return;
+    }
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
@@ -560,7 +559,71 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* باقي نوافذ التأكيد (الرفض، بدء الإجازة، العودة) تبقى كما هي مع التأكد من استخدام المكونات الصحيحة */}
+      <AlertDialog open={!!requestToReject} onOpenChange={() => setRequestToReject(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle className="text-xl font-black">رفض طلب الإجازة</AlertDialogTitle>
+                <AlertDialogDescription>الرجاء ذكر سبب الرفض ليتم إشعار الموظف به.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+                <Textarea value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} placeholder="اكتب سبب الرفض هنا..." className="rounded-xl border-2" />
+            </div>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmRejection} disabled={isProcessingAction || !rejectionReason.trim()} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد الرفض'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!requestToStart} onOpenChange={() => setRequestToStart(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 shadow-inner">
+                        <PlaneTakeoff className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">تسجيل مغادرة الموظف</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">يرجى تحديد التاريخ الذي غادر فيه الموظف العمل فعلياً لبدء الإجازة.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+                <Label className="font-bold pr-1">تاريخ المغادرة الفعلي:</Label>
+                <DateInput value={actualDate} onChange={setActualDate} />
+            </div>
+            <AlertDialogFooter className="mt-2 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleStartLeave} disabled={isProcessingAction || !actualDate} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black px-10 shadow-lg shadow-blue-100">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد المغادرة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!requestToReturn} onOpenChange={() => setRequestToReturn(null)}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-inner">
+                        <Home className="h-6 w-6" />
+                    </div>
+                    <AlertDialogTitle className="text-2xl font-black">إشعار مباشرة العمل</AlertDialogTitle>
+                </div>
+                <AlertDialogDescription className="text-base font-medium">يرجى تحديد التاريخ الذي باشر فيه الموظف عمله فعلياً بعد العودة من الإجازة.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+                <Label className="font-bold pr-1">تاريخ المباشرة الفعلي:</Label>
+                <DateInput value={actualDate} onChange={setActualDate} />
+            </div>
+            <AlertDialogFooter className="mt-2 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReturnToWork} disabled={isProcessingAction || !actualDate} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-black px-10 shadow-lg shadow-indigo-100">
+                    {isProcessingAction ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد العودة'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
