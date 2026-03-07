@@ -194,12 +194,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
-                
-                const [engSnapshot, govSnapshot] = await Promise.all([getDocs(engQuery), getDocs(govQuery)]);
-
-                const fetchedDepartments = [
+                const depts = [
                     { name: 'القسم المعماري', order: 1 },
                     { name: 'القسم الإنشائي', order: 2 },
                     { name: 'قسم الكهرباء', order: 3 },
@@ -211,9 +206,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     { name: 'سكرتارية', order: 9 },
                     { name: 'خارجية', order: 10 }
                 ] as Department[];
-                setDepartments(fetchedDepartments);
+                setDepartments(depts);
 
-                const fetchedJobs = [
+                const jbs = [
                     { name: 'مهندس معماري', order: 1 },
                     { name: 'مهندس مدني', order: 2 },
                     { name: 'مهندس كهرباء', order: 3 },
@@ -222,7 +217,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     { name: 'سكرتير', order: 6 },
                     { name: 'عامل', order: 7 }
                 ] as any[];
-                setJobs(fetchedJobs);
+                setJobs(jbs);
 
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
@@ -255,10 +250,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
     
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
-
-    const filteredJobOptions = useMemo(() => {
-        return jobs.map(j => ({ value: j.name, label: j.name }));
-    }, [jobs]);
+    const filteredJobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -293,7 +285,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         }
 
         if (isSimpleLayout) {
-            dataToSave.department = formData.department || 'عمالة خارجية';
+            dataToSave.department = formData.department || 'خارجية';
             dataToSave.jobTitle = 'عامل يومية';
             dataToSave.civilId = formData.civilId || ''; 
             dataToSave.hireDate = formData.hireDate;

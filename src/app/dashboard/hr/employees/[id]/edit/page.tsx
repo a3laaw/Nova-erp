@@ -11,7 +11,6 @@ import {
   CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X } from 'lucide-react';
 import { useFirebase, useDocument } from '@/firebase';
@@ -47,6 +46,7 @@ export default function EditEmployeePage() {
         
         setIsSaving(true);
 
+        // التحقق من تكرار IBAN
         if (updatedData.iban && updatedData.iban.trim() !== '') {
             const ibanQuery = query(
                 collection(firestore, 'employees'),
@@ -90,7 +90,12 @@ export default function EditEmployeePage() {
         };
 
         fieldMappings.forEach(({ key, label, isCurrency, changeType }) => {
-            const oldValue = employee[key];
+            // معالجة ذكية للفرق بين fullName و nameAr في البيانات القديمة
+            let oldValue = employee[key];
+            if (key === 'fullName' && oldValue === undefined) {
+                oldValue = (employee as any).nameAr;
+            }
+
             const newValue = updatedData[key];
 
             const formatValue = (val: any) => {
@@ -101,7 +106,7 @@ export default function EditEmployeePage() {
                 if (key === 'contractType') {
                     return contractTypeTranslations[val as string] || val;
                 }
-                if (key.toLowerCase().includes('date') || key.toLowerCase().includes('expiry')) {
+                if (typeof val === 'object' || String(key).toLowerCase().includes('date') || String(key).toLowerCase().includes('expiry')) {
                     const date = toFirestoreDate(val);
                     return date ? format(date, 'dd/MM/yyyy') : '-';
                 }
@@ -166,13 +171,9 @@ export default function EditEmployeePage() {
 
     if (error || !employee) {
         return (
-            <Card dir="rtl">
-                <CardHeader>
-                    <CardTitle>خطأ</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-destructive">فشل تحميل بيانات الموظف أو أنه غير موجود.</p>
-                </CardContent>
+            <Card dir="rtl" className="max-w-4xl mx-auto">
+                <CardHeader><CardTitle>خطأ</CardTitle></CardHeader>
+                <CardContent><p className="text-destructive">فشل تحميل بيانات الموظف.</p></CardContent>
             </Card>
         );
     }
