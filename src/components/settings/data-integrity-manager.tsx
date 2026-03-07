@@ -7,10 +7,10 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
-import { Loader2, Trash2, ShieldExclamation, AlertCircle, UserX } from 'lucide-react';
+import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Input } from '../ui/input';
@@ -72,9 +72,7 @@ function TerminatedEmployeesManager() {
             batch.delete(doc(firestore, 'employees', emp.id!));
         });
 
-        // Delete associated users (fetching in chunks if necessary, but here we assume a reasonable number)
         const employeeIds = terminatedEmployees.map(e => e.id);
-        // Note: Firestore 'in' queries are limited to 30 items
         const chunks = [];
         for (let i = 0; i < employeeIds.length; i += 30) {
             chunks.push(employeeIds.slice(i, i + 30));
@@ -142,7 +140,6 @@ function TerminatedEmployeesManager() {
             </Table>
         </div>
 
-        {/* حوار حذف موظف واحد */}
         <AlertDialog open={!!employeeToDelete} onOpenChange={() => setEmployeeToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-3xl">
                 <AlertDialogHeader>
@@ -160,7 +157,6 @@ function TerminatedEmployeesManager() {
             </AlertDialogContent>
         </AlertDialog>
 
-        {/* حوار المسح الجماعي */}
         <AlertDialog open={isWipeAllOpen} onOpenChange={setIsWipeAllOpen}>
             <AlertDialogContent dir="rtl" className="rounded-3xl">
                 <AlertDialogHeader>
@@ -239,7 +235,7 @@ function SystemWipeManager() {
     return (
         <div className="space-y-4">
             <h3 className="font-black text-lg text-destructive flex items-center gap-2">
-                <ShieldExclamation className="h-5 w-5" />
+                <ShieldAlert className="h-5 w-5" />
                 إجراءات إخلاء البيانات (Danger Zone)
             </h3>
             <p className="text-sm text-muted-foreground">
