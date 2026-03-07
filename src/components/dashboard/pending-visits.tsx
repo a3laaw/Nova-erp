@@ -9,32 +9,30 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Trash2, Loader2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, query, where, getDocs, limit, type QueryConstraint } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, type QueryConstraint, doc, deleteDoc } from 'firebase/firestore';
 import type { Appointment, Client } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
 import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useToast } from '@/hooks/use-toast';
 
 interface PendingVisit extends Appointment {
     clientName?: string;
 }
 
-/**
- * مكون الزيارات المعلقة: تم تبسيط الاستعلام ليعتمد على التصفية البرمجية 
- * لتجنب أخطاء الفهارس المركبة في Firestore.
- */
 export function PendingVisits() {
     const { firestore } = useFirebase();
     const { user, loading: userLoading } = useAuth();
+    const { toast } = useToast();
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     
     const pendingVisitsQuery = useMemo(() => {
         if (userLoading || !user) return null;
         
-        // استعلام مبسط: جلب الزيارات المعمارية التي لم يتم تحديث مرحلتها فقط
         const constraints: QueryConstraint[] = [
             where('type', '==', 'architectural'),
             where('workStageUpdated', '==', false),
@@ -54,11 +52,9 @@ export function PendingVisits() {
         pendingVisitsQuery || []
     );
 
-    const [augmentedVisits, setAugmentedVisits] = useState<PendingVisit[]>([]);
     const [clientsMap, setClientsMap] = useState<Map<string, Client>>(new Map());
     const [clientsFetched, setClientsFetched] = useState(false);
 
-    // تصفية الزيارات التي مضى تاريخها وترتيبها برمجياً
     const processedVisits = useMemo(() => {
         return rawPendingVisits
             .filter(v => {
@@ -93,22 +89,37 @@ export function PendingVisits() {
                 });
                 setClientsMap(prev => new Map([...prev, ...newClientsMap]));
             } catch (error) {
-                console.error("Error fetching clients for pending visits:", error);
+                console.error("Error fetching clients:", error);
             } finally {
                 setClientsFetched(true);
             }
         };
 
         fetchClients();
-    }, [processedVisits, firestore, clientsMap]);
+    }, [processedVisits, firestore]);
     
-    useEffect(() => {
-        const augmented = processedVisits.map(visit => ({
+    const augmentedVisits = useMemo(() => {
+        return processedVisits.map(visit => ({
             ...visit,
             clientName: visit.clientId ? (clientsMap.get(visit.clientId)?.nameAr || visit.clientName) : visit.clientName,
         }));
-        setAugmentedVisits(augmented);
     }, [processedVisits, clientsMap]);
+
+    const handleDeleteGhostRecord = async (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!firestore) return;
+        
+        setDeletingId(id);
+        try {
+            await deleteDoc(doc(firestore, 'appointments', id));
+            toast({ title: 'تم التنظيف', description: 'تم حذف السجل اليتيم بنجاح.' });
+        } catch (err) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف السجل.' });
+        } finally {
+            setDeletingId(null);
+        }
+    };
     
     const loading = visitsLoading || !clientsFetched;
     
@@ -118,13 +129,12 @@ export function PendingVisits() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
                         <AlertCircle />
-                        زيارات معلقة بانتظار تحديث
+                        زيارات معلقة
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <Skeleton className="h-5 w-full" />
                     <Skeleton className="h-5 w-5/6" />
-                    <Skeleton className="h-5 w-3/4" />
                 </CardContent>
             </Card>
         );
@@ -145,13 +155,28 @@ export function PendingVisits() {
             </CardHeader>
             <CardContent className="flex-grow space-y-3 overflow-y-auto">
                 {augmentedVisits.map(visit => (
-                     <Link href={`/dashboard/appointments/${visit.id}`} key={visit.id} className="block p-2 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30">
-                        <div className="flex justify-between items-center">
-                            <span className="font-semibold text-sm">{visit.clientName || 'عميل غير معروف'}</span>
-                             <span className="text-xs text-muted-foreground">{toFirestoreDate(visit.appointmentDate) ? format(toFirestoreDate(visit.appointmentDate)!, 'dd/MM/yyyy') : ''}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">{visit.title}</p>
-                    </Link>
+                     <div key={visit.id} className="relative group">
+                        <Link href={`/dashboard/appointments/${visit.id}`} className="block p-3 rounded-xl bg-white/50 border border-red-100 hover:bg-white transition-all shadow-sm">
+                            <div className="flex justify-between items-start">
+                                <div className="space-y-1">
+                                    <span className="font-black text-sm block">{visit.clientName || 'عميل غير معروف'}</span>
+                                    <p className="text-[10px] text-muted-foreground font-bold">{visit.title}</p>
+                                    <span className="text-[10px] text-red-600 font-mono font-bold bg-red-100/50 px-2 py-0.5 rounded-full">
+                                        {toFirestoreDate(visit.appointmentDate) ? format(toFirestoreDate(visit.appointmentDate)!, 'dd/MM/yyyy') : ''}
+                                    </span>
+                                </div>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                    onClick={(e) => handleDeleteGhostRecord(e, visit.id!)}
+                                    disabled={deletingId === visit.id}
+                                >
+                                    {deletingId === visit.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </Link>
+                    </div>
                 ))}
             </CardContent>
         </Card>

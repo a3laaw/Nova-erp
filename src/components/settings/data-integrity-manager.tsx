@@ -7,7 +7,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
-import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX } from 'lucide-react';
+import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX, CheckCircle2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -67,7 +67,6 @@ function TerminatedEmployeesManager() {
     try {
         const batch = writeBatch(firestore);
         
-        // Delete employees
         terminatedEmployees.forEach(emp => {
             batch.delete(doc(firestore, 'employees', emp.id!));
         });
@@ -199,32 +198,42 @@ function SystemWipeManager() {
         'transactionTypes', 'appointments', 'work_stages_progress', 'contracts', 
         'contractTemplates', 'chartOfAccounts', 'journalEntries', 
         'paymentVouchers', 'cashReceipts', 'quotations', 'vendors', 
-        'purchaseOrders', 'residencyRenewals', 'projects', 'field_visits', 'boqs'
+        'purchaseOrders', 'residencyRenewals', 'projects', 'field_visits', 'boqs',
+        'payment_applications', 'daily_reports', 'subcontractors', 'subcontractor_certificates'
     ];
     
     const handleWipeData = async () => {
-        if (!firestore) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم تهيئة قاعدة البيانات.' });
-            return;
-        }
+        if (!firestore) return;
         setIsProcessing(true);
         try {
             let deletedDocsCount = 0;
+            
+            // نظام الحلقات التكرارية لضمان حذف كافة السجلات وتجاوز حدود الـ Batch (500)
             for (const collectionName of collectionsToDelete) {
-                const snapshot = await getDocs(query(collection(firestore, collectionName)));
-                if (snapshot.empty) continue;
-                
-                const batch = writeBatch(firestore);
-                snapshot.docs.forEach(doc => {
-                    batch.delete(doc.ref);
-                });
-                await batch.commit();
-                deletedDocsCount += snapshot.size;
+                let hasMore = true;
+                while (hasMore) {
+                    const q = query(collection(firestore, collectionName), limit(400));
+                    const snapshot = await getDocs(q);
+                    
+                    if (snapshot.empty) {
+                        hasMore = false;
+                        continue;
+                    }
+                    
+                    const batch = writeBatch(firestore);
+                    snapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
+                    await batch.commit();
+                    
+                    deletedDocsCount += snapshot.size;
+                    // إذا كان العدد المسترجع أقل من الليميت، فهذا يعني أن المجموعة انتهت
+                    if (snapshot.size < 400) hasMore = false;
+                }
             }
-            toast({ title: 'نجاح', description: `تم مسح ${deletedDocsCount} مستنداً من النظام. يفضل إعادة تحميل الصفحة.` });
+            
+            toast({ title: 'نجاح تصفير النظام', description: `تم مسح ${deletedDocsCount} سجلاً بنجاح. النظام الآن نظيف تماماً.` });
         } catch (error) {
-            console.error("Error wiping data:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح البيانات.' });
+            console.error("Wipe Error:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح بعض البيانات.' });
         } finally {
             setIsProcessing(false);
             setIsConfirmOpen(false);
