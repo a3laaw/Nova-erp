@@ -36,13 +36,24 @@ const kuwaitGovernorates: Option[] = [
 export function GovernorateCombobox() {
   const [open, setOpen] = React.useState(false)
   const [value, setValue] = React.useState("")
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
 
   const selectedOption = kuwaitGovernorates.find((o) => o.value === value)
+
+  const handleSelect = React.useCallback(
+    (optionValue: string) => {
+      setValue(optionValue === value ? "" : optionValue);
+      setOpen(false);
+      setTimeout(() => triggerRef.current?.focus(), 0);
+    },
+    [value]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -56,7 +67,17 @@ export function GovernorateCombobox() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent 
+        className="w-[--radix-popover-trigger-width] p-0 z-[999999]"
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-governorate-combobox-options]')) {
+            e.preventDefault();
+          }
+        }}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        data-governorate-combobox-options
+      >
         <Command>
           <CommandInput placeholder="ابحث عن محافظة..." />
           <CommandList>
@@ -66,15 +87,13 @@ export function GovernorateCombobox() {
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onSelect={(currentLabel) => {
-                    const selected = kuwaitGovernorates.find(
-                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
-                    );
-                    if (selected) {
-                      setValue(selected.value);
-                    }
-                    setOpen(false);
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSelect(option.value);
+                  }}
+                  onSelect={() => {
+                    handleSelect(option.value);
                   }}
                 >
                   <Check
