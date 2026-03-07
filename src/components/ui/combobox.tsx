@@ -117,7 +117,7 @@ export function Combobox({
                 </CommandItem>
               ))}
             </CommandGroup>
-          </TableBody>
+          </CommandList>
         </Command>
       </PopoverContent>
     </Popover>
