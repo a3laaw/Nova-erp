@@ -115,7 +115,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         return true;
     }, [formData.contractType, formData.pieceRateMode]);
 
-    // ✨ محرك التوافق الرجعي (Backward Compatibility Engine)
     useEffect(() => {
         const generalHours = branding?.work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
@@ -165,6 +164,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [initialData, branding]);
 
     useEffect(() => {
+        if (initialData?.id) return;
         const noSalaryContractTypes = ['percentage', 'day_laborer'];
         const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate', 'day_laborer'].includes(formData.contractType);
 
@@ -186,7 +186,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 workEndTime: branding.work_hours.general.evening_end_time || '17:00',
             }));
         }
-    }, [formData.contractType, formData.pieceRateMode, branding]);
+    }, [formData.contractType, formData.pieceRateMode, branding, initialData?.id]);
 
 
     useEffect(() => {
