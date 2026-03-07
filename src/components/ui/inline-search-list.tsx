@@ -85,7 +85,7 @@ export function InlineSearchList({
                   onMouseDown={(e) => e.preventDefault()}
                   onSelect={(currentLabel) => {
                     const selected = options.find(
-                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
+                      (opt) => (opt.label + (opt.searchKey || '')).toLowerCase() === currentLabel.toLowerCase()
                     );
                     if (selected) {
                       onSelect(selected.value === value ? "" : selected.value);
