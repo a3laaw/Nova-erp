@@ -1,22 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import { Input } from './input';
 import { cn } from '@/lib/utils';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from './button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 export interface SearchOption {
   value: string;
@@ -42,86 +30,98 @@ export function InlineSearchList({
   className,
 }: InlineSearchListProps) {
   const [open, setOpen] = React.useState(false);
-  const isSelectingRef = React.useRef(false);
+  const [search, setSearch] = React.useState('');
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  
+  const selectedLabel = options.find((option) => option.value === value)?.label;
 
-  const selectedOption = React.useMemo(() => 
-    options.find((option) => option.value === value)
-  , [options, value]);
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
+
+  const filteredOptions = React.useMemo(() => {
+    if (!search) return options;
+    const searchLower = search.toLowerCase();
+    return options.filter(opt => 
+      opt.label.toLowerCase().includes(searchLower) || 
+      opt.searchKey?.toLowerCase().includes(searchLower)
+    );
+  }, [options, search]);
 
   return (
-    <Popover 
-      open={open} 
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen && isSelectingRef.current) {
-          isSelectingRef.current = false;
-          return;
-        }
-        setOpen(nextOpen);
-      }}
-    >
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            "w-full justify-between font-normal h-10 px-3 truncate",
-            !value && "text-muted-foreground",
-            className
-          )}
-          disabled={disabled}
-        >
-          <span className="truncate">{selectedOption?.label || placeholder}</span>
-          <div className="flex items-center shrink-0 gap-1">
-            {value && <Check className="h-4 w-4 opacity-50" />}
-            <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-          </div>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent 
-        className="p-0 w-[var(--radix-popover-trigger-width)] z-[999999]" 
-        align="start"
-        onInteractOutside={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
-        data-inline-search-list-options
+    <div className="relative w-full" ref={containerRef}>
+      <Button
+        type="button"
+        variant="outline"
+        role="combobox"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "w-full justify-between font-normal",
+          !value && "text-muted-foreground",
+          className
+        )}
+        disabled={disabled}
       >
-        <Command dir="rtl" className="w-full">
-          <CommandInput placeholder="ابحث..." className="h-9" />
-          <CommandList className="max-h-[250px]">
-            <CommandEmpty>لا توجد نتائج.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
+        <span className="truncate">{selectedLabel || placeholder}</span>
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+      
+      {open && (
+        <div 
+          className="absolute z-[99999] w-full mt-1 bg-popover border rounded-md shadow-md"
+          style={{ pointerEvents: 'auto' }}
+        >
+          <div className="p-2 border-b">
+            <Input
+              placeholder="ابحث..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-[200px] overflow-y-auto p-1">
+            {filteredOptions.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                لا توجد نتائج.
+              </div>
+            ) : (
+              filteredOptions.map((option) => (
+                <div
                   key={option.value}
-                  value={option.label + (option.searchKey || '')}
-                  onPointerDown={() => {
-                    isSelectingRef.current = true;
-                  }}
-                  onPointerUp={() => {
-                    isSelectingRef.current = false;
-                    onSelect(option.value === value ? "" : option.value);
+                  className={cn(
+                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                    value === option.value && "bg-accent"
+                  )}
+                  onClick={() => {
+                    onSelect(option.value === value ? '' : option.value);
                     setOpen(false);
+                    setSearch('');
                   }}
-                  onSelect={() => {
-                    onSelect(option.value === value ? "" : option.value);
-                    setOpen(false);
-                  }}
-                  className="cursor-pointer"
+                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
                 >
                   <Check
                     className={cn(
-                      "ml-2 h-4 w-4",
+                      "mr-2 h-4 w-4",
                       value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {option.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
