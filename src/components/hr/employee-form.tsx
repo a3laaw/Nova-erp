@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X, Loader2, Users } from 'lucide-react';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -119,12 +119,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
         const defaultEndTime = generalHours?.evening_end_time || '17:00';
 
-        if (!initialData && !branding) return;
-
         if (initialData) {
             setFormData({
-                fullName: initialData.fullName || '',
-                nameEn: initialData.nameEn || '',
+                fullName: initialData.fullName || (initialData as any).nameAr || '',
+                nameEn: initialData.nameEn || (initialData as any).nameEn || '',
                 civilId: initialData.civilId || '',
                 mobile: initialData.mobile || '',
                 hireDate: toFirestoreDate(initialData.hireDate) || new Date(),
@@ -153,7 +151,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             });
             setShowHousingAllowance(!!initialData.housingAllowance && initialData.housingAllowance > 0);
             setShowTransportAllowance(!!initialData.transportAllowance && initialData.transportAllowance > 0);
-        } else {
+        } else if (branding) {
             setFormData(prev => ({
                 ...prev,
                 workStartTime: defaultStartTime,
@@ -260,12 +258,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // التحقق من رقم الهاتف
         if (formData.mobile && formData.mobile.replace(/\D/g, '').length !== 8) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'رقم الهاتف يجب أن يكون 8 أرقام بالضبط.' });
             return;
         }
-        // التحقق من الرقم المدني (للموظف غير البسيط فقط)
         if (!isSimpleLayout && formData.civilId && formData.civilId.replace(/\D/g, '').length !== 12) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'الرقم المدني يجب أن يكون 12 رقماً بالضبط.' });
             return;
@@ -305,7 +301,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 dataToSave.dailyRate = parseFloat(formData.dailyRate);
             }
         } else {
-            // Logic for regular employees
             if (!formData.civilId || !formData.hireDate || !formData.department || !formData.jobTitle) {
                 toast({ variant: 'destructive', title: 'حقول مطلوبة', description: 'الرجاء تعبئة جميع الحقول الإلزامية (*).' });
                 return;

@@ -196,11 +196,12 @@ export default function EditEmployeePage() {
             <CardHeader>
                 <CardTitle>تعديل بيانات الموظف</CardTitle>
                 <CardDescription>
-                    تعديل الملف الشخصي لـ <span className="font-bold">{employee.fullName}</span>.
+                    تعديل الملف الشخصي لـ <span className="font-bold">{employee.fullName || (employee as any).nameAr}</span>.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <EmployeeForm 
+                    key={employee.id} 
                     initialData={employee}
                     onSave={handleSave}
                     onClose={() => router.back()}
