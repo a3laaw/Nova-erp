@@ -194,18 +194,26 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
+                // FIXED: Removed orderBy from collectionGroup query to avoid index errors in development environment.
+                // We will sort the results client-side instead.
                 const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
-                const jobsQuery = query(collectionGroup(firestore, 'jobs'), orderBy('order'));
+                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
                 const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
                 setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
-                setJobs(jobsSnapshot.docs.map(doc => {
+                
+                const fetchedJobs = jobsSnapshot.docs.map(doc => {
                     const departmentId = doc.ref.parent.parent!.id;
                     return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
-                }));
+                });
+                
+                // Sort jobs client-side
+                fetchedJobs.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+                setJobs(fetchedJobs);
 
             } catch (error) {
+                console.error("Reference data fetch error:", error);
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
             } finally {
                 setRefDataLoading(false);

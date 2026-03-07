@@ -71,6 +71,7 @@ export function InlineSearchList({
         className="p-0 w-[var(--radix-popover-trigger-width)] z-[999999]" 
         align="start"
         onCloseAutoFocus={(e) => e.preventDefault()}
+        data-inline-search-list-options
       >
         <Command dir="rtl" className="w-full">
           <CommandInput placeholder="ابحث..." className="h-9" />
