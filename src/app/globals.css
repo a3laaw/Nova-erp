@@ -90,6 +90,22 @@
         .no-print { display: none !important; }
         main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
     }
+
+    /* Hide scrollbar arrows/buttons globally for cleaner UI */
+    .scrollbar-none::-webkit-scrollbar-button {
+        display: none !important;
+        width: 0;
+        height: 0;
+    }
+    
+    .scrollbar-none::-webkit-scrollbar {
+        width: 4px;
+    }
+    
+    .scrollbar-none::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.1);
+        border-radius: 10px;
+    }
 }
 
 /* Global Transition for smoother SPA feel */
