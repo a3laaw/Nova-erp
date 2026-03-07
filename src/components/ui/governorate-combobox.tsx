@@ -80,6 +80,7 @@ export function GovernorateCombobox() {
                   key={option.value}
                   // 9. ✨ الجزء الأهم: نستخدم label هنا ليتم البحث بالنص الظاهر
                   value={option.label}
+                  onMouseDown={(e) => e.preventDefault()}
                   // 10. عند اختيار عنصر، نقوم بتحديث القيمة وإغلاق القائمة
                   onSelect={(currentLabel) => {
                     const selected = kuwaitGovernorates.find(
