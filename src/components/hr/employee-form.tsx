@@ -22,6 +22,7 @@ import { useBranding } from '@/context/branding-context';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
+import { cn } from '@/lib/utils';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -114,6 +115,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         return true;
     }, [formData.contractType, formData.pieceRateMode]);
 
+    // ✨ محرك التوافق الرجعي (Backward Compatibility Engine)
     useEffect(() => {
         const generalHours = branding?.work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';

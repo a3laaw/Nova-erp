@@ -89,15 +89,15 @@ export function ReturnToWorkNotice({ leave, employee }: Props) {
 
         <footer className="pt-24">
           <div className="grid grid-cols-3 gap-8 text-center text-[10px] font-black uppercase text-muted-foreground">
-            <div className="space-y-12">
+            <div className="space-y-16">
               <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">توقيع الموظف</p>
               <div className="pt-2 border-t border-dashed">إقرار بالمباشرة</div>
             </div>
-            <div className="space-y-12">
+            <div className="space-y-16">
               <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">اعتماد القسم</p>
               <div className="pt-2 border-t border-dashed">المدير المباشر</div>
             </div>
-            <div className="space-y-12">
+            <div className="space-y-16">
               <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">الموارد البشرية</p>
               <div className="pt-2 border-t border-dashed">التوثيق والأرشفة</div>
             </div>

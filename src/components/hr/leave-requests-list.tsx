@@ -582,7 +582,7 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ✨ نافذة التراجع عن الموافقة (تم إصلاحها) ✨ */}
+      {/* ✨ نافذة التراجع عن الموافقة ✨ */}
       <AlertDialog open={!!requestToUndoApproval} onOpenChange={() => setRequestToUndoApproval(null)}>
         <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
