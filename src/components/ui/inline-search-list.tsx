@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { Button } from './button';
 import {
   Command,
@@ -83,8 +83,13 @@ export function InlineSearchList({
                   key={option.value}
                   value={option.label + (option.searchKey || '')}
                   onMouseDown={(e) => e.preventDefault()}
-                  onSelect={() => {
-                    onSelect(option.value === value ? "" : option.value);
+                  onSelect={(currentLabel) => {
+                    const selected = options.find(
+                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
+                    );
+                    if (selected) {
+                      onSelect(selected.value === value ? "" : selected.value);
+                    }
                     setOpen(false);
                   }}
                   className="cursor-pointer"
