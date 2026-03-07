@@ -89,11 +89,9 @@ export function Combobox({
                   key={option.value}
                   value={option.label}
                   onPointerDown={() => {
-                    console.log('POINTER DOWN FIRED', option.value);
                     isSelectingRef.current = true;
                   }}
                   onPointerUp={() => {
-                    console.log('POINTER UP FIRED', option.value);
                     isSelectingRef.current = false;
                     if (onValueChange) {
                       onValueChange(option.value === value ? "" : option.value);

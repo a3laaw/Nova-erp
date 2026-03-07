@@ -96,11 +96,9 @@ export function InlineSearchList({
                   key={option.value}
                   value={option.label + (option.searchKey || '')}
                   onPointerDown={() => {
-                    console.log('POINTER DOWN FIRED', option.value);
                     isSelectingRef.current = true;
                   }}
                   onPointerUp={() => {
-                    console.log('POINTER UP FIRED', option.value);
                     isSelectingRef.current = false;
                     onSelect(option.value === value ? "" : option.value);
                     setOpen(false);

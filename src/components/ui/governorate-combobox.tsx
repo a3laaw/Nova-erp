@@ -82,11 +82,9 @@ export function GovernorateCombobox() {
                   key={option.value}
                   value={option.label}
                   onPointerDown={() => {
-                    console.log('POINTER DOWN FIRED', option.value);
                     isSelectingRef.current = true;
                   }}
                   onPointerUp={() => {
-                    console.log('POINTER UP FIRED', option.value);
                     isSelectingRef.current = false;
                     setValue(option.value === value ? "" : option.value);
                     setOpen(false);

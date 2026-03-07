@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -11,11 +10,12 @@ import {
 } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useFirebase } from '@/firebase';
-import { collectionGroup, query, orderBy, limit, getDocs, onSnapshot } from 'firebase/firestore';
+import { collectionGroup, query, limit, onSnapshot } from 'firebase/firestore'; 
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Skeleton } from '../ui/skeleton';
-import { History, MessageSquare, AlertCircle } from 'lucide-react';
+import { History } from 'lucide-react';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface ActivityEvent {
   id: string;
@@ -28,7 +28,7 @@ interface ActivityEvent {
 }
 
 /**
- * مكون النشاط الأخير: يجلب آخر الأحداث والتعليقات من كافة أنحاء النظام (Global Timeline).
+ * مكون النشاط الأخير: تم إزالة الترتيب من الاستعلام المجمع لتجنب أخطاء الفهارس.
  */
 export function RecentActivity() {
   const { firestore } = useFirebase();
@@ -38,11 +38,10 @@ export function RecentActivity() {
   useEffect(() => {
     if (!firestore) return;
 
-    // استخدام collectionGroup لجلب الأحداث من كافة المعاملات والمشاريع
+    // استعلام بدون orderBy لتجنب الحاجة لفهرس Collection Group Descending
     const q = query(
       collectionGroup(firestore, 'timelineEvents'),
-      orderBy('createdAt', 'desc'),
-      limit(8)
+      limit(50) 
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -50,7 +49,15 @@ export function RecentActivity() {
         id: doc.id,
         ...doc.data(),
       } as ActivityEvent));
-      setActivities(items);
+      
+      // الترتيب برمجياً (Client-side sorting) لضمان الدقة وتوفير الفهارس
+      const sortedItems = items.sort((a, b) => {
+          const dateA = toFirestoreDate(a.createdAt)?.getTime() || 0;
+          const dateB = toFirestoreDate(b.createdAt)?.getTime() || 0;
+          return dateB - dateA;
+      });
+
+      setActivities(sortedItems.slice(0, 8));
       setLoading(false);
     }, (error) => {
       console.error("Global Timeline Error:", error);
@@ -61,8 +68,8 @@ export function RecentActivity() {
   }, [firestore]);
 
   const formatDate = (dateValue: any) => {
-    if (!dateValue) return '';
-    const date = dateValue.toDate ? dateValue.toDate() : new Date(dateValue);
+    const date = toFirestoreDate(dateValue);
+    if (!date) return '';
     try {
       return formatDistanceToNow(date, { addSuffix: true, locale: ar });
     } catch {

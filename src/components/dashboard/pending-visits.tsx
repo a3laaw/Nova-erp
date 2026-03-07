@@ -9,13 +9,13 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { AlertCircle, ArrowUpRight } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, query, where, getDocs, Timestamp, orderBy, limit, type QueryConstraint } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, type QueryConstraint } from 'firebase/firestore';
 import type { Appointment, Client } from '@/lib/types';
 import { Skeleton } from '../ui/skeleton';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 
@@ -23,26 +23,24 @@ interface PendingVisit extends Appointment {
     clientName?: string;
 }
 
+/**
+ * مكون الزيارات المعلقة: تم تبسيط الاستعلام ليعتمد على التصفية البرمجية 
+ * لتجنب أخطاء الفهارس المركبة في Firestore.
+ */
 export function PendingVisits() {
     const { firestore } = useFirebase();
     const { user, loading: userLoading } = useAuth();
     
-    // NEW: Direct query for pending visits. This is the core of the fix.
     const pendingVisitsQuery = useMemo(() => {
         if (userLoading || !user) return null;
         
-        // Base query for past, non-updated architectural appointments
-        const now = new Date();
+        // استعلام مبسط: جلب الزيارات المعمارية التي لم يتم تحديث مرحلتها فقط
         const constraints: QueryConstraint[] = [
             where('type', '==', 'architectural'),
-            where('status', '!=', 'cancelled'),
-            where('appointmentDate', '<', Timestamp.fromDate(now)),
             where('workStageUpdated', '==', false),
-            orderBy('appointmentDate', 'desc'),
-            limit(10) // Limit to a reasonable number for the dashboard
+            limit(50) 
         ];
 
-        // Add user-specific filter if not an admin
         if (user.role !== 'Admin' && user.employeeId) {
             constraints.push(where('engineerId', '==', user.employeeId));
         }
@@ -50,7 +48,7 @@ export function PendingVisits() {
         return constraints;
     }, [user, userLoading]);
 
-    const { data: pendingVisits, loading: visitsLoading } = useSubscription<Appointment>(
+    const { data: rawPendingVisits, loading: visitsLoading } = useSubscription<Appointment>(
         firestore, 
         pendingVisitsQuery ? 'appointments' : null, 
         pendingVisitsQuery || []
@@ -60,36 +58,39 @@ export function PendingVisits() {
     const [clientsMap, setClientsMap] = useState<Map<string, Client>>(new Map());
     const [clientsFetched, setClientsFetched] = useState(false);
 
-    // Effect to fetch client data only for the pending visits received from the subscription
+    // تصفية الزيارات التي مضى تاريخها وترتيبها برمجياً
+    const processedVisits = useMemo(() => {
+        return rawPendingVisits
+            .filter(v => {
+                const date = toFirestoreDate(v.appointmentDate);
+                return v.status !== 'cancelled' && date && isPast(date);
+            })
+            .sort((a, b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0))
+            .slice(0, 10);
+    }, [rawPendingVisits]);
+
     useEffect(() => {
-        if (!firestore || pendingVisits.length === 0) {
+        if (!firestore || processedVisits.length === 0) {
             setClientsFetched(true);
             return;
         }
 
-        const clientIds = [...new Set(pendingVisits.map(v => v.clientId).filter(Boolean) as string[])];
+        const clientIds = [...new Set(processedVisits.map(v => v.clientId).filter(Boolean) as string[])];
         const newClientIdsToFetch = clientIds.filter(id => !clientsMap.has(id));
 
         if (newClientIdsToFetch.length === 0) {
-            if(!clientsFetched) setClientsFetched(true);
+            setClientsFetched(true);
             return;
         }
         
         const fetchClients = async () => {
-            const batches = [];
-            for (let i = 0; i < newClientIdsToFetch.length; i += 30) {
-                batches.push(newClientIdsToFetch.slice(i, i + 30));
-            }
-            
             try {
                 const newClientsMap = new Map<string, Client>();
-                for (const batch of batches) {
-                    const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', batch));
-                    const clientsSnapshot = await getDocs(clientsQuery);
-                    clientsSnapshot.forEach(doc => {
-                        newClientsMap.set(doc.id, doc.data() as Client);
-                    });
-                }
+                const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', newClientIdsToFetch));
+                const clientsSnapshot = await getDocs(clientsQuery);
+                clientsSnapshot.forEach(doc => {
+                    newClientsMap.set(doc.id, doc.data() as Client);
+                });
                 setClientsMap(prev => new Map([...prev, ...newClientsMap]));
             } catch (error) {
                 console.error("Error fetching clients for pending visits:", error);
@@ -99,16 +100,15 @@ export function PendingVisits() {
         };
 
         fetchClients();
-    }, [pendingVisits, firestore, clientsMap, clientsFetched]);
+    }, [processedVisits, firestore, clientsMap]);
     
-    // Augment visits with client names once clients are fetched
     useEffect(() => {
-        const augmented = pendingVisits.map(visit => ({
+        const augmented = processedVisits.map(visit => ({
             ...visit,
             clientName: visit.clientId ? (clientsMap.get(visit.clientId)?.nameAr || visit.clientName) : visit.clientName,
         }));
         setAugmentedVisits(augmented);
-    }, [pendingVisits, clientsMap]);
+    }, [processedVisits, clientsMap]);
     
     const loading = visitsLoading || !clientsFetched;
     
@@ -130,9 +130,7 @@ export function PendingVisits() {
         );
     }
     
-    if (augmentedVisits.length === 0) {
-        return null; // Don't render the card if there are no pending visits
-    }
+    if (augmentedVisits.length === 0) return null;
 
     return (
          <Card className="h-full flex flex-col bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800/50">
