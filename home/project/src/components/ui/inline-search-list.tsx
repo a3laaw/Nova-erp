@@ -42,13 +42,24 @@ export function InlineSearchList({
   className,
 }: InlineSearchListProps) {
   const [open, setOpen] = React.useState(false);
+  const isSelectingRef = React.useRef(false);
 
-  const selectedOption = React.useMemo(() => 
-    options.find((option) => option.value === value)
-  , [options, value]);
+  const selectedOption = React.useMemo(
+    () => options.find((option) => option.value === value),
+    [options, value]
+  );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isSelectingRef.current) {
+          isSelectingRef.current = false;
+          return;
+        }
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -63,15 +74,18 @@ export function InlineSearchList({
           disabled={disabled}
         >
           <span className="truncate">{selectedOption?.label || placeholder}</span>
-          <Check className={cn("ml-2 h-4 w-4 shrink-0 opacity-50", !value && "hidden")} />
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <div className="flex items-center shrink-0 gap-1">
+            {value && <Check className="h-4 w-4 opacity-50" />}
+            <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+          </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent 
-        className="p-0 w-[var(--radix-popover-trigger-width)] z-[999999]" 
+
+      <PopoverContent
+        className="p-0 w-[var(--radix-popover-trigger-width)] z-[999999]"
         align="start"
+        onInteractOutside={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
-        data-inline-search-list-options
       >
         <Command dir="rtl" className="w-full">
           <CommandInput placeholder="ابحث..." className="h-9" />
@@ -82,14 +96,16 @@ export function InlineSearchList({
                 <CommandItem
                   key={option.value}
                   value={option.label + (option.searchKey || '')}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onSelect={(currentLabel) => {
-                    const selected = options.find(
-                      (opt) => (opt.label + (opt.searchKey || '')).toLowerCase() === currentLabel.toLowerCase()
-                    );
-                    if (selected) {
-                      onSelect(selected.value === value ? "" : selected.value);
-                    }
+                  onPointerDown={() => {
+                    isSelectingRef.current = true;
+                  }}
+                  onPointerUp={() => {
+                    isSelectingRef.current = false;
+                    onSelect(option.value === value ? "" : option.value);
+                    setOpen(false);
+                  }}
+                  onSelect={() => {
+                    onSelect(option.value === value ? "" : option.value);
                     setOpen(false);
                   }}
                   className="cursor-pointer"
