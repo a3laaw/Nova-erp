@@ -21,6 +21,14 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Home,
   Briefcase,
   Users,
@@ -217,15 +225,17 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state } = useSidebar();
+  const isCollapsed = state === "collapsed";
   const Icon = item.icon;
 
   if (item.roles && !item.roles.includes(userRole)) {
     return null;
   }
 
+  const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : (item.href ? currentPath === item.href : false);
+
   if (!item.children && item.href) {
-    const isActive = currentPath === item.href;
     return (
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label}>
@@ -252,7 +262,43 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   }
   
   if (item.children) {
-    const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : false;
+    if (isCollapsed) {
+      return (
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <SidebarMenuButton isActive={isActive} tooltip={item.label}>
+                {Icon && (
+                  <Icon 
+                    className={cn(
+                      "size-8 shrink-0 transition-colors", 
+                      isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
+                    )} 
+                    strokeWidth={isActive ? 2.5 : 2} 
+                  />
+                )}
+              </SidebarMenuButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-2xl shadow-2xl border-primary/10 bg-card/95 backdrop-blur-md p-2">
+              <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {item.children.map((child: any) => {
+                const isChildActive = currentPath === child.href;
+                const ChildIcon = child.icon;
+                return (
+                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/5 text-primary font-bold")}>
+                    <Link href={child.href} className="flex items-center gap-3 w-full py-2.5 px-3">
+                      {ChildIcon && <ChildIcon className="size-5 shrink-0" />}
+                      <span className="text-sm">{child.label}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      );
+    }
 
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible">
