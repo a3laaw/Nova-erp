@@ -106,7 +106,6 @@ export function InlineSearchList({
                     setOpen(false);
                   }}
                   onSelect={() => {
-                    // This handles keyboard (Enter)
                     onSelect(option.value === value ? "" : option.value);
                     setOpen(false);
                   }}
