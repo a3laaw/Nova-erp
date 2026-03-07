@@ -78,14 +78,6 @@ import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 const navItems = {
   ar: [
@@ -199,7 +191,7 @@ const navItems = {
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarX },
-        { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذان', icon: Clock },
+        { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذانات', icon: Clock },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
         { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
@@ -248,8 +240,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               />
             )}
             <span className={cn(
-              "font-medium transition-colors",
-              isActive ? "text-[#6d28d9] font-bold text-base" : "text-gray-900 text-base group-hover:text-[#6d28d9]"
+              "font-medium transition-colors text-base",
+              isActive ? "text-[#6d28d9] font-bold" : "text-gray-900"
             )}>
               {item.label}
             </span>
@@ -263,67 +255,50 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : false;
 
     return (
-      <Collapsible defaultOpen={isActive}>
+      <Collapsible defaultOpen={isActive} className="group/collapsible">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton as="button" isActive={isActive} className="justify-between">
-              <div className='flex items-center gap-3'>
-                {Icon && (
-                  <Icon 
-                    className={cn(
-                      "size-8 shrink-0 transition-colors", 
-                      isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
-                    )} 
-                    strokeWidth={isActive ? 2.5 : 2} 
-                  />
-                )}
-                <span className={cn(
-                  "font-medium transition-colors text-base",
-                  isActive ? "text-[#6d28d9] font-bold" : "text-gray-900 group-hover:text-[#6d28d9]"
-                )}>
-                  {item.label}
-                </span>
-              </div>
+            <SidebarMenuButton isActive={isActive} tooltip={item.label}>
+              {Icon && (
+                <Icon 
+                  className={cn(
+                    "size-8 shrink-0 transition-colors", 
+                    isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
+                  )} 
+                  strokeWidth={isActive ? 2.5 : 2} 
+                />
+              )}
+              <span className={cn(
+                "font-medium transition-colors text-base",
+                isActive ? "text-[#6d28d9] font-bold" : "text-gray-900 group-hover:text-[#6d28d9]"
+              )}>
+                {item.label}
+              </span>
               <ChevronDown className={cn(
-                "h-4 w-4 transition-transform group-data-[state=open]:rotate-180 opacity-50",
+                "ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden",
                 isActive ? "text-[#6d28d9]" : "text-[#374151]"
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
-        </SidebarMenuItem>
-        <CollapsibleContent>
-          <SidebarMenuSub>
-            {item.children.map((child: any) => {
-              const isChildActive = currentPath === child.href;
-              const ChildIcon = child.icon;
-              return (
-                <SidebarMenuSubItem key={child.href}>
-                   <SidebarMenuSubButton isActive={isChildActive} asChild>
-                        <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                            <div className="flex items-center gap-3">
-                                {ChildIcon && (
-                                  <ChildIcon 
-                                    className={cn(
-                                      "size-8 shrink-0 transition-colors", 
-                                      isChildActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
-                                    )} 
-                                    strokeWidth={isChildActive ? 2.5 : 2} 
-                                  />
-                                )}
-                                <span className={cn(
-                                  "font-medium transition-colors text-sm",
-                                  isChildActive ? "text-[#6d28d9] font-bold" : "text-gray-800 group-hover:text-[#6d28d9]"
-                                )}>
-                                  {child.label}
-                                </span>
-                            </div>
-                        </Link>
+          <CollapsibleContent>
+            <SidebarMenuSub>
+              {item.children.map((child: any) => {
+                const isChildActive = currentPath === child.href;
+                const ChildIcon = child.icon;
+                return (
+                  <SidebarMenuSubItem key={child.href}>
+                    <SidebarMenuSubButton isActive={isChildActive} asChild>
+                      <Link href={child.href} onClick={() => setOpenMobile(false)}>
+                        {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
+                        <span>{child.label}</span>
+                      </Link>
                     </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-              );
-            })}
-          </SidebarMenuSub>
-        </CollapsibleContent>
+                  </SidebarMenuSubItem>
+                );
+              })}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </SidebarMenuItem>
       </Collapsible>
     );
   }
@@ -343,7 +318,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       <SidebarHeader className="p-6 mb-2">
         <div className="flex items-center gap-3">
             <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-sm border border-slate-100 bg-white" />
-            <div className="flex flex-col">
+            <div className="flex flex-col group-data-[state=collapsed]:hidden">
               <span className="text-xl font-black tracking-tight text-foreground leading-tight">{branding?.company_name || 'Nova ERP'}</span>
               <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-70">Purple Suite</span>
             </div>
