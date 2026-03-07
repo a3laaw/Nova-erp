@@ -5,13 +5,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc, collectionGroup } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX, CheckCircle2 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Input } from '../ui/input';
 
@@ -191,6 +192,7 @@ function SystemWipeManager() {
     const [isProcessing, setIsProcessing] = useState(false);
     const CONFIRMATION_PHRASE = 'مسح كل شيء';
 
+    // القائمة المحدثة لتشمل المجموعات الفرعية لضمان تنظيف "آخر النشاطات"
     const collectionsToDelete = [
         'company_settings', 'users', 'clients', 'transaction_assignments', 
         'counters', 'employees', 'leaveRequests', 'permissionRequests', 'holidays', 
@@ -199,7 +201,9 @@ function SystemWipeManager() {
         'contractTemplates', 'chartOfAccounts', 'journalEntries', 
         'paymentVouchers', 'cashReceipts', 'quotations', 'vendors', 
         'purchaseOrders', 'residencyRenewals', 'projects', 'field_visits', 'boqs',
-        'payment_applications', 'daily_reports', 'subcontractors', 'subcontractor_certificates'
+        'payment_applications', 'daily_reports', 'subcontractors', 'subcontractor_certificates',
+        // المجموعات الفرعية المتداخلة (Sub-collections)
+        'timelineEvents', 'history', 'items', 'auditLogs', 'workStages'
     ];
     
     const handleWipeData = async () => {
@@ -208,11 +212,12 @@ function SystemWipeManager() {
         try {
             let deletedDocsCount = 0;
             
-            // نظام الحلقات التكرارية لضمان حذف كافة السجلات وتجاوز حدود الـ Batch (500)
+            // استخدام نظام الحلقات مع collectionGroup لمسح كل المجموعات المتداخلة
             for (const collectionName of collectionsToDelete) {
                 let hasMore = true;
                 while (hasMore) {
-                    const q = query(collection(firestore, collectionName), limit(400));
+                    // collectionGroup يمسح كل المجموعات التي تحمل هذا الاسم في أي مستوى
+                    const q = query(collectionGroup(firestore, collectionName), limit(400));
                     const snapshot = await getDocs(q);
                     
                     if (snapshot.empty) {
@@ -225,15 +230,14 @@ function SystemWipeManager() {
                     await batch.commit();
                     
                     deletedDocsCount += snapshot.size;
-                    // إذا كان العدد المسترجع أقل من الليميت، فهذا يعني أن المجموعة انتهت
                     if (snapshot.size < 400) hasMore = false;
                 }
             }
             
-            toast({ title: 'نجاح تصفير النظام', description: `تم مسح ${deletedDocsCount} سجلاً بنجاح. النظام الآن نظيف تماماً.` });
+            toast({ title: 'نجاح تصفير النظام', description: `تم مسح ${deletedDocsCount} سجلاً بنجاح (بما في ذلك سجلات النشاط). النظام الآن نظيف تماماً.` });
         } catch (error) {
             console.error("Wipe Error:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح بعض البيانات.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح بعض البيانات المتداخلة.' });
         } finally {
             setIsProcessing(false);
             setIsConfirmOpen(false);
@@ -254,7 +258,7 @@ function SystemWipeManager() {
                 <div className="space-y-1">
                     <h4 className="font-black text-destructive text-lg">مسح قاعدة بيانات النظام بالكامل</h4>
                     <p className="text-xs font-bold text-red-700/70">
-                        سيقوم هذا الإجراء بحذف جميع العملاء، الموظفين، المعاملات، القيود المحاسبية، وجميع البيانات الأخرى المدخلة.
+                        سيقوم هذا الإجراء بحذف جميع العملاء، الموظفين، المعاملات، سجلات النشاط، والقيود المحاسبية.
                     </p>
                 </div>
                 <Button variant="destructive" onClick={() => setIsConfirmOpen(true)} className="rounded-xl font-black h-12 px-8">
@@ -268,8 +272,8 @@ function SystemWipeManager() {
                         <AlertDialogTitle className="text-2xl font-black text-red-700">تحذير: هل أنت متأكد تماماً؟</AlertDialogTitle>
                         <AlertDialogDescription asChild>
                             <div className="space-y-4 pt-2">
-                                <p className="text-base">أنت على وشك حذف **جميع البيانات** في هذا النظام. سيتم مسح كل شيء: العملاء، الموظفين، المعاملات، القيود المحاسبية، الإعدادات، وكل شيء آخر.</p>
-                                <p className="font-black text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">هذا الإجراء لا يمكن التراجع عنه نهائياً وسيتم فقدان العمل المنجز بالكامل.</p>
+                                <p className="text-base">أنت على وشك حذف **جميع البيانات** بما في ذلك سجلات النشاط والتعليقات. سيتم مسح كل شيء.</p>
+                                <p className="font-black text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">هذا الإجراء لا يمكن التراجع عنه نهائياً.</p>
                                 <p className="font-bold">للتأكيد، يرجى كتابة العبارة التالية في المربع أدناه:</p>
                                 <p className="font-mono font-black text-center bg-muted p-3 rounded-xl border-2 border-dashed">{CONFIRMATION_PHRASE}</p>
                             </div>
