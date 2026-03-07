@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X, Loader2, Users } from 'lucide-react';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -194,30 +194,16 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const depts = [
-                    { name: 'القسم المعماري', order: 1 },
-                    { name: 'القسم الإنشائي', order: 2 },
-                    { name: 'قسم الكهرباء', order: 3 },
-                    { name: 'قسم الميكانيك', order: 4 },
-                    { name: 'قسم المبيعات', order: 5 },
-                    { name: 'الإدارة', order: 6 },
-                    { name: 'المحاسبة', order: 7 },
-                    { name: 'الموارد البشرية', order: 8 },
-                    { name: 'سكرتارية', order: 9 },
-                    { name: 'خارجية', order: 10 }
-                ] as Department[];
-                setDepartments(depts);
+                const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
+                const jobsQuery = query(collectionGroup(firestore, 'jobs'), orderBy('order'));
+                
+                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
 
-                const jbs = [
-                    { name: 'مهندس معماري', order: 1 },
-                    { name: 'مهندس مدني', order: 2 },
-                    { name: 'مهندس كهرباء', order: 3 },
-                    { name: 'مهندس ميكانيك', order: 4 },
-                    { name: 'محاسب', order: 5 },
-                    { name: 'سكرتير', order: 6 },
-                    { name: 'عامل', order: 7 }
-                ] as any[];
-                setJobs(jbs);
+                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
+                setJobs(jobsSnapshot.docs.map(doc => {
+                    const departmentId = doc.ref.parent.parent!.id;
+                    return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
+                }));
 
             } catch (error) {
                 toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في جلب البيانات المرجعية.' });
@@ -250,7 +236,16 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
     
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
-    const filteredJobOptions = useMemo(() => jobs.map(j => ({ value: j.name, label: j.name })), [jobs]);
+    
+    const filteredJobOptions = useMemo(() => {
+        if (!formData.department) return [];
+        const selectedDept = departments.find(d => d.name === formData.department);
+        if (!selectedDept) return [];
+        
+        return jobs
+            .filter(j => j.departmentId === selectedDept.id)
+            .map(j => ({ value: j.name, label: j.name }));
+    }, [formData.department, departments, jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {

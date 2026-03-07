@@ -63,6 +63,7 @@ export function InlineSearchList({
           disabled={disabled}
         >
           <span className="truncate">{selectedOption?.label || placeholder}</span>
+          <Check className={cn("ml-2 h-4 w-4 shrink-0 opacity-50", !value && "hidden")} />
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
