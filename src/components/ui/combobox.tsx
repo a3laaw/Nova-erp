@@ -46,12 +46,21 @@ export function Combobox({
     className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  const isSelectingRef = React.useRef(false)
 
   const selectedLabel = options.find((option) => option.value === value)?.label
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      {/* 5. الزر الذي يفتح القائمة المنسدلة */}
+    <Popover 
+      open={open} 
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isSelectingRef.current) {
+          isSelectingRef.current = false;
+          return;
+        }
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -60,41 +69,44 @@ export function Combobox({
           className={cn("w-full justify-between font-normal", !value && "text-muted-foreground", className)}
           disabled={disabled}
         >
-          {/* عرض النص المختار أو النص الافتراضي */}
           {selectedLabel || placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
 
-      {/* 6. محتوى القائمة المنسدلة الذي يظهر عند النقر */}
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+      <PopoverContent 
+        className="w-[--radix-popover-trigger-width] p-0 z-[999999]"
+        onInteractOutside={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <Command>
-          {/* 7. مربع الكتابة الفعلي للبحث داخل القائمة */}
           <CommandInput placeholder={searchPlaceholder} />
-
-          {/* 8. قائمة الخيارات التي سيتم فلترتها */}
           <CommandList>
-            {/* رسالة تظهر عند عدم وجود نتائج */}
             <CommandEmpty>{notFoundMessage}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
-                  // 9. ✨ الجزء الأهم: نستخدم label هنا ليتم البحث بالنص الظاهر
                   value={option.label}
-                  // 10. عند اختيار عنصر، نقوم بتحديث القيمة وإغلاق القائمة
-                  onSelect={(currentLabel) => {
-                    const selectedOption = options.find(
-                      (opt) => opt.label.toLowerCase() === currentLabel.toLowerCase()
-                    );
-                    
-                    if (selectedOption && onValueChange) {
-                       onValueChange(selectedOption.value === value ? "" : selectedOption.value);
+                  onPointerDown={() => {
+                    console.log('POINTER DOWN FIRED', option.value);
+                    isSelectingRef.current = true;
+                  }}
+                  onPointerUp={() => {
+                    console.log('POINTER UP FIRED', option.value);
+                    isSelectingRef.current = false;
+                    if (onValueChange) {
+                      onValueChange(option.value === value ? "" : option.value);
+                    }
+                    setOpen(false);
+                  }}
+                  onSelect={() => {
+                    if (onValueChange) {
+                       onValueChange(option.value === value ? "" : option.value);
                     }
                     setOpen(false);
                   }}
                 >
-                  {/* 11. أيقونة ✔ التي تظهر بجانب العنصر المختار فقط */}
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4 transition-opacity",

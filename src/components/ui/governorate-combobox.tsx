@@ -36,24 +36,23 @@ const kuwaitGovernorates: Option[] = [
 export function GovernorateCombobox() {
   const [open, setOpen] = React.useState(false)
   const [value, setValue] = React.useState("")
-  const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const isSelectingRef = React.useRef(false)
 
   const selectedOption = kuwaitGovernorates.find((o) => o.value === value)
 
-  const handleSelect = React.useCallback(
-    (optionValue: string) => {
-      setValue(optionValue === value ? "" : optionValue);
-      setOpen(false);
-      setTimeout(() => triggerRef.current?.focus(), 0);
-    },
-    [value]
-  );
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover 
+      open={open} 
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isSelectingRef.current) {
+          isSelectingRef.current = false;
+          return;
+        }
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
-          ref={triggerRef}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -69,12 +68,7 @@ export function GovernorateCombobox() {
 
       <PopoverContent 
         className="w-[--radix-popover-trigger-width] p-0 z-[999999]"
-        onInteractOutside={(e) => {
-          const target = e.target as HTMLElement;
-          if (target.closest('[data-governorate-combobox-options]')) {
-            e.preventDefault();
-          }
-        }}
+        onInteractOutside={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
         data-governorate-combobox-options
       >
@@ -87,13 +81,19 @@ export function GovernorateCombobox() {
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSelect(option.value);
+                  onPointerDown={() => {
+                    console.log('POINTER DOWN FIRED', option.value);
+                    isSelectingRef.current = true;
+                  }}
+                  onPointerUp={() => {
+                    console.log('POINTER UP FIRED', option.value);
+                    isSelectingRef.current = false;
+                    setValue(option.value === value ? "" : option.value);
+                    setOpen(false);
                   }}
                   onSelect={() => {
-                    handleSelect(option.value);
+                    setValue(option.value === value ? "" : option.value);
+                    setOpen(false);
                   }}
                 >
                   <Check

@@ -42,27 +42,25 @@ export function InlineSearchList({
   className,
 }: InlineSearchListProps) {
   const [open, setOpen] = React.useState(false);
-  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const isSelectingRef = React.useRef(false);
 
   const selectedOption = React.useMemo(() => 
     options.find((option) => option.value === value)
   , [options, value]);
 
-  const handleSelect = React.useCallback(
-    (optionValue: string) => {
-      onSelect(optionValue === value ? "" : optionValue);
-      setOpen(false);
-      // إعادة التركيز للزر بعد إغلاق القائمة لضمان استقرار تجربة المستخدم
-      setTimeout(() => triggerRef.current?.focus(), 0);
-    },
-    [value, onSelect]
-  );
-
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover 
+      open={open} 
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && isSelectingRef.current) {
+          isSelectingRef.current = false;
+          return;
+        }
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
-          ref={triggerRef}
           type="button"
           variant="outline"
           role="combobox"
@@ -75,8 +73,8 @@ export function InlineSearchList({
           disabled={disabled}
         >
           <span className="truncate">{selectedOption?.label || placeholder}</span>
-          <div className="flex items-center shrink-0">
-            <Check className={cn("ml-2 h-4 w-4 opacity-50", !value && "hidden")} />
+          <div className="flex items-center shrink-0 gap-1">
+            {value && <Check className="h-4 w-4 opacity-50" />}
             <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
           </div>
         </Button>
@@ -84,13 +82,7 @@ export function InlineSearchList({
       <PopoverContent 
         className="p-0 w-[var(--radix-popover-trigger-width)] z-[999999]" 
         align="start"
-        onInteractOutside={(e) => {
-          const target = e.target as HTMLElement;
-          // منع إغلاق الـ Popover عند التفاعل مع القائمة نفسها
-          if (target.closest('[data-inline-search-list-options]')) {
-            e.preventDefault();
-          }
-        }}
+        onInteractOutside={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
         data-inline-search-list-options
       >
@@ -103,15 +95,20 @@ export function InlineSearchList({
                 <CommandItem
                   key={option.value}
                   value={option.label + (option.searchKey || '')}
-                  onPointerDown={(e) => {
-                    // الحدث الحاسم: نلتقط النقر قبل أن يفقد الـ Input التركيز
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSelect(option.value);
+                  onPointerDown={() => {
+                    console.log('POINTER DOWN FIRED', option.value);
+                    isSelectingRef.current = true;
+                  }}
+                  onPointerUp={() => {
+                    console.log('POINTER UP FIRED', option.value);
+                    isSelectingRef.current = false;
+                    onSelect(option.value === value ? "" : option.value);
+                    setOpen(false);
                   }}
                   onSelect={() => {
-                    // دعم الاختيار عبر الكيبورد (Enter)
-                    handleSelect(option.value);
+                    // This handles keyboard (Enter)
+                    onSelect(option.value === value ? "" : option.value);
+                    setOpen(false);
                   }}
                   className="cursor-pointer"
                 >
