@@ -211,6 +211,20 @@ export interface Employee extends BaseEntity {
     annualLeaveUsed?: number;
     sickLeaveUsed?: number;
     emergencyLeaveUsed?: number;
+    contractType?: 'permanent' | 'temporary' | 'piece-rate' | 'percentage' | 'part-time' | 'special' | 'day_laborer';
+    nameEn?: string;
+    gender?: 'male' | 'female';
+    nationality?: string;
+    salaryPaymentType?: 'cash' | 'cheque' | 'transfer';
+    bankName?: string;
+    accountNumber?: string;
+    iban?: string;
+    workStartTime?: string;
+    workEndTime?: string;
+    pieceRateMode?: 'salary_with_target' | 'per_piece';
+    targetDescription?: number;
+    pieceRate?: number;
+    dailyRate?: number;
 }
 
 export interface Warehouse extends BaseEntity { name: string; location?: string; isDefault?: boolean; }
