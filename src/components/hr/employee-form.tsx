@@ -161,7 +161,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             setShowHousingAllowance(false);
             setShowTransportAllowance(false);
         }
-    }, [initialData, branding]);
+    }, [initialData?.id, branding]);
 
     useEffect(() => {
         if (initialData?.id) return;
@@ -194,23 +194,34 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const deptsQuery = query(collection(firestore, 'departments'));
-                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
+                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
                 
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
+                const [engSnapshot, govSnapshot] = await Promise.all([getDocs(engQuery), getDocs(govQuery)]);
 
-                const fetchedDepartments = deptsSnapshot.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as Department))
-                    .filter(dept => dept && typeof dept.name === 'string' && dept.name.trim() !== '');
-
-                fetchedDepartments.sort((a,b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
+                const fetchedDepartments = [
+                    { name: 'القسم المعماري', order: 1 },
+                    { name: 'القسم الإنشائي', order: 2 },
+                    { name: 'قسم الكهرباء', order: 3 },
+                    { name: 'قسم الميكانيك', order: 4 },
+                    { name: 'قسم المبيعات', order: 5 },
+                    { name: 'الإدارة', order: 6 },
+                    { name: 'المحاسبة', order: 7 },
+                    { name: 'الموارد البشرية', order: 8 },
+                    { name: 'سكرتارية', order: 9 },
+                    { name: 'خارجية', order: 10 }
+                ] as Department[];
                 setDepartments(fetchedDepartments);
 
-                const fetchedJobs = jobsSnapshot.docs.map(doc => {
-                    const departmentId = doc.ref.parent.parent!.id;
-                    return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
-                }).filter(job => job && job.name);
-                
+                const fetchedJobs = [
+                    { name: 'مهندس معماري', order: 1 },
+                    { name: 'مهندس مدني', order: 2 },
+                    { name: 'مهندس كهرباء', order: 3 },
+                    { name: 'مهندس ميكانيك', order: 4 },
+                    { name: 'محاسب', order: 5 },
+                    { name: 'سكرتير', order: 6 },
+                    { name: 'عامل', order: 7 }
+                ] as any[];
                 setJobs(fetchedJobs);
 
             } catch (error) {
@@ -246,15 +257,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
 
     const filteredJobOptions = useMemo(() => {
-        if (!formData.department) return [];
-        const selectedDept = departments.find(d => d.name === formData.department);
-        if (!selectedDept) return [];
-        
-        return jobs
-            .filter(j => j.departmentId === selectedDept.id)
-            .sort((a, b) => (a.order ?? 99) - (b.order ?? 99))
-            .map(j => ({ value: j.name, label: j.name }));
-    }, [formData.department, departments, jobs]);
+        return jobs.map(j => ({ value: j.name, label: j.name }));
+    }, [jobs]);
 
 
     const handleSubmit = async (e: React.FormEvent) => {
