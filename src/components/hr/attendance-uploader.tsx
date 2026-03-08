@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, cleanFirestoreData } from '@/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 
 const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
