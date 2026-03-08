@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -194,8 +195,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                // FIXED: Removed orderBy from collectionGroup query to avoid index errors in development environment.
-                // We will sort the results client-side instead.
                 const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
                 
@@ -208,7 +207,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     return { id: doc.id, departmentId, ...doc.data() } as Job & { departmentId: string };
                 });
                 
-                // Sort jobs client-side
                 fetchedJobs.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
                 setJobs(fetchedJobs);
 
@@ -259,10 +257,13 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
+        // التحقق من طول رقم الهاتف (8 أرقام)
         if (formData.mobile && formData.mobile.replace(/\D/g, '').length !== 8) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'رقم الهاتف يجب أن يكون 8 أرقام بالضبط.' });
             return;
         }
+        
+        // التحقق من طول الرقم المدني (12 رقماً - السوق الكويتي)
         if (!isSimpleLayout && formData.civilId && formData.civilId.replace(/\D/g, '').length !== 12) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'الرقم المدني يجب أن يكون 12 رقماً بالضبط.' });
             return;
@@ -281,6 +282,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             fullName: formData.fullName,
             mobile: formData.mobile,
             contractType: formData.contractType,
+            iban: formData.iban, // ضمان إرسال الايبان للتحقق من التكرار
         };
 
         if (showTeamSelection) {
@@ -321,7 +323,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 salaryPaymentType: formData.salaryPaymentType,
                 bankName: formData.salaryPaymentType === 'transfer' ? formData.bankName : '',
                 accountNumber: formData.salaryPaymentType === 'transfer' ? formData.accountNumber : '',
-                iban: formData.salaryPaymentType === 'transfer' ? formData.iban : '',
                 gender: formData.gender,
                 dob: formData.dob,
                 nationality: formData.nationality,
@@ -519,6 +520,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t mt-4">
                                 <div className="grid gap-1.5"><Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label><Select value={formData.salaryPaymentType} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">كاش</SelectItem><SelectItem value="cheque">شيك</SelectItem><SelectItem value="transfer">تحويل بنكي</SelectItem></SelectContent></Select></div>
                                 {formData.salaryPaymentType === 'transfer' && (<><div className="grid gap-1.5"><Label htmlFor="bankName">اسم البنك</Label><Input id="bankName" value={formData.bankName} onChange={handleInputChange} /></div><div className="grid gap-1.5"><Label htmlFor="accountNumber">رقم الحساب</Label><Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr"/></div></>)}
+                            </div>
+                            <div className="grid gap-2 pt-4">
+                                <Label htmlFor="iban">رقم الـ IBAN (يمنع التكرار)</Label>
+                                <Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" placeholder="KW00 0000 0000 0000 0000 0000 0000" />
                             </div>
                         </section>
 
