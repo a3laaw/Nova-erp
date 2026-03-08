@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -114,7 +113,6 @@ export function PayslipsList() {
 
     }, [payslips, employees, searchQuery]);
 
-    // ✨ محرك إثبات الرواتب محاسبياً
     const handleConfirmAndPay = async () => {
         if (!firestore || !currentUser || sortedPayslips.length === 0) return;
         
@@ -129,8 +127,8 @@ export function PayslipsList() {
             const coaSnap = await getDocs(collection(firestore, 'chartOfAccounts'));
             const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
 
-            const salaryExpenseAccount = allAccounts.find(a => a.code === '5201'); // مصروف الرواتب
-            const bankAccount = allAccounts.find(a => a.code === '110102'); // البنك
+            const salaryExpenseAccount = allAccounts.find(a => a.code === '5201'); 
+            const bankAccount = allAccounts.find(a => a.code === '110102'); 
 
             if (!salaryExpenseAccount || !bankAccount) throw new Error("حسابات الرواتب أو البنك غير موجودة في الشجرة.");
 
@@ -145,7 +143,6 @@ export function PayslipsList() {
 
                 const totalNetSalaries = draftPayslips.reduce((sum, p) => sum + p.netSalary, 0);
 
-                // 1. إنشاء قيد الرواتب المجمع
                 transaction.set(newJeRef, {
                     entryNumber: jeNumber,
                     date: serverTimestamp(),
@@ -161,7 +158,6 @@ export function PayslipsList() {
                     createdBy: currentUser.id
                 });
 
-                // 2. تحديث حالة مسيرات الرواتب
                 draftPayslips.forEach(p => {
                     const pRef = doc(firestore, 'payroll', p.id!);
                     transaction.update(pRef, { status: 'paid', paidAt: serverTimestamp() });
@@ -200,8 +196,12 @@ export function PayslipsList() {
 
         const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, `Payslips_${year}_${month}`);
-        XLSX.writeFile(workbook, `Payslips_${year}-${month}.xlsx`);
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Payroll Data");
+        
+        const fileName = `Payroll_Export_${year}_${month}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        
+        toast({ title: 'تم التصدير', description: `تم تحميل ملف ${fileName} بنجاح.` });
     };
 
     const handlePrint = () => {
@@ -270,7 +270,7 @@ export function PayslipsList() {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                            <Button onClick={handlePrint} variant="outline" disabled={loading || sortedPayslips.length === 0}><Printer className="ml-2 h-4 w-4" /> طباعة</Button>
-                           <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0}><Download className="ml-2 h-4 w-4" /> Excel</Button>
+                           <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="border-green-600 text-green-700 hover:bg-green-50"><Download className="ml-2 h-4 w-4" /> تصدير Excel</Button>
                            <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0} className="bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 font-bold gap-2">
                                 {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Banknote className="ml-2 h-4 w-4" />}
                                 اعتماد وصرف الرواتب
