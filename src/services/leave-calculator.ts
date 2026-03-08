@@ -3,7 +3,7 @@
  * يطبق قوانين العمل في دولة الكويت (القطاع الأهلي) بدقة رياضية.
  */
 
-import { differenceInDays, eachDayOfInterval, format, differenceInYears, differenceInMonths } from 'date-fns';
+import { differenceInDays, eachDayOfInterval, format, differenceInYears, differenceInMonths, addMonths } from 'date-fns';
 import type { Employee, Holiday } from '@/lib/types';
 import { toFirestoreDate } from './date-converter';
 
@@ -71,38 +71,53 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
 /**
  * محرك مكافأة نهاية الخدمة (Gratuity Engine) - قانون العمل الكويتي رقم 6 لسنة 2010
  */
-export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
+export const calculateGratuity = (
+    employee: Employee, 
+    noticeStartDate: Date, 
+    noticeType: 'worked' | 'indemnity' | 'waived' = 'waived'
+) => {
     const hireDate = toFirestoreDate(employee.hireDate);
     if (!hireDate) return { 
-        gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'تاريخ تعيين غير صالح',
+        gratuity: 0, leaveBalancePay: 0, noticeIndemnity: 0, total: 0, notice: 'تاريخ تعيين غير صالح',
         yearsOfService: 0, lastSalary: 0, leaveBalance: 0, dailyWage: 0 
     };
 
-    // حساب المدة بالسنوات بدقة (بما في ذلك الكسور)
-    const totalDays = differenceInDays(asOfDate, hireDate);
-    const years = totalDays / 365.25; 
-    
     const salary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-    const dailyWage = salary / 26; // أجر اليوم في قانون العمل الكويتي
+    const dailyWage = salary / 26;
 
     if (salary === 0) {
-        return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.', yearsOfService: years, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
+        return { gratuity: 0, leaveBalancePay: 0, noticeIndemnity: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.', yearsOfService: 0, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
     }
 
+    // تحديد تاريخ انتهاء الخدمة بناءً على نوع الإنذار
+    let effectiveEndDate = noticeStartDate;
+    let noticeIndemnity = 0;
+
+    if (noticeType === 'worked') {
+        // الموظف داوم فترة الإنذار (3 أشهر) - تُضاف للخدمة
+        effectiveEndDate = addMonths(noticeStartDate, 3);
+    } else if (noticeType === 'indemnity') {
+        // دفع بدل إنذار نقدي - الخدمة تنتهي الآن ولكن يُضاف راتب 3 أشهر
+        effectiveEndDate = noticeStartDate;
+        noticeIndemnity = salary * 3;
+    }
+
+    // حساب المدة بالسنوات
+    const totalDays = differenceInDays(effectiveEndDate, hireDate);
+    const years = totalDays / 365.25; 
+    
     let rawGratuity = 0;
 
     // المادة 51: حساب المكافأة الأساسية
     if (years <= 5) {
-        // 15 يوماً عن كل سنة من السنوات الخمس الأولى
         rawGratuity = years * 15 * dailyWage;
     } else {
-        // 15 يوماً عن أول 5 سنوات + شهر كامل عن كل سنة تالية
         const firstFiveYearsGratuity = 5 * 15 * dailyWage;
         const remainingYears = years - 5;
         rawGratuity = firstFiveYearsGratuity + (remainingYears * salary);
     }
 
-    // الحد الأقصى للمكافأة هو راتب سنة ونصف (18 شهراً)
+    // الحد الأقصى للمكافأة هو راتب 18 شهراً
     const maxGratuity = 1.5 * 12 * salary;
     rawGratuity = Math.min(rawGratuity, maxGratuity);
 
@@ -124,7 +139,6 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
             lawNotice = "المادة 53: يستحق المكافأة كاملة لخدمة تزيد عن 10 سنوات.";
         }
     } else {
-        // في حالة الفصل/الإقالة
         if (years < 1) {
             finalGratuity = 0;
             lawNotice = "المادة 51: يشترط إتمام سنة واحدة لاستحقاق المكافأة في حالة إنهاء الخدمات.";
@@ -133,13 +147,14 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
         }
     }
 
-    const leaveBalance = calculateAnnualLeaveBalance(employee, asOfDate);
+    const leaveBalance = calculateAnnualLeaveBalance(employee, effectiveEndDate);
     const leaveBalancePay = leaveBalance * dailyWage;
 
     return { 
         gratuity: finalGratuity, 
         leaveBalancePay, 
-        total: finalGratuity + leaveBalancePay, 
+        noticeIndemnity,
+        total: finalGratuity + leaveBalancePay + noticeIndemnity, 
         notice: lawNotice,
         yearsOfService: years,
         lastSalary: salary,
