@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, Users, Clock, Banknote, FileSignature, User, ShieldCheck } from 'lucide-react';
+import { Save, X, Loader2, Users, Clock, Banknote, FileSignature, User, ShieldCheck, Briefcase } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -101,7 +101,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             try {
                 const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsSnapshot)]);
+                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
                 setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
                 setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, departmentId: doc.ref.parent.parent!.id, ...doc.data() } as Job & { departmentId: string })));
             } finally { setRefDataLoading(false); }
