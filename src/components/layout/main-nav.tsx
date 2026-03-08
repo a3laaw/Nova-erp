@@ -242,16 +242,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <Link href={item.href} onClick={() => setOpenMobile(false)}>
             {Icon && (
               <Icon 
-                className={cn(
-                  "size-8 shrink-0 transition-colors", 
-                  isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
-                )} 
+                className="size-8 shrink-0 transition-colors" 
                 strokeWidth={isActive ? 2.5 : 2} 
               />
             )}
             <span className={cn(
               "font-medium transition-colors text-base",
-              isActive ? "text-[#6d28d9] font-bold" : "text-gray-900"
+              isActive && "font-bold"
             )}>
               {item.label}
             </span>
@@ -270,10 +267,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               <SidebarMenuButton isActive={isActive} tooltip={item.label}>
                 {Icon && (
                   <Icon 
-                    className={cn(
-                      "size-8 shrink-0 transition-colors", 
-                      isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
-                    )} 
+                    className="size-8 shrink-0 transition-colors" 
                     strokeWidth={isActive ? 2.5 : 2} 
                   />
                 )}
@@ -307,22 +301,18 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <SidebarMenuButton isActive={isActive} tooltip={item.label}>
               {Icon && (
                 <Icon 
-                  className={cn(
-                    "size-8 shrink-0 transition-colors", 
-                    isActive ? "text-[#6d28d9]" : "text-[#374151] group-hover:text-[#6d28d9]"
-                  )} 
+                  className="size-8 shrink-0 transition-colors" 
                   strokeWidth={isActive ? 2.5 : 2} 
                 />
               )}
               <span className={cn(
                 "font-medium transition-colors text-base",
-                isActive ? "text-[#6d28d9] font-bold" : "text-gray-900 group-hover:text-[#6d28d9]"
+                isActive && "font-bold"
               )}>
                 {item.label}
               </span>
               <ChevronDown className={cn(
-                "ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden",
-                isActive ? "text-[#6d28d9]" : "text-[#374151]"
+                "ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden"
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
