@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
 import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, ListFilter, Save, Sparkles } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { parse, format, isSameDay, isValid } from 'date-fns';
+import { parse, format, isSameDay, isValid, compareAsc } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn } from '@/lib/utils';
@@ -101,7 +101,6 @@ export function AttendanceUploader() {
       return;
     }
     
-    // توليد نموذج يحتوي على أيام الشهر المختار لتسهيل العمل على المستخدم
     const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
     const templateData: any[] = [];
 
@@ -151,7 +150,6 @@ export function AttendanceUploader() {
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         
-        // هيكل البيانات المجمعة: [الشهر-السنة-الموظف] -> [سجلات]
         const groupedUpdates = new Map<string, any[]>();
         
         json.forEach(row => {
@@ -168,7 +166,8 @@ export function AttendanceUploader() {
 
             let status: 'present' | 'absent' | 'late' = t1 ? 'present' : 'absent';
             if (t1 && emp.workStartTime) {
-                const workStart = parse(emp.workStartTime, 'HH:mm', new Date());
+                const [hStart, mStart] = emp.workStartTime.split(':').map(Number);
+                const workStart = new Date(0, 0, 0, hStart, mStart);
                 const checkIn = new Date(0, 0, 0, t1.hours, t1.minutes);
                 if (checkIn > workStart) status = 'late';
             }
@@ -196,7 +195,6 @@ export function AttendanceUploader() {
             const existingDoc = await getDoc(docRef);
             let mergedRecords = existingDoc.exists() ? (existingDoc.data().records || []) : [];
 
-            // تحويل التواريخ القادمة من Firestore إلى كائنات Date للمقارنة
             mergedRecords = mergedRecords.map((r: any) => ({ ...r, date: toFirestoreDate(r.date) }));
 
             newRecords.forEach(newItem => {
@@ -205,7 +203,9 @@ export function AttendanceUploader() {
                 else mergedRecords.push(newItem);
             });
 
-            // إعادة حساب الملخص بناءً على السجلات المدمجة
+            // ضمان ترتيب السجلات زمنياً حتى لو رُفعت بشكل عشوائي في الشيت
+            mergedRecords.sort((a: any, b: any) => compareAsc(a.date, b.date));
+
             const summary = {
                 presentDays: mergedRecords.filter((r: any) => r.status === 'present' || r.status === 'late').length,
                 absentDays: mergedRecords.filter((r: any) => r.status === 'absent').length,
@@ -284,7 +284,7 @@ export function AttendanceUploader() {
                 <Sparkles className="h-4 w-4 text-indigo-600" />
                 <AlertTitle className="text-indigo-800 font-black">التحليل الذكي (Smart Sync)</AlertTitle>
                 <AlertDescription className="text-indigo-700 text-[10px] leading-relaxed font-bold">
-                    ارفع أي ملف يحتوي على أي تواريخ؛ سيقوم النظام بفرز السطور وتوجيهها للموظف والشهر المناسب في قاعدة البيانات تلقائياً.
+                    ارفع أي ملف يحتوي على أي تواريخ في أي ترتيب؛ سيقوم النظام بفرز السطور وتوجيهها للموظف والشهر المناسب وترتيبها زمنياً تلقائياً.
                 </AlertDescription>
             </Alert>
         </div>
@@ -330,7 +330,7 @@ export function AttendanceUploader() {
                 <CardFooter className="p-8 bg-muted/10 border-t flex justify-end">
                     <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 min-w-[320px] gap-3">
                         {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-                        {isProcessing ? 'جاري تحليل وتوزيع البيانات...' : 'اعتماد السجلات والمزامنة الحية'}
+                        {isProcessing ? 'جاري التحليل والترتيب...' : 'اعتماد السجلات والمزامنة الحية'}
                     </Button>
                 </CardFooter>
             </Card>
