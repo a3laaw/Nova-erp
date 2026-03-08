@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -10,7 +9,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Save, Sparkles, CalendarDays } from 'lucide-react';
+import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Save, Sparkles, CalendarDays, Filter } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
@@ -45,7 +44,7 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
         const datePart = parts[0];
         const timePart = parts[1] || "";
 
-        const dateFormats = ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yy-MM-dd', 'dd-MM-yy'];
+        const dateFormats = ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yy-MM-dd', 'dd-MM-yy', 'M/d/yyyy', 'MM/dd/yyyy'];
         for (const fmt of dateFormats) {
             const parsed = parse(datePart, fmt, new Date());
             if (isValid(parsed)) {
@@ -81,7 +80,7 @@ export function AttendanceUploader() {
   
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingResult, setProcessingResult] = useState<{ success: boolean, message: string } | null>(null);
+  const [processingResult, setProcessingResult] = useState<{ success: boolean, message: string, skippedCount?: number } | null>(null);
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
@@ -115,10 +114,16 @@ export function AttendanceUploader() {
   };
 
   const handleUpload = async () => {
-    if (!file || !firestore) return;
+    if (!file || !firestore || !year || !month) {
+        toast({ variant: 'destructive', title: 'تنبيه', description: 'يرجى تحديد الشهر والسنة قبل الرفع.' });
+        return;
+    }
 
     setIsProcessing(true);
     setProcessingResult(null);
+
+    const selectedYearNum = parseInt(year);
+    const selectedMonthNum = parseInt(month);
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -133,6 +138,7 @@ export function AttendanceUploader() {
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         const punchesMap = new Map<string, { date: Date, employeeId: string, times: string[] }>();
+        let skippedCount = 0;
 
         json.forEach(row => {
             const emp = employeeMap.get(String(row.employeeNumber));
@@ -141,14 +147,25 @@ export function AttendanceUploader() {
             const parsed = parseSmartDateTime(row.date) || parseSmartDateTime(row.time);
             if (!parsed) return;
 
+            // 🛡️ الرقابة: التحقق من مطابقة الشهر والسنة المختارة
+            if (parsed.date.getFullYear() !== selectedYearNum || (parsed.date.getMonth() + 1) !== selectedMonthNum) {
+                skippedCount++;
+                return;
+            }
+
             const dateKey = `${emp.id}_${parsed.date.getTime()}`;
             const existing = punchesMap.get(dateKey) || { date: parsed.date, employeeId: emp.id, times: [] };
 
             if (parsed.timeStr && !existing.times.includes(parsed.timeStr)) {
                 existing.times.push(parsed.timeStr);
             }
+            punchesMap.set(dateKey);
             punchesMap.set(dateKey, existing);
         });
+
+        if (punchesMap.size === 0 && skippedCount > 0) {
+            throw new Error(`لم يتم استيراد أي بيانات. جميع الأسطر في الملف (${skippedCount}) تخص شهوراً أخرى غير الشهر المختار (${selectedMonthNum}/${selectedYearNum}).`);
+        }
 
         const batch = writeBatch(firestore);
         const groupedUpdates = new Map<string, any[]>();
@@ -157,13 +174,12 @@ export function AttendanceUploader() {
             const emp = employeeMap.get(employees.find(e => e.id === entry.employeeId)?.employeeNumber || '');
             const sortedPunches = entry.times.sort();
             
-            // ✨ محرك كشف رمضان الذكي (يوم بيوم)
             const ramadan = branding?.work_hours?.ramadan;
             const ramStart = toFirestoreDate(ramadan?.start_date);
             const ramEnd = toFirestoreDate(ramadan?.end_date);
             
             const isRamadanDay = ramadan?.is_enabled && ramStart && ramEnd && 
-                                 entry.date >= startOfDay(ramStart) && 
+                                 entry.date >= startOfToday() && 
                                  entry.date <= startOfDay(ramEnd);
             
             const effectiveWorkStart = isRamadanDay 
@@ -181,7 +197,7 @@ export function AttendanceUploader() {
                 isRamadan: isRamadanDay
             };
 
-            const docKey = `${entry.date.getFullYear()}-${entry.date.getMonth() + 1}-${entry.employeeId}`;
+            const docKey = `${selectedYearNum}-${selectedMonthNum}-${entry.employeeId}`;
             if (!groupedUpdates.has(docKey)) groupedUpdates.set(docKey, []);
             groupedUpdates.get(docKey)!.push(mergedRecord);
         });
@@ -206,8 +222,8 @@ export function AttendanceUploader() {
 
             batch.set(docRef, cleanFirestoreData({
                 employeeId: docId.split('-')[2],
-                year: parseInt(docId.split('-')[0]),
-                month: parseInt(docId.split('-')[1]),
+                year: selectedYearNum,
+                month: selectedMonthNum,
                 records: finalRecords,
                 summary: {
                     presentDays: finalRecords.filter((r: any) => r.checkIn1).length,
@@ -220,8 +236,12 @@ export function AttendanceUploader() {
         }
 
         await batch.commit();
-        setProcessingResult({ success: true, message: `تم تحليل البيانات بنجاح. تم رصد الانتقال الزمني لرمضان آلياً.` });
-        toast({ title: 'نجاح الحفظ', description: 'تمت معالجة وسم التأخير لكل يوم بدقة.' });
+        setProcessingResult({ 
+            success: true, 
+            message: `تم تحليل وحفظ البيانات بنجاح لـ ${punchesMap.size} بصمة صحيحة.`,
+            skippedCount
+        });
+        toast({ title: 'نجاح الحفظ', description: `تمت المعالجة بنجاح. تم تجاهل ${skippedCount} سطر لا يخص شهر ${selectedMonthNum}.` });
         setFile(null);
       } catch (error: any) {
         setProcessingResult({ success: false, message: error.message });
@@ -239,21 +259,44 @@ export function AttendanceUploader() {
         <div className="lg:col-span-1 space-y-6">
             <Card className="rounded-3xl border-none shadow-sm overflow-hidden">
                 <CardHeader className="bg-primary/5">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <DownloadCloud className="h-5 w-5 text-primary" />
-                        تجهيز الملف
+                    <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                        <Filter className="h-5 w-5" />
+                        إعدادات الفلترة
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-4">
+                    <div className="grid gap-2">
+                        <Label className="font-bold">السنة المستهدفة</Label>
+                        <Select value={year} onValueChange={setYear}>
+                            <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                                {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label className="font-bold">الشهر المستهدف</Label>
+                        <Select value={month} onValueChange={setMonth}>
+                            <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                    <SelectItem key={m} value={String(m)}>{m}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Separator className="my-2"/>
                     <Button onClick={handleDownloadTemplate} variant="outline" className="w-full h-11 rounded-xl border-dashed border-primary/30 text-primary font-bold">تنزيل نموذج الرفع</Button>
                 </CardContent>
             </Card>
 
-            <Alert className="rounded-2xl border-orange-100 bg-orange-50/50">
-                <Sparkles className="h-4 w-4 text-orange-600" />
-                <AlertTitle className="font-black">ملاحظة الانتقال الزمني</AlertTitle>
+            <Alert className="rounded-2xl border-blue-100 bg-blue-50/50">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertTitle className="font-black">نظام الحماية من الخطأ</AlertTitle>
                 <AlertDescription className="text-[10px] leading-relaxed font-bold">
-                    النظام الآن "يتحسس" تاريخ كل بصمة؛ إذا صادف يوم 18/02/2026 (بداية رمضان)، سيقوم تلقائياً بتغيير معيار التأخير لهذا اليوم وما يليه دون تدخل منك.
+                    إذا قمت برفع ملف يحتوي على تواريخ شهر 2 وأنت اخترت شهر 3، سيقوم النظام **تلقائياً بتجاهل** بصمات شهر 2 ولن يقوم بتخزينها لضمان نظافة البيانات.
                 </AlertDescription>
             </Alert>
         </div>
@@ -261,8 +304,8 @@ export function AttendanceUploader() {
         <div className="lg:col-span-2">
             <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-muted/30 border-b pb-8 px-8">
-                    <CardTitle className="text-xl font-black">رفع ملف البصمة</CardTitle>
-                    <CardDescription>المحرك سيعالج كل يوم بمفرده لضمان دقة احتساب التأخير في أيام الانتقال لرمضان.</CardDescription>
+                    <CardTitle className="text-xl font-black">رفع ملف البصمة لشهر {month}/{year}</CardTitle>
+                    <CardDescription>المحرك سيفلتر البيانات آلياً لضمان تخزين ما يخص الفترة المحددة فقط.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8">
                     <div onClick={() => !isProcessing && fileInputRef.current?.click()} className={cn("border-4 border-dashed rounded-[2rem] p-12 text-center cursor-pointer transition-all", isProcessing ? "opacity-50" : "hover:border-primary/50 hover:bg-primary/[0.02]")}>
@@ -272,20 +315,32 @@ export function AttendanceUploader() {
                         </div>
                         <div className="mt-6">
                             <p className="text-lg font-black text-primary">{file ? file.name : "اسحب الملف هنا"}</p>
-                            {file && <p className="text-sm font-bold text-green-600 mt-2">الملف جاهز للتحليل</p>}
+                            {file && <p className="text-sm font-bold text-green-600 mt-2">الملف جاهز وبانتظار أمر التحليل</p>}
                         </div>
                     </div>
                     {processingResult && (
-                        <Alert className={cn("mt-6 rounded-2xl border-2", processingResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50")}>
-                            <AlertTitle className="font-black">{processingResult.success ? "نجاح المعالجة" : "خطأ"}</AlertTitle>
-                            <AlertDescription className="font-bold text-sm">{processingResult.message}</AlertDescription>
-                        </Alert>
+                        <div className="mt-6 space-y-3">
+                            <Alert className={cn("rounded-2xl border-2", processingResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50")}>
+                                <AlertTitle className="font-black">{processingResult.success ? "تمت المعالجة بنجاح" : "حدث خطأ"}</AlertTitle>
+                                <AlertDescription className="font-bold text-sm">{processingResult.message}</AlertDescription>
+                            </Alert>
+                            
+                            {processingResult.skippedCount! > 0 && (
+                                <Alert className="rounded-2xl border-orange-200 bg-orange-50/50">
+                                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                                    <AlertTitle className="text-xs font-black">تنبيه رقابي</AlertTitle>
+                                    <AlertDescription className="text-[10px] font-bold">
+                                        تم اكتشاف **{processingResult.skippedCount}** سطر في الملف تخص شهوراً أخرى وتم تجاهلها آلياً.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+                        </div>
                     )}
                 </CardContent>
                 <CardFooter className="p-8 bg-muted/10 border-t flex justify-end">
-                    <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 min-w-[280px] gap-3">
+                    <Button onClick={handleUpload} disabled={!file || isProcessing || !year || !month} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 min-w-[280px] gap-3">
                         {isProcessing ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                        تأكيد وحفظ الحركات
+                        تأكيد وحفظ حركات شهر {month}
                     </Button>
                 </CardFooter>
             </Card>
