@@ -29,7 +29,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertTriangle, FileSpreadsheet, DownloadCloud } from 'lucide-react';
+import { Loader2, AlertTriangle, FileSpreadsheet, DownloadCloud, Save } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -269,7 +269,7 @@ export function AttendanceUploader() {
         setIsProcessing(false);
       }
     };
-    reader.readAsDataURL(file!);
+    reader.readAsBinaryString(file!);
   };
 
   if (!isMounted) return null;
