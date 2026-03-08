@@ -1,12 +1,11 @@
-
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Loader2, Search, TrendingUp, TrendingDown, Target, User } from 'lucide-react';
@@ -35,6 +34,12 @@ export function ProjectsPnlReport() {
   const [engineerFilter, setEngineerFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+  useEffect(() => {
+    if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+        setDateTo(dateFrom);
+    }
+  }, [dateFrom, dateTo]);
 
   const reportData = useMemo(() => {
     if (loading || !dateFrom || !dateTo) return [];

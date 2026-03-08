@@ -27,6 +27,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { isBefore, startOfDay } from 'date-fns';
 
 export default function EditLeaveRequestPage() {
     const { firestore } = useFirebase();
@@ -65,10 +66,21 @@ export default function EditLeaveRequestPage() {
         }
     }, [leaveRequest]);
 
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
+            setEndDate(startDate);
+            toast({
+                title: 'تنبيه منطقي',
+                description: 'تم تعديل تاريخ النهاية ليكون متوافقاً مع تاريخ البداية.',
+            });
+        }
+    }, [startDate, endDate, toast]);
+
     const loading = employeesLoading || holidaysLoading || brandingLoading || leaveLoading;
 
     const leaveDuration = useMemo(() => {
-        if (!startDate || !endDate) return { totalDays: 0, workingDays: 0 };
+        if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) return { totalDays: 0, workingDays: 0 };
         return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
     }, [startDate, endDate, branding, publicHolidays]);
 
@@ -81,6 +93,12 @@ export default function EditLeaveRequestPage() {
 
         if (!firestore || !currentUser || !id || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
+            return;
+        }
+
+        // الرقابة النهائية
+        if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
+            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'تاريخ النهاية لا يمكن أن يكون قبل تاريخ البداية.' });
             return;
         }
 
@@ -101,8 +119,8 @@ export default function EditLeaveRequestPage() {
                 leaveType: leaveType,
                 startDate: startDate,
                 endDate: endDate,
-                days: leaveDuration.totalDays,
-                workingDays: leaveDuration.workingDays,
+                days: leaveAnalysis.totalDays,
+                workingDays: leaveAnalysis.workingDays,
                 notes: notes,
                 passportReceived: passportReceived
             });

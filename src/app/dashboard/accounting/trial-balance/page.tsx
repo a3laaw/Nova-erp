@@ -24,7 +24,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, Scale } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
@@ -59,6 +59,13 @@ export default function TrialBalancePage() {
         setDateTo(endOfMonth(now));
     }, []);
 
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+            setDateTo(dateFrom);
+        }
+    }, [dateFrom, dateTo]);
+
     // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
@@ -75,7 +82,7 @@ export default function TrialBalancePage() {
 
     // Fetch entries when date changes
     useEffect(() => {
-        if (!firestore || !dateTo) return;
+        if (!firestore || !dateTo || !dateFrom) return;
         const fetchEntries = async () => {
             setLoading(true);
             try {
@@ -98,7 +105,7 @@ export default function TrialBalancePage() {
             }
         };
         fetchEntries();
-    }, [firestore, dateTo]);
+    }, [firestore, dateTo, dateFrom]);
     
     const trialBalanceData = useMemo(() => {
         if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: {} };
@@ -186,7 +193,7 @@ export default function TrialBalancePage() {
             {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
             {!isLoading && dateFrom && dateTo &&(
-                 <Card id="printable-area" className="max-w-6xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
+                 <Card id="printable-area" className="max-w-6xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
                     <CardHeader className="p-8 md:p-12">
                         {branding?.letterhead_image_url ? (
                             <img src={branding.letterhead_image_url} alt={`${branding.company_name || ''} Letterhead`} className="w-full h-auto object-contain max-h-[150px] mb-4"/>
@@ -266,4 +273,3 @@ export default function TrialBalancePage() {
         </div>
     );
 }
-    

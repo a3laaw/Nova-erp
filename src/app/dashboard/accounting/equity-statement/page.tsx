@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -15,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
-import { format, startOfYear, endOfYear } from 'date-fns';
+import { format, startOfYear, endOfYear, isBefore, startOfDay } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, Users } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
@@ -54,6 +53,13 @@ export default function EquityStatementPage() {
         setDateTo(endOfYear(now));
     }, []);
 
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+            setDateTo(dateFrom);
+        }
+    }, [dateFrom, dateTo]);
+
     // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
@@ -70,7 +76,7 @@ export default function EquityStatementPage() {
 
     // Fetch entries when date changes
     useEffect(() => {
-        if (!firestore || !dateTo) return;
+        if (!firestore || !dateTo || !dateFrom) return;
         const fetchEntries = async () => {
             setLoading(true);
             try {
@@ -93,7 +99,7 @@ export default function EquityStatementPage() {
             }
         };
         fetchEntries();
-    }, [firestore, dateTo]);
+    }, [firestore, dateTo, dateFrom]);
     
     const equityAccounts = useMemo(() => accounts.filter(acc => acc.code.startsWith('3')), [accounts]);
     
@@ -247,4 +253,3 @@ export default function EquityStatementPage() {
         </div>
     );
 }
-    

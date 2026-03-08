@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -15,13 +14,14 @@ import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
-import { format, startOfYear, endOfYear } from 'date-fns';
+import { format, startOfYear, endOfYear, isBefore, startOfDay } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, LineChart, FileSearch } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { DateInput } from '@/components/ui/date-input';
+import { useToast } from '@/hooks/use-toast';
 
 interface IncomeStatementData {
     totalRevenue: number;
@@ -36,6 +36,7 @@ interface IncomeStatementData {
 
 export default function IncomeStatementPage() {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();
     
     const [isGenerating, setIsGenerating] = useState(false);
@@ -44,10 +45,23 @@ export default function IncomeStatementPage() {
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfYear(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfYear(new Date()));
 
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+            setDateTo(dateFrom);
+        }
+    }, [dateFrom, dateTo]);
+
     const handleGenerate = async () => {
         if (!firestore || !dateFrom || !dateTo) return;
-        setIsGenerating(true);
         
+        // الرقابة النهائية
+        if (isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+            toast({ variant: 'destructive', title: 'فترة غير صالحة', description: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.' });
+            return;
+        }
+
+        setIsGenerating(true);
         try {
             const [accountsSnap, entriesSnap] = await Promise.all([
                 getDocs(query(collection(firestore, 'chartOfAccounts'))),

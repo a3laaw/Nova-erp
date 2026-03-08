@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
-import { format, startOfYear, endOfYear, subDays } from 'date-fns';
+import { format, startOfYear, endOfYear, subDays, isBefore, startOfDay } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, ArrowLeftRight } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
@@ -56,6 +56,13 @@ export default function CashFlowStatementPage() {
         setDateTo(endOfYear(now));
     }, []);
 
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+            setDateTo(dateFrom);
+        }
+    }, [dateFrom, dateTo]);
+
     // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
@@ -72,7 +79,7 @@ export default function CashFlowStatementPage() {
 
     // Fetch entries when date changes
     useEffect(() => {
-        if (!firestore || !dateTo) return;
+        if (!firestore || !dateTo || !dateFrom) return;
         const fetchEntries = async () => {
             setLoading(true);
             try {
@@ -95,7 +102,7 @@ export default function CashFlowStatementPage() {
             }
         };
         fetchEntries();
-    }, [firestore, dateTo]);
+    }, [firestore, dateTo, dateFrom]);
 
 
     const cashFlowData = useMemo(() => {
@@ -275,4 +282,3 @@ export default function CashFlowStatementPage() {
         </div>
     );
 }
-    

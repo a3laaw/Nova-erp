@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { Loader2, Printer, ArrowRight, Search } from 'lucide-react';
@@ -67,6 +67,13 @@ export default function GeneralLedgerPage() {
         setDateFrom(startOfMonth(now));
         setDateTo(endOfMonth(now));
     }, []);
+
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
+            setDateTo(dateFrom);
+        }
+    }, [dateFrom, dateTo]);
 
     // --- Data Fetching ---
     useEffect(() => {
@@ -323,4 +330,3 @@ export default function GeneralLedgerPage() {
         </div>
     );
 }
-    

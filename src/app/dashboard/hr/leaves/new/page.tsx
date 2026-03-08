@@ -30,7 +30,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isBefore, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -74,6 +74,17 @@ export default function NewLeaveRequestPage() {
             setSelectedEmployeeId(currentUser.employeeId);
         }
     }, [currentUser, searchParams]);
+
+    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    useEffect(() => {
+        if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
+            setEndDate(startDate);
+            toast({
+                title: 'تنبيه منطقي',
+                description: 'تم تعديل تاريخ النهاية ليكون متوافقاً مع تاريخ البداية.',
+            });
+        }
+    }, [startDate, endDate, toast]);
 
     // جلب سياق القرار الذكي (آخر إجازة)
     useEffect(() => {
@@ -120,7 +131,9 @@ export default function NewLeaveRequestPage() {
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
     const leaveAnalysis = useMemo(() => {
-        if (!startDate || !endDate) return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
+        if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) {
+            return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
+        }
         
         const days = calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
         const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
@@ -144,6 +157,12 @@ export default function NewLeaveRequestPage() {
 
         if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
+            return;
+        }
+
+        // الرقابة المنطقية النهائية قبل الحفظ
+        if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
+            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن أن يكون تاريخ العودة قبل تاريخ بدء الإجازة.' });
             return;
         }
 
