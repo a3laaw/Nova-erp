@@ -19,6 +19,7 @@ import { Switch } from '../ui/switch';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { cn } from '@/lib/utils';
 
 const defaultSchedule = {
     morning_start_time: '08:00',
