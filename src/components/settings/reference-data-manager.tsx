@@ -74,103 +74,6 @@ function StatCard({ title, count, icon, onNavigate, color, loading }: { title: s
     );
 }
 
-function WorkShiftsManager({ onBack }: { onBack: () => void }) {
-    const { firestore } = useFirebase();
-    const { toast } = useToast();
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [editingItem, setEditingItem] = useState<WorkShift | null>(null);
-
-    const { data: shifts, loading } = useSubscription<WorkShift>(firestore, 'work_shifts', [orderBy('name')]);
-
-    const [formData, setFormData] = useState({ name: '', startTime: '08:00', endTime: '17:00' });
-
-    const openDialog = (item: WorkShift | null = null) => {
-        setEditingItem(item);
-        setFormData({
-            name: item?.name || '',
-            startTime: item?.startTime || '08:00',
-            endTime: item?.endTime || '17:00',
-        });
-        setIsDialogOpen(true);
-    };
-
-    const handleSave = async () => {
-        if (!firestore || !formData.name) return;
-        setIsSaving(true);
-        try {
-            if (editingItem) {
-                await updateDoc(doc(firestore, 'work_shifts', editingItem.id!), { ...formData, updatedAt: serverTimestamp() });
-            } else {
-                await addDoc(collection(firestore, 'work_shifts'), { ...formData, createdAt: serverTimestamp() });
-            }
-            setIsDialogOpen(false);
-            toast({ title: 'نجاح', description: 'تم حفظ فترة الدوام.' });
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ' });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Clock className="h-6 w-6 text-primary" />
-                    <CardTitle>إدارة فترات الدوام (Shifts)</CardTitle>
-                </div>
-                <Button onClick={onBack} variant="outline"><ArrowRight className="ml-2 h-4 w-4" /> العودة</Button>
-            </CardHeader>
-            <CardContent>
-                <div className="flex justify-end mb-4">
-                    <Button onClick={() => openDialog()} size="sm"><PlusCircle className="ml-2 h-4 w-4" /> إضافة فترة دوام</Button>
-                </div>
-                <div className="border rounded-lg">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>اسم الفترة</TableHead>
-                                <TableHead>وقت البداية</TableHead>
-                                <TableHead>وقت النهاية</TableHead>
-                                <TableHead className="text-center">إجراءات</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? <TableRow><TableCell colSpan={4} className="text-center p-4"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow> :
-                            shifts.length === 0 ? <TableRow><TableCell colSpan={4} className="text-center h-24 text-muted-foreground italic">لا توجد فترات دوام معرفة.</TableCell></TableRow> :
-                            shifts.map(shift => (
-                                <TableRow key={shift.id}>
-                                    <TableCell className="font-bold">{shift.name}</TableCell>
-                                    <TableCell className="font-mono">{shift.startTime}</TableCell>
-                                    <TableCell className="font-mono">{shift.endTime}</TableCell>
-                                    <TableCell className="text-center">
-                                        <Button variant="ghost" size="icon" onClick={() => openDialog(shift)}><Pencil className="h-4 w-4"/></Button>
-                                        <Button variant="ghost" size="icon" onClick={async () => { if(confirm('حذف؟')) await deleteDoc(doc(firestore!, 'work_shifts', shift.id!)) }} className="text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            </CardContent>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent dir="rtl">
-                    <DialogHeader><DialogTitle>{editingItem ? 'تعديل' : 'إضافة'} فترة دوام</DialogTitle></DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2"><Label>اسم الفترة</Label><Input value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} placeholder="مثال: الدوام الصباحي الأساسي" /></div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2"><Label>بداية الدوام</Label><Input type="time" value={formData.startTime} onChange={e => setFormData(p => ({...p, startTime: e.target.value}))} /></div>
-                            <div className="grid gap-2"><Label>نهاية الدوام</Label><Input type="time" value={formData.endTime} onChange={e => setFormData(p => ({...p, endTime: e.target.value}))} /></div>
-                        </div>
-                    </div>
-                    <DialogFooter><Button variant="outline" onClick={() => setIsDialogOpen(false)}>إلغاء</Button><Button onClick={handleSave} disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Save className="ml-2 h-4 w-4"/>} حفظ</Button></DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </Card>
-    );
-}
-
 // --- Main Manager View Logic ---
 function ManagerView({
   primaryTitle,
@@ -851,97 +754,564 @@ function ManagerView({
           .map(cat => ({ value: cat.id!, label: cat.name }));
     }, [primaryItems, editingItem]);
 
-    return (
-        <Card>
-            <CardHeader>
-            <CardTitle>إدارة البيانات المرجعية</CardTitle>
-            <CardDescription>
-                تحكم في القوائم المنسدلة المستخدمة في جميع أنحاء النظام.
-            </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <StatCard 
-                    title="الأقسام والوظائف" 
-                    count={counts.depts + counts.jobs} 
-                    icon={<Building className="h-full w-full" />} 
-                    onNavigate={() => setView('depts')} 
-                    color="blue" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="المحافظات والمناطق" 
-                    count={counts.govs + counts.areas} 
-                    icon={<Globe className="h-full w-full" />} 
-                    onNavigate={() => setView('locations')} 
-                    color="cyan" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="أنواع المعاملات" 
-                    count={counts.transactionTypes} 
-                    icon={<FileText className="h-full w-full" />} 
-                    onNavigate={() => setView('transactionTypes')} 
-                    color="red" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="سير العمل مكتب هندسي" 
-                    count={counts.workStages} 
-                    icon={<Workflow className="h-full w-full" />} 
-                    onNavigate={() => setView('workStages')} 
-                    color="purple" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="تخصصات المقاولين" 
-                    count={counts.subcontractorTypes + counts.subcontractorSpecializations} 
-                    icon={<Users className="h-full w-full" />} 
-                    onNavigate={() => setView('subcontractorTypes')} 
-                    color="purple" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="أنواع أنشطة الشركات" 
-                    count={counts.companyActivityTypes} 
-                    icon={<Building className="h-full w-full" />} 
-                    onNavigate={() => setView('companyActivityTypes')} 
-                    color="orange" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="فترات الدوام (Shifts)" 
-                    count={counts.workShifts || 0} 
-                    icon={<Clock className="h-full w-full" />} 
-                    onNavigate={() => setView('workShifts')} 
-                    color="blue" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="بنود المقايسات (BOQ)" 
-                    count={counts.boqReferenceItems} 
-                    icon={<ClipboardCheck className="h-full w-full" />} 
-                    onNavigate={() => setView('boqReferenceItems')} 
-                    color="green" 
-                    loading={loadingCounts} 
-                />
-                <StatCard 
-                    title="سير عمل المقاولات" 
-                    count={counts.constructionTypes} 
-                    icon={<LayoutGrid className="h-full w-full" />} 
-                    onNavigate={() => setView('constructionWorkflow')} 
-                    color="blue" 
-                    loading={loadingCounts} 
-                />
-            </CardContent>
-        </Card>
-    );
+    const RecursiveItemRenderer = ({ node, level, onEdit, onDelete, onAddSub, type }: any) => {
+        const isOpen = openCategories.has(node.id!);
+        const toggleOpen = () => {
+            setOpenCategories(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(node.id!)) newSet.delete(node.id!);
+                else newSet.add(node.id!);
+                return newSet;
+            });
+        };
+
+        return (
+            <div style={{ paddingRight: `${level * 1.5}rem` }} className="space-y-1">
+                <div className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 group transition-all">
+                    <div className="flex items-center gap-2 flex-grow cursor-pointer" onClick={toggleOpen}>
+                        {node.children && node.children.length > 0 ? (
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                                {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                            </Button>
+                        ) : <div className="w-6 h-6" />}
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm">{node.name}</span>
+                            {node.isHeader && <Badge variant="secondary" className="w-fit text-[8px] h-3 px-1 mt-0.5">قسم رئيسي</Badge>}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => onAddSub(node)}><PlusCircle className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(node)}><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(node, type)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                </div>
+                {isOpen && node.children && node.children.map((child: any) => (
+                    <RecursiveItemRenderer key={child.id} node={child} level={level + 1} onEdit={onEdit} onDelete={onDelete} onAddSub={onAddSub} type={type} />
+                ))}
+            </div>
+        );
+    };
+
+  return (
+    <Card className="rounded-3xl border-none shadow-sm overflow-hidden">
+      <CardHeader className="bg-muted/10 border-b pb-6 px-8">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl text-primary">{icon}</div>
+            <div>
+              <CardTitle className="text-2xl font-black">{primaryTitle}</CardTitle>
+              <CardDescription>إدارة {primaryTitle} وتحديث {secondaryTitle || 'البيانات المرتبطة'}.</CardDescription>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {(primaryCollectionName === 'departments' || primaryCollectionName === 'governorates') && (
+                <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting} className="rounded-xl border-dashed">
+                    {isImporting ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                    استيراد الافتراضي
+                </Button>
+            )}
+            {secondaryCollectionName === 'workStages' && (
+                <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting} className="rounded-xl border-dashed border-purple-300 text-purple-700">
+                    <Workflow className="ml-2 h-4 w-4" />
+                    استيراد مراحل عمل موحدة
+                </Button>
+            )}
+            <Button onClick={onBack} variant="ghost" className="rounded-xl font-bold gap-2">
+              <ArrowRight className="h-4 w-4" /> العودة للرئيسية
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px]">
+          {/* Primary List Sidebar */}
+          <div className="md:col-span-4 border-l bg-muted/5 flex flex-col">
+            <div className="p-4 border-b space-y-4">
+                <div className="flex justify-between items-center">
+                    <Label className="font-black text-sm">{primaryTitle}</Label>
+                    {!disablePrimaryActions && <Button size="icon" variant="ghost" onClick={() => openDialog('primary')} className="h-8 w-8 text-primary"><Plus className="h-5 w-5" /></Button>}
+                </div>
+                
+                {primaryCollectionName === 'departments' && (
+                    <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black text-muted-foreground mr-1">فلترة حسب النشاط</Label>
+                        <Select value={departmentActivityFilter} onValueChange={setDepartmentActivityFilter}>
+                            <SelectTrigger className="h-8 text-xs rounded-lg"><SelectValue /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                                <SelectItem value="all">الكل</SelectItem>
+                                {companyActivityTypes?.map(t => <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+            
+            <ScrollArea className="flex-1">
+              <div className="p-2 space-y-1">
+                {loadingPrimary ? (
+                  Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl mb-2" />)
+                ) : filteredPrimaryItems.length === 0 ? (
+                  <p className="text-center text-muted-foreground p-8 text-sm italic">لا توجد سجلات حالياً.</p>
+                ) : isRecursiveView ? (
+                    recursiveTree.map(node => (
+                        <RecursiveItemRenderer 
+                            key={node.id} 
+                            node={node} 
+                            level={0} 
+                            onEdit={(item: any) => openDialog('primary', item)} 
+                            onDelete={openDeleteDialog} 
+                            onAddSub={(p: any) => openDialog('primary', null, p)}
+                            type="primary"
+                        />
+                    ))
+                ) : (
+                  filteredPrimaryItems.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSelectPrimary(item)}
+                      className={cn(
+                        "group flex items-center justify-between p-3 rounded-2xl cursor-pointer transition-all",
+                        selectedPrimary?.id === item.id ? "bg-primary text-white shadow-lg" : "hover:bg-muted"
+                      )}
+                    >
+                      <div className="flex flex-col flex-1 overflow-hidden">
+                        <span className="font-bold text-sm truncate">{item.name}</span>
+                        {item.activityTypes && (
+                            <div className="flex gap-1 mt-1">
+                                {item.activityTypes.map((t: string) => <Badge key={t} variant="outline" className={cn("text-[8px] h-3 px-1 border-none", selectedPrimary?.id === item.id ? "bg-white/20 text-white" : "bg-primary/10 text-primary")}>{activityTypeMap.get(t) || t}</Badge>)}
+                            </div>
+                        )}
+                      </div>
+                      {!disablePrimaryActions && (
+                        <div className={cn("flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity", selectedPrimary?.id === item.id && "opacity-100")}>
+                          <Button variant="ghost" size="icon" className={cn("h-7 w-7", selectedPrimary?.id === item.id ? "text-white hover:bg-white/20" : "text-muted-foreground")} onClick={(e) => { e.stopPropagation(); openDialog('primary', item); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className={cn("h-7 w-7", selectedPrimary?.id === item.id ? "text-white hover:bg-white/20" : "text-destructive")} onClick={(e) => { e.stopPropagation(); openDeleteDialog(item, 'primary'); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+            
+            {!loadingPrimary && !isRecursiveView && filteredPrimaryItems.length > 0 && (
+                <div className="p-4 border-t bg-muted/10">
+                    <div className="flex items-center justify-between gap-4">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">تعديل الترتيب</Label>
+                        <div className="flex gap-2">
+                            {isPrimaryOrderChanged && <Button size="sm" onClick={() => handleSaveOrder('primary')} disabled={isSaving} className="h-7 text-[10px] px-3 font-black">حفظ الترتيب</Button>}
+                            <Button variant="ghost" size="sm" onClick={() => setIsPrimaryOrderChanged(!isPrimaryOrderChanged)} className="h-7 text-[10px] px-3">
+                                {isPrimaryOrderChanged ? 'إلغاء' : 'ترتيب'}
+                            </Button>
+                        </div>
+                    </div>
+                    {isPrimaryOrderChanged && (
+                        <div className="mt-3 space-y-2">
+                            {filteredPrimaryItems.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between gap-2">
+                                    <span className="text-[10px] font-bold truncate max-w-[120px]">{item.name}</span>
+                                    <Input 
+                                        type="number" 
+                                        className="h-6 w-14 text-[10px] font-mono text-center" 
+                                        value={primaryOrderValues[item.id!] ?? item.order ?? 0}
+                                        onChange={(e) => handleOrderChange('primary', item.id!, e.target.value)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+          </div>
+
+          {/* Secondary List Content Area */}
+          <div className="md:col-span-8 flex flex-col bg-card">
+            {selectedPrimary ? (
+              <>
+                <div className="p-6 border-b flex justify-between items-center bg-muted/5">
+                  <div>
+                    <h3 className="text-xl font-black text-foreground">{secondaryTitle}</h3>
+                    <p className="text-xs text-muted-foreground font-medium">التابعة لـ {primarySingularTitle}: <span className="text-primary font-bold">{selectedPrimary.name}</span></p>
+                  </div>
+                  {secondaryCollectionName && (
+                    <Button onClick={() => openDialog('secondary')} className="rounded-xl font-bold gap-2">
+                      <PlusCircle className="h-4 w-4" /> إضافة {secondarySingularTitle} جديد
+                    </Button>
+                  )}
+                </div>
+                
+                <ScrollArea className="flex-1">
+                  <div className="p-6">
+                    {loadingSecondary ? (
+                      <div className="space-y-4">
+                        <Skeleton className="h-16 w-full rounded-2xl" />
+                        <Skeleton className="h-16 w-full rounded-2xl" />
+                      </div>
+                    ) : secondaryItems.length === 0 ? (
+                      <div className="text-center py-20 opacity-30 grayscale flex flex-col items-center">
+                        <LayoutGrid className="h-16 w-16 mb-4" />
+                        <p className="font-bold">لا يوجد {secondaryTitle} حالياً لهذه الفئة.</p>
+                      </div>
+                    ) : isRecursiveSecondary ? (
+                        <div className="space-y-2">
+                            {recursiveSecondaryTree.map(node => (
+                                <RecursiveItemRenderer 
+                                    key={node.id} 
+                                    node={node} 
+                                    level={0} 
+                                    onEdit={(item: any) => openDialog('secondary', item)} 
+                                    onDelete={openDeleteDialog} 
+                                    onAddSub={(p: any) => openDialog('secondary', null, p)}
+                                    type="secondary"
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {secondaryItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between p-4 border-2 border-transparent bg-muted/20 rounded-2xl hover:bg-white hover:border-primary/10 hover:shadow-md transition-all group"
+                          >
+                            <div className="flex flex-col">
+                                <span className="font-black text-foreground/80">{item.name}</span>
+                                {isWorkStageView && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                        <Badge variant="outline" className={cn("text-[8px] h-4", item.stageType === 'parallel' ? "bg-purple-50 text-purple-700" : "bg-blue-50 text-blue-700")}>
+                                            {item.stageType === 'parallel' ? 'مسار متوازي' : 'مسار تسلسلي'}
+                                        </Badge>
+                                        {(item.allowedRoles || []).map((role: string) => <Badge key={role} variant="secondary" className="text-[8px] h-4">{role}</Badge>)}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                               {isWorkStageView && isSecondaryOrderChanged && (
+                                    <Input 
+                                        type="number" 
+                                        className="h-8 w-14 font-mono text-center text-xs" 
+                                        value={secondaryOrderValues[item.id!] ?? item.order ?? 0}
+                                        onChange={(e) => handleOrderChange('secondary', item.id!, e.target.value)}
+                                    />
+                               )}
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openDialog('secondary', item)}><Pencil className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive hover:bg-red-50" onClick={() => openDeleteDialog(item, 'secondary')}><Trash2 className="h-4 w-4" /></Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+                
+                {/* Secondary Sort Controls */}
+                {!loadingSecondary && secondaryItems.length > 0 && (
+                    <div className="p-6 border-t bg-muted/10 flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+                            {isSecondaryOrderChanged && <Loader2 className={cn("h-3 w-3", isSaving ? "animate-spin" : "hidden")} />}
+                            {isSecondaryOrderChanged ? 'تعديل الترتيب نشط' : 'ترتيب العناصر'}
+                        </div>
+                        <div className="flex gap-2">
+                            {isSecondaryOrderChanged && <Button size="sm" onClick={() => handleSaveOrder('secondary')} disabled={isSaving} className="h-8 rounded-lg font-black">حفظ الترتيب</Button>}
+                            <Button variant="outline" size="sm" onClick={() => setIsSecondaryOrderChanged(!isSecondaryOrderChanged)} className="h-8 rounded-lg font-bold">
+                                {isSecondaryOrderChanged ? 'إلغاء' : 'تعديل الترتيب'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-40 grayscale">
+                <ArrowRight className="h-16 w-16 mb-4 text-primary animate-pulse" />
+                <h3 className="text-xl font-black">اختر {primarySingularTitle}</h3>
+                <p className="text-sm font-medium mt-2">يرجى اختيار {primarySingularTitle} من القائمة الجانبية لعرض {secondaryTitle}.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+
+      {/* --- Primary Item Dialog (Recursive or Regular) --- */}
+      <Dialog open={isPrimaryDialogOpen} onOpenChange={closeDialog}>
+        <DialogContent 
+            dir="rtl" 
+            className="max-w-xl rounded-[2rem] shadow-2xl"
+            onInteractOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                    e.preventDefault();
+                }
+            }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">{editingItem ? `تعديل ${primarySingularTitle}` : `إضافة ${primarySingularTitle} جديد`}</DialogTitle>
+            <DialogDescription>أدخل بيانات {primarySingularTitle} واحفظ التغييرات.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-6">
+            <div className="grid gap-2">
+              <Label htmlFor="primary-name" className="font-bold">اسم {primarySingularTitle} *</Label>
+              <Input id="primary-name" value={itemName} onChange={(e) => setItemName(e.target.value)} required placeholder={`ادخل اسم الـ ${primarySingularTitle}...`} className="h-12 rounded-2xl border-2 text-lg font-bold" />
+            </div>
+            
+            {primaryCollectionName === 'departments' && (
+                <div className="grid gap-2 animate-in fade-in">
+                    <Label className="font-bold text-xs text-muted-foreground uppercase">الأنشطة المرتبطة بهذا القسم</Label>
+                    <MultiSelect 
+                        options={activityTypeOptions} 
+                        selected={itemActivityTypes} 
+                        onChange={setItemActivityTypes} 
+                        placeholder="اختر الأنشطة..." 
+                        className="rounded-xl"
+                    />
+                </div>
+            )}
+
+            {isRecursiveView && (
+                <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border-2 border-primary/10">
+                        <div className="space-y-0.5">
+                            <Label className="font-black text-primary">هل هذا العنصر "قسم رئيسي"؟</Label>
+                            <p className="text-[10px] text-muted-foreground font-medium">الأقسام الرئيسية تعمل كمجلدات تنظيمية للبنود بداخلها.</p>
+                        </div>
+                        <Switch checked={isHeader} onCheckedChange={setIsHeader} />
+                    </div>
+
+                    {!isHeader && (
+                        <div className="grid gap-2 animate-in zoom-in-95">
+                            <Label className="font-bold">وحدة القياس</Label>
+                            <Input value={itemUnit} onChange={e => setItemUnit(e.target.value)} placeholder="مثال: متر، قطعة، مقطوعية..." className="h-11 rounded-xl" />
+                        </div>
+                    )}
+
+                    <div className="grid gap-2">
+                        <Label className="font-bold">العنصر الأب (المجلد)</Label>
+                        <InlineSearchList 
+                            value={parentCategory?.id || ''} 
+                            onSelect={(v) => setParentCategory(primaryItems.find(p => p.id === v))} 
+                            options={primaryOptions} 
+                            placeholder="اتركه فارغاً ليكون قسماً رئيسياً (جذر)" 
+                            className="h-11 rounded-xl border-dashed"
+                        />
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-4">
+                        <Label className="font-black text-xs text-muted-foreground flex items-center gap-2"><GitBranch className="h-3 w-3"/> ربط العلاقات الإجرائية</Label>
+                        <div className="grid gap-4 p-4 border-2 border-dashed rounded-3xl bg-muted/5">
+                            <div className="grid gap-1.5">
+                                <Label className="text-[10px] font-bold">يرتبط بأنشطة الشركة</Label>
+                                <MultiSelect options={activityTypeOptions} selected={itemActivityTypeIdsForBoq} onChange={setItemActivityTypeIdsForBoq} placeholder="اختر الأنشطة..." />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-[10px] font-bold">يرتبط بأنواع المعاملات (المكتب)</Label>
+                                <MultiSelect options={filteredTransactionTypeOptionsForBoq} selected={itemTransactionTypeIds} onChange={setItemTransactionTypeIds} placeholder="اختر المعاملات..." disabled={itemActivityTypeIdsForBoq.length === 0} />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-[10px] font-bold">يرتبط بتخصصات المقاولين (الباطن)</Label>
+                                <MultiSelect options={subcontractorTypeOptions} selected={itemSubcontractorTypeIds} onChange={setItemSubcontractorTypeIds} placeholder="اختر تخصص المقاول..." />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={closeDialog} disabled={isSaving} className="rounded-xl h-11 px-6">إلغاء</Button>
+            <Button onClick={() => handleSave('primary')} disabled={isSaving || !itemName.trim()} className="rounded-xl h-11 px-10 font-black gap-2 shadow-lg shadow-primary/20">
+              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+              حفظ وتطبيق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- Secondary Item Dialog (Work Stages or Regular) --- */}
+      <Dialog open={isSecondaryDialogOpen} onOpenChange={closeDialog}>
+        <DialogContent dir="rtl" className="max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden p-0 h-auto max-h-[90vh] flex flex-col border-none">
+          <DialogHeader className="p-8 pb-6 border-b bg-muted/30">
+            <DialogTitle className="text-2xl font-black text-foreground">
+                {editingItem ? `تعديل ${secondarySingularTitle}` : `إضافة ${secondarySingularTitle} جديد`}
+            </DialogTitle>
+            <DialogDescription className="text-sm font-medium mt-1">تخصيص القواعد الإجرائية والرقابية لهذه المرحلة.</DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="flex-1">
+            <div className="p-8 space-y-8">
+                <div className="grid gap-3">
+                    <Label htmlFor="secondary-name" className="font-black text-foreground/70 mr-1">اسم {secondarySingularTitle} *</Label>
+                    <Input id="secondary-name" value={itemName} onChange={(e) => setItemName(e.target.value)} required className="h-12 text-lg font-bold rounded-2xl border-2 shadow-inner" placeholder={`اسم الـ ${secondarySingularTitle}...`} />
+                </div>
+
+                {isRecursiveSecondary && (
+                    <div className="grid gap-2 animate-in zoom-in-95">
+                        <Label className="font-bold">المرحلة الأب (المجلد)</Label>
+                        <InlineSearchList 
+                            value={parentCategory?.id || ''} 
+                            onSelect={(v) => setParentCategory(secondaryItems.find(p => p.id === v))} 
+                            options={secondaryItems.filter(i => i.id !== editingItem?.id).map(i => ({ value: i.id!, label: i.name }))} 
+                            placeholder="اتركه فارغاً ليكون قسماً رئيسياً" 
+                            className="h-11 rounded-xl border-dashed"
+                        />
+                    </div>
+                )}
+
+                {isWorkStageView && (
+                    <div className="space-y-8 animate-in fade-in duration-500">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                                <Label className="font-black text-xs uppercase tracking-widest text-primary flex items-center gap-2"><Workflow className="h-3 w-3"/> طبيعة المسار</Label>
+                                <RadioGroup value={itemStageType} onValueChange={(v: any) => setItemStageType(v)} className="grid grid-cols-2 gap-4">
+                                    <div className={cn("flex items-center gap-3 p-4 rounded-2xl border-2 transition-all cursor-pointer", itemStageType === 'sequential' ? "bg-blue-50 border-blue-500 shadow-md" : "bg-muted/20 border-transparent hover:border-muted-foreground/20")}>
+                                        <RadioGroupItem value="sequential" id="sequential" />
+                                        <Label htmlFor="sequential" className="cursor-pointer font-black text-xs">تسلسلي (Step)</Label>
+                                    </div>
+                                    <div className={cn("flex items-center gap-3 p-4 rounded-2xl border-2 transition-all cursor-pointer", itemStageType === 'parallel' ? "bg-purple-50 border-purple-500 shadow-md" : "bg-muted/20 border-transparent hover:border-muted-foreground/20")}>
+                                        <RadioGroupItem value="parallel" id="parallel" />
+                                        <Label htmlFor="parallel" className="cursor-pointer font-black text-xs">متوازي (Activity)</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Label className="font-black text-xs uppercase tracking-widest text-primary flex items-center gap-2"><Clock className="h-3 w-3"/> معيار الرقابة الزمنية</Label>
+                                <Select value={itemTrackingType} onValueChange={(v: any) => setItemTrackingType(v)}>
+                                    <SelectTrigger className="h-12 rounded-2xl border-2 bg-muted/5 font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                        <SelectItem value="duration">مدة الإنجاز (أيام)</SelectItem>
+                                        <SelectItem value="occurrence">تكرار الأحداث (مرات)</SelectItem>
+                                        <SelectItem value="none">بدون تتبع زمني</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/10 shadow-inner">
+                            {itemTrackingType === 'duration' && (
+                                <div className="grid gap-3 animate-in zoom-in-95">
+                                    <Label className="font-black text-xs text-primary">المدة المتوقعة للإنجاز (بالأيام)</Label>
+                                    <div className="flex items-center gap-3">
+                                        <Input type="number" value={itemDuration} onChange={e => setItemDuration(e.target.value ? Number(e.target.value) : '')} className="h-12 rounded-xl text-center text-xl font-black font-mono border-primary/20 shadow-md" placeholder="0" />
+                                        <span className="font-black text-primary text-sm">يوم عمل</span>
+                                    </div>
+                                </div>
+                            )}
+                            {itemTrackingType === 'occurrence' && (
+                                <div className="grid gap-3 animate-in zoom-in-95">
+                                    <Label className="font-black text-xs text-primary">الحد الأقصى للتكرار (مثال: التعديلات)</Label>
+                                    <div className="flex items-center gap-3">
+                                        <Input type="number" value={itemMaxOccurrences} onChange={e => setItemMaxOccurrences(e.target.value ? Number(e.target.value) : '')} className="h-12 rounded-xl text-center text-xl font-black font-mono border-primary/20 shadow-md" placeholder="0" />
+                                        <span className="font-black text-primary text-sm">مرات سماح</span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between p-3 bg-white rounded-2xl border shadow-sm">
+                                    <div className="space-y-0.5">
+                                        <Label htmlFor="manual-completion" className="text-xs font-black">إغلاق يدوي</Label>
+                                        <p className="text-[9px] text-muted-foreground font-bold">السماح للمهندس بإغلاق المرحلة يدوياً.</p>
+                                    </div>
+                                    <Switch id="manual-completion" checked={itemAllowManualCompletion} onCheckedChange={setItemAllowManualCompletion} />
+                                </div>
+                                <div className="flex items-center justify-between p-3 bg-white rounded-2xl border shadow-sm">
+                                    <div className="space-y-0.5">
+                                        <Label htmlFor="mod-tracking" className="text-xs font-black">تتبع التعديلات</Label>
+                                        <p className="text-[9px] text-muted-foreground font-bold">تفعيل زر "تسجيل تعديل" داخل هذه المرحلة.</p>
+                                    </div>
+                                    <Switch id="mod-tracking" checked={itemEnableModificationTracking} onCheckedChange={setItemEnableModificationTracking} />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4">
+                            <Label className="font-black text-xs uppercase tracking-widest text-primary flex items-center gap-2"><ShieldCheck className="h-3 w-3"/> صلاحيات البدء (Allowed Roles)</Label>
+                            <MultiSelect 
+                                options={allJobs} 
+                                selected={itemRoles} 
+                                onChange={setItemRoles} 
+                                placeholder="من يحق له العمل على هذه المرحلة؟" 
+                                className="rounded-2xl"
+                            />
+                        </div>
+
+                        <div className="grid gap-6 border-t pt-8">
+                            <div className="grid gap-3">
+                                <Label className="font-black text-xs text-muted-foreground flex items-center gap-2"><ArrowRight className="h-3 w-3 rotate-180"/> المراحل التالية الممكنة</Label>
+                                <MultiSelect options={allSequentialStages} selected={itemNextStageIds} onChange={setItemNextStageIds} placeholder="اختر المراحل التي تلي هذه المرحلة..." className="rounded-xl"/>
+                            </div>
+                            <div className="grid gap-3">
+                                <Label className="font-black text-xs text-muted-foreground flex items-center gap-2"><GitBranch className="h-3 w-3"/> السماح بالتنفيذ أثناء المراحل التالية</Label>
+                                <MultiSelect options={allSequentialStages} selected={itemAllowedDuringStages} onChange={setItemAllowedDuringStages} placeholder="اختر المراحل التي يمكن أن تعمل هذه المرحلة بالتوازي معها..." className="rounded-xl"/>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="p-8 pt-4 border-t bg-muted/30">
+            <Button type="button" variant="ghost" onClick={closeDialog} disabled={isSaving} className="h-12 px-8 rounded-2xl font-bold">إلغاء</Button>
+            <Button onClick={() => handleSave('secondary')} disabled={isSaving || !itemName.trim()} className="h-12 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 min-w-[200px] gap-3">
+              {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
+              حفظ المرحلة والقواعد
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- Global Delete Dialog --- */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl shadow-2xl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+                <div className="p-3 bg-red-100 rounded-2xl text-red-600 shadow-inner">
+                    <ShieldAlert className="h-6 w-6" />
+                </div>
+                <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-base font-medium leading-relaxed">
+              أنت على وشك حذف <strong>&quot;{itemToDelete?.name}&quot;</strong> من {itemToDelete?.type === 'primary' ? primaryTitle : secondaryTitle}. 
+              <br/><br/>
+              <span className="font-black text-red-600">تحذير رقابي:</span> سيؤدي هذا الإجراء إلى حذف كافة التبعيات والروابط الإجرائية المرتبطة. هذا الإجراء غير قابل للتراجع.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 gap-2">
+            <AlertDialogCancel className="rounded-xl font-bold" disabled={isSaving}>تراجع</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-10">
+              {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'نعم، حذف نهائي'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* --- Import Default Confirmation --- */}
+      <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle className="text-2xl font-black text-primary">تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
+                <AlertDialogDescription className="text-base font-medium leading-relaxed">
+                    سيقوم هذا الإجراء بـ <strong>مسح كافة البيانات الحالية</strong> لـ {primaryTitle} وتنزيل القائمة المرجعية الموحدة.
+                    <br/><br/>
+                    <span className="font-black text-orange-600 flex items-center gap-2"><AlertCircle className="h-4 w-4"/> هل أنت متأكد من المتابعة؟</span>
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="mt-6 gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                <AlertDialogAction onClick={secondaryCollectionName === 'workStages' ? handleImportWorkStages : handleImportDefaults} disabled={isImporting} className="bg-primary hover:bg-primary/90 rounded-xl font-black px-10 shadow-lg shadow-primary/20">
+                    {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، استيراد وتحديث'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
 }
 
-// --- Unified (Full) ReferenceDataManager with workShifts view support ---
+// --- Unified (Full) ReferenceDataManager ---
 export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkflow' | 'workShifts'>('dashboard');
+    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkflow'>('dashboard');
 
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionTypes: 0, workShifts: 0 });
+    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionTypes: 0 });
     const [loadingCounts, setLoadingCounts] = useState(true);
     const { firestore } = useFirebase();
     const { toast } = useToast();
@@ -957,7 +1327,7 @@ export function ReferenceDataManager() {
         const fetchCounts = async () => {
             setLoadingCounts(true);
             try {
-                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap, boqRefItemsSnap, constrTypesSnap, workShiftsSnap] = await Promise.all([
+                const [deptsSnap, govsSnap, jobsSnap, areasSnap, transTypesSnap, workStagesSnap, subTypesSnap, subSpecsSnap, companyActivityTypesSnap, boqRefItemsSnap, constrTypesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'departments'))),
                     getDocs(query(collection(firestore, 'governorates'))),
                     getDocs(query(collectionGroup(firestore, 'jobs'))),
@@ -969,7 +1339,6 @@ export function ReferenceDataManager() {
                     getDocs(query(collection(firestore, 'companyActivityTypes'))),
                     getDocs(query(collection(firestore, 'boqReferenceItems'))),
                     getDocs(query(collection(firestore, 'construction_types'))),
-                    getDocs(query(collection(firestore, 'work_shifts'))),
                 ]);
 
                 setCounts({
@@ -984,7 +1353,6 @@ export function ReferenceDataManager() {
                     companyActivityTypes: companyActivityTypesSnap.size,
                     boqReferenceItems: boqRefItemsSnap.size,
                     constructionTypes: constrTypesSnap.size,
-                    workShifts: workShiftsSnap.size,
                 });
 
             } catch (error) {
@@ -1075,10 +1443,6 @@ export function ReferenceDataManager() {
         />
     }
 
-    if (view === 'workShifts') {
-        return <WorkShiftsManager onBack={() => setView('dashboard')} />;
-    }
-
     if (view === 'boqReferenceItems') {
         return <ManagerView
             primaryTitle="بنود جداول الكميات"
@@ -1164,14 +1528,6 @@ export function ReferenceDataManager() {
                     icon={<Building className="h-full w-full" />} 
                     onNavigate={() => setView('companyActivityTypes')} 
                     color="orange" 
-                    loading={loadingCounts} 
-                />
-                 <StatCard 
-                    title="فترات الدوام (Shifts)" 
-                    count={counts.workShifts} 
-                    icon={<Clock className="h-full w-full" />} 
-                    onNavigate={() => setView('workShifts')} 
-                    color="blue" 
                     loading={loadingCounts} 
                 />
                  <StatCard 
