@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -224,11 +223,18 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         let sanitizedValue = value;
-        if (id === 'fullName') {
+        
+        // منع تجاوز الأرقام المقررة (8 للهاتف و 12 للمدني)
+        if (id === 'mobile') {
+            sanitizedValue = value.replace(/\D/g, '').slice(0, 8);
+        } else if (id === 'civilId') {
+            sanitizedValue = value.replace(/\D/g, '').slice(0, 12);
+        } else if (id === 'fullName') {
             sanitizedValue = value.replace(/[^ \u0600-\u06FF]/g, ''); 
         } else if (id === 'nameEn') {
             sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         }
+        
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
     };
     
@@ -257,14 +263,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // التحقق من طول رقم الهاتف (8 أرقام)
-        if (formData.mobile && formData.mobile.replace(/\D/g, '').length !== 8) {
+        if (formData.mobile && formData.mobile.length !== 8) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'رقم الهاتف يجب أن يكون 8 أرقام بالضبط.' });
             return;
         }
         
-        // التحقق من طول الرقم المدني (12 رقماً - السوق الكويتي)
-        if (!isSimpleLayout && formData.civilId && formData.civilId.replace(/\D/g, '').length !== 12) {
+        if (!isSimpleLayout && formData.civilId && formData.civilId.length !== 12) {
             toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'الرقم المدني يجب أن يكون 12 رقماً بالضبط.' });
             return;
         }
@@ -282,7 +286,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             fullName: formData.fullName,
             mobile: formData.mobile,
             contractType: formData.contractType,
-            iban: formData.iban, // ضمان إرسال الايبان للتحقق من التكرار
+            iban: formData.iban,
         };
 
         if (showTeamSelection) {
@@ -370,7 +374,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                            <Input id="mobile" value={formData.mobile} onChange={handleInputChange} dir="ltr" required />
+                            <Input id="mobile" value={formData.mobile} onChange={handleInputChange} dir="ltr" maxLength={8} required />
                         </div>
                     </div>
                      <div className="grid gap-1.5 pt-4">
@@ -400,7 +404,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             </div>
                             <div className="grid gap-1.5">
                                 <Label htmlFor="civilId-dl">الرقم المدني (اختياري)</Label>
-                                <Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" placeholder="أدخل الرقم المدني إن وجد" />
+                                <Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" maxLength={12} placeholder="أدخل الرقم المدني إن وجد" />
                             </div>
                             {isDayLaborer && (
                                 <div className="grid gap-1.5">
@@ -531,7 +535,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <h3 className="font-semibold text-lg">معلومات شخصية إضافية</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="grid gap-1.5"><Label htmlFor="nameEn">الاسم (بالإنجليزية)</Label><Input id="nameEn" dir="ltr" value={formData.nameEn} onChange={handleInputChange} /></div>
-                                <div className="grid gap-1.5"><Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label><Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" required /></div>
+                                <div className="grid gap-1.5"><Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label><Input id="civilId" value={formData.civilId} onChange={handleInputChange} dir="ltr" maxLength={12} required /></div>
                                 <div className="grid gap-1.5"><Label htmlFor="dob">تاريخ الميلاد</Label><DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} /></div>
                                 <div className="grid gap-1.5"><Label htmlFor="gender">الجنس</Label><Select value={formData.gender} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="male">ذكر</SelectItem><SelectItem value="female">أنثى</SelectItem></SelectContent></Select></div>
                                 <div className="grid gap-1.5"><Label htmlFor="nationality">الجنسية</Label><InlineSearchList value={formData.nationality} onSelect={(value) => handleSelectChange('nationality', value)} options={nationalityOptions} placeholder="اختر الجنسية..." /></div>

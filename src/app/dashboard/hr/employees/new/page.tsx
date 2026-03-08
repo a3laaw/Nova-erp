@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
@@ -17,7 +16,7 @@ import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { cleanFirestoreData } from '@/lib/utils'; // IMPROVED: Import the data cleaning utility.
+import { cleanFirestoreData } from '@/lib/utils';
 
 export default function NewEmployeePage() {
     const router = useRouter();
@@ -73,6 +72,7 @@ export default function NewEmployeePage() {
                     throw new Error('الرقم المدني هذا مسجل بالفعل لموظف آخر.');
                 }
             }
+            // التحقق من تكرار IBAN
             if (newEmployeeData.iban && newEmployeeData.iban.trim() !== '') {
                 const ibanQuery = query(collection(firestore, 'employees'), where('iban', '==', newEmployeeData.iban.trim()));
                 const ibanSnapshot = await getDocs(ibanQuery);
