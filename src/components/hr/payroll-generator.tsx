@@ -6,12 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, limit } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, PermissionRequest } from '@/lib/types';
+import { collection, query, where, getDocs, writeBatch, doc, limit, getDoc, serverTimestamp } from 'firebase/firestore';
+import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
 import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { parse } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
@@ -23,8 +22,11 @@ export function PayrollGenerator() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
-  const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+  // FIX: Defer state initialization to avoid hydration mismatch
+  const [year, setYear] = useState('');
+  const [month, setMonth] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingResult, setProcessingResult] = useState<string | null>(null);
   const [ignoreAttendance, setIgnoreAttendance] = useState(false);
@@ -34,15 +36,20 @@ export function PayrollGenerator() {
 
   const [attendanceRecordsExist, setAttendanceRecordsExist] = useState(false);
 
-  // Check if attendance for the selected month/year exists
   useEffect(() => {
-    if(!firestore) return;
+    setIsMounted(true);
+    setYear(new Date().getFullYear().toString());
+    setMonth((new Date().getMonth() + 1).toString());
+  }, []);
+
+  useEffect(() => {
+    if(!firestore || !year || !month) return;
     const checkAttendance = async () => {
         const q = query(
             collection(firestore, 'attendance'), 
             where('year', '==', parseInt(year)), 
             where('month', '==', parseInt(month)),
-            limit(1) // More efficient way to check for existence
+            limit(1)
         );
         const snap = await getDocs(q);
         setAttendanceRecordsExist(!snap.empty);
@@ -51,7 +58,7 @@ export function PayrollGenerator() {
   }, [firestore, year, month]);
 
   const handleGeneratePayroll = async () => {
-    if (!firestore || !currentUser) return;
+    if (!firestore || !currentUser || !year || !month) return;
 
     setIsProcessing(true);
     setProcessingResult(null);
@@ -80,7 +87,7 @@ export function PayrollGenerator() {
           attendanceMap.set(data.employeeId, {id: doc.id, ...data});
       });
 
-      const permissionsMap = new Map<string, Map<string, string>>(); // employeeId -> dateString -> type
+      const permissionsMap = new Map<string, Map<string, string>>();
       permissionsSnap.forEach(doc => {
         const perm = doc.data();
         const permDate = toFirestoreDate(perm.date)?.toISOString().split('T')[0];
@@ -132,7 +139,7 @@ export function PayrollGenerator() {
                   payslipNotes = `تم تجاهل خصم ${waivedLates} أيام تأخير لوجود استئذان موافق عليه.`;
               }
           } else {
-              const requiresAttendance = employee.contractType === 'permanent' || employee.contractType === 'temporary' || (employee.contractType === 'piece-rate' && employee.pieceRateMode === 'salary_with_target');
+              const requiresAttendance = employee.contractType === 'permanent' || employee.contractType === 'temporary';
               if (requiresAttendance) {
                  payslipNotes = "لم يتم العثور على سجل حضور، تم احتساب الراتب على أساس الحضور الكامل.";
               }
@@ -186,7 +193,7 @@ export function PayrollGenerator() {
               deductions,
               netSalary,
               status: 'draft',
-              createdAt: new Date(),
+              createdAt: serverTimestamp(),
               type: 'Monthly',
               notes: payslipNotes.trim(),
           };
@@ -203,7 +210,7 @@ export function PayrollGenerator() {
 
       const message = `تم إنشاء أو تحديث ${payslipsCreated} كشوف رواتب بنجاح للشهر المحدد.`;
       setProcessingResult(message);
-      toast({ title: 'نجاح', description: message });
+      toast({ title: 'نجاح المزامنة', description: message });
 
     } catch (error) {
       const message = error instanceof Error ? error.message : 'فشل إنشاء كشوف الرواتب.';
@@ -214,10 +221,12 @@ export function PayrollGenerator() {
     }
   };
   
+  if (!isMounted) return null;
+
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
+  const monthName = year && month ? new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' }) : '';
 
   return (
     <div className="grid lg:grid-cols-2 gap-8 items-start">
@@ -241,7 +250,7 @@ export function PayrollGenerator() {
             </div>
             <div className="flex items-center space-x-2 rtl:space-x-reverse self-center pt-2">
                 <Checkbox id="ignoreAttendance" checked={ignoreAttendance} onCheckedChange={(checked) => setIgnoreAttendance(checked as boolean)} />
-                <Label htmlFor="ignoreAttendance">تجاهل سجلات الحضور واحتساب حضور كامل للجميع</Label>
+                <Label htmlFor="ignoreAttendance" className="cursor-pointer">تجاهل سجلات الحضور واحتساب حضور كامل للجميع</Label>
             </div>
         </div>
 
@@ -251,32 +260,32 @@ export function PayrollGenerator() {
                 أنت على وشك إنشاء كشوف رواتب لشهر <strong>{monthName} {year}</strong> لـِ <strong>{employees.length}</strong> موظف نشط.
             </p>
             {!ignoreAttendance && !attendanceRecordsExist && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="bg-red-50 border-red-200">
                     <FileWarning className="h-4 w-4" />
-                    <AlertTitle>تنبيه</AlertTitle>
-                    <AlertDescription>
-                        لم يتم رفع سجلات الحضور لهذا الشهر. سيتم احتساب حضور كامل للموظفين ذوي العقود التي تتطلب حضورًا.
+                    <AlertTitle>تنبيه الحضور</AlertTitle>
+                    <AlertDescription className="text-xs font-bold">
+                        لم يتم رفع سجلات الحضور لهذا الشهر. سيتم احتساب حضور كامل للموظفين ذوي العقود التي تتطلب حضوراً.
                     </AlertDescription>
                 </Alert>
             )}
             {ignoreAttendance && (
-                 <Alert>
+                 <Alert className="bg-blue-50 border-blue-200">
                     <Info className="h-4 w-4" />
-                    <AlertTitle>ملاحظة</AlertTitle>
-                    <AlertDescription>
+                    <AlertTitle>ملاحظة الإدخال</AlertTitle>
+                    <AlertDescription className="text-xs font-bold">
                        سيتم تجاهل أي سجلات حضور مرفوعة لهذا الشهر واحتساب حضور كامل لجميع الموظفين.
                     </AlertDescription>
                 </Alert>
             )}
             <Separator />
-            <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading} className="w-full">
+            <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading || !year || !month} className="w-full h-12 rounded-xl font-bold">
                 {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Sheet className="ml-2 h-4 w-4" />}
                 {isProcessing ? 'جاري المعالجة...' : `توليد كشوف رواتب شهر ${monthName}`}
             </Button>
              {processingResult && (
-                <Alert>
-                    <AlertTitle>نتيجة المعالجة</AlertTitle>
-                    <AlertDescription>{processingResult}</AlertDescription>
+                <Alert className="bg-green-50 border-green-200">
+                    <AlertTitle className="text-green-800 font-bold">نتيجة المعالجة</AlertTitle>
+                    <AlertDescription className="text-green-700">{processingResult}</AlertDescription>
                 </Alert>
             )}
         </div>
