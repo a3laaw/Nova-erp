@@ -7,7 +7,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc, collectionGroup } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
-import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX, CheckCircle2 } from 'lucide-react';
+import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX, CheckCircle2, DatabaseZap, settings } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -190,20 +190,30 @@ function SystemWipeManager() {
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [confirmText, setConfirmText] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const CONFIRMATION_PHRASE = 'مسح كل شيء';
+    const [wipeType, setWipeType] = useState<'operational' | 'full'>('operational');
+    
+    const CONFIRMATION_PHRASE = 'مسح البيانات';
 
-    // القائمة المحدثة لتشمل المجموعات الفرعية لضمان تنظيف "آخر النشاطات"
-    const collectionsToDelete = [
-        'company_settings', 'users', 'clients', 'transaction_assignments', 
-        'counters', 'employees', 'leaveRequests', 'permissionRequests', 'holidays', 
-        'attendance', 'payroll', 'notifications', 'departments', 'governorates', 
-        'transactionTypes', 'appointments', 'work_stages_progress', 'contracts', 
-        'contractTemplates', 'chartOfAccounts', 'journalEntries', 
-        'paymentVouchers', 'cashReceipts', 'quotations', 'vendors', 
-        'purchaseOrders', 'residencyRenewals', 'projects', 'field_visits', 'boqs',
-        'payment_applications', 'daily_reports', 'subcontractors', 'subcontractor_certificates',
-        // المجموعات الفرعية المتداخلة (Sub-collections)
-        'timelineEvents', 'history', 'items', 'auditLogs', 'workStages'
+    // 1. البيانات التشغيلية فقط (الحركات اليومية)
+    const operationalCollections = [
+        'clients', 'employees', 'leaveRequests', 'permissionRequests', 
+        'attendance', 'payroll', 'notifications', 'appointments', 
+        'journalEntries', 'paymentVouchers', 'cashReceipts', 'quotations', 
+        'purchaseOrders', 'purchase_requests', 'grns', 'inventoryAdjustments', 
+        'projects', 'field_visits', 'boqs', 'payment_applications', 
+        'subcontractor_certificates', 'recurring_obligations', 'counters',
+        // المجموعات الفرعية
+        'timelineEvents', 'history', 'auditLogs', 'daily_reports', 'items'
+    ];
+
+    // 2. البيانات المرجعية (الإعدادات)
+    const referenceCollections = [
+        'company_settings', 'users', 'departments', 'governorates', 
+        'transactionTypes', 'contractTemplates', 'chartOfAccounts', 
+        'itemCategories', 'boqReferenceItems', 'construction_types',
+        'subcontractorTypes', 'workTeams', 'vendors', 'subcontractors',
+        // المجموعات الفرعية للتهيئة
+        'jobs', 'areas', 'workStages', 'specializations'
     ];
     
     const handleWipeData = async () => {
@@ -211,12 +221,13 @@ function SystemWipeManager() {
         setIsProcessing(true);
         try {
             let deletedDocsCount = 0;
+            const targetCollections = wipeType === 'full' 
+                ? [...operationalCollections, ...referenceCollections]
+                : operationalCollections;
             
-            // استخدام نظام الحلقات مع collectionGroup لمسح كل المجموعات المتداخلة
-            for (const collectionName of collectionsToDelete) {
+            for (const collectionName of targetCollections) {
                 let hasMore = true;
                 while (hasMore) {
-                    // collectionGroup يمسح كل المجموعات التي تحمل هذا الاسم في أي مستوى
                     const q = query(collectionGroup(firestore, collectionName), limit(400));
                     const snapshot = await getDocs(q);
                     
@@ -234,10 +245,12 @@ function SystemWipeManager() {
                 }
             }
             
-            toast({ title: 'نجاح تصفير النظام', description: `تم مسح ${deletedDocsCount} سجلاً بنجاح (بما في ذلك سجلات النشاط). النظام الآن نظيف تماماً.` });
+            toast({ 
+                title: 'تم التنظيف', 
+                description: `تم مسح ${deletedDocsCount} سجلاً بنجاح. ${wipeType === 'operational' ? 'تم الحفاظ على القوائم المرجعية.' : 'تم مسح النظام بالكامل.'}` 
+            });
         } catch (error) {
-            console.error("Wipe Error:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح بعض البيانات المتداخلة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل مسح بعض البيانات.' });
         } finally {
             setIsProcessing(false);
             setIsConfirmOpen(false);
@@ -246,35 +259,82 @@ function SystemWipeManager() {
     };
 
     return (
-        <div className="space-y-4">
-            <h3 className="font-black text-lg text-destructive flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5" />
-                إجراءات إخلاء البيانات (Danger Zone)
-            </h3>
-            <p className="text-sm text-muted-foreground">
-                الإجراءات في هذا القسم تقوم بحذف البيانات بشكل نهائي ولا يمكن التراجع عنها. استخدمها فقط في حال الرغبة في تصفير النظام تماماً للبدء من جديد.
+        <div className="space-y-6">
+            <div className="flex items-center gap-3">
+                <DatabaseZap className="text-primary h-6 w-6" />
+                <h3 className="font-black text-xl">تطهير وتصفير قاعدة البيانات</h3>
+            </div>
+            
+            <p className="text-sm text-muted-foreground leading-relaxed">
+                اختر نوع المسح المطلوب. نوصي بمسح <strong>البيانات التشغيلية</strong> فقط إذا كنت ترغب في تنظيف النظام من حركات التجربة السابقة مع الحفاظ على إعدادات شركتك (الأقسام، الموظفين، أنواع المعاملات).
             </p>
-            <div className="border-2 border-destructive/20 rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center bg-destructive/5 gap-4">
-                <div className="space-y-1">
-                    <h4 className="font-black text-destructive text-lg">مسح قاعدة بيانات النظام بالكامل</h4>
-                    <p className="text-xs font-bold text-red-700/70">
-                        سيقوم هذا الإجراء بحذف جميع العملاء، الموظفين، المعاملات، سجلات النشاط، والقيود المحاسبية.
-                    </p>
-                </div>
-                <Button variant="destructive" onClick={() => setIsConfirmOpen(true)} className="rounded-xl font-black h-12 px-8">
-                    تصفير النظام بالكامل
-                </Button>
+
+            <div className="grid md:grid-cols-2 gap-6">
+                {/* الخيار الأول: مسح الحركات فقط */}
+                <Card className="border-2 border-primary/10 hover:border-primary/30 transition-all rounded-3xl bg-muted/5 group">
+                    <CardHeader>
+                        <div className="flex justify-between items-start">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary"><RotateCcw className="h-5 w-5"/></div>
+                            <Badge variant="secondary" className="bg-primary/5 text-primary">آمن للتجربة</Badge>
+                        </div>
+                        <CardTitle className="text-lg font-black mt-4">مسح البيانات التشغيلية</CardTitle>
+                        <CardDescription className="text-xs">حذف الحركات، العملاء، والمالية.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-xs space-y-2">
+                        <p className="flex items-center gap-2 text-green-600 font-bold"><CheckCircle2 className="h-3 w-3"/> الحفاظ على الأقسام والوظائف</p>
+                        <p className="flex items-center gap-2 text-green-600 font-bold"><CheckCircle2 className="h-3 w-3"/> الحفاظ على شجرة الحسابات والشركات</p>
+                        <p className="flex items-center gap-2 text-red-600 font-bold"><X className="h-3 w-3"/> مسح كل العملاء والمشاريع والقيود</p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button 
+                            className="w-full rounded-xl font-bold" 
+                            onClick={() => { setWipeType('operational'); setIsConfirmOpen(true); }}
+                        >
+                            تطهير الحركات فقط
+                        </Button>
+                    </CardFooter>
+                </Card>
+
+                {/* الخيار الثاني: مسح كل شيء */}
+                <Card className="border-2 border-red-100 hover:border-red-300 transition-all rounded-3xl bg-red-50/10 group">
+                    <CardHeader>
+                        <div className="flex justify-between items-start">
+                            <div className="p-2 bg-red-100 rounded-xl text-red-600"><ShieldAlert className="h-5 w-5"/></div>
+                            <Badge variant="destructive" className="font-black">خطير جداً</Badge>
+                        </div>
+                        <CardTitle className="text-lg font-black mt-4 text-red-900">مسح قاعدة البيانات بالكامل</CardTitle>
+                        <CardDescription className="text-xs">حذف كل شيء والبدء من الصفر تماماً.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-xs space-y-2">
+                        <p className="flex items-center gap-2 text-red-600 font-bold"><X className="h-3 w-3"/> مسح القوائم المرجعية والمواقع</p>
+                        <p className="flex items-center gap-2 text-red-600 font-bold"><X className="h-3 w-3"/> مسح إعدادات العلامة التجارية</p>
+                        <p className="flex items-center gap-2 text-red-600 font-bold"><X className="h-3 w-3"/> مسح حسابات المستخدمين والمديرين</p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button 
+                            variant="destructive" 
+                            className="w-full rounded-xl font-bold" 
+                            onClick={() => { setWipeType('full'); setIsConfirmOpen(true); }}
+                        >
+                            مسح شامل (إخلاء المصنع)
+                        </Button>
+                    </CardFooter>
+                </Card>
             </div>
 
             <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-[2rem]">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-2xl font-black text-red-700">تحذير: هل أنت متأكد تماماً؟</AlertDialogTitle>
+                        <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد عملية المسح</AlertDialogTitle>
                         <AlertDialogDescription asChild>
                             <div className="space-y-4 pt-2">
-                                <p className="text-base">أنت على وشك حذف **جميع البيانات** بما في ذلك سجلات النشاط والتعليقات. سيتم مسح كل شيء.</p>
-                                <p className="font-black text-red-600 bg-red-50 p-3 rounded-xl border border-red-100">هذا الإجراء لا يمكن التراجع عنه نهائياً.</p>
-                                <p className="font-bold">للتأكيد، يرجى كتابة العبارة التالية في المربع أدناه:</p>
+                                <p className="text-base">
+                                    {wipeType === 'full' 
+                                        ? "أنت على وشك تصفير النظام بالكامل. سيتم مسح الإعدادات والقوائم المرجعية."
+                                        : "سيتم مسح حركات العملاء والمشاريع والمالية، مع الحفاظ على هيكل النظام المرجعي."}
+                                </p>
+                                <p className="font-black text-red-600 bg-red-50 p-3 rounded-xl border border-red-100 text-center uppercase tracking-widest">تحذير: لا يمكن التراجع</p>
+                                <p className="font-bold">للتأكيد، يرجى كتابة العبارة التالية:</p>
                                 <p className="font-mono font-black text-center bg-muted p-3 rounded-xl border-2 border-dashed">{CONFIRMATION_PHRASE}</p>
                             </div>
                         </AlertDialogDescription>
@@ -282,13 +342,13 @@ function SystemWipeManager() {
                     <Input
                         value={confirmText}
                         onChange={(e) => setConfirmText(e.target.value)}
-                        placeholder="اكتب العبارة التأكيدية هنا..."
+                        placeholder="اكتب العبارة هنا..."
                         className="h-12 rounded-xl border-2 text-center text-lg font-black"
                     />
                     <AlertDialogFooter className="mt-4">
                         <AlertDialogCancel disabled={isProcessing} className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleWipeData} disabled={confirmText !== CONFIRMATION_PHRASE || isProcessing} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-10">
-                            {isProcessing ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري المسح...</> : 'أفهم العواقب، قم بالمسح النهائي'}
+                            {isProcessing ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري المسح...</> : 'تأكيد المسح النهائي'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -297,6 +357,7 @@ function SystemWipeManager() {
     );
 }
 
+import { RotateCcw } from 'lucide-react';
 
 // Main Component
 export function DataIntegrityManager() {
