@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, Users, Clock, Banknote, Briefcase, User, ShieldCheck, Phone } from 'lucide-react';
+import { Save, X, Loader2, Users, Clock, Banknote, Briefcase, User, ShieldCheck, Phone, Globe } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +33,7 @@ interface EmployeeFormProps {
 const commonNationalities = [
   "كويتي", "سعودي", "إماراتي", "بحريني", "قطري", "عماني",
   "مصري", "سوري", "لبناني", "أردني", "فلسطيني", "يمني",
-  "هندي", "باكستاني", "فلبيني", "بنغلاديشي", "نيبالي", "إيراني",
+  "هندي", "باكستاني", "فلبيني", "بنغلاديشي", "نيبالي", "إإيراني",
   "بريطاني", "أمريكي"
 ].sort((a,b) => a.localeCompare(b, 'ar'));
 
@@ -45,18 +45,33 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { branding } = useBranding();
     
     const [formData, setFormData] = useState<Partial<Employee>>({
-        fullName: '', nameEn: '', civilId: '', mobile: '',
-        hireDate: new Date(), department: '', jobTitle: '',
+        fullName: '',
+        nameEn: '',
+        civilId: '',
+        mobile: '',
+        hireDate: new Date(),
+        department: '',
+        jobTitle: '',
         shiftId: '',
-        contractType: 'permanent', basicSalary: 0,
-        housingAllowance: 0, transportAllowance: 0,
+        contractType: 'permanent',
+        basicSalary: 0,
+        housingAllowance: 0,
+        transportAllowance: 0,
         salaryPaymentType: 'cash',
-        bankName: '', accountNumber: '', iban: '',
-        contractPercentage: 0, gender: 'male',
-        dob: undefined, nationality: '', residencyExpiry: undefined,
-        workStartTime: '08:00', workEndTime: '17:00',
+        bankName: '',
+        accountNumber: '',
+        iban: '',
+        contractPercentage: 0,
+        gender: 'male',
+        dob: undefined,
+        nationality: '',
+        residencyExpiry: undefined,
+        workStartTime: '08:00',
+        workEndTime: '17:00',
         pieceRateMode: 'salary_with_target',
-        targetDescription: 0, pieceRate: 0, dailyRate: 0,
+        targetDescription: 0,
+        pieceRate: 0,
+        dailyRate: 0,
     });
 
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
@@ -71,6 +86,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     
     const isDayLaborer = formData.contractType === 'day_laborer';
 
+    // ✨ تحديث البيانات عند فتح شاشة التعديل
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -85,8 +101,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
-                // إصلاح حاسم: التأكد من تعيين طريقة الدفع فوراً عند تحميل البيانات
+                // 🛡️ حماية حقل طريقة الدفع من الظهور فارغاً
                 salaryPaymentType: initialData.salaryPaymentType || 'cash',
+                nationality: initialData.nationality || '',
             });
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
             setShowTransportAllowance(Number(initialData.transportAllowance) > 0);
@@ -128,8 +145,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.fullName || !formData.mobile) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة البيانات الأساسية.' });
+        if (!formData.fullName || !formData.mobile || !formData.nationality) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة الاسم والجوال والجنسية.' });
             return;
         }
         await onSave(formData);
@@ -139,7 +156,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         <form onSubmit={handleSubmit} className="space-y-8">
             <div className="py-4 px-1 space-y-8 max-h-[75vh] overflow-y-auto scrollbar-none">
                 
-                {/* 1. المعلومات الأساسية */}
+                {/* 1. المعلومات الأساسية والشخصية */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-card shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2"><User className="h-5 w-5 text-primary"/> المعلومات الشخصية والأساسية</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -163,8 +180,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Input id="civilId" value={formData.civilId || ''} onChange={handleInputChange} dir="ltr" maxLength={12} className="h-11 rounded-xl" />
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-bold mr-1">الجنسية</Label>
-                            <InlineSearchList value={formData.nationality || ''} onSelect={v => setFormData(p => ({...p, nationality: v}))} options={nationalityOptions} placeholder="اختر الجنسية..." className="h-11" />
+                            <Label className="font-bold mr-1">الجنسية *</Label>
+                            <InlineSearchList 
+                                value={formData.nationality || ''} 
+                                onSelect={v => setFormData(p => ({...p, nationality: v}))} 
+                                options={nationalityOptions} 
+                                placeholder="اختر الجنسية..." 
+                                className="h-11" 
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">تاريخ الميلاد</Label>
@@ -173,7 +196,20 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {/* 2. المعلومات الوظيفية والدوام */}
+                {/* 2. بيانات الإقامة والوثائق (تظهر فقط لغير الكويتيين) */}
+                {formData.nationality && formData.nationality !== 'كويتي' && (
+                    <section className="space-y-6 p-6 border rounded-[2rem] bg-orange-50/10 border-orange-100 shadow-sm animate-in fade-in zoom-in-95">
+                        <h3 className="font-black text-lg flex items-center gap-2 text-orange-800"><ShieldCheck className="h-5 w-5" /> الوثائق وتاريخ الإقامة</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="font-bold mr-1">تاريخ انتهاء الإقامة</Label>
+                                <DateInput value={formData.residencyExpiry} onChange={d => setFormData(p => ({...p, residencyExpiry: d}))} />
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {/* 3. المعلومات الوظيفية والدوام */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/> التعيين والدوام</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -227,7 +263,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     )}
                 </section>
 
-                {/* 3. المعلومات المالية والرواتب */}
+                {/* 4. المعلومات المالية والرواتب */}
                 <section className="space-y-6 p-6 border rounded-[2.5rem] bg-emerald-50/20 border-emerald-100 shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800"><Banknote className="h-5 w-5" /> المعلومات المالية والرواتب</h3>
                     
@@ -290,19 +326,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         )}
                     </div>
                 </section>
-
-                {/* 4. بيانات الإقامة والوثائق */}
-                {formData.nationality !== 'كويتي' && (
-                    <section className="space-y-6 p-6 border rounded-[2.5rem] bg-orange-50/10 border-orange-100 shadow-sm animate-in fade-in">
-                        <h3 className="font-black text-lg flex items-center gap-2 text-orange-800"><ShieldCheck className="h-5 w-5" /> الوثائق وتاريخ الإقامة</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="grid gap-2">
-                                <Label className="font-bold mr-1">تاريخ انتهاء الإقامة</Label>
-                                <DateInput value={formData.residencyExpiry} onChange={d => setFormData(p => ({...p, residencyExpiry: d}))} />
-                            </div>
-                        </div>
-                    </section>
-                )}
             </div>
 
             <DialogFooter className="mt-6 pt-6 border-t bg-muted/10 rounded-b-[2rem] p-6">
