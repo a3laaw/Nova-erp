@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
@@ -10,16 +9,13 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Info, ListFilter, Save, Sparkles, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, ListFilter, Save, Sparkles } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse, format, isSameDay, isValid } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
-import { DateInput } from '../ui/date-input';
 import { cn } from '@/lib/utils';
-
-const EXPECTED_COLUMNS = ['employeeNumber', 'employeeName', 'date', 'checkIn1', 'checkOut1', 'checkIn2', 'checkOut2'];
 
 /**
  * دالة مساعدة لتحويل تاريخ الإكسل (رقم أو نص) إلى تاريخ JS صحيح
@@ -67,8 +63,6 @@ export function AttendanceUploader() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
 
-  const [uploadMode, setUploadMode] = useState<'daily' | 'monthly'>('daily');
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   
@@ -107,15 +101,24 @@ export function AttendanceUploader() {
       return;
     }
     
-    const templateData = employees.map(emp => ({
-        employeeNumber: emp.employeeNumber,
-        employeeName: emp.fullName, 
-        date: uploadMode === 'daily' && selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '',
-        checkIn1: '',
-        checkOut1: '',
-        checkIn2: '',
-        checkOut2: '',
-    }));
+    // توليد نموذج يحتوي على أيام الشهر المختار لتسهيل العمل على المستخدم
+    const daysInMonth = new Date(parseInt(year), parseInt(month), 0).getDate();
+    const templateData: any[] = [];
+
+    employees.forEach(emp => {
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = format(new Date(parseInt(year), parseInt(month) - 1, d), 'yyyy-MM-dd');
+            templateData.push({
+                employeeNumber: emp.employeeNumber,
+                employeeName: emp.fullName, 
+                date: dateStr,
+                checkIn1: '',
+                checkOut1: '',
+                checkIn2: '',
+                checkOut2: '',
+            });
+        }
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     worksheet['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
@@ -123,11 +126,7 @@ export function AttendanceUploader() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
     
-    const fileName = uploadMode === 'daily' && selectedDate 
-        ? `Attendance_Template_${format(selectedDate, 'yyyy-MM-dd')}.xlsx`
-        : `Attendance_Template_${year}-${month}.xlsx`;
-        
-    XLSX.writeFile(workbook, fileName);
+    XLSX.writeFile(workbook, `Attendance_Template_${year}-${month}.xlsx`);
   };
 
   const handleUpload = async () => {
@@ -226,7 +225,7 @@ export function AttendanceUploader() {
 
         await batch.commit();
         setProcessingResult({ success: true, message: `تم تحليل الملف بنجاح وتحديث ${groupedUpdates.size} سجلات شهرية للموظفين.` });
-        toast({ title: 'نجاح الرفع الذكي', description: 'تم توزيع البيانات على الأشهر والموظفين حسب التواريخ المكتوبة في الملف.' });
+        toast({ title: 'نجاح التحليل الذكي', description: 'تم توزيع البيانات على الأشهر والموظفين حسب التواريخ المكتوبة في الملف.' });
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -250,72 +249,51 @@ export function AttendanceUploader() {
                 <CardHeader className="bg-primary/5">
                     <CardTitle className="text-lg flex items-center gap-2">
                         <ListFilter className="h-5 w-5 text-primary" />
-                        أدوات توليد النماذج
+                        تجهيز نموذج الإدخال
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
-                    <div className="flex bg-muted p-1 rounded-xl border shadow-inner">
-                        <Button 
-                            variant="ghost" 
-                            className={cn("flex-1 rounded-lg font-bold text-xs", uploadMode === 'daily' && "bg-white shadow-sm text-primary")}
-                            onClick={() => setUploadMode('daily')}
-                        >
-                            نموذج يومي
-                        </Button>
-                        <Button 
-                            variant="ghost" 
-                            className={cn("flex-1 rounded-lg font-bold text-xs", uploadMode === 'monthly' && "bg-white shadow-sm text-primary")}
-                            onClick={() => setUploadMode('monthly')}
-                        >
-                            نموذج شهري
-                        </Button>
+                    <p className="text-xs text-muted-foreground font-bold leading-relaxed">
+                        اختر الشهر المُراد تعبئة بياناته لتوليد ملف إكسل جاهز بأسماء الموظفين وتواريخ الشهر بالكامل.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold text-muted-foreground">السنة</Label>
+                            <Select value={year} onValueChange={setYear}>
+                                <SelectTrigger className="rounded-xl h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold text-muted-foreground">الشهر</Label>
+                            <Select value={month} onValueChange={setMonth}>
+                                <SelectTrigger className="rounded-xl h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
                     </div>
-
-                    {uploadMode === 'daily' ? (
-                        <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
-                            <Label className="font-bold text-xs pr-1 text-muted-foreground">تاريخ اليوم المختار:</Label>
-                            <DateInput value={selectedDate} onChange={setSelectedDate} />
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2">
-                            <div className="grid gap-2">
-                                <Label className="text-xs font-bold text-muted-foreground">السنة</Label>
-                                <Select value={year} onValueChange={setYear}>
-                                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                                    <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="text-xs font-bold text-muted-foreground">الشهر</Label>
-                                <Select value={month} onValueChange={setMonth}>
-                                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                                    <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    )}
 
                     <Button onClick={handleDownloadTemplate} variant="outline" className="w-full h-12 rounded-xl border-dashed border-primary/30 text-primary font-bold gap-2 hover:bg-primary/5">
                         <DownloadCloud className="h-5 w-5" />
-                        تنزيل نموذج الإدخال
+                        تنزيل نموذج الشهر المختار
                     </Button>
                 </CardContent>
             </Card>
 
             <Alert className="rounded-2xl border-indigo-100 bg-indigo-50/50">
                 <Sparkles className="h-4 w-4 text-indigo-600" />
-                <AlertTitle className="text-indigo-800 font-black">التحليل الذكي نشط</AlertTitle>
-                <AlertDescription className="text-indigo-700 text-xs leading-relaxed font-medium">
-                    يمكنك الآن رفع ملف واحد يحتوي على تواريخ مختلفة أو مختلطة؛ سيقوم النظام بقراءة تاريخ كل سطر وتوجيهه تلقائياً للموظف والشهر المناسب.
+                <AlertTitle className="text-indigo-800 font-black">التحليل الذكي (Smart Sync)</AlertTitle>
+                <AlertDescription className="text-indigo-700 text-[10px] leading-relaxed font-bold">
+                    ارفع أي ملف يحتوي على أي تواريخ؛ سيقوم النظام بفرز السطور وتوجيهها للموظف والشهر المناسب في قاعدة البيانات تلقائياً.
                 </AlertDescription>
             </Alert>
         </div>
 
         <div className="lg:col-span-2">
             <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-muted/30 border-b pb-8">
+                <CardHeader className="bg-muted/30 border-b pb-8 px-8">
                     <CardTitle className="text-xl font-black">مركز الرفع والتحليل التلقائي</CardTitle>
-                    <CardDescription>اسحب الملف هنا ليقوم "محرك الذكاء" بتصنيف البيانات وتوزيعها زمنياً.</CardDescription>
+                    <CardDescription className="text-base">اسحب الملف هنا ليقوم "محرك الذكاء" بتصنيف البيانات وتوزيعها زمنياً.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
                     <div
@@ -331,7 +309,7 @@ export function AttendanceUploader() {
                         {file ? (
                             <div className="mt-6 space-y-1">
                                 <p className="text-lg font-black text-primary">{file.name}</p>
-                                <p className="text-xs text-muted-foreground font-bold italic">الملف بانتظار التحليل البصري والمكاني...</p>
+                                <p className="text-xs text-muted-foreground font-bold italic">الملف بانتظار التحليل الزمني وتوزيع السجلات...</p>
                             </div>
                         ) : (
                             <div className="mt-6 space-y-1">
@@ -344,7 +322,7 @@ export function AttendanceUploader() {
                     {processingResult && (
                         <Alert variant={processingResult.success ? 'default' : 'destructive'} className={cn("rounded-2xl border-2 animate-in zoom-in-95", processingResult.success ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200")}>
                             {processingResult.success ? <FileCheck className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-                            <AlertTitle className="font-black">{processingResult.success ? 'نجاح التحليل الذكي' : 'خطأ في معالجة البيانات'}</AlertTitle>
+                            <AlertTitle className="font-black">{processingResult.success ? 'نجاح التحليل والمزامنة' : 'خطأ في معالجة الملف'}</AlertTitle>
                             <AlertDescription className="font-bold text-sm">{processingResult.message}</AlertDescription>
                         </Alert>
                     )}
@@ -352,7 +330,7 @@ export function AttendanceUploader() {
                 <CardFooter className="p-8 bg-muted/10 border-t flex justify-end">
                     <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 min-w-[320px] gap-3">
                         {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-                        {isProcessing ? 'جاري تحليل وتوزيع البيانات...' : 'اعتماد وتوزيع السجلات زمنياً'}
+                        {isProcessing ? 'جاري تحليل وتوزيع البيانات...' : 'اعتماد السجلات والمزامنة الحية'}
                     </Button>
                 </CardFooter>
             </Card>
