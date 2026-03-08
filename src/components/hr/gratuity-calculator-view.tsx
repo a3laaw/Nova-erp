@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -44,6 +45,7 @@ interface GratuityResult {
 
 export function GratuityCalculatorView() {
   const { firestore } = useFirebase();
+  const searchParams = useSearchParams();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination'>('termination');
   const [noticeType, setNoticeType] = useState<'worked' | 'indemnity' | 'waived'>('waived');
@@ -51,6 +53,13 @@ export function GratuityCalculatorView() {
   const [result, setResult] = useState<GratuityResult | null>(null);
 
   const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
+
+  useEffect(() => {
+    const empId = searchParams.get('employeeId');
+    if (empId) {
+        setSelectedEmployeeId(empId);
+    }
+  }, [searchParams]);
 
   const employeeOptions = useMemo(() => {
     return (employees || []).map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber }));

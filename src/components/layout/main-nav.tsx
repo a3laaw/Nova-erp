@@ -78,7 +78,8 @@ import {
   UserX,
   ShoppingBag,
   FileStack,
-  Wallet
+  Wallet,
+  Calculator
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -201,6 +202,7 @@ const navItems = {
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarX },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذانات', icon: Clock },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة', icon: Calculator },
         { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
     },

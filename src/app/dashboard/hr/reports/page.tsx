@@ -1,4 +1,3 @@
-
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -42,18 +41,18 @@ const reportList = [
         color: 'bg-purple-100 text-purple-600'
     },
     { 
+        title: 'حاسبة نهاية الخدمة (قانون العمل)', 
+        description: 'أداة حساب دقيقة للمستحقات مع معالجة فترات الإنذار.', 
+        href: '/dashboard/hr/gratuity-calculator', 
+        icon: Calculator,
+        color: 'bg-cyan-100 text-cyan-600'
+    },
+    { 
         title: 'السلف والاستقطاعات', 
         description: 'تتبع السلف المالية المقدمة للموظفين.', 
         href: '/dashboard/hr/reports/advances', 
         icon: HandCoins,
         color: 'bg-amber-100 text-amber-600'
-    },
-    { 
-        title: 'تقدير مكافأة نهاية الخدمة', 
-        description: 'حساب تقديري لاستحقاقات الموظفين.', 
-        href: '/dashboard/hr/reports/gratuity', 
-        icon: Calculator,
-        color: 'bg-cyan-100 text-cyan-600'
     },
     { 
         title: 'التكاليف والمصروفات السنوية', 

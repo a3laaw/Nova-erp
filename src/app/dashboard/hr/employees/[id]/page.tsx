@@ -8,10 +8,11 @@ import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus, FileCheck } from 'lucide-react';
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus, FileCheck, Calculator } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInDays } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
 import { ResidencyRenewalDialog } from '@/components/hr/residency-renewal-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -104,6 +105,11 @@ export default function EmployeeProfilePage() {
                     </TabsList>
                     
                     <div className="flex gap-2">
+                        <Button asChild variant="outline" className="bg-white shadow-sm border-amber-200 text-amber-700 hover:bg-amber-50 font-bold gap-2 rounded-xl">
+                            <Link href={`/dashboard/hr/gratuity-calculator?employeeId=${employee.id}`}>
+                                <Calculator className="h-4 w-4" /> تسوية نهاية الخدمة
+                            </Link>
+                        </Button>
                         <Button asChild variant="outline" className="bg-white shadow-sm border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-bold gap-2 rounded-xl">
                             <Link href={`/dashboard/hr/employees/${id}/print-commencement`}>
                                 <FileCheck className="h-4 w-4" /> طباعة إشعار المباشرة
