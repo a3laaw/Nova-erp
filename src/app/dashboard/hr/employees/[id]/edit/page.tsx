@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Card,
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Save, X } from 'lucide-react';
+import { Save, X, Loader2 } from 'lucide-react';
 import { useFirebase, useDocument } from '@/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,7 @@ export default function EditEmployeePage() {
         return doc(firestore, 'employees', id);
     }, [firestore, id]);
 
+    // جلب بيانات الموظف بشكل لحظي ومستقر
     const { data: employee, loading, error } = useDocument<Employee>(firestore, employeeRef ? employeeRef.path : null);
 
     const handleSave = useCallback(async (updatedData: Partial<Employee>) => {
@@ -46,7 +47,7 @@ export default function EditEmployeePage() {
         
         setIsSaving(true);
 
-        // التحقق من تكرار IBAN
+        // التحقق من تكرار IBAN لضمان فرادة الحسابات البنكية
         if (updatedData.iban && updatedData.iban.trim() !== '') {
             const ibanQuery = query(
                 collection(firestore, 'employees'),
@@ -55,7 +56,7 @@ export default function EditEmployeePage() {
             const ibanSnapshot = await getDocs(ibanQuery);
             const ibanDuplicates = ibanSnapshot.docs.filter(d => d.id !== id);
             if (ibanDuplicates.length > 0) {
-                toast({ variant: 'destructive', title: 'خطأ', description: 'رقم الـ IBAN هذا مسجل بالفعل لموظف آخر.' });
+                toast({ variant: 'destructive', title: 'خطأ في الحساب البنكي', description: 'رقم الـ IBAN هذا مسجل بالفعل لموظف آخر.' });
                 setIsSaving(false);
                 return;
             }
@@ -66,6 +67,7 @@ export default function EditEmployeePage() {
 
         const changesToLog: Omit<AuditLog, 'id' | 'changedBy' | 'effectiveDate'>[] = [];
 
+        // قائمة الحقول المراد تتبع تغييراتها في سجل التدقيق
         const fieldMappings: { key: keyof Employee; changeType: AuditLog['changeType'], label: string, isCurrency?: boolean }[] = [
             { key: 'fullName', changeType: 'DataUpdate', label: 'الاسم الكامل' },
             { key: 'nameEn', changeType: 'DataUpdate', label: 'الاسم بالإنجليزية' },
@@ -87,11 +89,14 @@ export default function EditEmployeePage() {
             subcontractor: 'مقاول باطن',
             percentage: 'نسبة من العقود',
             'part-time': 'دوام جزئي',
+            'piece-rate': 'بالقطعة',
+            special: 'دوام خاص',
+            day_laborer: 'عامل يومية'
         };
 
         fieldMappings.forEach(({ key, label, isCurrency, changeType }) => {
-            // معالجة ذكية للفرق بين fullName و nameAr في البيانات القديمة
             let oldValue = employee[key];
+            // معالجة البيانات القديمة التي قد تستخدم nameAr بدلاً من fullName
             if (key === 'fullName' && oldValue === undefined) {
                 oldValue = (employee as any).nameAr;
             }
@@ -99,13 +104,9 @@ export default function EditEmployeePage() {
             const newValue = updatedData[key];
 
             const formatValue = (val: any) => {
-                if (isCurrency) {
-                    return formatCurrency(Number(val || 0));
-                }
+                if (isCurrency) return formatCurrency(Number(val || 0));
                 if (val === null || val === undefined || val === '') return '-';
-                if (key === 'contractType') {
-                    return contractTypeTranslations[val as string] || val;
-                }
+                if (key === 'contractType') return contractTypeTranslations[val as string] || val;
                 if (typeof val === 'object' || String(key).toLowerCase().includes('date') || String(key).toLowerCase().includes('expiry')) {
                     const date = toFirestoreDate(val);
                     return date ? format(date, 'dd/MM/yyyy') : '-';
@@ -128,8 +129,7 @@ export default function EditEmployeePage() {
         });
         
         try {
-            const updatePayload = { ...updatedData };
-            batch.update(employeeRefDoc, cleanFirestoreData(updatePayload));
+            batch.update(employeeRefDoc, cleanFirestoreData(updatedData));
 
             if (changesToLog.length > 0) {
                  const logCollectionRef = collection(firestore, `employees/${id}/auditLogs`);
@@ -144,12 +144,11 @@ export default function EditEmployeePage() {
             }
 
             await batch.commit();
-
-            toast({ title: 'نجاح', description: 'تم تحديث بيانات الموظف بنجاح.' });
+            toast({ title: 'تم الحفظ', description: 'تم تحديث بيانات الموظف وسجل التدقيق بنجاح.' });
             router.push(`/dashboard/hr/employees/${id}`);
         } catch (error) {
             console.error("Error updating employee:", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ التعديلات.' });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ التعديلات، يرجى المحاولة مرة أخرى.' });
         } finally {
             setIsSaving(false);
         }
@@ -160,10 +159,10 @@ export default function EditEmployeePage() {
              <Card className="max-w-4xl mx-auto" dir="rtl">
                 <CardHeader>
                      <Skeleton className="h-8 w-48" />
-                     <Skeleton className="h-4 w-64 mt-2" />
+                     <Skeleton className="h-4 w-32 mt-2" />
                 </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-96 w-full" />
+                <CardContent className="space-y-6">
+                    <Skeleton className="h-64 w-full rounded-2xl" />
                 </CardContent>
             </Card>
         )
@@ -172,8 +171,9 @@ export default function EditEmployeePage() {
     if (error || !employee) {
         return (
             <Card dir="rtl" className="max-w-4xl mx-auto">
-                <CardHeader><CardTitle>خطأ</CardTitle></CardHeader>
-                <CardContent><p className="text-destructive">فشل تحميل بيانات الموظف.</p></CardContent>
+                <CardHeader><CardTitle>خطأ في الوصول</CardTitle></CardHeader>
+                <CardContent><p className="text-destructive">تعذر تحميل بيانات الموظف، قد يكون الرابط غير صحيح.</p></CardContent>
+                <CardFooter><Button onClick={() => router.back()} variant="outline">العودة للخلف</Button></CardFooter>
             </Card>
         );
     }
@@ -182,11 +182,11 @@ export default function EditEmployeePage() {
         return (
             <Card dir="rtl" className="max-w-4xl mx-auto">
                 <CardHeader>
-                    <CardTitle>غير مسموح</CardTitle>
-                    <CardDescription>لا يمكن تعديل بيانات موظف منتهي الخدمة.</CardDescription>
+                    <CardTitle>ملف منتهي الخدمة</CardTitle>
+                    <CardDescription>لا يمكن تعديل بيانات موظف تم إنهاء خدمته مسبقاً.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button variant="outline" onClick={() => router.back()}>عودة</Button>
+                    <Button variant="outline" onClick={() => router.back()}>العودة لقائمة الموظفين</Button>
                 </CardContent>
             </Card>
         );
@@ -195,12 +195,23 @@ export default function EditEmployeePage() {
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
             <CardHeader>
-                <CardTitle>تعديل بيانات الموظف</CardTitle>
-                <CardDescription>
-                    تعديل الملف الشخصي لـ <span className="font-bold">{employee.fullName || (employee as any).nameAr}</span>.
-                </CardDescription>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle>تعديل بيانات الموظف</CardTitle>
+                        <CardDescription>
+                            تعديل الملف الشخصي لـ <span className="font-bold text-primary">{employee.fullName || (employee as any).nameAr}</span>.
+                        </CardDescription>
+                    </div>
+                    <div className="text-right bg-muted/50 px-4 py-2 rounded-xl border">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">رقم الملف الوظيفي</Label>
+                        <div className="font-mono text-lg font-semibold text-primary">
+                            {employee.employeeNumber}
+                        </div>
+                    </div>
+                </div>
             </CardHeader>
             <CardContent>
+                {/* استخدام الـ key يضمن إعادة بناء النموذج بالبيانات الجديدة فور وصولها */}
                 <EmployeeForm 
                     key={employee.id} 
                     initialData={employee}
