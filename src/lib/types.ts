@@ -187,6 +187,13 @@ export interface ClientTransaction extends BaseEntity {
     projectId?: string;
 }
 
+export interface WorkShift extends BaseEntity {
+    name: string;
+    startTime: string;
+    endTime: string;
+    isDefault?: boolean;
+}
+
 export interface Employee extends BaseEntity {
     employeeNumber: string;     
     fullName: string;           
@@ -219,8 +226,9 @@ export interface Employee extends BaseEntity {
     bankName?: string;
     accountNumber?: string;
     iban?: string;
-    workStartTime?: string;
-    workEndTime?: string;
+    shiftId?: string;           // ربط الموظف بفترة دوام
+    workStartTime: string;      // وقت البداية الفعلي (قد يكون مخصصاً)
+    workEndTime: string;        // وقت النهاية الفعلي
     pieceRateMode?: 'salary_with_target' | 'per_piece';
     targetDescription?: number;
     pieceRate?: number;

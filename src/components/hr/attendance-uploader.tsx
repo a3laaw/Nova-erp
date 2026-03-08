@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -172,7 +173,7 @@ export function AttendanceUploader() {
             const emp = employeeMap.get(employees.find(e => e.id === entry.employeeId)?.employeeNumber || '');
             const sortedPunches = entry.times.sort();
             
-            // ✨ محرك استخراج وقت البداية الفعلي (رمضان vs عادي)
+            // ✨ محرك استخراج وقت البداية الفعلي (رمضان vs وردية خاصة vs عام)
             const ramadan = branding?.work_hours?.ramadan;
             const isRamadan = ramadan?.is_enabled && 
                               ramadan.start_date && 
@@ -280,7 +281,7 @@ export function AttendanceUploader() {
                 <Sparkles className="h-4 w-4 text-blue-600" />
                 <AlertTitle className="font-black">التحليل الزمني المتقدم</AlertTitle>
                 <AlertDescription className="text-[10px] leading-relaxed font-bold">
-                    يقوم النظام الآن بفرز الحركات المدمجة وترتيبها زمنياً ووسم التأخير بناءً على **وقت بداية دوام كل موظف** (عادي أو رمضاني) المسجل في الإعدادات.
+                    يقوم النظام الآن بفرز الحركات المدمجة وترتيبها زمنياً ووسم التأخير بناءً على **وقت بداية دوام كل موظف** (عادي أو وردية خاصة) المسجل في الإعدادات.
                 </AlertDescription>
             </Alert>
         </div>
