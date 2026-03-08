@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -6,12 +5,12 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Printer, FileSearch, Loader2, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -84,14 +83,18 @@ export function MonthlyAttendanceReport() {
                         <Label className="font-bold mr-1">السنة</Label>
                         <Select value={year} onValueChange={setYear}>
                             <SelectTrigger className="w-[120px] bg-background rounded-xl"><SelectValue /></SelectTrigger>
-                            <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                            <SelectContent>
+                                {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                            </SelectContent>
                         </Select>
                     </div>
                     <div className="grid gap-2">
                         <Label className="font-bold mr-1">الشهر</Label>
                         <Select value={month} onValueChange={setMonth}>
                             <SelectTrigger className="w-[120px] bg-background rounded-xl"><SelectValue /></SelectTrigger>
-                            <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                            <SelectContent>
+                                {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
+                            </SelectContent>
                         </Select>
                     </div>
                     <Button onClick={handleGenerate} disabled={isGenerating} className="h-10 px-8 rounded-xl font-black text-base gap-2 shadow-lg shadow-primary/20">
