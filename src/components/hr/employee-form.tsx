@@ -85,7 +85,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
-                // إصلاح: التأكد من وجود قيمة لطريقة الدفع أو استخدام الافتراضي
+                // إصلاح حاسم: التأكد من تعيين طريقة الدفع فوراً عند تحميل البيانات
                 salaryPaymentType: initialData.salaryPaymentType || 'cash',
             });
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
@@ -273,7 +273,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         <div className="grid gap-2">
                             <Label className="font-bold text-xs text-muted-foreground mr-1">طريقة دفع الراتب</Label>
                             <Select value={formData.salaryPaymentType} onValueChange={v => setFormData(p => ({...p, salaryPaymentType: v as any}))}>
-                                <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="cash">نقداً (كاش)</SelectItem>
                                     <SelectItem value="transfer">تحويل بنكي</SelectItem>
@@ -293,7 +293,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 {/* 4. بيانات الإقامة والوثائق */}
                 {formData.nationality !== 'كويتي' && (
-                    <section className="space-y-6 p-6 border rounded-[2rem] bg-orange-50/10 border-orange-100 shadow-sm animate-in fade-in">
+                    <section className="space-y-6 p-6 border rounded-[2.5rem] bg-orange-50/10 border-orange-100 shadow-sm animate-in fade-in">
                         <h3 className="font-black text-lg flex items-center gap-2 text-orange-800"><ShieldCheck className="h-5 w-5" /> الوثائق وتاريخ الإقامة</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="grid gap-2">
