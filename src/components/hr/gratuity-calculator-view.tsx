@@ -25,7 +25,7 @@ import { InlineSearchList } from '../ui/inline-search-list';
 import { useSubscription } from '@/hooks/use-subscription';
 import { calculateGratuity } from '@/services/leave-calculator';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Calculator, Info, AlertTriangle, Scale, Landmark, Clock, FileCheck } from 'lucide-react';
+import { Calculator, Info, AlertTriangle, Scale, Landmark, Clock, FileCheck, ShieldAlert } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { DateInput } from '../ui/date-input';
@@ -44,8 +44,11 @@ interface GratuityResult {
 }
 
 const terminationReasons = [
-    { value: 'termination', label: 'إنهاء خدمات (من قبل الشركة)' },
-    { value: 'resignation', label: 'استقالة (من قبل الموظف)' },
+    { value: 'termination', label: 'إنهاء خدمات (من قبل الشركة) - مادة 51' },
+    { value: 'resignation', label: 'استقالة (من قبل الموظف) - مادة 53' },
+    { value: 'misconduct', label: 'إنهاء خدمات تأديبي (مادة 41 - بدون مكافأة)' },
+    { value: 'probation_termination', label: 'إنهاء خدمات خلال فترة التجربة' },
+    { value: 'probation_resignation', label: 'استقالة خلال فترة التجربة' },
     { value: 'article_48', label: 'ترك العمل للمادة 48 (خطأ صاحب العمل)' },
     { value: 'death_or_disability', label: 'الوفاة أو العجز الكلي (مادة 52)' },
     { value: 'contract_expiry', label: 'انتهاء مدة العقد المحدد' },
@@ -95,7 +98,7 @@ export function GratuityCalculatorView() {
             </div>
             <div>
               <CardTitle className="text-2xl font-black">حاسبة مستحقات الموظف النهائية</CardTitle>
-              <CardDescription className="text-base font-medium">حساب المكافأة وبدل الإجازات وتعويضات الإنذار وفقاً لقانون العمل.</CardDescription>
+              <CardDescription className="text-base font-medium">حساب المكافأة وبدل الإجازات وتعويضات الإنذار وفقاً لقانون العمل الكويتي.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -213,6 +216,18 @@ export function GratuityCalculatorView() {
                   </Alert>
               </div>
 
+              {(terminationReason === 'misconduct' || terminationReason.includes('probation')) && (
+                  <div className="p-6 bg-red-50 border-2 border-red-100 rounded-3xl animate-bounce">
+                      <div className="flex items-center gap-2 mb-3 text-red-800 font-black">
+                          <ShieldAlert className="h-6 w-6" />
+                          <h4>تنبيه حرمان قانوني:</h4>
+                      </div>
+                      <p className="text-sm font-bold text-red-700 leading-relaxed">
+                          بناءً على السبب المختار، تم تصفير مكافأة نهاية الخدمة آلياً توافقاً مع قوانين العمل (المادة 41 لمخالفات السلوك، أو المادة 24 لفترة التجربة). المبالغ المتبقية قد تشمل فقط رصيد الإجازات المستحق.
+                      </p>
+                  </div>
+              )}
+
               <div className="p-6 bg-orange-50 border-2 border-orange-100 rounded-3xl">
                   <div className="flex items-center gap-2 mb-3 text-orange-800 font-black">
                       <AlertTriangle className="h-5 w-5" />
@@ -228,7 +243,7 @@ export function GratuityCalculatorView() {
           )}
         </CardContent>
         <CardFooter className="bg-muted/10 p-6 border-t flex justify-center no-print">
-            <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Nova ERP - Legal Calculations Core v2.1</p>
+            <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Nova ERP - Legal Calculations Core v2.2</p>
         </CardFooter>
       </Card>
     </div>

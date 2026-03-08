@@ -120,8 +120,16 @@ export const calculateGratuity = (
     let finalGratuity = rawGratuity;
     let lawNotice = `بناءً على خدمة مدتها ${years.toFixed(2)} سنة.`;
 
-    // المادة 53: في حالة الاستقالة فقط يتم تطبيق الخصومات
-    if (employee.terminationReason === 'resignation') {
+    // --- معالجة الحالات الخاصة والحرمان من المكافأة ---
+    
+    if (employee.terminationReason === 'misconduct') {
+        finalGratuity = 0;
+        lawNotice = "المادة 41: يُحرم الموظف من المكافأة نهائياً بسبب إنهاء الخدمة لأسباب تأديبية (سوء سلوك جسيم).";
+    } else if (employee.terminationReason === 'probation_termination' || employee.terminationReason === 'probation_resignation') {
+        finalGratuity = 0;
+        lawNotice = "المادة 24: لا يستحق الموظف مكافأة نهاية خدمة عن فترة التجربة (أقل من 100 يوم).";
+    } else if (employee.terminationReason === 'resignation') {
+        // المادة 53: في حالة الاستقالة فقط يتم تطبيق الخصومات
         if (years < 3) {
             finalGratuity = 0;
             lawNotice = "المادة 53: لا يستحق الموظف مكافأة لخدمة أقل من 3 سنوات في حالة الاستقالة.";
@@ -138,7 +146,7 @@ export const calculateGratuity = (
         // أي سبب آخر (إنهاء خدمات، مادة 48، وفاة، عجز، انتهاء عقد) يستحق المكافأة كاملة مادة 51
         if (years < 1) {
             finalGratuity = 0;
-            lawNotice = "المادة 51: يشترط إتمام سنة واحدة لاستحقاق المكافأة في الحالات غير الاستقالة.";
+            lawNotice = "المادة 51: يشترط إتمام سنة واحدة على الأقل لاستحقاق المكافأة في الحالات غير الاستقالة.";
         } else {
             lawNotice = "يستحق الموظف المكافأة كاملة (المادة 51/52/48) حسب سبب ترك العمل المختار.";
         }
