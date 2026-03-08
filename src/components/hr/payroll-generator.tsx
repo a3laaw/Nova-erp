@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -6,12 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, limit, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, limit, serverTimestamp } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
 import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Checkbox } from '../ui/checkbox';
@@ -22,7 +23,6 @@ export function PayrollGenerator() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
-  // FIX: Defer state initialization to avoid hydration mismatch
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [isMounted, setIsMounted] = useState(false);
@@ -69,11 +69,10 @@ export function PayrollGenerator() {
 
       const attendanceQuery = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)));
       
+      // FIX: Use simple query to avoid composite index requirement. We filter by date in memory.
       const permissionsQuery = query(
           collection(firestore, 'permissionRequests'),
-          where('status', '==', 'approved'),
-          where('date', '>=', payrollStart),
-          where('date', '<=', payrollEnd)
+          where('status', '==', 'approved')
       );
       
       const [attendanceSnap, permissionsSnap] = await Promise.all([
@@ -90,12 +89,15 @@ export function PayrollGenerator() {
       const permissionsMap = new Map<string, Map<string, string>>();
       permissionsSnap.forEach(doc => {
         const perm = doc.data();
-        const permDate = toFirestoreDate(perm.date)?.toISOString().split('T')[0];
-        if (permDate) {
+        const rawDate = toFirestoreDate(perm.date);
+        
+        // Memory-based date filtering
+        if (rawDate && rawDate >= payrollStart && rawDate <= payrollEnd) {
+            const permDateKey = rawDate.toISOString().split('T')[0];
             if (!permissionsMap.has(perm.employeeId)) {
                 permissionsMap.set(perm.employeeId, new Map());
             }
-            permissionsMap.get(perm.employeeId)!.set(permDate, perm.type);
+            permissionsMap.get(perm.employeeId)!.set(permDateKey, perm.type);
         }
       });
       

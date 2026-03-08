@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -14,7 +15,7 @@ import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { InlineSearchList } from '../ui/inline-search-list';
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, isSameDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -80,25 +81,28 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         const startOfMonthDate = startOfMonth(date);
         const endOfMonthDate = endOfMonth(date);
         
+        // FIX: Simplified query to only filter by employeeId to avoid composite index requirement
         const permissionsQuery = query(
             collection(firestore, 'permissionRequests'),
-            where('employeeId', '==', selectedEmployeeId),
-            where('date', '>=', startOfMonthDate),
-            where('date', '<=', endOfMonthDate)
+            where('employeeId', '==', selectedEmployeeId)
         );
         const permissionsSnapshot = await getDocs(permissionsQuery);
+        const allUserPermissions = permissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
-        const approvedCountInMonth = permissionsSnapshot.docs.filter(doc => doc.data().status === 'approved').length;
+        // Memory-based filtering for month count
+        const approvedCountInMonth = allUserPermissions.filter(p => {
+            const pDate = toFirestoreDate(p.date);
+            return p.status === 'approved' && pDate && pDate >= startOfMonthDate && pDate <= endOfMonthDate;
+        }).length;
+
         if (approvedCountInMonth >= 3) {
             throw new Error('لقد استنفذ الموظف الحد الأقصى للاستئذانات الموافق عليها (3) لهذا الشهر.');
         }
         
-        const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
-        const dayEnd = new Date(date); dayEnd.setHours(23,59,59,999);
-        
-        const sameDayRequest = permissionsSnapshot.docs.some(doc => {
-            const permissionDate = toFirestoreDate(doc.data().date);
-            return permissionDate && permissionDate >= dayStart && permissionDate <= dayEnd;
+        // Memory-based filtering for same day check
+        const sameDayRequest = allUserPermissions.some(p => {
+            const pDate = toFirestoreDate(p.date);
+            return pDate && isSameDay(pDate, date);
         });
 
         if (sameDayRequest) {
@@ -167,7 +171,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 <Label htmlFor="permissionType">نوع الاستئذان</Label>
                 <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)}>
                     <SelectTrigger id="permissionType"><SelectValue/></SelectTrigger>
-                    <SelectContent>
+                    <SelectContent dir="rtl">
                         <SelectItem value="late_arrival">تأخير صباحي</SelectItem>
                         <SelectItem value="early_departure">خروج مبكر</SelectItem>
                     </SelectContent>
