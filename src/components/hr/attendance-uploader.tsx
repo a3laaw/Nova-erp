@@ -16,6 +16,7 @@ import { parse, format, isSameDay, isValid, compareAsc, startOfToday, startOfDay
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { useBranding } from '@/context/branding-context';
 
 const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
@@ -71,6 +72,7 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
 export function AttendanceUploader() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const { branding } = useBranding();
 
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
@@ -169,9 +171,20 @@ export function AttendanceUploader() {
         punchesMap.forEach((entry) => {
             const emp = employeeMap.get(employees.find(e => e.id === entry.employeeId)?.employeeNumber || '');
             const sortedPunches = entry.times.sort();
-            const workStart = emp?.workStartTime || '08:00';
             
-            const isLate = sortedPunches[0] && sortedPunches[0] > workStart;
+            // ✨ محرك استخراج وقت البداية الفعلي (رمضان vs عادي)
+            const ramadan = branding?.work_hours?.ramadan;
+            const isRamadan = ramadan?.is_enabled && 
+                              ramadan.start_date && 
+                              ramadan.end_date &&
+                              entry.date >= toFirestoreDate(ramadan.start_date)! && 
+                              entry.date <= toFirestoreDate(ramadan.end_date)!;
+            
+            const effectiveWorkStart = isRamadan 
+                ? (ramadan.start_time || '09:30') 
+                : (emp?.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00');
+            
+            const isLate = sortedPunches[0] && sortedPunches[0] > effectiveWorkStart;
 
             const mergedRecord = {
                 date: entry.date,
@@ -216,7 +229,7 @@ export function AttendanceUploader() {
                 summary: {
                     presentDays: finalRecords.filter((r: any) => r.checkIn1).length,
                     lateDays: finalRecords.filter((r: any) => r.status === 'late').length,
-                    absentDays: 0, // Will be calculated by payroll engine
+                    absentDays: 0, 
                     totalDays: finalRecords.length
                 },
                 updatedAt: serverTimestamp()
@@ -265,8 +278,10 @@ export function AttendanceUploader() {
 
             <Alert className="rounded-2xl border-blue-100 bg-blue-50/50">
                 <Sparkles className="h-4 w-4 text-blue-600" />
-                <AlertTitle className="font-black">التحليل الزمني (Punch Log Analysis)</AlertTitle>
-                <AlertDescription className="text-[10px] leading-relaxed font-bold">يقوم النظام بفرز الحركات المدمجة وترتيبها زمنياً ووسم التأخير بناءً على وقت بداية دوام كل موظف مسجل في ملفه.</AlertDescription>
+                <AlertTitle className="font-black">التحليل الزمني المتقدم</AlertTitle>
+                <AlertDescription className="text-[10px] leading-relaxed font-bold">
+                    يقوم النظام الآن بفرز الحركات المدمجة وترتيبها زمنياً ووسم التأخير بناءً على **وقت بداية دوام كل موظف** (عادي أو رمضاني) المسجل في الإعدادات.
+                </AlertDescription>
             </Alert>
         </div>
 
@@ -274,7 +289,7 @@ export function AttendanceUploader() {
             <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-muted/30 border-b pb-8 px-8">
                     <CardTitle className="text-xl font-black">مركز الرفع والدمج الذكي</CardTitle>
-                    <CardDescription>ارفع ملف البصمة الخام وسيقوم النظام بتوزيعه ووسم التأخير آلياً.</CardDescription>
+                    <CardDescription>ارفع ملف البصمة الخام وسيقوم النظام بتوزيعه ووسم التأخير آلياً بناءً على مواقيت الدوام.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
                     <div onClick={() => !isProcessing && fileInputRef.current?.click()} onDragOver={handleDragOver} onDrop={handleDrop} className={cn("group border-4 border-dashed rounded-[2rem] p-12 text-center cursor-pointer transition-all duration-300", isProcessing ? "opacity-50 cursor-not-allowed" : "hover:border-primary/50 hover:bg-primary/[0.02]")}>

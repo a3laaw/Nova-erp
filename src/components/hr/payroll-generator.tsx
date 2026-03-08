@@ -12,11 +12,11 @@ import { Loader2, Sheet, Info, FileWarning, Calculator } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { parse, format, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
-import { format, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { useBranding } from '@/context/branding-context';
 
@@ -108,24 +108,22 @@ export function PayrollGenerator() {
           const employeePermissions = permissionsMap.get(employee.id);
 
           if (!ignoreAttendance) {
-              // ✨ محرك استنتاج الغياب الذكي: مقارنة كل يوم عمل بسجل الحضور والإجازات المعتمدة
               for (let d = new Date(payrollStart); d <= payrollEnd; d.setDate(d.getDate() + 1)) {
                   const dateKey = format(d, 'yyyy-MM-dd');
-                  // فحص هل اليوم هو يوم عمل أصلاً
                   const { workingDays } = calculateWorkingDays(d, d, companyHolidays, publicHolidays);
                   if (workingDays === 0) continue;
 
                   const record = attendance?.records?.find((r: any) => isSameDay(toFirestoreDate(r.date)!, d));
                   
                   if (record && record.checkIn1) {
-                      // حاضر -> فحص التأخير
+                      // حاضر -> فحص التأخير بناءً على القواعد الجديدة (رمضان أو عادي)
                       if (record.status === 'late') {
                           if (employeePermissions?.get(dateKey) !== 'late_arrival') {
                               chargeableLateDays++;
                           }
                       }
                   } else {
-                      // غائب -> فحص هل لديه إجازة معتمدة تغطي هذا اليوم
+                      // غائب -> فحص الإجازات المعتمدة
                       const isOnApprovedLeave = allLeaves.some(leave => {
                           if (leave.employeeId !== employee.id || !['approved', 'on-leave', 'returned'].includes(leave.status)) return false;
                           const lStart = toFirestoreDate(leave.startDate);
@@ -140,7 +138,7 @@ export function PayrollGenerator() {
               }
 
               absenceDeduction = actualAbsentDays * dailyRate;
-              lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate; // كل 3 تأخيرات بخصم يوم
+              lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate; 
 
               if (actualAbsentDays > 0) payslipNotes += `خصم ${actualAbsentDays} يوم غياب غير مبرر. `;
               if (chargeableLateDays > 0) {
@@ -169,8 +167,8 @@ export function PayrollGenerator() {
       }
       
       await batch.commit();
-      setProcessingResult(`تم بنجاح تحليل ${payslipsCreated} كشوف رواتب مع خصم الغياب والتأخيرات غير المبررة.`);
-      toast({ title: 'نجاح المعالجة', description: 'تم استنتاج الخصومات بناءً على أيام العمل الفعلية.' });
+      setProcessingResult(`تم بنجاح تحليل ${payslipsCreated} كشوف رواتب مع مراعاة أوقات دوام رمضان والخصومات المستنتجة.`);
+      toast({ title: 'نجاح المزامنة', description: 'تم تحديث الرواتب بناءً على معايير الدوام الذكية.' });
 
     } catch (error: any) {
       setProcessingResult(`فشل: ${error.message}`);
@@ -211,7 +209,7 @@ export function PayrollGenerator() {
             <div className="text-sm space-y-2 leading-relaxed">
                 <p>سيقوم النظام بفحص <span className="font-black">أيام العمل الفعلية</span> في شهر {monthName} ومقارنتها بـ:</p>
                 <ul className="list-disc pr-5 font-bold text-muted-foreground text-xs space-y-1">
-                    <li>سجلات الحضور المرفوعة.</li>
+                    <li>سجلات الحضور المرفوعة (مع مراعاة مواقيت رمضان).</li>
                     <li>طلبات الإجازات المعتمدة (سنوي/مرضي).</li>
                     <li>الاستئذانات (لإلغاء خصم التأخير).</li>
                 </ul>
