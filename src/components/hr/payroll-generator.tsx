@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -7,9 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, limit, serverTimestamp } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, LeaveRequest } from '@/lib/types';
-import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, limit } from 'firebase/firestore';
+import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, Holiday, PermissionRequest } from '@/lib/types';
+import { Loader2, Sheet, Info, FileWarning, Calculator } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -17,11 +16,15 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '../ui/separator';
+import { format, isSameDay, startOfDay, endOfDay } from 'date-fns';
+import { calculateWorkingDays } from '@/services/leave-calculator';
+import { useBranding } from '@/context/branding-context';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const { branding } = useBranding();
 
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
@@ -33,6 +36,7 @@ export function PayrollGenerator() {
 
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const { data: allLeaves = [], loading: leavesLoading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests');
+  const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
   const [attendanceRecordsExist, setAttendanceRecordsExist] = useState(false);
 
@@ -45,12 +49,7 @@ export function PayrollGenerator() {
   useEffect(() => {
     if(!firestore || !year || !month) return;
     const checkAttendance = async () => {
-        const q = query(
-            collection(firestore, 'attendance'), 
-            where('year', '==', parseInt(year)), 
-            where('month', '==', parseInt(month)),
-            limit(1)
-        );
+        const q = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)), limit(1));
         const snap = await getDocs(q);
         setAttendanceRecordsExist(!snap.empty);
     };
@@ -68,17 +67,9 @@ export function PayrollGenerator() {
       const payrollEnd = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59);
 
       const attendanceQuery = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)));
+      const permissionsQuery = query(collection(firestore, 'permissionRequests'), where('status', '==', 'approved'));
       
-      // FIX: Use simple query to avoid composite index requirement. We filter by date in memory.
-      const permissionsQuery = query(
-          collection(firestore, 'permissionRequests'),
-          where('status', '==', 'approved')
-      );
-      
-      const [attendanceSnap, permissionsSnap] = await Promise.all([
-          getDocs(attendanceQuery),
-          getDocs(permissionsQuery)
-      ]);
+      const [attendanceSnap, permissionsSnap] = await Promise.all([getDocs(attendanceQuery), getDocs(permissionsQuery)]);
       
       const attendanceMap = new Map<string, MonthlyAttendance>();
       attendanceSnap.forEach(doc => {
@@ -88,20 +79,17 @@ export function PayrollGenerator() {
 
       const permissionsMap = new Map<string, Map<string, string>>();
       permissionsSnap.forEach(doc => {
-        const perm = doc.data();
+        const perm = doc.data() as PermissionRequest;
         const rawDate = toFirestoreDate(perm.date);
-        
-        // Memory-based date filtering
         if (rawDate && rawDate >= payrollStart && rawDate <= payrollEnd) {
-            const permDateKey = rawDate.toISOString().split('T')[0];
-            if (!permissionsMap.has(perm.employeeId)) {
-                permissionsMap.set(perm.employeeId, new Map());
-            }
+            const permDateKey = format(rawDate, 'yyyy-MM-dd');
+            if (!permissionsMap.has(perm.employeeId)) permissionsMap.set(perm.employeeId, new Map());
             permissionsMap.get(perm.employeeId)!.set(permDateKey, perm.type);
         }
       });
       
       const batch = writeBatch(firestore);
+      const companyHolidays = branding?.work_hours?.holidays || [];
       let payslipsCreated = 0;
 
       for (const employee of employees) {
@@ -112,112 +100,81 @@ export function PayrollGenerator() {
 
           let absenceDeduction = 0;
           let lateDeduction = 0;
+          let chargeableLateDays = 0;
+          let actualAbsentDays = 0;
           let payslipNotes = '';
 
           const attendance = attendanceMap.get(employee.id);
-          
-          if (ignoreAttendance) {
-            payslipNotes = "تم احتساب حضور كامل بناءً على طلب المستخدم.";
-          } else if (attendance && attendance.summary) {
-              const employeePermissions = permissionsMap.get(employee.id!);
-              let chargeableLateDays = 0;
-              
-              if ((attendance.summary.lateDays || 0) > 0) {
-                  attendance.records.forEach(rec => {
-                      if (rec.status === 'late') {
-                          const recDate = toFirestoreDate(rec.date)?.toISOString().split('T')[0];
-                          if (!recDate || employeePermissions?.get(recDate) !== 'late_arrival') {
+          const employeePermissions = permissionsMap.get(employee.id);
+
+          if (!ignoreAttendance) {
+              // ✨ محرك استنتاج الغياب الذكي: مقارنة كل يوم عمل بسجل الحضور والإجازات المعتمدة
+              for (let d = new Date(payrollStart); d <= payrollEnd; d.setDate(d.getDate() + 1)) {
+                  const dateKey = format(d, 'yyyy-MM-dd');
+                  // فحص هل اليوم هو يوم عمل أصلاً
+                  const { workingDays } = calculateWorkingDays(d, d, companyHolidays, publicHolidays);
+                  if (workingDays === 0) continue;
+
+                  const record = attendance?.records?.find((r: any) => isSameDay(toFirestoreDate(r.date)!, d));
+                  
+                  if (record && record.checkIn1) {
+                      // حاضر -> فحص التأخير
+                      if (record.status === 'late') {
+                          if (employeePermissions?.get(dateKey) !== 'late_arrival') {
                               chargeableLateDays++;
                           }
                       }
-                  });
+                  } else {
+                      // غائب -> فحص هل لديه إجازة معتمدة تغطي هذا اليوم
+                      const isOnApprovedLeave = allLeaves.some(leave => {
+                          if (leave.employeeId !== employee.id || !['approved', 'on-leave', 'returned'].includes(leave.status)) return false;
+                          const lStart = toFirestoreDate(leave.startDate);
+                          const lEnd = toFirestoreDate(leave.endDate);
+                          return lStart && lEnd && d >= startOfDay(lStart) && d <= endOfDay(lEnd);
+                      });
+
+                      if (!isOnApprovedLeave) {
+                          actualAbsentDays++;
+                      }
+                  }
               }
 
-              absenceDeduction = (attendance.summary.absentDays || 0) * dailyRate;
-              lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate;
-              
-              const waivedLates = (attendance.summary.lateDays || 0) - chargeableLateDays;
-              if (waivedLates > 0) {
-                  payslipNotes = `تم تجاهل خصم ${waivedLates} أيام تأخير لوجود استئذان موافق عليه.`;
+              absenceDeduction = actualAbsentDays * dailyRate;
+              lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate; // كل 3 تأخيرات بخصم يوم
+
+              if (actualAbsentDays > 0) payslipNotes += `خصم ${actualAbsentDays} يوم غياب غير مبرر. `;
+              if (chargeableLateDays > 0) {
+                  const waivedLates = (attendance?.summary?.lateDays || 0) - chargeableLateDays;
+                  payslipNotes += `إجمالي التأخيرات المخصومة: ${chargeableLateDays} (تم خصم ${Math.floor(chargeableLateDays / 3)} أيام). `;
+                  if (waivedLates > 0) payslipNotes += `تم إعفاء ${waivedLates} تأخيرات لوجود استئذان. `;
               }
           } else {
-              const requiresAttendance = employee.contractType === 'permanent' || employee.contractType === 'temporary';
-              if (requiresAttendance) {
-                 payslipNotes = "لم يتم العثور على سجل حضور، تم احتساب الراتب على أساس الحضور الكامل.";
-              }
+              payslipNotes = "تم احتساب حضور كامل بناءً على طلب المستخدم.";
           }
 
-          const unpaidLeaveDaysInMonth = (allLeaves || []).reduce((totalDays, leave) => {
-            if (leave.employeeId === employee.id && leave.leaveType === 'Unpaid' && leave.status === 'approved') {
-                const leaveStart = toFirestoreDate(leave.startDate);
-                const leaveEnd = toFirestoreDate(leave.endDate);
-                
-                if(leaveStart && leaveEnd) {
-                    if (leaveStart <= payrollEnd && leaveEnd >= payrollStart) {
-                       return totalDays + (leave.workingDays || 0);
-                    }
-                }
-            }
-            return totalDays;
-          }, 0);
-          
-          if (unpaidLeaveDaysInMonth > 0) {
-              absenceDeduction += unpaidLeaveDaysInMonth * dailyRate;
-              payslipNotes += (payslipNotes ? '\n' : '') + `تم خصم ${unpaidLeaveDaysInMonth} أيام إجازة بدون راتب.`;
-          }
-
-          const earnings = {
-              basicSalary: employee.basicSalary || 0,
-              housingAllowance: employee.housingAllowance || 0,
-              transportAllowance: employee.transportAllowance || 0,
-              commission: 0,
-          };
+          const earnings = { basicSalary: employee.basicSalary || 0, housingAllowance: employee.housingAllowance || 0, transportAllowance: employee.transportAllowance || 0, commission: 0 };
           const totalEarnings = Object.values(earnings).reduce((sum, val) => sum + val, 0);
-
-          const deductions = {
-              absenceDeduction: absenceDeduction + lateDeduction,
-              otherDeductions: 0,
-          };
+          const deductions = { absenceDeduction: absenceDeduction + lateDeduction, otherDeductions: 0 };
           const totalDeductions = Object.values(deductions).reduce((sum, val) => sum + val, 0);
 
-          const netSalary = totalEarnings - totalDeductions;
-          
           const payslipId = `${year}-${month}-${employee.id}`;
           const payslipRef = doc(firestore, 'payroll', payslipId);
 
-          const payslipData: Partial<Payslip> = {
-              employeeId: employee.id,
-              employeeName: employee.fullName,
-              year: parseInt(year),
-              month: parseInt(month),
-              salaryPaymentType: employee.salaryPaymentType,
-              earnings,
-              deductions,
-              netSalary,
-              status: 'draft',
-              createdAt: serverTimestamp(),
-              type: 'Monthly',
-              notes: payslipNotes.trim(),
-          };
-
-          if (attendance?.id) {
-            payslipData.attendanceId = attendance.id;
-          }
-          
-          batch.set(payslipRef, cleanFirestoreData(payslipData), { merge: true });
+          batch.set(payslipRef, cleanFirestoreData({
+              employeeId: employee.id, employeeName: employee.fullName, year: parseInt(year), month: parseInt(month),
+              salaryPaymentType: employee.salaryPaymentType, earnings, deductions, netSalary: totalEarnings - totalDeductions,
+              status: 'draft', createdAt: serverTimestamp(), type: 'Monthly', notes: payslipNotes.trim(),
+          }), { merge: true });
           payslipsCreated++;
       }
       
       await batch.commit();
+      setProcessingResult(`تم بنجاح تحليل ${payslipsCreated} كشوف رواتب مع خصم الغياب والتأخيرات غير المبررة.`);
+      toast({ title: 'نجاح المعالجة', description: 'تم استنتاج الخصومات بناءً على أيام العمل الفعلية.' });
 
-      const message = `تم إنشاء أو تحديث ${payslipsCreated} كشوف رواتب بنجاح للشهر المحدد.`;
-      setProcessingResult(message);
-      toast({ title: 'نجاح المزامنة', description: message });
-
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'فشل إنشاء كشوف الرواتب.';
-      setProcessingResult(message);
-      toast({ variant: 'destructive', title: 'خطأ', description: message });
+    } catch (error: any) {
+      setProcessingResult(`فشل: ${error.message}`);
+      toast({ variant: 'destructive', title: 'خطأ', description: error.message });
     } finally {
       setIsProcessing(false);
     }
@@ -227,69 +184,43 @@ export function PayrollGenerator() {
 
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
-
   const monthName = year && month ? new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' }) : '';
 
   return (
     <div className="grid lg:grid-cols-2 gap-8 items-start">
         <div className="space-y-6">
-            <h3 className="font-semibold text-lg">1. حدد الإعدادات</h3>
+            <h3 className="font-semibold text-lg">1. إعدادات الفترة</h3>
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                    <Label htmlFor="payroll-year-select">السنة</Label>
-                    <Select value={year} onValueChange={setYear}>
-                        <SelectTrigger id="payroll-year-select"><SelectValue /></SelectTrigger>
-                        <SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <Label>السنة</Label>
+                    <Select value={year} onValueChange={setYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select>
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="payroll-month-select">الشهر</Label>
-                    <Select value={month} onValueChange={setMonth}>
-                        <SelectTrigger id="payroll-month-select"><SelectValue /></SelectTrigger>
-                        <SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <Label>الشهر</Label>
+                    <Select value={month} onValueChange={setMonth}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select>
                 </div>
             </div>
-            <div className="flex items-center space-x-2 rtl:space-x-reverse self-center pt-2">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
                 <Checkbox id="ignoreAttendance" checked={ignoreAttendance} onCheckedChange={(checked) => setIgnoreAttendance(checked as boolean)} />
-                <Label htmlFor="ignoreAttendance" className="cursor-pointer">تجاهل سجلات الحضور واحتساب حضور كامل للجميع</Label>
+                <Label htmlFor="ignoreAttendance" className="cursor-pointer font-bold text-xs">صرف الراتب كاملاً (تجاهل الغياب والتأخير)</Label>
             </div>
         </div>
 
-        <div className="border rounded-lg p-6 bg-muted/50 space-y-4">
-            <h3 className="font-semibold text-lg">2. تأكيد العملية</h3>
-            <p className="text-sm text-muted-foreground">
-                أنت على وشك إنشاء كشوف رواتب لشهر <strong>{monthName} {year}</strong> لـِ <strong>{employees.length}</strong> موظف نشط.
-            </p>
-            {!ignoreAttendance && !attendanceRecordsExist && (
-                <Alert variant="destructive" className="bg-red-50 border-red-200">
-                    <FileWarning className="h-4 w-4" />
-                    <AlertTitle>تنبيه الحضور</AlertTitle>
-                    <AlertDescription className="text-xs font-bold">
-                        لم يتم رفع سجلات الحضور لهذا الشهر. سيتم احتساب حضور كامل للموظفين ذوي العقود التي تتطلب حضوراً.
-                    </AlertDescription>
-                </Alert>
-            )}
-            {ignoreAttendance && (
-                 <Alert className="bg-blue-50 border-blue-200">
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>ملاحظة الإدخال</AlertTitle>
-                    <AlertDescription className="text-xs font-bold">
-                       سيتم تجاهل أي سجلات حضور مرفوعة لهذا الشهر واحتساب حضور كامل لجميع الموظفين.
-                    </AlertDescription>
-                </Alert>
-            )}
-            <Separator />
-            <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading || !year || !month} className="w-full h-12 rounded-xl font-bold">
-                {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Sheet className="ml-2 h-4 w-4" />}
-                {isProcessing ? 'جاري المعالجة...' : `توليد كشوف رواتب شهر ${monthName}`}
+        <div className="border rounded-[2rem] p-8 bg-primary/5 space-y-6 border-primary/10 shadow-inner">
+            <h3 className="font-black text-xl flex items-center gap-2 text-primary"><Calculator className="h-6 w-6"/> محرك الحسبة المالية</h3>
+            <div className="text-sm space-y-2 leading-relaxed">
+                <p>سيقوم النظام بفحص <span className="font-black">أيام العمل الفعلية</span> في شهر {monthName} ومقارنتها بـ:</p>
+                <ul className="list-disc pr-5 font-bold text-muted-foreground text-xs space-y-1">
+                    <li>سجلات الحضور المرفوعة.</li>
+                    <li>طلبات الإجازات المعتمدة (سنوي/مرضي).</li>
+                    <li>الاستئذانات (لإلغاء خصم التأخير).</li>
+                </ul>
+            </div>
+            <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading || !year || !month} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
+                {isProcessing ? <Loader2 className="animate-spin ml-2 h-5 w-5" /> : <Sheet className="ml-2 h-5 w-5" />}
+                توليد ومزامنة الرواتب
             </Button>
-             {processingResult && (
-                <Alert className="bg-green-50 border-green-200">
-                    <AlertTitle className="text-green-800 font-bold">نتيجة المعالجة</AlertTitle>
-                    <AlertDescription className="text-green-700">{processingResult}</AlertDescription>
-                </Alert>
-            )}
+             {processingResult && <Alert className="rounded-2xl border-green-200 bg-green-50"><AlertDescription className="font-bold text-green-800">{processingResult}</AlertDescription></Alert>}
         </div>
     </div>
   );
