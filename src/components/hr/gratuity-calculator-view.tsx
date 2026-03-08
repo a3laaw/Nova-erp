@@ -43,11 +43,19 @@ interface GratuityResult {
     dailyWage: number;
 }
 
+const terminationReasons = [
+    { value: 'termination', label: 'إنهاء خدمات (من قبل الشركة)' },
+    { value: 'resignation', label: 'استقالة (من قبل الموظف)' },
+    { value: 'article_48', label: 'ترك العمل للمادة 48 (خطأ صاحب العمل)' },
+    { value: 'death_or_disability', label: 'الوفاة أو العجز الكلي (مادة 52)' },
+    { value: 'contract_expiry', label: 'انتهاء مدة العقد المحدد' },
+];
+
 export function GratuityCalculatorView() {
   const { firestore } = useFirebase();
   const searchParams = useSearchParams();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [terminationReason, setTerminationReason] = useState<'resignation' | 'termination'>('termination');
+  const [terminationReason, setTerminationReason] = useState<string>('termination');
   const [noticeType, setNoticeType] = useState<'worked' | 'indemnity' | 'waived'>('waived');
   const [noticeStartDate, setNoticeStartDate] = useState<Date | undefined>(new Date());
   const [result, setResult] = useState<GratuityResult | null>(null);
@@ -72,7 +80,7 @@ export function GratuityCalculatorView() {
   const handleCalculate = () => {
     const emp = employees.find(e => e.id === selectedEmployeeId);
     if (emp && noticeStartDate) {
-      const calculationResult = calculateGratuity({ ...emp, terminationReason }, noticeStartDate, noticeType);
+      const calculationResult = calculateGratuity({ ...emp, terminationReason: terminationReason as any }, noticeStartDate, noticeType);
       setResult(calculationResult);
     }
   };
@@ -124,11 +132,12 @@ export function GratuityCalculatorView() {
             </div>
             <div className="grid gap-3">
               <Label className="font-black text-gray-700">سبب نهاية الخدمة</Label>
-              <Select value={terminationReason} onValueChange={(v) => setTerminationReason(v as any)}>
+              <Select value={terminationReason} onValueChange={setTerminationReason}>
                 <SelectTrigger className="h-12 rounded-2xl border-2"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
-                  <SelectItem value="termination">إنهاء خدمات (إقالة من الشركة)</SelectItem>
-                  <SelectItem value="resignation">استقالة من الموظف</SelectItem>
+                  {terminationReasons.map(r => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -165,7 +174,7 @@ export function GratuityCalculatorView() {
                       </h3>
                       <div className="flex gap-2">
                         <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4">
-                            {terminationReason === 'resignation' ? 'استقالة' : 'إنهاء خدمات'}
+                            {terminationReasons.find(r => r.value === terminationReason)?.label}
                         </Badge>
                         <Badge variant="secondary" className="font-bold">
                             {noticeType === 'worked' ? 'داوم الإنذار' : noticeType === 'indemnity' ? 'تعويض نقدي' : 'بدون إنذار'}

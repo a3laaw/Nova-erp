@@ -94,15 +94,12 @@ export const calculateGratuity = (
     let noticeIndemnity = 0;
 
     if (noticeType === 'worked') {
-        // الموظف داوم فترة الإنذار (3 أشهر) - تُضاف للخدمة
         effectiveEndDate = addMonths(noticeStartDate, 3);
     } else if (noticeType === 'indemnity') {
-        // دفع بدل إنذار نقدي - الخدمة تنتهي الآن ولكن يُضاف راتب 3 أشهر
         effectiveEndDate = noticeStartDate;
         noticeIndemnity = salary * 3;
     }
 
-    // حساب المدة بالسنوات
     const totalDays = differenceInDays(effectiveEndDate, hireDate);
     const years = totalDays / 365.25; 
     
@@ -117,14 +114,13 @@ export const calculateGratuity = (
         rawGratuity = firstFiveYearsGratuity + (remainingYears * salary);
     }
 
-    // الحد الأقصى للمكافأة هو راتب 18 شهراً
     const maxGratuity = 1.5 * 12 * salary;
     rawGratuity = Math.min(rawGratuity, maxGratuity);
 
     let finalGratuity = rawGratuity;
     let lawNotice = `بناءً على خدمة مدتها ${years.toFixed(2)} سنة.`;
 
-    // المادة 53: في حالة الاستقالة
+    // المادة 53: في حالة الاستقالة فقط يتم تطبيق الخصومات
     if (employee.terminationReason === 'resignation') {
         if (years < 3) {
             finalGratuity = 0;
@@ -139,11 +135,12 @@ export const calculateGratuity = (
             lawNotice = "المادة 53: يستحق المكافأة كاملة لخدمة تزيد عن 10 سنوات.";
         }
     } else {
+        // أي سبب آخر (إنهاء خدمات، مادة 48، وفاة، عجز، انتهاء عقد) يستحق المكافأة كاملة مادة 51
         if (years < 1) {
             finalGratuity = 0;
-            lawNotice = "المادة 51: يشترط إتمام سنة واحدة لاستحقاق المكافأة في حالة إنهاء الخدمات.";
+            lawNotice = "المادة 51: يشترط إتمام سنة واحدة لاستحقاق المكافأة في الحالات غير الاستقالة.";
         } else {
-            lawNotice = "المادة 51: يستحق الموظف المكافأة كاملة في حالة إنهاء الخدمات من طرف الشركة.";
+            lawNotice = "يستحق الموظف المكافأة كاملة (المادة 51/52/48) حسب سبب ترك العمل المختار.";
         }
     }
 
