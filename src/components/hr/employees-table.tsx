@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Trash2, Edit, Loader2, Calendar, Search } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit, Loader2, Calendar, Search, Eye, EyeOff } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +43,7 @@ import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
 import { DateInput } from '../ui/date-input';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
@@ -72,10 +72,11 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
     const [departmentFilter, setDepartmentFilter] = useState('all');
     const [serviceDurationFilter, setServiceDurationFilter] = useState('all');
     const [internalSearchQuery, setInternalSearchQuery] = useState('');
+    const [showSalaries, setShowSalaries] = useState(false);
     
     const combinedSearch = externalSearchQuery || internalSearchQuery;
 
-    const employeesQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
+    const employeesQuery = useMemo(() => [orderBy('employeeNumber', 'asc')], []);
     const { data: employees, loading } = useSubscription<Employee>(firestore, 'employees', employeesQuery);
 
     const [employeeToTerminate, setEmployeeToTerminate] = useState<Employee | null>(null);
@@ -115,7 +116,14 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
             });
         }
         
-        return searchEmployees(filtered, combinedSearch);
+        // Sorting numerically by employeeNumber
+        const sorted = [...filtered].sort((a, b) => {
+            const numA = parseInt(a.employeeNumber) || 0;
+            const numB = parseInt(b.employeeNumber) || 0;
+            return numA - numB;
+        });
+
+        return searchEmployees(sorted, combinedSearch);
     }, [employees, combinedSearch, statusFilter, departmentFilter, serviceDurationFilter]);
 
     const formatDate = (dateValue: any) => {
@@ -183,9 +191,21 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                     <TableHeader className="bg-[#F8F9FE]">
                         <TableRow className="border-none">
                             <TableHead className="px-8 py-5 font-black text-[#7209B7]">الاسم الكامل</TableHead>
-                            <TableHead className="font-black text-[#7209B7]">الرقم الوظيفي</TableHead>
-                            <TableHead className="font-black text-[#7209B7]">القسم</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">رقم الملف</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">الوظيفة والقسم</TableHead>
                             <TableHead className="font-black text-[#7209B7]">تاريخ التعيين</TableHead>
+                            <TableHead className="text-left font-black text-[#7209B7] flex items-center justify-end gap-2">
+                                <span>الراتب</span>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-primary hover:bg-primary/10 rounded-full" 
+                                    onClick={() => setShowSalaries(!showSalaries)}
+                                    title={showSalaries ? "إخفاء الرواتب" : "إظهار الرواتب"}
+                                >
+                                    {showSalaries ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                </Button>
+                            </TableHead>
                             <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
                             <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
                         </TableRow>
@@ -193,10 +213,10 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                     <TableBody>
                         {loading ? (
                             Array.from({ length: 3 }).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={6} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+                                <TableRow key={i}><TableCell colSpan={7} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
                             ))
                         ) : filteredEmployees.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد سجلات موظفين مطابقة.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد سجلات موظفين مطابقة.</TableCell></TableRow>
                         ) : (
                             filteredEmployees.map((employee) => (
                                 <TableRow key={employee.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
@@ -204,8 +224,16 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                                         <Link href={`/dashboard/hr/employees/${employee.id}`} className="hover:underline">{employee.fullName}</Link>
                                     </TableCell>
                                     <TableCell className="font-mono font-bold opacity-60 text-xs">{employee.employeeNumber}</TableCell>
-                                    <TableCell className="font-medium text-xs">{employee.department}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-sm text-primary">{employee.jobTitle}</span>
+                                            <span className="text-[10px] text-muted-foreground font-bold">{employee.department}</span>
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="font-bold text-xs opacity-60">{formatDate(employee.hireDate)}</TableCell>
+                                    <TableCell className="text-left font-mono font-black text-blue-700">
+                                        {showSalaries ? formatCurrency(employee.basicSalary) : '***.***'}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[employee.status])}>
                                             {statusTranslations[employee.status]}
@@ -218,8 +246,8 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
                                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}`}><Edit className="ml-2 h-4 w-4" /> عرض الملف</Link></DropdownMenuItem>
-                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}/edit`}>تعديل</Link></DropdownMenuItem>
+                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}`}><Eye className="ml-2 h-4 w-4" /> عرض الملف</Link></DropdownMenuItem>
+                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}/edit`}><Edit className="ml-2 h-4 w-4" /> تعديل</Link></DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 {employee.status !== 'terminated' ? (
                                                     <DropdownMenuItem onClick={() => setEmployeeToTerminate(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
