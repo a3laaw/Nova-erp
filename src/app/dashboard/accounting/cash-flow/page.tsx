@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -21,6 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { DateInput } from '@/components/ui/date-input';
+import { useToast } from '@/hooks/use-toast';
 
 interface StatementLineProps {
     label: string;
@@ -42,6 +44,7 @@ const StatementLine = ({ label, value, isSubtotal = false, isTotal = false, isSu
 
 export default function CashFlowStatementPage() {
     const { firestore } = useFirebase();
+    const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();
     const [loading, setLoading] = useState(true);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -56,12 +59,17 @@ export default function CashFlowStatementPage() {
         setDateTo(endOfYear(now));
     }, []);
 
-    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان يسبق البداية
     useEffect(() => {
         if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
-            setDateTo(dateFrom);
+            setDateTo(undefined);
+            toast({
+                variant: 'destructive',
+                title: 'خطأ منطقي',
+                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
+            });
         }
-    }, [dateFrom, dateTo]);
+    }, [dateFrom, dateTo, toast]);
 
     // Fetch accounts once
     useEffect(() => {

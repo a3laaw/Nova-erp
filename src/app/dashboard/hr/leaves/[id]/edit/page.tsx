@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -51,7 +52,6 @@ export default function EditLeaveRequestPage() {
     const [notes, setNotes] = useState('');
     const [passportReceived, setPassportReceived] = useState(false);
     
-    // --- Double-Save Guard System ---
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
@@ -66,20 +66,21 @@ export default function EditLeaveRequestPage() {
         }
     }, [leaveRequest]);
 
-    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان قبل البداية
     useEffect(() => {
         if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            setEndDate(startDate);
+            setEndDate(undefined);
             toast({
-                title: 'تنبيه منطقي',
-                description: 'تم تعديل تاريخ النهاية ليكون متوافقاً مع تاريخ البداية.',
+                variant: 'destructive',
+                title: 'خطأ منطقي',
+                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
             });
         }
     }, [startDate, endDate, toast]);
 
     const loading = employeesLoading || holidaysLoading || brandingLoading || leaveLoading;
 
-    const leaveDuration = useMemo(() => {
+    const leaveAnalysis = useMemo(() => {
         if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) return { totalDays: 0, workingDays: 0 };
         return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
     }, [startDate, endDate, branding, publicHolidays]);
@@ -98,7 +99,7 @@ export default function EditLeaveRequestPage() {
 
         // الرقابة النهائية
         if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'تاريخ النهاية لا يمكن أن يكون قبل تاريخ البداية.' });
+            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.' });
             return;
         }
 
@@ -127,7 +128,6 @@ export default function EditLeaveRequestPage() {
             
             toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
             router.push('/dashboard/hr/leaves');
-            router.refresh();
         } catch (error) {
             savingRef.current = false;
             setIsSaving(false);
@@ -191,10 +191,10 @@ export default function EditLeaveRequestPage() {
                         <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                     </div>
-                    {leaveDuration.totalDays > 0 && (
+                    {leaveAnalysis.totalDays > 0 && (
                       <div className="text-sm text-primary font-bold p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
-                        <p>إجمالي الأيام: <span className="text-lg font-black">{leaveDuration.totalDays}</span></p>
-                        <p>أيام العمل الفعلية: <span className="text-lg font-black">{leaveDuration.workingDays}</span></p>
+                        <p>إجمالي الأيام: <span className="text-lg font-black">{leaveAnalysis.totalDays}</span></p>
+                        <p>أيام العمل الفعلية: <span className="text-lg font-black">{leaveAnalysis.workingDays}</span></p>
                       </div>
                     )}
                      <div className="grid gap-2">
@@ -210,7 +210,7 @@ export default function EditLeaveRequestPage() {
                      <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
                     <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                        {isSaving ? 'جاري الحفظ والتحويل...' : 'حفظ التعديلات'}
+                        {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
                     </Button>
                 </CardFooter>
             </form>

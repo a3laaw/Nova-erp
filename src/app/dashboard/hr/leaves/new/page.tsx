@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -75,13 +76,14 @@ export default function NewLeaveRequestPage() {
         }
     }, [currentUser, searchParams]);
 
-    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان قبل البداية
     useEffect(() => {
         if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            setEndDate(startDate);
+            setEndDate(undefined);
             toast({
-                title: 'تنبيه منطقي',
-                description: 'تم تعديل تاريخ النهاية ليكون متوافقاً مع تاريخ البداية.',
+                variant: 'destructive',
+                title: 'خطأ منطقي',
+                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
             });
         }
     }, [startDate, endDate, toast]);
@@ -162,7 +164,7 @@ export default function NewLeaveRequestPage() {
 
         // الرقابة المنطقية النهائية قبل الحفظ
         if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن أن يكون تاريخ العودة قبل تاريخ بدء الإجازة.' });
+            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.' });
             return;
         }
 

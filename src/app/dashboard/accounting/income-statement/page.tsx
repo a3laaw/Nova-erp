@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -45,19 +46,26 @@ export default function IncomeStatementPage() {
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfYear(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfYear(new Date()));
 
-    // الرقابة المنطقية: تعديل تاريخ النهاية آلياً إذا كان قبل البداية
+    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان يسبق البداية
     useEffect(() => {
         if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
-            setDateTo(dateFrom);
+            setDateTo(undefined);
+            toast({
+                variant: 'destructive',
+                title: 'خطأ منطقي',
+                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
+            });
         }
-    }, [dateFrom, dateTo]);
+    }, [dateFrom, dateTo, toast]);
 
     const handleGenerate = async () => {
-        if (!firestore || !dateFrom || !dateTo) return;
+        if (!firestore || !dateFrom || !dateTo) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تحديد فترة زمنية صحيحة.' });
+            return;
+        }
         
-        // الرقابة النهائية
         if (isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
-            toast({ variant: 'destructive', title: 'فترة غير صالحة', description: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية.' });
+            toast({ variant: 'destructive', title: 'فترة غير صالحة', description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.' });
             return;
         }
 
