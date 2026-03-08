@@ -15,7 +15,8 @@ import { parse } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-
+import { Checkbox } from '../ui/checkbox';
+import { Separator } from '../ui/separator';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
