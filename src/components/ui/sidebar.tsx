@@ -673,7 +673,7 @@ const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-r-2 border-primary/10 px-2.5 py-0.5 ml-0 mr-4 pr-4 pl-0 bg-primary/5 rounded-l-xl",
+      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-r-2 border-primary/10 px-2.5 py-0.5 ml-0 mr-4 pr-4 pl-0 bg-primary/25 rounded-l-xl",
       "group-data-[collapsible=icon]:hidden",
       className
     )}
