@@ -502,7 +502,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden text-start text-sm outline-none ring-sidebar-ring transition-all duration-300 ease-in-out rounded-[var(--radius)] disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-md data-[active=true]:border-r-4 data-[active=true]:border-primary group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden text-start text-sm outline-none ring-sidebar-ring transition-all duration-300 ease-in-out rounded-2xl disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-md data-[active=true]:border-r-4 data-[active=true]:border-primary group-data-[collapsible=icon]:!size-10 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -673,7 +673,7 @@ const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-r-2 border-primary/10 px-2.5 py-0.5 ml-0 mr-4 pr-4 pl-0 bg-primary/25 rounded-l-xl",
+      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-2 p-2 ml-0 mr-4 pr-4 pl-0 bg-primary/25 rounded-2xl",
       "group-data-[collapsible=icon]:hidden",
       className
     )}
@@ -702,7 +702,7 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-lg py-3 px-4 outline-none ring-sidebar-ring transition-all duration-300 text-primary bg-transparent hover:bg-white hover:shadow-sm disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0",
+        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-2xl py-3 px-4 outline-none ring-sidebar-ring transition-all duration-300 text-primary bg-transparent hover:bg-white hover:shadow-sm disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0",
         "data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-sm",
         size === "sm" && "text-xs",
         "group-data-[collapsible=icon]:hidden",
