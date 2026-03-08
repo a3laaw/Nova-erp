@@ -3,7 +3,22 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc, updateDoc, writeBatch, getDocs, where, limit, Timestamp, getDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  doc, 
+  deleteDoc, 
+  updateDoc, 
+  writeBatch, 
+  getDocs, 
+  where, 
+  limit, 
+  Timestamp, 
+  getDoc,
+  runTransaction,
+  serverTimestamp 
+} from 'firebase/firestore';
 import {
   Table,
   TableBody,
@@ -44,7 +59,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -70,6 +85,17 @@ const statusTranslations: Record<LeaveRequest['status'], string> = {
 const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
 };
+
+
+function InfoRow({ label, value, icon }: { label: string, value: string | React.ReactNode, icon: React.ReactNode }) {
+    return (
+        <div className="flex gap-4 text-sm">
+            <div className="text-muted-foreground shrink-0">{icon}</div>
+            <div className="font-semibold w-24 shrink-0">{label}:</div>
+            <div className="break-words">{value}</div>
+        </div>
+    )
+}
 
 export function LeaveRequestsList() {
   const { firestore } = useFirebase();
@@ -148,7 +174,6 @@ export function LeaveRequestsList() {
     return date ? format(date, 'dd/MM/yyyy') : '-';
   };
   
-  // دالة الحذف والترميم التلقائي للطلبات المعلقة
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore) return;
     setIsDeleting(true);
@@ -217,22 +242,26 @@ export function LeaveRequestsList() {
     if (!requestToApprove || !firestore || !currentUser) return;
 
     setIsProcessingAction(true);
-    const batch = writeBatch(firestore);
-
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToApprove.id!);
-        batch.update(leaveRef, {
-            status: 'approved',
-            approvedBy: currentUser.id,
-            approvedAt: serverTimestamp()
-        });
+        await runTransaction(firestore, async (transaction) => {
+            const leaveRef = doc(firestore, 'leaveRequests', requestToApprove.id!);
+            const employeeRef = doc(firestore, 'employees', requestToApprove.employeeId);
+            const employeeSnap = await transaction.get(employeeRef);
 
-        const employee = employees.find(e => e.id === requestToApprove.employeeId);
-        if (employee) {
-            const employeeRef = doc(firestore, 'employees', employee.id!);
+            if (!employeeSnap.exists()) throw new Error("الموظف غير موجود في النظام.");
+            const employee = employeeSnap.data() as Employee;
+
+            // تحديث طلب الإجازة
+            transaction.update(leaveRef, {
+                status: 'approved',
+                approvedBy: currentUser.id,
+                approvedAt: serverTimestamp()
+            });
+
+            // تحديث رصيد الموظف
             const daysToDeduct = (requestToApprove.workingDays || 0) - (requestToApprove.unpaidDays || 0);
-            
             let employeeUpdate: Partial<Employee> = {};
+            
             if (requestToApprove.leaveType === 'Annual') {
                 employeeUpdate.annualLeaveUsed = (employee.annualLeaveUsed || 0) + daysToDeduct;
             } else if (requestToApprove.leaveType === 'Sick') {
@@ -242,14 +271,14 @@ export function LeaveRequestsList() {
             }
             
             if (Object.keys(employeeUpdate).length > 0) {
-                batch.update(employeeRef, employeeUpdate);
+                transaction.update(employeeRef, employeeUpdate);
             }
-        }
+        });
 
-        await batch.commit();
-        toast({ title: 'نجاح', description: 'تمت الموافقة على طلب الإجازة.' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في الموافقة على طلب الإجازة.' });
+        toast({ title: 'نجاح', description: 'تمت الموافقة على طلب الإجازة وتحديث الرصيد.' });
+    } catch (e: any) {
+        console.error("Approval error:", e);
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل في الموافقة على طلب الإجازة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToApprove(null);
@@ -268,8 +297,8 @@ export function LeaveRequestsList() {
             approvedAt: serverTimestamp()
         });
         toast({ title: 'تم الرفض', description: 'تم رفض طلب الإجازة بنجاح.' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في رفض طلب الإجازة.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل في رفض طلب الإجازة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToReject(null);
@@ -281,15 +310,17 @@ export function LeaveRequestsList() {
     if (!requestToUndoApproval || !firestore || !currentUser) return;
 
     setIsProcessingAction(true);
-    const batch = writeBatch(firestore);
-
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToUndoApproval.id!);
-        batch.update(leaveRef, { status: 'pending' });
+        await runTransaction(firestore, async (transaction) => {
+            const leaveRef = doc(firestore, 'leaveRequests', requestToUndoApproval.id!);
+            const employeeRef = doc(firestore, 'employees', requestToUndoApproval.employeeId);
+            const employeeSnap = await transaction.get(employeeRef);
 
-        const employee = employees.find(e => e.id === requestToUndoApproval.employeeId);
-        if (employee) {
-            const employeeRef = doc(firestore, 'employees', employee.id!);
+            if (!employeeSnap.exists()) throw new Error("الموظف غير موجود.");
+            const employee = employeeSnap.data() as Employee;
+
+            transaction.update(leaveRef, { status: 'pending' });
+
             const daysToRevert = (requestToUndoApproval.workingDays || 0) - (requestToUndoApproval.unpaidDays || 0);
             let employeeUpdate: any = {};
             
@@ -301,13 +332,14 @@ export function LeaveRequestsList() {
                 employeeUpdate.emergencyLeaveUsed = Math.max(0, (employee.emergencyLeaveUsed || 0) - daysToRevert);
             }
 
-            batch.update(employeeRef, employeeUpdate);
-        }
+            if (Object.keys(employeeUpdate).length > 0) {
+                transaction.update(employeeRef, employeeUpdate);
+            }
+        });
 
-        await batch.commit();
-        toast({ title: 'تم التراجع', description: 'تمت إعادة حالة الطلب واسترداد الرصيد.' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في التراجع عن الموافقة.' });
+        toast({ title: 'تم التراجع', description: 'تمت إعادة حالة الطلب واسترداد الرصيد المخصوم.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'خطأ', description: e.message || 'فشل في التراجع عن الموافقة.' });
     } finally {
         setIsProcessingAction(false);
         setRequestToUndoApproval(null);
