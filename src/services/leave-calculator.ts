@@ -3,7 +3,7 @@
  * يطبق قوانين العمل في دولة الكويت (القطاع الأهلي) بدقة رياضية.
  */
 
-import { differenceInDays, eachDayOfInterval, format, differenceInMonths } from 'date-fns';
+import { differenceInDays, eachDayOfInterval, format, differenceInYears, differenceInMonths } from 'date-fns';
 import type { Employee, Holiday } from '@/lib/types';
 import { toFirestoreDate } from './date-converter';
 
@@ -69,8 +69,7 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
 };
 
 /**
- * محرك مكافأة نهاية الخدمة (Gratuity Engine):
- * يطبق المادة 51 من قانون العمل الكويتي رقم 6 لسنة 2010.
+ * محرك مكافأة نهاية الخدمة (Gratuity Engine) - قانون العمل الكويتي رقم 6 لسنة 2010
  */
 export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
     const hireDate = toFirestoreDate(employee.hireDate);
@@ -79,41 +78,58 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
         yearsOfService: 0, lastSalary: 0, leaveBalance: 0, dailyWage: 0 
     };
 
+    // حساب المدة بالسنوات بدقة (بما في ذلك الكسور)
     const totalDays = differenceInDays(asOfDate, hireDate);
-    const years = totalDays / 365;
+    const years = totalDays / 365.25; 
     
     const salary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-    const dailyWage = salary / 26;
+    const dailyWage = salary / 26; // أجر اليوم في قانون العمل الكويتي
 
     if (salary === 0) {
         return { gratuity: 0, leaveBalancePay: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.', yearsOfService: years, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
     }
 
     let rawGratuity = 0;
+
+    // المادة 51: حساب المكافأة الأساسية
     if (years <= 5) {
+        // 15 يوماً عن كل سنة من السنوات الخمس الأولى
         rawGratuity = years * 15 * dailyWage;
     } else {
+        // 15 يوماً عن أول 5 سنوات + شهر كامل عن كل سنة تالية
         const firstFiveYearsGratuity = 5 * 15 * dailyWage;
         const remainingYears = years - 5;
         rawGratuity = firstFiveYearsGratuity + (remainingYears * salary);
     }
 
+    // الحد الأقصى للمكافأة هو راتب سنة ونصف (18 شهراً)
     const maxGratuity = 1.5 * 12 * salary;
     rawGratuity = Math.min(rawGratuity, maxGratuity);
 
     let finalGratuity = rawGratuity;
-    let notice = `بناءً على ${years.toFixed(1)} سنوات من الخدمة.`;
+    let lawNotice = `بناءً على خدمة مدتها ${years.toFixed(2)} سنة.`;
 
+    // المادة 53: في حالة الاستقالة
     if (employee.terminationReason === 'resignation') {
         if (years < 3) {
             finalGratuity = 0;
-            notice += " (لا يستحق مكافأة لخدمة أقل من 3 سنوات عند الاستقالة)";
+            lawNotice = "المادة 53: لا يستحق الموظف مكافأة لخدمة أقل من 3 سنوات في حالة الاستقالة.";
         } else if (years < 5) {
             finalGratuity = rawGratuity * 0.5;
-             notice += " (يستحق نصف المكافأة لخدمة بين 3-5 سنوات عند الاستقالة)";
+            lawNotice = "المادة 53: يستحق نصف المكافأة لخدمة بين 3 و 5 سنوات في حالة الاستقالة.";
         } else if (years < 10) {
-            finalGratuity = rawGratuity * (2 / 3);
-            notice += " (يستحق ثلثي المكافأة لخدمة بين 5-10 سنوات عند الاستقالة)";
+            finalGratuity = rawGratuity * (2/3);
+            lawNotice = "المادة 53: يستحق ثلثي المكافأة لخدمة بين 5 و 10 سنوات في حالة الاستقالة.";
+        } else {
+            lawNotice = "المادة 53: يستحق المكافأة كاملة لخدمة تزيد عن 10 سنوات.";
+        }
+    } else {
+        // في حالة الفصل/الإقالة
+        if (years < 1) {
+            finalGratuity = 0;
+            lawNotice = "المادة 51: يشترط إتمام سنة واحدة لاستحقاق المكافأة في حالة إنهاء الخدمات.";
+        } else {
+            lawNotice = "المادة 51: يستحق الموظف المكافأة كاملة في حالة إنهاء الخدمات من طرف الشركة.";
         }
     }
 
@@ -124,7 +140,7 @@ export const calculateGratuity = (employee: Employee, asOfDate: Date) => {
         gratuity: finalGratuity, 
         leaveBalancePay, 
         total: finalGratuity + leaveBalancePay, 
-        notice,
+        notice: lawNotice,
         yearsOfService: years,
         lastSalary: salary,
         leaveBalance,
