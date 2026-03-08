@@ -82,10 +82,9 @@ export function AttendanceUploader() {
       return;
     }
 
-    // تم إضافة اسم الموظف هنا بناءً على طلبك لتسهيل الإدخال
     const templateData = employees.map(emp => ({
         employeeNumber: emp.employeeNumber,
-        employeeName: emp.fullName, // العمود الجديد للمساعدة
+        employeeName: emp.fullName, 
         date: '',
         checkIn1: '',
         checkOut1: '',
@@ -95,10 +94,9 @@ export function AttendanceUploader() {
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     
-    // تنسيق عرض الأعمدة
     worksheet['!cols'] = [
       { wch: 15 }, // employeeNumber
-      { wch: 30 }, // employeeName (عرض أكبر للاسم)
+      { wch: 30 }, // employeeName
       { wch: 15 }, // date
       { wch: 12 }, // checkIn1
       { wch: 12 }, // checkOut1
@@ -196,7 +194,7 @@ export function AttendanceUploader() {
                 };
 
                 attendanceData.records.push({
-                    date: new Date((row.date - (25567 + 1)) * 86400 * 1000), // Convert Excel date
+                    date: new Date((row.date - (25567 + 1)) * 86400 * 1000), 
                     checkIn1: formatTime(t1),
                     checkOut1: formatTime(t2),
                     checkIn2: formatTime(t3),
@@ -254,21 +252,20 @@ export function AttendanceUploader() {
         <div className="lg:col-span-1 space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>تعليمات الرفع</CardTitle>
+                    <CardTitle>تعليمات الرفع الشهري</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm text-muted-foreground">
                     <ol className="list-decimal list-inside space-y-3">
-                        <li><strong>تنزيل النموذج:</strong> قم بتنزيل النموذج الرسمي. يحتوي الآن على <strong>أسماء الموظفين</strong> لتسهيل الإدخال.</li>
-                        <li><strong>ملء البيانات:</strong> املأ بيانات الحضور. عمود الاسم للمساعدة فقط، النظام يعتمد على الرقم الوظيفي.</li>
-                        <li><strong>تحديد الفترة:</strong> اختر السنة والشهر الصحيحين.</li>
-                        <li><strong>رفع الملف:</strong> اسحب الملف إلى منطقة الرفع.</li>
-                        <li><strong>تأكيد:</strong> اضغط على زر "رفع وتحديث السجلات".</li>
+                        <li><strong>تنزيل النموذج:</strong> قم بتنزيل النموذج الرسمي الذي يحتوي على أسماء الموظفين النشطين.</li>
+                        <li><strong>ملء البيانات:</strong> املأ بيانات الحضور لكل يوم في الشهر. النظام سيعالج كل سطر بناءً على التاريخ والرقم الوظيفي.</li>
+                        <li><strong>تحديد الفترة:</strong> اختر السنة والشهر الذي يمثله الملف المرفوع.</li>
+                        <li><strong>رفع الملف:</strong> اسحب الملف إلى منطقة الرفع لرفع سجلات الشهر بالكامل دفعة واحدة.</li>
                     </ol>
                     <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
                         <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
                         <AlertTitle>ملاحظة هامة</AlertTitle>
                         <AlertDescription>
-                            للتصحيح، ما عليك سوى رفع ملف جديد بنفس الشهر والسنة. سيتم استبدال البيانات القديمة تلقائيًا.
+                            هذا النموذج مخصص لرفع سجلات **الشهر كاملاً**. عند الرفع، سيتم استبدال أي بيانات سابقة لنفس الشهر والسنة لضمان دقة مسير الرواتب.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -278,15 +275,15 @@ export function AttendanceUploader() {
         <div className="lg:col-span-2">
             <Card>
                 <CardHeader>
-                    <CardTitle>رفع سجلات الحضور الشهرية</CardTitle>
+                    <CardTitle>رفع ملف الحضور الشهري (Excel)</CardTitle>
                     <CardDescription>
-                        قم برفع ملف Excel يحتوي على بيانات الحضور والانصراف للموظفين عن شهر محدد.
+                        رفع بصمات الموظفين المجمعة لشهر كامل لمعالجتها في مسير الرواتب.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                         <div className="grid gap-2">
-                            <Label htmlFor="year-select">السنة</Label>
+                            <Label htmlFor="year-select">سنة السجل</Label>
                             <Select value={year} onValueChange={setYear}>
                                 <SelectTrigger id="year-select"><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -295,7 +292,7 @@ export function AttendanceUploader() {
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="month-select">الشهر</Label>
+                            <Label htmlFor="month-select">شهر السجل</Label>
                             <Select value={month} onValueChange={setMonth}>
                                 <SelectTrigger id="month-select"><SelectValue /></SelectTrigger>
                                 <SelectContent>
@@ -306,7 +303,7 @@ export function AttendanceUploader() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label>ملف الحضور (Excel)</Label>
+                        <Label>ملف سجلات الشهر (Excel)</Label>
                         <div
                             onClick={() => fileInputRef.current?.click()}
                             onDragOver={handleDragOver}
@@ -324,7 +321,7 @@ export function AttendanceUploader() {
                             {file ? (
                                 <p className="mt-4 text-sm font-semibold text-primary">{file.name}</p>
                             ) : (
-                                <p className="mt-4 text-sm text-muted-foreground">اسحب وأفلت الملف هنا، أو اضغط للاختيار</p>
+                                <p className="mt-4 text-sm text-muted-foreground">اسحب وأفلت ملف الشهر هنا، أو اضغط للاختيار</p>
                             )}
                         </div>
                     </div>
@@ -339,11 +336,11 @@ export function AttendanceUploader() {
                 <CardFooter className="justify-between">
                     <Button onClick={handleUpload} disabled={!file || isProcessing}>
                         {isProcessing ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Upload className="ml-2 h-4 w-4" />}
-                        {isProcessing ? 'جاري المعالجة...' : 'رفع وتحديث السجلات'}
+                        {isProcessing ? 'جاري المعالجة...' : 'رفع ومعالجة الشهر'}
                     </Button>
                     <Button onClick={handleDownloadTemplate} variant="outline" disabled={employeesLoading}>
                         {employeesLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                        تنزيل النموذج (بالأسماء)
+                        تنزيل نموذج الشهر
                     </Button>
                 </CardFooter>
             </Card>
