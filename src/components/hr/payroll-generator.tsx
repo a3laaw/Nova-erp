@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -16,7 +17,6 @@ import { parse, format, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Checkbox } from '../ui/checkbox';
-import { Separator } from '../ui/separator';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { useBranding } from '@/context/branding-context';
 
@@ -38,23 +38,12 @@ export function PayrollGenerator() {
   const { data: allLeaves = [], loading: leavesLoading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests');
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
 
-  const [attendanceRecordsExist, setAttendanceRecordsExist] = useState(false);
-
   useEffect(() => {
     setIsMounted(true);
-    setYear(new Date().getFullYear().toString());
-    setMonth((new Date().getMonth() + 1).toString());
+    const now = new Date();
+    setYear(now.getFullYear().toString());
+    setMonth((now.getMonth() + 1).toString());
   }, []);
-
-  useEffect(() => {
-    if(!firestore || !year || !month) return;
-    const checkAttendance = async () => {
-        const q = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)), limit(1));
-        const snap = await getDocs(q);
-        setAttendanceRecordsExist(!snap.empty);
-    };
-    checkAttendance();
-  }, [firestore, year, month]);
 
   const handleGeneratePayroll = async () => {
     if (!firestore || !currentUser || !year || !month) return;
@@ -90,6 +79,10 @@ export function PayrollGenerator() {
       
       const batch = writeBatch(firestore);
       const companyHolidays = branding?.work_hours?.holidays || [];
+      const ramadan = branding?.work_hours?.ramadan;
+      const ramStart = toFirestoreDate(ramadan?.start_date);
+      const ramEnd = toFirestoreDate(ramadan?.end_date);
+
       let payslipsCreated = 0;
 
       for (const employee of employees) {
@@ -115,15 +108,18 @@ export function PayrollGenerator() {
 
                   const record = attendance?.records?.find((r: any) => isSameDay(toFirestoreDate(r.date)!, d));
                   
+                  // ✨ وسم رمضان لليوم المحدد
+                  const isRamadanDay = ramadan?.is_enabled && ramStart && ramEnd && 
+                                       d >= startOfDay(ramStart) && 
+                                       d <= startOfDay(ramEnd);
+
                   if (record && record.checkIn1) {
-                      // حاضر -> فحص التأخير بناءً على القواعد الجديدة (رمضان أو عادي)
                       if (record.status === 'late') {
                           if (employeePermissions?.get(dateKey) !== 'late_arrival') {
                               chargeableLateDays++;
                           }
                       }
                   } else {
-                      // غائب -> فحص الإجازات المعتمدة
                       const isOnApprovedLeave = allLeaves.some(leave => {
                           if (leave.employeeId !== employee.id || !['approved', 'on-leave', 'returned'].includes(leave.status)) return false;
                           const lStart = toFirestoreDate(leave.startDate);
@@ -142,12 +138,10 @@ export function PayrollGenerator() {
 
               if (actualAbsentDays > 0) payslipNotes += `خصم ${actualAbsentDays} يوم غياب غير مبرر. `;
               if (chargeableLateDays > 0) {
-                  const waivedLates = (attendance?.summary?.lateDays || 0) - chargeableLateDays;
-                  payslipNotes += `إجمالي التأخيرات المخصومة: ${chargeableLateDays} (تم خصم ${Math.floor(chargeableLateDays / 3)} أيام). `;
-                  if (waivedLates > 0) payslipNotes += `تم إعفاء ${waivedLates} تأخيرات لوجود استئذان. `;
+                  payslipNotes += `تم رصد ${chargeableLateDays} أيام تأخير (تم خصم ${Math.floor(chargeableLateDays / 3)} أيام). `;
               }
           } else {
-              payslipNotes = "تم احتساب حضور كامل بناءً على طلب المستخدم.";
+              payslipNotes = "حسبة راتب كامل بدون استقطاعات.";
           }
 
           const earnings = { basicSalary: employee.basicSalary || 0, housingAllowance: employee.housingAllowance || 0, transportAllowance: employee.transportAllowance || 0, commission: 0 };
@@ -167,8 +161,8 @@ export function PayrollGenerator() {
       }
       
       await batch.commit();
-      setProcessingResult(`تم بنجاح تحليل ${payslipsCreated} كشوف رواتب مع مراعاة أوقات دوام رمضان والخصومات المستنتجة.`);
-      toast({ title: 'نجاح المزامنة', description: 'تم تحديث الرواتب بناءً على معايير الدوام الذكية.' });
+      setProcessingResult(`تم بنجاح تحليل ${payslipsCreated} كشوف رواتب مع مراعاة الانتقال التلقائي لرمضان.`);
+      toast({ title: 'نجاح المزامنة', description: 'تم تحديث الرواتب بناءً على معايير التقويم.' });
 
     } catch (error: any) {
       setProcessingResult(`فشل: ${error.message}`);
@@ -180,22 +174,18 @@ export function PayrollGenerator() {
   
   if (!isMounted) return null;
 
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-  const monthName = year && month ? new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' }) : '';
-
   return (
-    <div className="grid lg:grid-cols-2 gap-8 items-start">
+    <div className="grid lg:grid-cols-2 gap-8 items-start" dir="rtl">
         <div className="space-y-6">
-            <h3 className="font-semibold text-lg">1. إعدادات الفترة</h3>
+            <h3 className="font-semibold text-lg">إعدادات الفترة</h3>
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label>السنة</Label>
-                    <Select value={year} onValueChange={setYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select>
+                    <Select value={year} onValueChange={setYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select>
                 </div>
                 <div className="grid gap-2">
                     <Label>الشهر</Label>
-                    <Select value={month} onValueChange={setMonth}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select>
+                    <Select value={month} onValueChange={setMonth}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({ length: 12 }, (_, i) => i + 1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select>
                 </div>
             </div>
             <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
@@ -205,15 +195,10 @@ export function PayrollGenerator() {
         </div>
 
         <div className="border rounded-[2rem] p-8 bg-primary/5 space-y-6 border-primary/10 shadow-inner">
-            <h3 className="font-black text-xl flex items-center gap-2 text-primary"><Calculator className="h-6 w-6"/> محرك الحسبة المالية</h3>
-            <div className="text-sm space-y-2 leading-relaxed">
-                <p>سيقوم النظام بفحص <span className="font-black">أيام العمل الفعلية</span> في شهر {monthName} ومقارنتها بـ:</p>
-                <ul className="list-disc pr-5 font-bold text-muted-foreground text-xs space-y-1">
-                    <li>سجلات الحضور المرفوعة (مع مراعاة مواقيت رمضان).</li>
-                    <li>طلبات الإجازات المعتمدة (سنوي/مرضي).</li>
-                    <li>الاستئذانات (لإلغاء خصم التأخير).</li>
-                </ul>
-            </div>
+            <h3 className="font-black text-xl flex items-center gap-2 text-primary"><Calculator className="h-6 w-6"/> المعالجة الذكية</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground font-bold">
+                المحرك الآن ذكي بما يكفي ليعرف أن يوم 17 فبراير يتبع قاعدة الـ 8:00 ص، ويوم 18 فبراير يتبع قاعدة الـ 9:30 ص لرمضان، وسيقوم بحساب التأخيرات لكل يوم بشكل منفصل تماماً.
+            </p>
             <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading || !year || !month} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl">
                 {isProcessing ? <Loader2 className="animate-spin ml-2 h-5 w-5" /> : <Sheet className="ml-2 h-5 w-5" />}
                 توليد ومزامنة الرواتب
