@@ -15,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse, format, isSameDay, isValid, compareAsc } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
-import { cn } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 
 /**
  * دالة مساعدة لتحويل تاريخ الإكسل (رقم أو نص) إلى تاريخ JS صحيح
@@ -57,6 +57,11 @@ const parseExcelTime = (excelTime: any): { hours: number, minutes: number } | nu
         }
     }
     return null;
+};
+
+const timeToString = (t: { hours: number, minutes: number } | null) => {
+    if (!t) return null;
+    return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`;
 };
 
 export function AttendanceUploader() {
@@ -150,8 +155,10 @@ export function AttendanceUploader() {
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         
-        const groupedUpdates = new Map<string, any[]>();
-        
+        // ✨ مرحلة الدمج الرأسي (Vertical Merging)
+        // نقوم بجمع كافة بيانات نفس الموظف ونفس اليوم في كائن واحد قبل معالجة قاعدة البيانات
+        const fileConsolidatedMap = new Map<string, any>(); // مفتاح: employeeId_dateTimestamp
+
         json.forEach(row => {
             const emp = employeeMap.get(String(row.employeeNumber));
             if (!emp?.id) return;
@@ -159,31 +166,52 @@ export function AttendanceUploader() {
             const rowDate = parseExcelDate(row.date);
             if (!rowDate || !isValid(rowDate)) return;
 
+            const dateKey = `${emp.id}_${rowDate.getTime()}`;
+            const existing = fileConsolidatedMap.get(dateKey) || {
+                date: rowDate,
+                employeeId: emp.id,
+                checkIn1: null,
+                checkOut1: null,
+                checkIn2: null,
+                checkOut2: null,
+            };
+
+            // دمج البصمات من الصف الحالي مع الصفوف السابقة لنفس اليوم
             const t1 = parseExcelTime(row.checkIn1);
             const t2 = parseExcelTime(row.checkOut1);
             const t3 = parseExcelTime(row.checkIn2);
             const t4 = parseExcelTime(row.checkOut2);
 
-            let status: 'present' | 'absent' | 'late' = t1 ? 'present' : 'absent';
-            if (t1 && emp.workStartTime) {
+            if (t1) existing.checkIn1 = timeToString(t1);
+            if (t2) existing.checkOut1 = timeToString(t2);
+            if (t3) existing.checkIn2 = timeToString(t3);
+            if (t4) existing.checkOut2 = timeToString(t4);
+
+            fileConsolidatedMap.set(dateKey, existing);
+        });
+
+        // تصنيف السطور المدمجة حسب الشهر والموظف (للتوافق مع هيكل Firestore)
+        const groupedUpdates = new Map<string, any[]>();
+        
+        fileConsolidatedMap.forEach((mergedRecord) => {
+            const { date, employeeId } = mergedRecord;
+            const emp = employeeMap.get(employees.find(e => e.id === employeeId)?.employeeNumber || '');
+            
+            // حساب الحالة النهائية لليوم المدمج
+            let status: 'present' | 'absent' | 'late' = mergedRecord.checkIn1 ? 'present' : 'absent';
+            if (mergedRecord.checkIn1 && emp?.workStartTime) {
                 const [hStart, mStart] = emp.workStartTime.split(':').map(Number);
+                const [hIn, mIn] = mergedRecord.checkIn1.split(':').map(Number);
                 const workStart = new Date(0, 0, 0, hStart, mStart);
-                const checkIn = new Date(0, 0, 0, t1.hours, t1.minutes);
+                const checkIn = new Date(0, 0, 0, hIn, mIn);
                 if (checkIn > workStart) status = 'late';
             }
-
-            const record = {
-                date: rowDate,
-                checkIn1: t1 ? `${String(t1.hours).padStart(2, '0')}:${String(t1.minutes).padStart(2, '0')}` : null,
-                checkOut1: t2 ? `${String(t2.hours).padStart(2, '0')}:${String(t2.minutes).padStart(2, '0')}` : null,
-                checkIn2: t3 ? `${String(t3.hours).padStart(2, '0')}:${String(t3.minutes).padStart(2, '0')}` : null,
-                checkOut2: t4 ? `${String(t4.hours).padStart(2, '0')}:${String(t4.minutes).padStart(2, '0')}` : null,
-                status
-            };
-
-            const docKey = `${rowDate.getFullYear()}-${rowDate.getMonth() + 1}-${emp.id}`;
+            
+            const finalRecord = { ...mergedRecord, status };
+            const docKey = `${date.getFullYear()}-${date.getMonth() + 1}-${employeeId}`;
+            
             if (!groupedUpdates.has(docKey)) groupedUpdates.set(docKey, []);
-            groupedUpdates.get(docKey)!.push(record);
+            groupedUpdates.get(docKey)!.push(finalRecord);
         });
 
         const batch = writeBatch(firestore);
@@ -195,15 +223,28 @@ export function AttendanceUploader() {
             const existingDoc = await getDoc(docRef);
             let mergedRecords = existingDoc.exists() ? (existingDoc.data().records || []) : [];
 
+            // تحويل التواريخ المخزنة إلى كائنات JS للمقارنة
             mergedRecords = mergedRecords.map((r: any) => ({ ...r, date: toFirestoreDate(r.date) }));
 
             newRecords.forEach(newItem => {
                 const existingIdx = mergedRecords.findIndex((r: any) => r.date && isSameDay(r.date, newItem.date));
-                if (existingIdx > -1) mergedRecords[existingIdx] = newItem;
-                else mergedRecords.push(newItem);
+                if (existingIdx > -1) {
+                    // دمج البيانات الجديدة مع البيانات الموجودة مسبقاً في الداتابيز لنفس اليوم
+                    mergedRecords[existingIdx] = {
+                        ...mergedRecords[existingIdx],
+                        ...newItem,
+                        // إعطاء الأولوية للبيانات المكتملة
+                        checkIn1: newItem.checkIn1 || mergedRecords[existingIdx].checkIn1,
+                        checkOut1: newItem.checkOut1 || mergedRecords[existingIdx].checkOut1,
+                        checkIn2: newItem.checkIn2 || mergedRecords[existingIdx].checkIn2,
+                        checkOut2: newItem.checkOut2 || mergedRecords[existingIdx].checkOut2,
+                    };
+                } else {
+                    mergedRecords.push(newItem);
+                }
             });
 
-            // ضمان ترتيب السجلات زمنياً حتى لو رُفعت بشكل عشوائي في الشيت
+            // ضمان الترتيب الزمني للسجلات داخل الشهر
             mergedRecords.sort((a: any, b: any) => compareAsc(a.date, b.date));
 
             const summary = {
@@ -213,19 +254,19 @@ export function AttendanceUploader() {
                 totalDays: mergedRecords.length
             };
 
-            batch.set(docRef, {
+            batch.set(docRef, cleanFirestoreData({
                 employeeId,
                 year: parseInt(yearStr),
                 month: parseInt(monthStr),
                 records: mergedRecords,
                 summary,
                 updatedAt: serverTimestamp()
-            }, { merge: true });
+            }), { merge: true });
         }
 
         await batch.commit();
-        setProcessingResult({ success: true, message: `تم تحليل الملف بنجاح وتحديث ${groupedUpdates.size} سجلات شهرية للموظفين.` });
-        toast({ title: 'نجاح التحليل الذكي', description: 'تم توزيع البيانات على الأشهر والموظفين حسب التواريخ المكتوبة في الملف.' });
+        setProcessingResult({ success: true, message: `تم دمج البيانات بنجاح وتحديث ${groupedUpdates.size} سجلات شهرية.` });
+        toast({ title: 'نجاح الدمج الذكي', description: 'تم دمج البصمات الصباحية والمسائية حتى لو كانت في صفوف منفصلة.' });
         setFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
 
@@ -282,9 +323,9 @@ export function AttendanceUploader() {
 
             <Alert className="rounded-2xl border-indigo-100 bg-indigo-50/50">
                 <Sparkles className="h-4 w-4 text-indigo-600" />
-                <AlertTitle className="text-indigo-800 font-black">التحليل الذكي (Smart Sync)</AlertTitle>
+                <AlertTitle className="text-indigo-800 font-black">الدمج الرأسي الذكي (Vertical Merge)</AlertTitle>
                 <AlertDescription className="text-indigo-700 text-[10px] leading-relaxed font-bold">
-                    ارفع أي ملف يحتوي على أي تواريخ في أي ترتيب؛ سيقوم النظام بفرز السطور وتوجيهها للموظف والشهر المناسب وترتيبها زمنياً تلقائياً.
+                    لا تقلق إذا كانت بصمة الدخول في سطر وبصمة الخروج في سطر آخر؛ سيقوم النظام بدمجهما تلقائياً في يوم واحد.
                 </AlertDescription>
             </Alert>
         </div>
@@ -309,7 +350,7 @@ export function AttendanceUploader() {
                         {file ? (
                             <div className="mt-6 space-y-1">
                                 <p className="text-lg font-black text-primary">{file.name}</p>
-                                <p className="text-xs text-muted-foreground font-bold italic">الملف بانتظار التحليل الزمني وتوزيع السجلات...</p>
+                                <p className="text-xs text-muted-foreground font-bold italic">الملف بانتظار التحليل والدمج الذكي...</p>
                             </div>
                         ) : (
                             <div className="mt-6 space-y-1">
@@ -330,7 +371,7 @@ export function AttendanceUploader() {
                 <CardFooter className="p-8 bg-muted/10 border-t flex justify-end">
                     <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 min-w-[320px] gap-3">
                         {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-                        {isProcessing ? 'جاري التحليل والترتيب...' : 'اعتماد السجلات والمزامنة الحية'}
+                        {isProcessing ? 'جاري التحليل والدمج...' : 'اعتماد السجلات والمزامنة الحية'}
                     </Button>
                 </CardFooter>
             </Card>
