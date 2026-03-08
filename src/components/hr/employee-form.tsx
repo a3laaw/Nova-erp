@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, Users, Clock, Banknote, FileSignature, User, ShieldCheck, Briefcase } from 'lucide-react';
+import { Save, X, Loader2, Users, Clock, Banknote, Briefcase, User, ShieldCheck, Phone } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -19,8 +19,6 @@ import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Checkbox } from '../ui/checkbox';
 import { useBranding } from '@/context/branding-context';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
-import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +85,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
+                // إصلاح: التأكد من وجود قيمة لطريقة الدفع أو استخدام الافتراضي
+                salaryPaymentType: initialData.salaryPaymentType || 'cash',
             });
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
             setShowTransportAllowance(Number(initialData.transportAllowance) > 0);
@@ -153,7 +153,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">رقم الجوال *</Label>
-                            <Input id="mobile" value={formData.mobile || ''} onChange={handleInputChange} dir="ltr" required className="h-11 rounded-xl" />
+                            <div className="relative">
+                                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input id="mobile" value={formData.mobile || ''} onChange={handleInputChange} dir="ltr" required className="pr-10 h-11 rounded-xl" />
+                            </div>
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">الرقم المدني</Label>
@@ -303,7 +306,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             </div>
 
             <DialogFooter className="mt-6 pt-6 border-t bg-muted/10 rounded-b-[2rem] p-6">
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي
