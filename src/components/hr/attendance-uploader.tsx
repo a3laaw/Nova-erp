@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, AlertTriangle, Info, Save, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Upload, AlertTriangle, Info, Save, FileSpreadsheet, DownloadCloud } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -98,6 +99,18 @@ export function AttendanceUploader() {
     }
   };
 
+  const handleDownloadTemplate = () => {
+    const data = [
+      { 'الرقم الوظيفي': '101', 'التاريخ': '2026-03-01', 'الوقت': '08:00' },
+      { 'الرقم الوظيفي': '101', 'التاريخ': '2026-03-01', 'الوقت': '17:00' },
+      { 'الرقم الوظيفي': '102', 'التاريخ': '2026-03-01', 'الوقت': '08:15' },
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Template");
+    XLSX.writeFile(workbook, "Attendance_Import_Template.xlsx");
+  };
+
   const handleUpload = async () => {
     if (!file || !firestore || !year || !month) {
         toast({ variant: 'destructive', title: 'تنبيه', description: 'يرجى تحديد الشهر والسنة قبل الرفع.' });
@@ -134,7 +147,6 @@ export function AttendanceUploader() {
             const parsed = parseSmartDateTime(row.date || row['التاريخ'] || row['Time']) || parseSmartDateTime(row.time || row['الوقت']);
             if (!parsed) return;
 
-            // 🛡️ الحماية الرقابية: التجاهل الصارم لأي تاريخ خارج الشهر والسنة المختارة
             if (parsed.date.getFullYear() !== selectedYearNum || (parsed.date.getMonth() + 1) !== selectedMonthNum) {
                 skippedCount++;
                 return;
@@ -151,7 +163,7 @@ export function AttendanceUploader() {
         });
 
         if (punchesMap.size === 0) {
-            throw new Error(`لم يتم العثور على أي حركات تخص شهر ${selectedMonthNum}/${selectedYearNum} في هذا الملف. تم تجاهل ${skippedCount} سطر لمطابقتها لشهور أخرى.`);
+            throw new Error(`لم يتم العثور على أي حركات تخص شهر ${selectedMonthNum}/${selectedYearNum} في هذا الملف.`);
         }
 
         const batch = writeBatch(firestore);
@@ -230,7 +242,7 @@ export function AttendanceUploader() {
             skippedCount,
             validCount
         });
-        toast({ title: 'تم الحفظ', description: `تم استيراد بصمات الشهر المختار بنجاح. تم تجاهل ${skippedCount} سطر لشهور أخرى.` });
+        toast({ title: 'نجاح الاستيراد', description: `تم استيراد بيانات شهر ${selectedMonthNum} بنجاح.` });
         setFile(null);
       } catch (error: any) {
         setProcessingResult({ success: false, message: error.message });
@@ -239,7 +251,7 @@ export function AttendanceUploader() {
         setIsProcessing(false);
       }
     };
-    reader.readAsBinaryString(file!);
+    reader.readAsDataURL(file!);
   };
 
   if (!isMounted) return null;
@@ -250,6 +262,7 @@ export function AttendanceUploader() {
             <Card className="rounded-3xl border-none shadow-sm overflow-hidden">
                 <CardHeader className="bg-primary/5">
                     <CardTitle className="text-lg flex items-center gap-2 text-primary">
+                        <DownloadCloud className="h-5 w-5 text-primary" />
                         إعدادات الاستيراد
                     </CardTitle>
                 </CardHeader>
@@ -276,6 +289,8 @@ export function AttendanceUploader() {
                             </SelectContent>
                         </Select>
                     </div>
+                    <Separator className="my-2"/>
+                    <Button onClick={handleDownloadTemplate} variant="outline" className="w-full h-11 rounded-xl border-dashed border-primary/30 text-primary font-bold">تنزيل نموذج الرفع</Button>
                 </CardContent>
             </Card>
 
@@ -292,7 +307,7 @@ export function AttendanceUploader() {
             <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-muted/30 border-b pb-8 px-8">
                     <CardTitle className="text-xl font-black">رفع ملف البصمة</CardTitle>
-                    <CardDescription>قم باختيار ملف الإكسل المستخرج من جهاز البصمة.</CardDescription>
+                    <CardDescription>قم باختيار ملف الإكسل المستخرج من جهاز البصمة للتحليل.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8">
                     <div 
@@ -310,7 +325,7 @@ export function AttendanceUploader() {
                             {file ? (
                                 <div className="space-y-2">
                                     <p className="text-lg font-black text-primary">{file.name}</p>
-                                    <p className="text-sm font-bold text-green-600">الملف جاهز وبانتظار أمر التحليل</p>
+                                    <p className="text-sm font-bold text-green-600">الملف جاهز — اضغط على الزر بالأسفل للتحليل</p>
                                 </div>
                             ) : (
                                 <p className="text-lg font-black text-muted-foreground">اضغط هنا لاختيار الملف</p>
@@ -340,3 +355,17 @@ export function AttendanceUploader() {
     </div>
   );
 }
+
+const Alert = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+    <div className={cn("relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4", className)}>
+        {children}
+    </div>
+);
+
+const AlertTitle = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+    <h5 className={cn("mb-1 font-medium leading-none tracking-tight", className)}>{children}</h5>
+);
+
+const AlertDescription = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+    <div className={cn("text-sm [&_p]:leading-relaxed", className)}>{children}</div>
+);
