@@ -7,7 +7,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, writeBatch, doc, getDocs, limit, deleteDoc, collectionGroup } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
-import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX, CheckCircle2, DatabaseZap, settings } from 'lucide-react';
+import { Loader2, Trash2, ShieldAlert, AlertCircle, UserX, CheckCircle2, DatabaseZap, RotateCcw, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Separator } from '../ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,6 +15,8 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Input } from '../ui/input';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 function TerminatedEmployeesManager() {
   const { firestore } = useFirebase();
@@ -130,7 +132,7 @@ function TerminatedEmployeesManager() {
                             <TableCell className="font-mono text-xs">{emp.employeeNumber}</TableCell>
                             <TableCell className="text-xs">{emp.terminationDate ? format(toFirestoreDate(emp.terminationDate)!, 'dd/MM/yyyy') : '-'}</TableCell>
                             <TableCell className="text-left">
-                                <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(emp)} className="text-destructive hover:bg-red-50">
+                                <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(emp)} className="text-destructive hover:bg-red-50">
                                     <Trash2 className="h-4 w-4"/>
                                 </Button>
                             </TableCell>
@@ -194,7 +196,6 @@ function SystemWipeManager() {
     
     const CONFIRMATION_PHRASE = 'مسح البيانات';
 
-    // 1. البيانات التشغيلية فقط (الحركات اليومية)
     const operationalCollections = [
         'clients', 'employees', 'leaveRequests', 'permissionRequests', 
         'attendance', 'payroll', 'notifications', 'appointments', 
@@ -202,17 +203,14 @@ function SystemWipeManager() {
         'purchaseOrders', 'purchase_requests', 'grns', 'inventoryAdjustments', 
         'projects', 'field_visits', 'boqs', 'payment_applications', 
         'subcontractor_certificates', 'recurring_obligations', 'counters',
-        // المجموعات الفرعية
         'timelineEvents', 'history', 'auditLogs', 'daily_reports', 'items'
     ];
 
-    // 2. البيانات المرجعية (الإعدادات)
     const referenceCollections = [
         'company_settings', 'users', 'departments', 'governorates', 
         'transactionTypes', 'contractTemplates', 'chartOfAccounts', 
         'itemCategories', 'boqReferenceItems', 'construction_types',
         'subcontractorTypes', 'workTeams', 'vendors', 'subcontractors',
-        // المجموعات الفرعية للتهيئة
         'jobs', 'areas', 'workStages', 'specializations'
     ];
     
@@ -270,7 +268,6 @@ function SystemWipeManager() {
             </p>
 
             <div className="grid md:grid-cols-2 gap-6">
-                {/* الخيار الأول: مسح الحركات فقط */}
                 <Card className="border-2 border-primary/10 hover:border-primary/30 transition-all rounded-3xl bg-muted/5 group">
                     <CardHeader>
                         <div className="flex justify-between items-start">
@@ -295,7 +292,6 @@ function SystemWipeManager() {
                     </CardFooter>
                 </Card>
 
-                {/* الخيار الثاني: مسح كل شيء */}
                 <Card className="border-2 border-red-100 hover:border-red-300 transition-all rounded-3xl bg-red-50/10 group">
                     <CardHeader>
                         <div className="flex justify-between items-start">
@@ -357,9 +353,6 @@ function SystemWipeManager() {
     );
 }
 
-import { RotateCcw } from 'lucide-react';
-
-// Main Component
 export function DataIntegrityManager() {
     return (
         <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden">
