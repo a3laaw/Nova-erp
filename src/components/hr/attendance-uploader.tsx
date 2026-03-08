@@ -7,15 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, limit } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Info } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
+import { toFirestoreDate } from '@/services/date-converter';
 
-const EXPECTED_COLUMNS = ['employeeNumber', 'date', 'checkIn1', 'checkOut1', 'checkIn2', 'checkOut2'];
+const EXPECTED_COLUMNS = ['employeeNumber', 'employeeName', 'date', 'checkIn1', 'checkOut1', 'checkIn2', 'checkOut2'];
 
 const parseExcelTime = (excelTime: any): { hours: number, minutes: number } | null => {
     if (typeof excelTime !== 'number' || excelTime < 0 || excelTime > 1) {
@@ -81,8 +82,10 @@ export function AttendanceUploader() {
       return;
     }
 
+    // تم إضافة اسم الموظف هنا بناءً على طلبك لتسهيل الإدخال
     const templateData = employees.map(emp => ({
         employeeNumber: emp.employeeNumber,
+        employeeName: emp.fullName, // العمود الجديد للمساعدة
         date: '',
         checkIn1: '',
         checkOut1: '',
@@ -92,13 +95,15 @@ export function AttendanceUploader() {
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     
+    // تنسيق عرض الأعمدة
     worksheet['!cols'] = [
-      { wch: 20 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
+      { wch: 15 }, // employeeNumber
+      { wch: 30 }, // employeeName (عرض أكبر للاسم)
+      { wch: 15 }, // date
+      { wch: 12 }, // checkIn1
+      { wch: 12 }, // checkOut1
+      { wch: 12 }, // checkIn2
+      { wch: 12 }, // checkOut2
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -126,7 +131,7 @@ export function AttendanceUploader() {
 
         const firstRow = json[0];
         if (!firstRow || !EXPECTED_COLUMNS.every(col => col in firstRow)) {
-            throw new Error(`الملف يجب أن يحتوي على الأعمدة التالية باللغة الإنجليزية: ${EXPECTED_COLUMNS.join(', ')}`);
+            throw new Error(`المسودة غير صحيحة. يجب أن يحتوي الملف على الأعمدة التالية باللغة الإنجليزية: ${EXPECTED_COLUMNS.join(', ')}`);
         }
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
@@ -215,7 +220,7 @@ export function AttendanceUploader() {
         for (const [employeeId, data] of attendanceByEmployee.entries()) {
             const docId = `${year}-${month}-${employeeId}`;
             const docRef = doc(firestore, 'attendance', docId);
-            const attendanceDoc: Omit<MonthlyAttendance, 'id'> = {
+            const attendanceDoc = {
                 employeeId,
                 year: parseInt(year),
                 month: parseInt(month),
@@ -253,11 +258,11 @@ export function AttendanceUploader() {
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm text-muted-foreground">
                     <ol className="list-decimal list-inside space-y-3">
-                        <li><strong>تنزيل النموذج:</strong> قم بتنزيل النموذج الرسمي لملف الحضور. يحتوي على أرقام الموظفين النشطين وأعمدة باللغة الإنجليزية يجب عدم تغييرها.</li>
-                        <li><strong>ملء البيانات:</strong> املأ بيانات الحضور لكل موظف. يمكنك ترك صفوف الموظفين الذين ليس لديهم بصمة فارغة.</li>
+                        <li><strong>تنزيل النموذج:</strong> قم بتنزيل النموذج الرسمي. يحتوي الآن على <strong>أسماء الموظفين</strong> لتسهيل الإدخال.</li>
+                        <li><strong>ملء البيانات:</strong> املأ بيانات الحضور. عمود الاسم للمساعدة فقط، النظام يعتمد على الرقم الوظيفي.</li>
                         <li><strong>تحديد الفترة:</strong> اختر السنة والشهر الصحيحين.</li>
-                        <li><strong>رفع الملف:</strong> اسحب الملف إلى منطقة الرفع أو اضغط لاختياره.</li>
-                        <li><strong>تأكيد:</strong> اضغط على زر "رفع وتحديث السجلات" لمعالجة البيانات.</li>
+                        <li><strong>رفع الملف:</strong> اسحب الملف إلى منطقة الرفع.</li>
+                        <li><strong>تأكيد:</strong> اضغط على زر "رفع وتحديث السجلات".</li>
                     </ol>
                     <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-200">
                         <Info className="h-4 w-4 !text-blue-600 dark:!text-blue-300" />
@@ -338,7 +343,7 @@ export function AttendanceUploader() {
                     </Button>
                     <Button onClick={handleDownloadTemplate} variant="outline" disabled={employeesLoading}>
                         {employeesLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="ml-2 h-4 w-4" />}
-                        تنزيل النموذج الرسمي
+                        تنزيل النموذج (بالأسماء)
                     </Button>
                 </CardFooter>
             </Card>
