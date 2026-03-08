@@ -116,7 +116,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [formData.contractType, formData.pieceRateMode]);
 
     // ✨ محرك مزامنة البيانات (Data Synchronization Engine)
-    // هذا الجزء هو المسؤول عن ملء النموذج بالبيانات الحقيقية عند التعديل
     useEffect(() => {
         const generalHours = branding?.work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
@@ -166,32 +165,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [initialData, branding]);
 
     useEffect(() => {
-        if (initialData?.id) return; // لا نغير هذه الإعدادات أثناء التعديل إلا يدوياً
-        const noSalaryContractTypes = ['percentage', 'day_laborer'];
-        const workTimeShouldBeHidden = ['permanent', 'percentage', 'piece-rate', 'day_laborer'].includes(formData.contractType || '');
-
-        if (noSalaryContractTypes.includes(formData.contractType || '') || (formData.contractType === 'piece-rate' && formData.pieceRateMode === 'per_piece')) {
-            setFormData(prev => ({
-                ...prev,
-                basicSalary: 0,
-                housingAllowance: 0,
-                transportAllowance: 0,
-            }));
-            setShowHousingAllowance(false);
-            setShowTransportAllowance(false);
-        }
-        
-        if (workTimeShouldBeHidden && branding?.work_hours?.general) {
-             setFormData(prev => ({
-                ...prev,
-                workStartTime: branding.work_hours.general.morning_start_time || '08:00',
-                workEndTime: branding.work_hours.general.evening_end_time || '17:00',
-            }));
-        }
-    }, [formData.contractType, formData.pieceRateMode, branding, initialData?.id]);
-
-
-    useEffect(() => {
         if (!firestore) return;
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
@@ -235,7 +208,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         } else if (id === 'nameEn') {
             sanitizedValue = value.replace(/[^ a-zA-Z]/g, '');
         } else if (['basicSalary', 'housingAllowance', 'transportAllowance', 'contractPercentage', 'targetDescription', 'pieceRate', 'dailyRate'].includes(id)) {
-            sanitizedValue = Number(value);
+            sanitizedValue = value === '' ? '' : Number(value);
         }
         
         setFormData(prev => ({ ...prev, [id]: sanitizedValue }));

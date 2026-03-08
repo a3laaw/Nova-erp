@@ -96,10 +96,7 @@ export default function EditEmployeePage() {
 
         fieldMappings.forEach(({ key, label, isCurrency, changeType }) => {
             let oldValue = employee[key];
-            // معالجة البيانات القديمة التي قد تستخدم nameAr بدلاً من fullName
-            if (key === 'fullName' && oldValue === undefined) {
-                oldValue = (employee as any).nameAr;
-            }
+            if (key === 'fullName' && oldValue === undefined) oldValue = (employee as any).nameAr;
 
             const newValue = updatedData[key];
 
