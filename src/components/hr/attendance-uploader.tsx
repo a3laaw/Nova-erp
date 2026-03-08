@@ -9,14 +9,13 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Info, Calendar as CalendarIcon, ListFilter } from 'lucide-react';
+import { Loader2, Upload, FileCheck, AlertTriangle, DownloadCloud, Info, Calendar as CalendarIcon, ListFilter, Save } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { parse, format, isSameDay } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DateInput } from '../ui/date-input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { cn } from '@/lib/utils';
 
 const EXPECTED_COLUMNS = ['employeeNumber', 'employeeName', 'date', 'checkIn1', 'checkOut1', 'checkIn2', 'checkOut2'];
@@ -315,7 +314,7 @@ export function AttendanceUploader() {
                         {file ? (
                             <div className="mt-6 space-y-1">
                                 <p className="text-lg font-black text-primary">{file.name}</p>
-                                <p className="text-xs text-muted-foreground font-bold">جاهز للرفع والمعالجة</p>
+                                <p className="text-xs text-muted-foreground font-bold">جاهز للرفع ومعالجة</p>
                             </div>
                         ) : (
                             <div className="mt-6 space-y-1">
