@@ -6,16 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, limit } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, PermissionRequest } from '@/lib/types';
 import { Loader2, Sheet, Info, FileWarning } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { useAuth } from '@/context/auth-context';
+import { parse } from 'date-fns';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '../ui/card';
 import { toFirestoreDate } from '@/services/date-converter';
-import { Checkbox } from '../ui/checkbox';
-import { Separator } from '../ui/separator';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { useAuth } from '@/context/auth-context';
 
 
 export function PayrollGenerator() {
