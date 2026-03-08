@@ -58,27 +58,60 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { toast } = useToast();
     const { branding } = useBranding();
     
-    const [formData, setFormData] = useState<Partial<Employee>>({
-        fullName: '', nameEn: '', civilId: '', mobile: '',
-        hireDate: new Date(), department: '', jobTitle: '',
-        workTeam: '', 
-        contractType: 'permanent' as Employee['contractType'], basicSalary: 0,
-        housingAllowance: 0, transportAllowance: 0,
-        salaryPaymentType: 'cash' as Employee['salaryPaymentType'],
-        bankName: '',
-        accountNumber: '',
-        iban: '',
-        contractPercentage: 0,
-        gender: 'male' as Employee['gender'],
-        dob: undefined as Date | undefined, 
-        nationality: '',
-        residencyExpiry: undefined as Date | undefined,
-        workStartTime: '08:00',
-        workEndTime: '17:00',
-        pieceRateMode: 'salary_with_target' as 'salary_with_target' | 'per_piece',
-        targetDescription: 0,
-        pieceRate: 0,
-        dailyRate: 0,
+    const [formData, setFormData] = useState<Partial<Employee>>(() => {
+        if (initialData) {
+            return {
+                fullName: initialData.fullName || (initialData as any).nameAr || '',
+                nameEn: initialData.nameEn || (initialData as any).nameEn || '',
+                civilId: initialData.civilId || '',
+                mobile: initialData.mobile || '',
+                hireDate: toFirestoreDate(initialData.hireDate) || new Date(),
+                department: initialData.department || '',
+                jobTitle: initialData.jobTitle || '',
+                workTeam: (initialData as any).workTeam || '',
+                contractType: initialData.contractType || 'permanent',
+                basicSalary: Number(initialData.basicSalary ?? 0),
+                housingAllowance: Number(initialData.housingAllowance ?? 0),
+                transportAllowance: Number(initialData.transportAllowance ?? 0),
+                salaryPaymentType: initialData.salaryPaymentType || 'cash',
+                bankName: initialData.bankName || '',
+                accountNumber: initialData.accountNumber || '',
+                iban: initialData.iban || '',
+                contractPercentage: Number(initialData.contractPercentage ?? 0),
+                gender: initialData.gender || 'male',
+                dob: toFirestoreDate(initialData.dob) || undefined, 
+                nationality: initialData.nationality || '',
+                residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
+                workStartTime: initialData.workStartTime || '08:00',
+                workEndTime: initialData.workEndTime || '17:00',
+                pieceRateMode: initialData.pieceRateMode || 'salary_with_target',
+                targetDescription: Number(initialData.targetDescription ?? 0),
+                pieceRate: Number(initialData.pieceRate ?? 0),
+                dailyRate: Number(initialData.dailyRate ?? 0),
+            }
+        }
+        return {
+            fullName: '', nameEn: '', civilId: '', mobile: '',
+            hireDate: new Date(), department: '', jobTitle: '',
+            workTeam: '', 
+            contractType: 'permanent' as Employee['contractType'], basicSalary: 0,
+            housingAllowance: 0, transportAllowance: 0,
+            salaryPaymentType: 'cash' as Employee['salaryPaymentType'],
+            bankName: '',
+            accountNumber: '',
+            iban: '',
+            contractPercentage: 0,
+            gender: 'male' as Employee['gender'],
+            dob: undefined, 
+            nationality: '',
+            residencyExpiry: undefined,
+            workStartTime: '08:00',
+            workEndTime: '17:00',
+            pieceRateMode: 'salary_with_target' as 'salary_with_target' | 'per_piece',
+            targetDescription: 0,
+            pieceRate: 0,
+            dailyRate: 0,
+        };
     });
 
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
@@ -117,12 +150,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     }, [formData.contractType, formData.pieceRateMode]);
 
     useEffect(() => {
-        const generalHours = branding?.work_hours?.general;
-        const defaultStartTime = generalHours?.morning_start_time || '08:00';
-        const defaultEndTime = generalHours?.evening_end_time || '17:00';
-
         if (initialData) {
-            setFormData({
+            const data = {
                 fullName: initialData.fullName || (initialData as any).nameAr || '',
                 nameEn: initialData.nameEn || (initialData as any).nameEn || '',
                 civilId: initialData.civilId || '',
@@ -132,35 +161,35 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 jobTitle: initialData.jobTitle || '',
                 workTeam: (initialData as any).workTeam || '',
                 contractType: initialData.contractType || 'permanent',
-                basicSalary: Number(initialData.basicSalary || 0),
-                housingAllowance: Number(initialData.housingAllowance || 0),
-                transportAllowance: Number(initialData.transportAllowance || 0),
+                basicSalary: Number(initialData.basicSalary ?? 0),
+                housingAllowance: Number(initialData.housingAllowance ?? 0),
+                transportAllowance: Number(initialData.transportAllowance ?? 0),
                 salaryPaymentType: initialData.salaryPaymentType || 'cash',
                 bankName: initialData.bankName || '',
                 accountNumber: initialData.accountNumber || '',
                 iban: initialData.iban || '',
-                contractPercentage: Number(initialData.contractPercentage || 0),
+                contractPercentage: Number(initialData.contractPercentage ?? 0),
                 gender: initialData.gender || 'male',
                 dob: toFirestoreDate(initialData.dob) || undefined,
                 nationality: initialData.nationality || '',
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
-                workStartTime: initialData.workStartTime || defaultStartTime,
-                workEndTime: initialData.workEndTime || defaultEndTime,
+                workStartTime: initialData.workStartTime || '08:00',
+                workEndTime: initialData.workEndTime || '17:00',
                 pieceRateMode: initialData.pieceRateMode || 'salary_with_target',
-                targetDescription: Number(initialData.targetDescription || 0),
-                pieceRate: Number(initialData.pieceRate || 0),
-                dailyRate: Number(initialData.dailyRate || 0),
-            });
-            setShowHousingAllowance(!!initialData.housingAllowance && Number(initialData.housingAllowance) > 0);
-            setShowTransportAllowance(!!initialData.transportAllowance && Number(initialData.transportAllowance) > 0);
-        } else if (branding) {
+                targetDescription: Number(initialData.targetDescription ?? 0),
+                pieceRate: Number(initialData.pieceRate ?? 0),
+                dailyRate: Number(initialData.dailyRate ?? 0),
+            };
+            setFormData(data);
+            setShowHousingAllowance(Number(data.housingAllowance) > 0);
+            setShowTransportAllowance(Number(data.transportAllowance) > 0);
+        } else if (branding?.work_hours?.general) {
+            const generalHours = branding.work_hours.general;
             setFormData(prev => ({
                 ...prev,
-                workStartTime: defaultStartTime,
-                workEndTime: defaultEndTime,
+                workStartTime: generalHours.morning_start_time || '08:00',
+                workEndTime: generalHours.evening_end_time || '17:00',
             }));
-            setShowHousingAllowance(false);
-            setShowTransportAllowance(false);
         }
     }, [initialData, branding]);
 
@@ -346,16 +375,16 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="fullName">الاسم الكامل <span className="text-destructive">*</span></Label>
-                            <Input id="fullName" value={formData.fullName || ''} onChange={handleInputChange} required />
+                            <Input id="fullName" value={formData.fullName ?? ''} onChange={handleInputChange} required />
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="mobile">رقم الجوال <span className="text-destructive">*</span></Label>
-                            <Input id="mobile" value={formData.mobile || ''} onChange={handleInputChange} dir="ltr" maxLength={8} required />
+                            <Input id="mobile" value={formData.mobile ?? ''} onChange={handleInputChange} dir="ltr" maxLength={8} required />
                         </div>
                     </div>
                      <div className="grid gap-1.5 pt-4">
                         <Label htmlFor="contractType">نوع العقد <span className="text-destructive">*</span></Label>
-                        <Select value={formData.contractType || ''} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])} dir="rtl">
+                        <Select value={formData.contractType ?? ''} onValueChange={(v) => handleSelectChange('contractType', v as Employee['contractType'])} dir="rtl">
                             <SelectTrigger><SelectValue/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="permanent">دائم</SelectItem>
@@ -376,16 +405,16 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="department-dl">القسم (التخصص)</Label>
-                                <InlineSearchList value={formData.department || ''} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder="اختر قسم اليومية..." />
+                                <InlineSearchList value={formData.department ?? ''} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder="اختر قسم اليومية..." />
                             </div>
                             <div className="grid gap-1.5">
                                 <Label htmlFor="civilId-dl">الرقم المدني (اختياري)</Label>
-                                <Input id="civilId" value={formData.civilId || ''} onChange={handleInputChange} dir="ltr" maxLength={12} placeholder="أدخل الرقم المدني إن وجد" />
+                                <Input id="civilId" value={formData.civilId ?? ''} onChange={handleInputChange} dir="ltr" maxLength={12} placeholder="أدخل الرقم المدني إن وجد" />
                             </div>
                             {isDayLaborer && (
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="dailyRate">اليومية (د.ك) <span className="text-destructive">*</span></Label>
-                                    <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate || ''} onChange={handleInputChange} dir="ltr" required />
+                                    <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate ?? ''} onChange={handleInputChange} dir="ltr" required />
                                 </div>
                             )}
                         </div>
@@ -398,12 +427,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="department">القسم <span className="text-destructive">*</span></Label>
-                                <InlineSearchList value={formData.department || ''} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder={refDataLoading ? "تحميل..." : "اختر قسمًا..."} disabled={refDataLoading} />
+                                <InlineSearchList value={formData.department ?? ''} onSelect={(v) => handleSelectChange('department', v)} options={departmentOptions} placeholder={refDataLoading ? "تحميل..." : "اختر قسمًا..."} disabled={refDataLoading} />
                             </div>
                             <div className="grid gap-1.5">
                                 <Label htmlFor="jobTitle">المسمى الوظيفي <span className="text-destructive">*</span></Label>
                                 <InlineSearchList 
-                                    value={formData.jobTitle || ''} 
+                                    value={formData.jobTitle ?? ''} 
                                     onSelect={(v) => handleSelectChange('jobTitle', v)} 
                                     options={filteredJobOptions} 
                                     placeholder={!formData.department ? "اختر قسمًا أولاً" : refDataLoading ? "تحميل..." : "اختر مسمى وظيفي..."} 
@@ -420,7 +449,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <Label htmlFor="workTeam" className="font-bold text-primary flex items-center gap-2">
                                 <Users className="h-4 w-4" /> توزيع فريق العمل (ترميز ثنائي ذكي)
                             </Label>
-                            <Select value={formData.workTeam || ''} onValueChange={(v) => handleSelectChange('workTeam', v)} dir="rtl">
+                            <Select value={formData.workTeam ?? ''} onValueChange={(v) => handleSelectChange('workTeam', v)} dir="rtl">
                                 <SelectTrigger id="workTeam" className="border-primary/20 bg-white">
                                     <SelectValue placeholder={!formData.department ? "حدد القسم أولاً لتوليد الرموز" : "اختر الرمز..."} />
                                 </SelectTrigger>
@@ -468,11 +497,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t mt-4">
                                     <div className="grid gap-1.5">
                                         <Label htmlFor="workStartTime">يبدأ الدوام الساعة</Label>
-                                        <Input id="workStartTime" type="time" value={formData.workStartTime} onChange={handleInputChange} />
+                                        <Input id="workStartTime" type="time" value={formData.workStartTime ?? ''} onChange={handleInputChange} />
                                     </div>
                                     <div className="grid gap-1.5">
                                         <Label htmlFor="workEndTime">ينتهي الدوام الساعة</Label>
-                                        <Input id="workEndTime" type="time" value={formData.workEndTime} onChange={handleInputChange} />
+                                        <Input id="workEndTime" type="time" value={formData.workEndTime ?? ''} onChange={handleInputChange} />
                                     </div>
                                 </div>
                             )}
@@ -483,40 +512,40 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                              {formData.contractType === 'piece-rate' && (
                                 <div className="p-4 border rounded-md bg-muted/50 space-y-4">
                                    <RadioGroup
-                                        value={formData.pieceRateMode}
+                                        value={formData.pieceRateMode ?? 'salary_with_target'}
                                         onValueChange={(value: "salary_with_target" | "per_piece") => handleSelectChange('pieceRateMode', value)}
                                         className="flex items-center space-x-4 rtl:space-x-reverse"
                                     >
                                         <div className="flex items-center space-x-2 rtl:space-x-reverse"><RadioGroupItem value="salary_with_target" id="r-salary" /><Label htmlFor="r-salary">راتب مع تارجت</Label></div>
                                         <div className="flex items-center space-x-2 rtl:space-x-reverse"><RadioGroupItem value="per_piece" id="r-piece" /><Label htmlFor="r-piece">بالقطعة فقط</Label></div>
                                     </RadioGroup>
-                                     {formData.pieceRateMode === 'salary_with_target' && (<div className="grid gap-1.5 max-w-sm"><Label htmlFor="targetDescription">التارجت الشهري</Label><Input id="targetDescription" type="number" value={formData.targetDescription || ''} onChange={handleInputChange} /></div>)}
-                                     {formData.pieceRateMode === 'per_piece' && (<div className="grid gap-1.5 max-w-sm"><Label htmlFor="pieceRate">سعر القطعة (د.ك)</Label><Input id="pieceRate" type="number" step="any" value={formData.pieceRate || ''} onChange={handleInputChange} /></div>)}
+                                     {formData.pieceRateMode === 'salary_with_target' && (<div className="grid gap-1.5 max-w-sm"><Label htmlFor="targetDescription">التارجت الشهري</Label><Input id="targetDescription" type="number" value={formData.targetDescription ?? ''} onChange={handleInputChange} /></div>)}
+                                     {formData.pieceRateMode === 'per_piece' && (<div className="grid gap-1.5 max-w-sm"><Label htmlFor="pieceRate">سعر القطعة (د.ك)</Label><Input id="pieceRate" type="number" step="any" value={formData.pieceRate ?? ''} onChange={handleInputChange} /></div>)}
                                 </div>
                             )}
                             {showStandardSalary && (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start pt-2">
-                                    <div className="grid gap-1.5"><Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label><Input id="basicSalary" type="number" step="0.001" value={formData.basicSalary || ''} onChange={handleInputChange} dir="ltr" required /></div>
-                                    <div className="grid gap-1.5"><div className="flex items-center gap-2 mb-2"><Checkbox id="show-housing" checked={showHousingAllowance} onCheckedChange={(c) => setShowHousingAllowance(!!c)}/><Label htmlFor="show-housing">إضافة بدل سكن</Label></div>{showHousingAllowance && <Input id="housingAllowance" type="number" step="0.001" value={formData.housingAllowance || ''} onChange={handleInputChange} dir="ltr" />}</div>
-                                    <div className="grid gap-1.5"><div className="flex items-center gap-2 mb-2"><Checkbox id="show-transport" checked={showTransportAllowance} onCheckedChange={(c) => setShowTransportAllowance(!!c)}/><Label htmlFor="show-transport">إضافة بدل مواصلات</Label></div>{showTransportAllowance && <Input id="transportAllowance" type="number" step="0.001" value={formData.transportAllowance || ''} onChange={handleInputChange} dir="ltr" />}</div>
+                                    <div className="grid gap-1.5"><Label htmlFor="basicSalary">الراتب الأساسي (د.ك) <span className="text-destructive">*</span></Label><Input id="basicSalary" type="number" step="0.001" value={formData.basicSalary ?? ''} onChange={handleInputChange} dir="ltr" required /></div>
+                                    <div className="grid gap-1.5"><div className="flex items-center gap-2 mb-2"><Checkbox id="show-housing" checked={showHousingAllowance} onCheckedChange={(c) => setShowHousingAllowance(!!c)}/><Label htmlFor="show-housing">إضافة بدل سكن</Label></div>{showHousingAllowance && <Input id="housingAllowance" type="number" step="0.001" value={formData.housingAllowance ?? ''} onChange={handleInputChange} dir="ltr" />}</div>
+                                    <div className="grid gap-1.5"><div className="flex items-center gap-2 mb-2"><Checkbox id="show-transport" checked={showTransportAllowance} onCheckedChange={(c) => setShowTransportAllowance(!!c)}/><Label htmlFor="show-transport">إضافة بدل مواصلات</Label></div>{showTransportAllowance && <Input id="transportAllowance" type="number" step="0.001" value={formData.transportAllowance ?? ''} onChange={handleInputChange} dir="ltr" />}</div>
                                 </div>
                             )}
-                            {(formData.contractType === 'percentage' || formData.contractType === 'special') && (<div className="grid gap-1.5 max-w-sm"><Label htmlFor="contractPercentage">نسبة العقد (%)</Label><Input id="contractPercentage" type="number" step="0.1" value={formData.contractPercentage || ''} onChange={handleInputChange} dir="ltr" /></div>)}
+                            {(formData.contractType === 'percentage' || formData.contractType === 'special') && (<div className="grid gap-1.5 max-w-sm"><Label htmlFor="contractPercentage">نسبة العقد (%)</Label><Input id="contractPercentage" type="number" step="0.1" value={formData.contractPercentage ?? ''} onChange={handleInputChange} dir="ltr" /></div>)}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t mt-4">
-                                <div className="grid gap-1.5"><Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label><Select value={formData.salaryPaymentType || ''} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">كاش</SelectItem><SelectItem value="cheque">شيك</SelectItem><SelectItem value="transfer">تحويل بنكي</SelectItem></SelectContent></Select></div>
-                                {formData.salaryPaymentType === 'transfer' && (<><div className="grid gap-1.5"><Label htmlFor="bankName">اسم البنك</Label><Input id="bankName" value={formData.bankName || ''} onChange={handleInputChange} /></div><div className="grid gap-1.5"><Label htmlFor="accountNumber">رقم الحساب</Label><Input id="accountNumber" value={formData.accountNumber || ''} onChange={handleInputChange} dir="ltr"/></div></>)}
+                                <div className="grid gap-1.5"><Label htmlFor="salaryPaymentType">طريقة دفع الراتب</Label><Select value={formData.salaryPaymentType ?? ''} onValueChange={(v) => handleSelectChange('salaryPaymentType', v as Employee['salaryPaymentType'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="cash">كاش</SelectItem><SelectItem value="cheque">شيك</SelectItem><SelectItem value="transfer">تحويل بنكي</SelectItem></SelectContent></Select></div>
+                                {formData.salaryPaymentType === 'transfer' && (<><div className="grid gap-1.5"><Label htmlFor="bankName">اسم البنك</Label><Input id="bankName" value={formData.bankName ?? ''} onChange={handleInputChange} /></div><div className="grid gap-1.5"><Label htmlFor="accountNumber">رقم الحساب</Label><Input id="accountNumber" value={formData.accountNumber ?? ''} onChange={handleInputChange} dir="ltr"/></div></>)}
                             </div>
                             <div className="grid gap-2 pt-4">
                                 <Label htmlFor="iban">رقم الـ IBAN (يمنع التكرار)</Label>
-                                <Input id="iban" value={formData.iban || ''} onChange={handleInputChange} dir="ltr" placeholder="KW00 0000 0000 0000 0000 0000 0000" />
+                                <Input id="iban" value={formData.iban ?? ''} onChange={handleInputChange} dir="ltr" placeholder="KW00 0000 0000 0000 0000 0000 0000" />
                             </div>
                         </section>
 
                         <section className="space-y-4 p-4 border rounded-lg">
                             <h3 className="font-semibold text-lg">معلومات شخصية إضافية</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div className="grid gap-1.5"><Label htmlFor="nameEn">الاسم (بالإنجليزية)</Label><Input id="nameEn" dir="ltr" value={formData.nameEn || ''} onChange={handleInputChange} /></div>
-                                <div className="grid gap-1.5"><Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label><Input id="civilId" value={formData.civilId || ''} onChange={handleInputChange} dir="ltr" maxLength={12} required /></div>
+                                <div className="grid gap-1.5"><Label htmlFor="nameEn">الاسم (بالإنجليزية)</Label><Input id="nameEn" dir="ltr" value={formData.nameEn ?? ''} onChange={handleInputChange} /></div>
+                                <div className="grid gap-1.5"><Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label><Input id="civilId" value={formData.civilId ?? ''} onChange={handleInputChange} dir="ltr" maxLength={12} required /></div>
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="dob">تاريخ الميلاد</Label>
                                     <DateInput 
@@ -526,8 +555,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                         maxDate={subYears(new Date(), 18)}
                                     />
                                 </div>
-                                <div className="grid gap-1.5"><Label htmlFor="gender">الجنس</Label><Select value={formData.gender || ''} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="male">ذكر</SelectItem><SelectItem value="female">أنثى</SelectItem></SelectContent></Select></div>
-                                <div className="grid gap-1.5"><Label htmlFor="nationality">الجنسية</Label><InlineSearchList value={formData.nationality || ''} onSelect={(value) => handleSelectChange('nationality', value)} options={nationalityOptions} placeholder="اختر الجنسية..." /></div>
+                                <div className="grid gap-1.5"><Label htmlFor="gender">الجنس</Label><Select value={formData.gender ?? ''} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="male">ذكر</SelectItem><SelectItem value="female">أنثى</SelectItem></SelectContent></Select></div>
+                                <div className="grid gap-1.5"><Label htmlFor="nationality">الجنسية</Label><InlineSearchList value={formData.nationality ?? ''} onSelect={(value) => handleSelectChange('nationality', value)} options={nationalityOptions} placeholder="اختر الجنسية..." /></div>
                                 {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
                                     <div className="grid gap-1.5">
                                         <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>

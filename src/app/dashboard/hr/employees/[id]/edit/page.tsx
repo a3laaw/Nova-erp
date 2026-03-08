@@ -39,7 +39,6 @@ export default function EditEmployeePage() {
         return doc(firestore, 'employees', id);
     }, [firestore, id]);
 
-    // جلب بيانات الموظف بشكل لحظي ومستقر
     const { data: employee, loading, error } = useDocument<Employee>(firestore, employeeRef ? employeeRef.path : null);
 
     const handleSave = useCallback(async (updatedData: Partial<Employee>) => {
@@ -47,7 +46,6 @@ export default function EditEmployeePage() {
         
         setIsSaving(true);
 
-        // التحقق من تكرار IBAN لضمان فرادة الحسابات البنكية
         if (updatedData.iban && updatedData.iban.trim() !== '') {
             const ibanQuery = query(
                 collection(firestore, 'employees'),
@@ -67,7 +65,6 @@ export default function EditEmployeePage() {
 
         const changesToLog: Omit<AuditLog, 'id' | 'changedBy' | 'effectiveDate'>[] = [];
 
-        // قائمة الحقول المراد تتبع تغييراتها في سجل التدقيق
         const fieldMappings: { key: keyof Employee; changeType: AuditLog['changeType'], label: string, isCurrency?: boolean }[] = [
             { key: 'fullName', changeType: 'DataUpdate', label: 'الاسم الكامل' },
             { key: 'nameEn', changeType: 'DataUpdate', label: 'الاسم بالإنجليزية' },
@@ -175,20 +172,6 @@ export default function EditEmployeePage() {
         );
     }
 
-    if (employee.status === 'terminated') {
-        return (
-            <Card dir="rtl" className="max-w-4xl mx-auto">
-                <CardHeader>
-                    <CardTitle>ملف منتهي الخدمة</CardTitle>
-                    <CardDescription>لا يمكن تعديل بيانات موظف تم إنهاء خدمته مسبقاً.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button variant="outline" onClick={() => router.back()}>العودة لقائمة الموظفين</Button>
-                </CardContent>
-            </Card>
-        );
-    }
-
     return (
         <Card className="max-w-4xl mx-auto" dir="rtl">
             <CardHeader>
@@ -208,7 +191,6 @@ export default function EditEmployeePage() {
                 </div>
             </CardHeader>
             <CardContent>
-                {/* استخدام الـ key يضمن إعادة بناء النموذج بالبيانات الجديدة فور وصولها */}
                 <EmployeeForm 
                     key={employee.id} 
                     initialData={employee}
