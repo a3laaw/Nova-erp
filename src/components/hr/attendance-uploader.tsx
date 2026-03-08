@@ -59,6 +59,20 @@ export function AttendanceUploader() {
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setFile(e.dataTransfer.files[0]);
+      setProcessingResult(null);
+    }
+  };
+
   const handleDownloadTemplate = () => {
     if (employeesLoading) {
       toast({ title: 'الرجاء الانتظار', description: 'جاري تحميل قائمة الموظفين.' });
@@ -115,7 +129,6 @@ export function AttendanceUploader() {
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         
-        // تجميع الحركات من الملف
         const newRecordsByEmployee = new Map<string, any[]>();
         json.forEach(row => {
             const emp = employeeMap.get(String(row.employeeNumber));
@@ -157,9 +170,7 @@ export function AttendanceUploader() {
 
         const batch = writeBatch(firestore);
         
-        // دمج السجلات الجديدة مع الموجودة في قاعدة البيانات
         for (const [employeeId, newItems] of newRecordsByEmployee.entries()) {
-            // نستخدم دائماً الشهر والسنة من أول سجل في الملف أو المختار
             const sampleDate = newItems[0].date;
             const docYear = sampleDate.getFullYear();
             const docMonth = sampleDate.getMonth() + 1;
@@ -169,7 +180,6 @@ export function AttendanceUploader() {
             const existingDoc = await getDoc(docRef);
             let mergedRecords = existingDoc.exists() ? (existingDoc.data().records || []) : [];
 
-            // تحويل التواريخ في السجلات القديمة لمقارنتها
             mergedRecords = mergedRecords.map((r: any) => ({ ...r, date: toFirestoreDate(r.date) }));
 
             newItems.forEach(newItem => {
@@ -178,7 +188,6 @@ export function AttendanceUploader() {
                 else mergedRecords.push(newItem);
             });
 
-            // إعادة حساب الملخص
             const summary = {
                 presentDays: mergedRecords.filter((r: any) => r.status === 'present' || r.status === 'late').length,
                 absentDays: mergedRecords.filter((r: any) => r.status === 'absent').length,
@@ -215,6 +224,8 @@ export function AttendanceUploader() {
   const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start" dir="rtl">
