@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, setDoc, collection, addDoc, serverTimestamp, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { cn } from '@/lib/utils';
 import type { WorkShift } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const defaultSchedule = {
     morning_start_time: '08:00',
@@ -198,6 +199,16 @@ export function WorkHoursManager() {
         }
     };
 
+    const openShiftDialog = (shift: WorkShift | null = null) => {
+        setEditingShift(shift);
+        if (shift) {
+            setShiftFormData({ name: shift.name, startTime: shift.startTime, endTime: shift.endTime });
+        } else {
+            setShiftFormData({ name: '', startTime: '08:00', endTime: '17:00' });
+        }
+        setIsShiftDialogOpen(true);
+    };
+
     if (loading) return <div className="space-y-6"><Skeleton className="h-20 w-full rounded-[2.5rem]"/><Skeleton className="h-96 w-full rounded-[3rem]"/></div>;
 
     return (
@@ -349,7 +360,7 @@ export function WorkHoursManager() {
                                 {shiftsLoading ? <TableRow><TableCell colSpan={4} className="text-center p-12"><Loader2 className="animate-spin mx-auto text-primary h-8 w-8"/></TableCell></TableRow> :
                                 shifts.length === 0 ? <TableRow><TableCell colSpan={4} className="h-64 text-center text-muted-foreground italic font-bold">لا توجد ورديات معرفة حالياً.</TableCell></TableRow> :
                                 shifts.map(shift => (
-                                    <TableRow key={shift.id} className="hover:bg-primary/5 transition-colors h-20 border-b last:border-0">
+                                    <TableRow key={shift.id} className="hover:bg-primary/5 transition-colors h-20 border-b last:border-0 group">
                                         <TableCell className="px-10 font-black text-lg text-gray-800">{shift.name}</TableCell>
                                         <TableCell className="font-mono font-black text-2xl text-primary">{shift.startTime}</TableCell>
                                         <TableCell className="font-mono font-black text-2xl">{shift.endTime}</TableCell>
