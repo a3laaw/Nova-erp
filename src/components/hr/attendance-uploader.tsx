@@ -1,17 +1,35 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardContent, 
+  CardDescription, 
+  CardFooter 
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { 
+  Alert, 
+  AlertDescription, 
+  AlertTitle 
+} from '@/components/ui/alert';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, Upload, AlertTriangle, Info, Save, FileSpreadsheet, DownloadCloud } from 'lucide-react';
+import { Loader2, AlertTriangle, FileSpreadsheet, DownloadCloud } from 'lucide-react';
 import type { Employee, MonthlyAttendance } from '@/lib/types';
 import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -355,17 +373,3 @@ export function AttendanceUploader() {
     </div>
   );
 }
-
-const Alert = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <div className={cn("relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4", className)}>
-        {children}
-    </div>
-);
-
-const AlertTitle = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <h5 className={cn("mb-1 font-medium leading-none tracking-tight", className)}>{children}</h5>
-);
-
-const AlertDescription = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <div className={cn("text-sm [&_p]:leading-relaxed", className)}>{children}</div>
-);
