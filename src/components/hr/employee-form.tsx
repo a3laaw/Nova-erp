@@ -23,6 +23,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
+import { subYears, startOfToday, addYears } from 'date-fns';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -115,7 +116,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         return true;
     }, [formData.contractType, formData.pieceRateMode]);
 
-    // ✨ محرك مزامنة البيانات (Data Synchronization Engine)
     useEffect(() => {
         const generalHours = branding?.work_hours?.general;
         const defaultStartTime = generalHours?.morning_start_time || '08:00';
@@ -456,7 +456,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                 </div>
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="hireDate">تاريخ التعيين <span className="text-destructive">*</span></Label>
-                                    <DateInput value={formData.hireDate} onChange={(date) => handleSelectChange('hireDate', date!)} />
+                                    <DateInput 
+                                        value={formData.hireDate} 
+                                        onChange={(date) => handleSelectChange('hireDate', date!)} 
+                                        minDate={new Date(2000, 0, 1)}
+                                        maxDate={addYears(new Date(), 5)}
+                                    />
                                 </div>
                             </div>
                             {formData.contractType === 'special' && (
@@ -512,10 +517,27 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="grid gap-1.5"><Label htmlFor="nameEn">الاسم (بالإنجليزية)</Label><Input id="nameEn" dir="ltr" value={formData.nameEn || ''} onChange={handleInputChange} /></div>
                                 <div className="grid gap-1.5"><Label htmlFor="civilId">الرقم المدني <span className="text-destructive">*</span></Label><Input id="civilId" value={formData.civilId || ''} onChange={handleInputChange} dir="ltr" maxLength={12} required /></div>
-                                <div className="grid gap-1.5"><Label htmlFor="dob">تاريخ الميلاد</Label><DateInput value={formData.dob} onChange={(date) => handleSelectChange('dob', date)} /></div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="dob">تاريخ الميلاد</Label>
+                                    <DateInput 
+                                        value={formData.dob} 
+                                        onChange={(date) => handleSelectChange('dob', date)} 
+                                        minDate={subYears(new Date(), 100)}
+                                        maxDate={subYears(new Date(), 18)}
+                                    />
+                                </div>
                                 <div className="grid gap-1.5"><Label htmlFor="gender">الجنس</Label><Select value={formData.gender || ''} onValueChange={(v) => handleSelectChange('gender', v as Employee['gender'])} dir="rtl"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="male">ذكر</SelectItem><SelectItem value="female">أنثى</SelectItem></SelectContent></Select></div>
                                 <div className="grid gap-1.5"><Label htmlFor="nationality">الجنسية</Label><InlineSearchList value={formData.nationality || ''} onSelect={(value) => handleSelectChange('nationality', value)} options={nationalityOptions} placeholder="اختر الجنسية..." /></div>
-                                {formData.nationality && formData.nationality.trim() !== 'كويتي' && (<div className="grid gap-1.5"><Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label><DateInput value={formData.residencyExpiry} onChange={(date) => handleSelectChange('residencyExpiry', date)} /></div>)}
+                                {formData.nationality && formData.nationality.trim() !== 'كويتي' && (
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="residencyExpiry">تاريخ انتهاء الإقامة</Label>
+                                        <DateInput 
+                                            value={formData.residencyExpiry} 
+                                            onChange={(date) => handleSelectChange('residencyExpiry', date)} 
+                                            minDate={startOfToday()}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </section>
                     </>

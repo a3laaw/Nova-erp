@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { format as formatDate, isValid, parse as parseDate } from 'date-fns';
+import { format as formatDate, isValid, parse as parseDate, isBefore, isAfter, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
@@ -17,11 +17,11 @@ interface DateInputProps {
   disabled?: boolean;
   className?: string;
   required?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
+  placeholder?: string;
 }
 
-// The format seen by the user
-const displayFormat = 'PPP';
-// Formats to try parsing when user types manually
 const parseableFormats = [
     'dd/MM/yyyy', 'd/M/yyyy', 'dd/M/yyyy', 'd/MM/yyyy',
     'dd-MM-yyyy', 'd-M-yyyy', 'dd-M-yyyy', 'd-MM-yyyy',
@@ -32,8 +32,7 @@ const parseableFormats = [
     'ddMMyyyy', 'yyyyMMdd',
 ];
 
-
-export function DateInput({ value, onChange, disabled, className, ...props }: DateInputProps) {
+export function DateInput({ value, onChange, disabled, className, minDate, maxDate, placeholder, ...props }: DateInputProps) {
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState('');
 
@@ -77,8 +76,8 @@ export function DateInput({ value, onChange, disabled, className, ...props }: Da
 
     let parsedDate: Date | null = null;
     
-    for (const format of parseableFormats) {
-      const parsed = parseDate(inputValue, format, new Date());
+    for (const fmt of parseableFormats) {
+      const parsed = parseDate(inputValue, fmt, new Date());
       if (isValid(parsed)) {
         parsedDate = parsed;
         break;
@@ -93,6 +92,19 @@ export function DateInput({ value, onChange, disabled, className, ...props }: Da
     }
 
     if (parsedDate) {
+      // التحقق من القيود الزمنية (Validation against min/max)
+      if (minDate && isBefore(startOfDay(parsedDate), startOfDay(minDate))) {
+          parsedDate = minDate;
+      }
+      if (maxDate && isAfter(startOfDay(parsedDate), startOfDay(maxDate))) {
+          parsedDate = maxDate;
+      }
+
+      // منع التواريخ القديمة جداً افتراضياً (مثل 1190)
+      if (parsedDate.getFullYear() < 1900) {
+          parsedDate = new Date(1900, 0, 1);
+      }
+
       if (!dateValue || parsedDate.getTime() !== dateValue.getTime()) {
         onChange(parsedDate);
       } else {
@@ -130,7 +142,7 @@ export function DateInput({ value, onChange, disabled, className, ...props }: Da
           onChange={handleInputChange}
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
-          placeholder={`مثال: ${formatDate(new Date(), 'dd/MM/yyyy')}`}
+          placeholder={placeholder || `مثال: ${formatDate(new Date(), 'dd/MM/yyyy')}`}
           disabled={disabled}
           className="w-full pl-10 rtl:pr-10"
           {...props}
@@ -145,8 +157,13 @@ export function DateInput({ value, onChange, disabled, className, ...props }: Da
           disabled={disabled}
           locale={ar}
           captionLayout="dropdown-buttons"
-          fromYear={1960}
-          toYear={new Date().getFullYear() + 5}
+          fromYear={minDate ? minDate.getFullYear() : 1940}
+          toYear={maxDate ? maxDate.getFullYear() : new Date().getFullYear() + 10}
+          disabled={ (date) => {
+              if (minDate && isBefore(startOfDay(date), startOfDay(minDate))) return true;
+              if (maxDate && isAfter(startOfDay(date), startOfDay(maxDate))) return true;
+              return false;
+          }}
         />
       </PopoverContent>
     </Popover>
