@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -75,7 +74,7 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
     return new Map(categories.map(cat => [cat.id, cat]));
   }, [categories]);
 
-  const activityTypeMap = useMemo(() => new Map(activityTypes.map(t => [t.id, t.name])), [activityTypes]);
+  const activityTypeMap = useMemo(() => new Map((activityTypes || []).map(t => [t.id, t.name])), [activityTypes]);
 
   const filteredItems = useMemo(() => {
     let augmentedItems = (items || []).map(item => {
@@ -151,7 +150,7 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">كل الأنشطة</SelectItem>
-                        {activityTypes.map(t => (
+                        {(activityTypes || []).map(t => (
                             <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>
                         ))}
                     </SelectContent>

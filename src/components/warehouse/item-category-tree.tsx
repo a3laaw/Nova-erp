@@ -9,6 +9,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Loader2 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Input } from '../ui/input';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface CategoryNode extends ItemCategory {
   children: CategoryNode[];
@@ -85,7 +86,7 @@ export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSe
     const [openCategories, setOpenCategories] = React.useState(new Set<string>());
     const [searchQuery, setSearchQuery] = React.useState('');
 
-    // Safe effect to handle search expansion without infinite loops
+    // Safe expansion logic upon search
     React.useEffect(() => {
         if (searchQuery.trim() === '') return;
         const lowerQuery = searchQuery.toLowerCase();
@@ -104,7 +105,11 @@ export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSe
         });
         
         if (toOpen.size > 0) {
-            setOpenCategories(prev => new Set([...prev, ...toOpen]));
+            setOpenCategories(prev => {
+                const combined = new Set(prev);
+                toOpen.forEach(id => combined.add(id));
+                return combined;
+            });
         }
     }, [searchQuery, categories]);
 

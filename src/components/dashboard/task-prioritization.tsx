@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
-import { ClipboardList, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
+import { ClipboardList, Clock, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isPast, differenceInDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -57,9 +57,8 @@ export function TaskPrioritization() {
     // ترتيب المهام حسب عدد أيام التأخير (الأكثر تأخراً أولاً)
     const sortedTasks = tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
     
-    // تحديث الحالة فقط إذا كانت هناك تغييرات فعلية
     setUrgentTasks(sortedTasks);
-  }, [transactions, projects, loading]); // مصفوفة تبعيات ثابتة لمنع الـ infinite loop
+  }, [transactions, projects, loading]); // مصفوفة التبعيات تمنع الحلقة اللانهائية
 
   return (
     <Card className="h-full flex flex-col rounded-3xl border-none shadow-sm overflow-hidden">
