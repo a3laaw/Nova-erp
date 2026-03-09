@@ -1,10 +1,22 @@
 'use client';
 
 import * as React from 'react';
-import { Input } from './input';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { Button } from './button';
+import { Button } from '@/components/ui/button';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 export interface SearchOption {
   value: string;
@@ -30,98 +42,62 @@ export function InlineSearchList({
   className,
 }: InlineSearchListProps) {
   const [open, setOpen] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const containerRef = React.useRef<HTMLDivElement>(null);
   
-  const selectedLabel = options.find((option) => option.value === value)?.label;
-
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    if (open) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [open]);
-
-  const filteredOptions = React.useMemo(() => {
-    if (!search) return options;
-    const searchLower = search.toLowerCase();
-    return options.filter(opt => 
-      opt.label.toLowerCase().includes(searchLower) || 
-      opt.searchKey?.toLowerCase().includes(searchLower)
-    );
-  }, [options, search]);
+  const selectedLabel = React.useMemo(() => 
+    options.find((option) => option.value === value)?.label
+  , [options, value]);
 
   return (
-    <div className="relative w-full" ref={containerRef}>
-      <Button
-        type="button"
-        variant="outline"
-        role="combobox"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "w-full justify-between font-normal",
-          !value && "text-muted-foreground",
-          className
-        )}
-        disabled={disabled}
-      >
-        <span className="truncate">{selectedLabel || placeholder}</span>
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </Button>
-      
-      {open && (
-        <div 
-          className="absolute z-[99999] w-full mt-1 bg-popover border rounded-md shadow-md"
-          style={{ pointerEvents: 'auto' }}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn(
+            "w-full justify-between font-normal h-11 rounded-xl border-2",
+            !value && "text-muted-foreground",
+            className
+          )}
+          disabled={disabled}
         >
-          <div className="p-2 border-b">
-            <Input
-              placeholder="ابحث..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8"
-              autoFocus
-            />
-          </div>
-          <div className="max-h-[200px] overflow-y-auto p-1">
-            {filteredOptions.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                لا توجد نتائج.
-              </div>
-            ) : (
-              filteredOptions.map((option) => (
-                <div
+          <span className="truncate">{selectedLabel || placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent 
+        className="w-[--radix-popover-trigger-width] p-0 z-[999999]" 
+        align="start"
+        dir="rtl"
+      >
+        <Command>
+          <CommandInput placeholder="ابحث..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>لا توجد نتائج.</CommandEmpty>
+            <CommandGroup>
+              {options.map((option) => (
+                <CommandItem
                   key={option.value}
-                  className={cn(
-                    "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                    value === option.value && "bg-accent"
-                  )}
-                  onClick={() => {
-                    onSelect(option.value === value ? '' : option.value);
+                  value={option.label}
+                  onSelect={() => {
+                    onSelect(option.value === value ? "" : option.value);
                     setOpen(false);
-                    setSearch('');
                   }}
-                  style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  className="cursor-pointer"
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      "ml-2 h-4 w-4",
                       value === option.value ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {option.label}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

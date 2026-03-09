@@ -46,6 +46,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { branding } = useBranding();
     const aiFileInputRef = useRef<HTMLInputElement>(null);
     
+    // استخدام البث اللحظي للقوائم المرجعية لضمان استقرار البيانات
+    const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
+    const { data: jobs, loading: jobsLoading } = useSubscription<Job>(firestore, 'jobs', [], true);
+
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '',
         nameEn: '',
@@ -79,12 +83,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
-    const [refDataLoading, setRefDataLoading] = useState(true);
-
-    const isDayLaborer = formData.contractType === 'day_laborer';
 
     useEffect(() => {
         if (initialData) {
@@ -111,29 +109,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         }
     }, [initialData]);
 
-    useEffect(() => {
-        if (!firestore) return;
-        const fetchReferenceData = async () => {
-            setRefDataLoading(true);
-            try {
-                const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
-                const jobsQuery = query(collectionGroup(firestore, 'jobs'));
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsSnapshot)]);
-                setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
-                setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, departmentId: doc.ref.parent.parent!.id, ...doc.data() } as Job & { departmentId: string })));
-            } catch (e) {
-                console.error("Reference data fetch failed:", e);
-            } finally { setRefDataLoading(false); }
-        };
-        fetchReferenceData();
-    }, [firestore]);
-
     const handleAiAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         if (aiFileInputRef.current) aiFileInputRef.current.value = '';
-
         setIsAnalyzing(true);
         try {
             const reader = new FileReader();
@@ -141,7 +120,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 try {
                     const dataUri = evt.target?.result as string;
                     const result = await analyzeEmployeeDocument({ fileDataUri: dataUri });
-
                     if (result) {
                         setFormData(prev => ({
                             ...prev,
@@ -157,14 +135,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     }
                 } catch (err: any) {
                     toast({ variant: 'destructive', title: 'خطأ في التحليل', description: err.message });
-                } finally {
-                    setIsAnalyzing(false);
-                }
+                } finally { setIsAnalyzing(false); }
             };
             reader.readAsDataURL(file);
-        } catch (error) {
-            setIsAnalyzing(false);
-        }
+        } catch (error) { setIsAnalyzing(false); }
     };
 
     const handleCustomHoursToggle = (checked: boolean) => {
@@ -193,6 +167,21 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         }
         await onSave(formData);
     };
+
+    const departmentOptions = useMemo(() => 
+        departments.map(d => ({ value: d.name, label: d.name }))
+    , [departments]);
+
+    const filteredJobOptions = useMemo(() => {
+        if (!formData.department) return [];
+        const selectedDept = departments.find(d => d.name === formData.department);
+        if (!selectedDept) return [];
+        
+        // تصفية الوظائف بناءً على الـ departmentId في بيانات الـ jobs
+        return jobs
+            .filter(j => (j as any).departmentId === selectedDept.id)
+            .map(j => ({ value: j.name, label: j.name }));
+    }, [departments, jobs, formData.department]);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -265,28 +254,28 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {formData.nationality && formData.nationality !== 'كويتي' && (
-                    <section className="space-y-6 p-6 border rounded-[2rem] bg-orange-50/10 border-orange-100 shadow-sm animate-in fade-in zoom-in-95">
-                        <h3 className="font-black text-lg flex items-center gap-2 text-orange-800"><ShieldCheck className="h-5 w-5" /> الوثائق وتاريخ الإقامة</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="grid gap-2">
-                                <Label className="font-bold mr-1">تاريخ انتهاء الإقامة</Label>
-                                <DateInput value={formData.residencyExpiry} onChange={d => setFormData(p => ({...p, residencyExpiry: d}))} />
-                            </div>
-                        </div>
-                    </section>
-                )}
-
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/> التعيين والدوام</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">القسم *</Label>
-                            <InlineSearchList value={formData.department || ''} onSelect={v => setFormData(p => ({...p, department: v, jobTitle: ''}))} options={departments.map(d => ({value: d.name, label: d.name}))} placeholder="اختر القسم..." className="h-11" />
+                            <InlineSearchList 
+                                value={formData.department || ''} 
+                                onSelect={v => setFormData(p => ({...p, department: v, jobTitle: ''}))} 
+                                options={departmentOptions} 
+                                placeholder={deptsLoading ? "جاري التحميل..." : "اختر القسم..."} 
+                                disabled={deptsLoading}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">المسمى الوظيفي *</Label>
-                            <InlineSearchList value={formData.jobTitle || ''} onSelect={v => setFormData(p => ({...p, jobTitle: v}))} options={jobs.filter(j => j.departmentId === departments.find(d => d.name === formData.department)?.id).map(j => ({value: j.name, label: j.name}))} placeholder="اختر المسمى..." disabled={!formData.department} className="h-11" />
+                            <InlineSearchList 
+                                value={formData.jobTitle || ''} 
+                                onSelect={v => setFormData(p => ({...p, jobTitle: v}))} 
+                                options={filteredJobOptions} 
+                                placeholder={!formData.department ? "اختر القسم أولاً" : jobsLoading ? "تحميل..." : "اختر المسمى..."} 
+                                disabled={!formData.department || jobsLoading}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">نوع التعاقد *</Label>
@@ -336,7 +325,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 <section className="space-y-6 p-6 border rounded-[2.5rem] bg-emerald-50/20 border-emerald-100 shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800"><Banknote className="h-5 w-5" /> المعلومات المالية والرواتب</h3>
                     
-                    {isDayLaborer ? (
+                    {formData.contractType === 'day_laborer' ? (
                         <div className="grid gap-2 max-w-xs animate-in zoom-in-95">
                             <Label className="font-black text-emerald-900">أجرة اليومية (د.ك) *</Label>
                             <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} className="h-12 text-2xl font-black text-center font-mono border-2 border-emerald-200 bg-white rounded-2xl" />
