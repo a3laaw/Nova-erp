@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -19,13 +19,13 @@ import Link from 'next/link';
 /**
  * مكون قائمة الأولويات الذكية: 
  * يحلل سير العمل في الموقع ويستخرج التنبيهات الحرجة.
- * تم تحديث المنطق لاستبعاد المهام المرتبطة بمشاريع تم حذفها أو معاملات متوقفة.
  */
 export function TaskPrioritization() {
   const { transactions, projects, loading } = useAnalyticalData();
+  const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
 
-  const urgentTasks = useMemo(() => {
-    if (loading || !transactions || !projects) return [];
+  useEffect(() => {
+    if (loading || !transactions || !projects) return;
     
     const now = new Date();
     const tasks: any[] = [];
@@ -55,8 +55,11 @@ export function TaskPrioritization() {
     });
 
     // ترتيب المهام حسب عدد أيام التأخير (الأكثر تأخراً أولاً)
-    return tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
-  }, [transactions, projects, loading]);
+    const sortedTasks = tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
+    
+    // تحديث الحالة فقط إذا كانت هناك تغييرات فعلية
+    setUrgentTasks(sortedTasks);
+  }, [transactions, projects, loading]); // مصفوفة تبعيات ثابتة لمنع الـ infinite loop
 
   return (
     <Card className="h-full flex flex-col rounded-3xl border-none shadow-sm overflow-hidden">
