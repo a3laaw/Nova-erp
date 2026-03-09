@@ -21,7 +21,7 @@ export function TaskPrioritization() {
   const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    // FIX: Check dependencies properly to prevent infinite loops
+    // تم إضافة مصفوفة التبعيات لمنع الحلقة اللانهائية
     if (loading || !transactions || !projects) return;
     
     const now = new Date();
@@ -49,7 +49,7 @@ export function TaskPrioritization() {
 
     const sortedTasks = tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
     
-    // Only update state if results actually changed to avoid unnecessary re-renders
+    // تحديث الحالة فقط عند تغير النتائج لضمان استقرار الرندرة
     setUrgentTasks(prev => {
         if (JSON.stringify(prev) === JSON.stringify(sortedTasks)) return prev;
         return sortedTasks;

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -142,7 +141,6 @@ export function ClassificationsManager() {
             }
             
             toast({ title: 'تم الحفظ بنجاح' });
-            // Close but don't reset state immediately to prevent race conditions
             setIsDialogOpen(false);
             setItemName('');
             setEditingItem(null);
