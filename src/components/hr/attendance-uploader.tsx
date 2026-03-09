@@ -19,20 +19,13 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { 
-  Alert, 
-  AlertDescription, 
-  AlertTitle 
-} from '@/components/ui/alert';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertTriangle, FileSpreadsheet, DownloadCloud, Save, SearchCode } from 'lucide-react';
+import { Loader2, FileSpreadsheet, Save, DownloadCloud } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
-import { toFirestoreDate } from '@/services/date-converter';
+import { parse, format, isValid, startOfDay } from 'date-fns';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 
@@ -84,16 +77,13 @@ export function AttendanceUploader() {
 
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingResult, setProcessingResult] = useState<any>(null);
   
   const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setIsMounted(true);
     const now = new Date();
     setYear(now.getFullYear().toString());
     setMonth((now.getMonth() + 1).toString());
@@ -143,7 +133,6 @@ export function AttendanceUploader() {
             const emp = employees.find(e => e.id === entry.employeeId);
             const sorted = entry.times.sort();
             
-            // محرك الفحص الذكي للفترات
             const morningPunches = sorted.filter(t => t <= mEnd);
             const eveningPunches = sorted.filter(t => t >= eStart);
 
@@ -152,10 +141,11 @@ export function AttendanceUploader() {
             let manualDeduction = 0;
 
             if (emp?.workStartTime) {
-                // دوام مخصص (فترة واحدة)
-                if (sorted[0] > emp.workStartTime) status = 'late';
+                if (sorted[0] > emp.workStartTime) {
+                    status = 'late';
+                    anomaly = `تأخير عن الدوام المخصص (${emp.workStartTime})`;
+                }
             } else {
-                // دوام رسمي (فترتين)
                 const hasMorning = morningPunches.length > 0;
                 const hasEvening = eveningPunches.length > 0;
 
@@ -170,6 +160,10 @@ export function AttendanceUploader() {
                 } else if (hasMorning && hasEvening && sorted.length < 4) {
                     status = 'missing_punch';
                     anomaly = 'فقدان بصمة وسيطة (تم احتساب يوم كامل)';
+                } else if (!hasMorning && !hasEvening) {
+                    status = 'absent';
+                    anomaly = 'غياب كامل عن اليوم';
+                    manualDeduction = 1;
                 }
             }
 
@@ -178,12 +172,12 @@ export function AttendanceUploader() {
                 employeeId: entry.employeeId,
                 checkIn1: sorted[0] || null,
                 checkOut1: sorted.length > 1 ? sorted[sorted.length-1] : null,
-                checkIn2: null, checkOut2: null, // سيتم عرض كل البصمات في التفاصيل
+                checkIn2: null, checkOut2: null,
                 allPunches: sorted,
                 status,
                 anomalyDescription: anomaly,
                 manualDeductionDays: manualDeduction,
-                auditStatus: 'pending'
+                auditStatus: status === 'present' ? 'verified' : 'pending'
             };
 
             const docKey = `${selectedYearNum}-${selectedMonthNum}-${entry.employeeId}`;
@@ -199,8 +193,8 @@ export function AttendanceUploader() {
         }
 
         await batch.commit();
-        setProcessingResult({ success: true, message: `تم تحليل بيانات ${punchesMap.size} أيام عمل.` });
-        toast({ title: 'نجاح الاستيراد' });
+        toast({ title: 'نجاح الاستيراد', description: `تم تحليل بيانات ${punchesMap.size} بصمة موظف.` });
+        setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
       } finally { setIsProcessing(false); }
@@ -210,26 +204,42 @@ export function AttendanceUploader() {
 
   return (
     <div className="grid lg:grid-cols-3 gap-8" dir="rtl">
-        <Card className="lg:col-span-1 rounded-3xl">
-            <CardHeader><CardTitle className="text-lg">إعدادات الشهر</CardTitle></CardHeader>
+        <Card className="lg:col-span-1 rounded-[2rem] border-none shadow-sm">
+            <CardHeader><CardTitle className="text-lg font-black">إعدادات الشهر</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-                <div className="grid gap-2"><Label>السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{[2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
-                <div className="grid gap-2"><Label>الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
-                <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">تنزيل نموذج</Button>
+                <div className="grid gap-2">
+                    <Label className="font-bold">السنة</Label>
+                    <Select value={year} onValueChange={setYear}>
+                        <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent>{[2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-2">
+                    <Label className="font-bold">الشهر</Label>
+                    <Select value={month} onValueChange={setMonth}>
+                        <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent>{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
             </CardContent>
         </Card>
-        <Card className="lg:col-span-2 rounded-3xl">
-            <CardHeader><CardTitle>رفع ملف البصمة</CardTitle><CardDescription>سيقوم النظام بتحليل الفترات ورصد المخالفات آلياً للمراجعة.</CardDescription></CardHeader>
+        <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl">
+            <CardHeader>
+                <CardTitle className="font-black">رفع ملف البصمة (Excel)</CardTitle>
+                <CardDescription>ارفع ملف الحضور والغياب بصيغة Excel لتحليله ورصد المخالفات.</CardDescription>
+            </CardHeader>
             <CardContent>
-                <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-3xl p-12 text-center cursor-pointer hover:bg-primary/5 transition-all">
-                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".xlsx, .xls" />
-                    <FileSpreadsheet className="h-12 w-12 mx-auto opacity-20 mb-4" />
-                    <p className="font-bold">{file ? file.name : "اسحب ملف البصمة هنا"}</p>
+                <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls" />
+                    <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
+                    <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار الملف"}</p>
+                    <p className="text-xs text-muted-foreground mt-2">يدعم تنسيق: التاريخ والوقت في خانة واحدة</p>
                 </div>
             </CardContent>
             <CardFooter className="justify-end border-t p-6">
-                <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-12 px-10 rounded-xl font-black">
-                    {isProcessing ? <Loader2 className="animate-spin ml-2"/> : <Save className="ml-2"/>} معالجة وتدقيق البيانات
+                <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20">
+                    {isProcessing ? <Loader2 className="animate-spin ml-2"/> : <Save className="ml-2"/>} 
+                    معالجة وتدقيق البيانات
                 </Button>
             </CardFooter>
         </Card>

@@ -267,6 +267,8 @@ export interface AttendanceRecord {
     auditStatus?: 'pending' | 'verified' | 'waived';
     manualDeductionDays?: number; // 0.5, 1, etc.
     anomalyDescription?: string;
+    waivedBy?: string;
+    waivedAt?: any;
 }
 
 export interface MonthlyAttendance extends BaseEntity { 

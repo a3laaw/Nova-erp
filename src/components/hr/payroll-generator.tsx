@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, AlertCircle, CheckCircle2, UserX } from 'lucide-react';
+import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
+import { cn } from '@/lib/utils';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -36,22 +37,21 @@ export function PayrollGenerator() {
   
   const { data: attendanceDocs, loading: attLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery);
 
-  // استخراج كافة السجلات التي تحتاج مراجعة
   const anomalies = useMemo(() => {
-    const list: { docId: string, record: AttendanceRecord, empName: string }[] = [];
+    const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
     attendanceDocs.forEach(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
         doc.records?.forEach(r => {
-            if (r.status !== 'present' && r.auditStatus === 'pending') {
-                list.push({ docId: doc.id!, record: r, empName: emp?.fullName || 'موظف' });
+            if (r.status !== 'present') {
+                list.push({ docId: doc.id!, record: r, empName: emp?.fullName || 'موظف', employeeNumber: emp?.employeeNumber || '000' });
             }
         });
     });
-    return list;
+    return list.sort((a, b) => toFirestoreDate(a.record.date)!.getTime() - toFirestoreDate(b.record.date)!.getTime());
   }, [attendanceDocs, employees]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
-    if (!firestore) return;
+    if (!firestore || !currentUser) return;
     try {
         const docRef = doc(firestore, 'attendance', docId);
         const snap = await getDoc(docRef);
@@ -62,15 +62,21 @@ export function PayrollGenerator() {
                 return { 
                     ...r, 
                     auditStatus: action === 'waive' ? 'waived' : 'verified',
-                    manualDeductionDays: action === 'waive' ? 0 : r.manualDeductionDays 
+                    manualDeductionDays: action === 'waive' ? 0 : r.manualDeductionDays,
+                    waivedBy: currentUser.fullName,
+                    waivedAt: new Date()
                 };
             }
             return r;
         });
         
         await updateDoc(docRef, { records });
-        toast({ title: 'تم التحديث' });
+        toast({ title: 'تم حفظ القرار', description: 'تم تحديث حالة المخالفة وحفظها لوقت لاحق.' });
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
+  };
+
+  const handlePrintAudit = () => {
+    window.print();
   };
 
   const handleGeneratePayroll = async () => {
@@ -104,90 +110,119 @@ export function PayrollGenerator() {
         }
 
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تم توليد مسودة الرواتب بنجاح.' });
+        toast({ title: 'تم توليد الرواتب', description: 'مسودة الرواتب جاهزة الآن للمراجعة المالية.' });
         setIsAuditing(false);
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ في التوليد' }); }
     finally { setIsProcessing(false); }
   };
 
+  const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
+
   return (
     <div className="space-y-8" dir="rtl">
-        <div className="flex gap-4 p-4 bg-muted/50 rounded-2xl border no-print">
-            <div className="grid gap-1.5"><Label className="text-xs">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-9 w-32"><SelectValue/></SelectTrigger><SelectContent>{[2025, 2026].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
-            <div className="grid gap-1.5"><Label className="text-xs">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-9 w-32"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
+        <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2rem] border shadow-inner no-print justify-between items-end">
+            <div className="flex gap-4">
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{[2025, 2026].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
+            </div>
+            <div className="flex gap-3">
+                <Button variant="outline" onClick={handlePrintAudit} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
+                <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20">
+                    {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
+                    {pendingAnomaliesCount > 0 ? `بانتظار قرار المدير (${pendingAnomaliesCount})` : 'اعتماد الرواتب'}
+                </Button>
+            </div>
         </div>
 
-        {isAuditing ? (
-            <div className="space-y-6 animate-in fade-in">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-xl font-black flex items-center gap-2">
-                        <ShieldCheck className="text-primary"/> مراجعة مخالفات البصمة ({anomalies.length})
-                    </h3>
-                    <Button onClick={handleGeneratePayroll} disabled={isProcessing || anomalies.length > 0} className="rounded-xl font-black h-12 px-10 shadow-xl">
-                        {isProcessing ? <Loader2 className="animate-spin ml-2"/> : <Calculator className="ml-2"/>} اعتماد الحضور وتوليد الرواتب
-                    </Button>
-                </div>
+        <div className="space-y-6">
+            <div className="flex justify-between items-center px-4">
+                <h3 className="text-2xl font-black flex items-center gap-3">
+                    <ShieldCheck className="text-primary h-8 w-8"/> 
+                    مركز تدقيق الحضور والمخالفات
+                </h3>
+                {pendingAnomaliesCount > 0 && (
+                    <Badge variant="destructive" className="animate-pulse rounded-lg h-8 px-4 font-black">
+                        <AlertCircle className="h-4 w-4 ml-2" />
+                        يوجد {pendingAnomaliesCount} مخالفة بانتظار قرارك
+                    </Badge>
+                )}
+            </div>
 
-                {anomalies.length > 0 ? (
-                    <div className="border-2 rounded-[2rem] overflow-hidden bg-white shadow-lg">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>الموظف</TableHead>
-                                    <TableHead>التاريخ</TableHead>
-                                    <TableHead>الحالة المرصودة</TableHead>
-                                    <TableHead>البصمات</TableHead>
-                                    <TableHead>الخصم المقترح</TableHead>
-                                    <TableHead className="text-center">إجراء المدير</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {anomalies.map((item, idx) => (
-                                    <TableRow key={idx} className="h-20 hover:bg-muted/20">
-                                        <TableCell className="font-black">{item.empName}</TableCell>
-                                        <TableCell className="font-bold text-xs">{format(toFirestoreDate(item.record.date)!, 'eeee, dd MMMM', { locale: ar })}</TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col gap-1">
-                                                <Badge variant="destructive" className="w-fit text-[10px]">{item.record.status === 'half_day' ? 'نص يوم' : 'بصمة ناقصة'}</Badge>
-                                                <span className="text-[10px] font-bold text-red-600">{item.record.anomalyDescription}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                                {item.record.allPunches.map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] px-1 h-4">{p}</Badge>)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="font-black text-primary">{item.record.manualDeductionDays || 0} يوم</TableCell>
-                                        <TableCell className="text-center">
-                                            <div className="flex justify-center gap-2">
-                                                <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 font-bold" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>
-                                                    <CheckCircle2 className="h-3 w-3 ml-1"/> تغاضي
+            {anomalies.length > 0 ? (
+                <div className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl printable-area">
+                    <Table>
+                        <TableHeader className="bg-muted/50 h-16">
+                            <TableRow>
+                                <TableHead className="px-8">الموظف</TableHead>
+                                <TableHead>التاريخ</TableHead>
+                                <TableHead>الحالة المرصودة</TableHead>
+                                <TableHead>البصمات المسجلة</TableHead>
+                                <TableHead>الخصم المقترح</TableHead>
+                                <TableHead className="text-center no-print">القرار الإداري</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {anomalies.map((item, idx) => (
+                                <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : item.record.auditStatus === 'verified' ? "bg-red-50/20" : "bg-white")}>
+                                    <TableCell className="px-8">
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-lg">{item.empName}</span>
+                                            <span className="font-mono text-[10px] text-muted-foreground">ID: {item.employeeNumber}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="font-bold text-sm">
+                                        {format(toFirestoreDate(item.record.date)!, 'eeee, dd MMMM', { locale: ar })}
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-1.5">
+                                            <Badge variant={item.record.status === 'absent' ? 'destructive' : 'outline'} className="w-fit text-[9px] font-black uppercase">
+                                                {item.record.status === 'half_day' ? 'نصف يوم' : item.record.status === 'absent' ? 'غياب كامل' : 'بصمة ناقصة'}
+                                            </Badge>
+                                            <span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1.5 max-w-[180px]">
+                                            {item.record.allPunches.map((p, i) => (
+                                                <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm">{p}</Badge>
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-xl text-primary">{item.record.manualDeductionDays || 0} يوم</span>
+                                            {item.record.auditStatus === 'waived' && <span className="text-[9px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="h-2 w-2"/> تم التغاضي</span>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center no-print">
+                                        {item.record.auditStatus === 'pending' ? (
+                                            <div className="flex justify-center gap-3">
+                                                <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-600 hover:text-white rounded-xl font-bold h-10 px-6" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>
+                                                    تغاضي
                                                 </Button>
-                                                <Button size="sm" className="bg-red-600 font-bold" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>
+                                                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-10 px-6" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>
                                                     اعتماد الخصم
                                                 </Button>
                                             </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                ) : (
-                    <div className="p-20 text-center border-2 border-dashed rounded-[3rem] bg-green-50/50">
-                        <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                        <p className="text-xl font-black text-green-800">لا توجد مخالفات تحتاج مراجعة لهذا الشهر!</p>
-                        <p className="text-sm text-green-700 mt-2">يمكنك الآن ضغط زر التوليد في الأعلى لإصدار كشوف الرواتب.</p>
-                    </div>
-                )}
-            </div>
-        ) : (
-            <div className="p-20 text-center space-y-6">
-                <CheckCircle2 className="h-20 w-20 text-green-600 mx-auto" />
-                <h3 className="text-2xl font-black">تم توليد الرواتب بنجاح</h3>
-                <Button onClick={() => setIsAuditing(true)} variant="outline">العودة للتدقيق</Button>
-            </div>
-        )}
+                                        ) : (
+                                            <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} className="text-muted-foreground h-10 rounded-xl gap-2 font-bold">
+                                                <History className="h-4 w-4" /> تغيير القرار
+                                            </Button>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            ) : (
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/20">
+                    <CheckCircle2 className="h-24 w-24 text-green-600/30 mx-auto mb-6" />
+                    <p className="text-3xl font-black text-green-800">السجل نظيف تماماً!</p>
+                    <p className="text-lg font-medium text-green-700 mt-3">لا توجد مخالفات مرصودة أو بانتظار قرارك لهذا الشهر.</p>
+                </div>
+            )}
+        </div>
     </div>
   );
 }
