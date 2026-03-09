@@ -182,6 +182,12 @@ export interface ClientTransaction extends BaseEntity {
         termsAndConditions?: any[];
         openClauses?: any[];
         specs?: TechnicalSpecifications; 
+        signatureInfo?: {
+            clientSignature?: string; // base64 image
+            authorizedSignature?: string; // base64 image
+            signedAt?: Timestamp | any;
+            signedByIP?: string;
+        }
     };
     boqId?: string;
     projectId?: string;

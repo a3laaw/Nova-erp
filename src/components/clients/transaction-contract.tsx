@@ -8,6 +8,9 @@ import type { Client, ClientTransaction } from '@/lib/types';
 import { useBranding } from '@/context/branding-context';
 import { PrintableDocument } from '../layout/printable-document';
 import { Ruler, Building2, Droplets, Zap, Layers, Package, Check, FileSignature } from 'lucide-react';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface TransactionContractProps {
   client: Client;
@@ -45,27 +48,26 @@ export function TransactionContract({ client, transaction }: TransactionContract
     const clauses = transaction.contract?.clauses || [];
     const financials = transaction.contract;
     const specs = transaction.contract?.specs;
+    const signatureInfo = transaction.contract?.signatureInfo;
 
     const isSanitary = transaction.transactionType?.includes('صحي');
     const isElectrical = transaction.transactionType?.includes('كهرباء');
     
     useEffect(() => {
-        const today = new Date();
-        const day = String(today.getDate()).padStart(2, '0');
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const year = today.getFullYear();
-        setContractDate(`${day}/${month}/${year}`);
-        setContractNumber(`TX-CONTRACT-${year}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`);
-    }, []);
+        const createdAt = toFirestoreDate(transaction.createdAt);
+        const today = createdAt || new Date();
+        setContractDate(format(today, 'dd/MM/yyyy'));
+        setContractNumber(transaction.transactionNumber || 'CONTRACT-TEMP');
+    }, [transaction]);
 
     const totalAmount = financials?.totalAmount || 0;
     
     const clientAddress = client.address ? [
         client.address.governorate, 
         client.address.area, 
-        `قطعة ${client.address.block}`, 
-        `شارع ${client.address.street}`, 
-        `منزل ${client.address.houseNumber}`
+        client.address.block ? `قطعة ${client.address.block}` : '', 
+        client.address.street ? `شارع ${client.address.street}` : '', 
+        client.address.houseNumber ? `منزل ${client.address.houseNumber}` : ''
     ].filter(Boolean).join('، ') : 'غير محدد';
 
     if (!transaction.contract) return null;
@@ -210,8 +212,26 @@ export function TransactionContract({ client, transaction }: TransactionContract
 
                 <section className="pt-20">
                     <div className="grid grid-cols-2 gap-20 text-center text-sm">
-                        <div><p className="font-black border-b-2 border-foreground pb-2 mb-16">الطرف الأول (الشركة)</p><div className="pt-2 border-t border-dashed">التوقيع والختم</div></div>
-                        <div><p className="font-black border-b-2 border-foreground pb-2 mb-16">الطرف الثاني (المالك)</p><div className="pt-2 border-t border-dashed">التوقيع</div></div>
+                        <div>
+                            <p className="font-black border-b-2 border-foreground pb-2 mb-16">الطرف الأول (الشركة)</p>
+                            <div className="relative h-24 flex items-center justify-center border-t border-dashed">
+                                {branding?.logo_url && <img src={branding.logo_url} alt="Stamp" className="absolute opacity-20 h-20 grayscale" />}
+                                <p className="text-[10px] text-muted-foreground italic">توقيع وختم رسمي</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="font-black border-b-2 border-foreground pb-2 mb-16">الطرف الثاني (المالك)</p>
+                            <div className="relative h-24 flex items-center justify-center border-t border-dashed overflow-hidden">
+                                {signatureInfo?.clientSignature ? (
+                                    <img src={signatureInfo.clientSignature} alt="Client Signature" className="max-h-full max-w-full" />
+                                ) : (
+                                    <p className="text-[10px] text-muted-foreground italic">بانتظار التوقيع</p>
+                                )}
+                            </div>
+                            {signatureInfo?.signedAt && (
+                                <p className="text-[8px] text-muted-foreground mt-1 font-mono">تاريخ التوقيع: {format(toFirestoreDate(signatureInfo.signedAt)!, 'dd/MM/yyyy HH:mm:ss')}</p>
+                            )}
+                        </div>
                     </div>
                 </section>
             </div>

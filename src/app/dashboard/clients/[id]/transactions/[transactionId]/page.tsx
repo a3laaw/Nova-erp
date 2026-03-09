@@ -1,8 +1,9 @@
+
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc, collectionGroup, addDoc } from 'firebase/firestore';
+import { doc, collection, query, orderBy, type DocumentData, getDocs, writeBatch, serverTimestamp, deleteField, deleteDoc, updateDoc, where, getDoc, collectionGroup, addDoc, Timestamp, limit } from 'firebase/firestore';
 import {
   Card,
   CardContent,
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink, Sparkles, Coins } from 'lucide-react';
+import { Pencil, User, Calendar, Workflow, Play, Check, Undo2, Plus, MessageSquare, History, ClipboardList, ExternalLink, Sparkles, Coins, FileSignature, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -41,6 +42,8 @@ import { createNotification, findUserIdByEmployeeId } from '@/services/notificat
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { SignaturePad } from '@/components/ui/signature-pad';
 
 const transactionStatusTranslations: Record<string, string> = {
   new: 'جديدة',
@@ -98,6 +101,7 @@ export default function TransactionDetailPage() {
   const [employeesMap, setEmployeesMap] = useState<Map<string, string>>(new Map());
   const [workStageTemplates, setWorkStageTemplates] = useState<WorkStage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSignDialogOpen, setIsSignDialogOpen] = useState(false);
 
   const transactionRef = useMemo(() => (firestore && clientId && transactionId ? doc(firestore, 'clients', clientId, 'transactions', transactionId) : null), [firestore, clientId, transactionId]);
   const { data: transaction, loading: transactionLoading, error: transactionError } = useDocument<ClientTransaction>(firestore, transactionRef ? transactionRef.path : null);
@@ -139,7 +143,6 @@ export default function TransactionDetailPage() {
             const stageIndex = currentStages.findIndex(s => s.stageId === stageId);
             if (stageIndex === -1) throw new Error("Stage not found");
             const stage = currentStages[stageIndex];
-            const stageTemplate = workStageTemplates.find(t => t.id === stageId);
             
             stage.status = newStatus;
             const now = new Date();
@@ -151,14 +154,12 @@ export default function TransactionDetailPage() {
                 const matchedClause = transaction.contract.clauses.find(c => c.condition === stage.name && c.status === 'غير مستحقة');
                 
                 if (matchedClause) {
-                    // 1. توليد رقم مستخلص تلقائي
                     const currentYear = new Date().getFullYear();
                     const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
                     const appCounterDoc = await getDoc(appCounterRef);
                     const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                     const appNumber = `AUTO-APP-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
 
-                    // 2. إنشاء مستند المستخلص (مسودة)
                     const newAppRef = doc(collection(firestore, 'payment_applications'));
                     const newJeRef = doc(collection(firestore, 'journalEntries'));
 
@@ -188,7 +189,6 @@ export default function TransactionDetailPage() {
                     batch.set(newAppRef, appData);
                     batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
 
-                    // 3. إنشاء القيد المحاسبي المرتبط (مسودة)
                     const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
                     const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', client?.nameAr), limit(1)));
 
@@ -215,13 +215,11 @@ export default function TransactionDetailPage() {
                         batch.set(newJeRef, jeData);
                     }
 
-                    // 4. تحديث حالة بند العقد إلى "مستحقة"
                     const updatedClauses = transaction.contract.clauses.map(c => 
                         c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c
                     );
                     batch.update(transactionRef, { 'contract.clauses': updatedClauses });
 
-                    // 5. تسجيل حدث في التايم لاين
                     const timelineRef = collection(transactionRef, 'timelineEvents');
                     const autoLog = {
                         type: 'comment',
@@ -231,8 +229,6 @@ export default function TransactionDetailPage() {
                         createdAt: serverTimestamp(),
                     };
                     batch.set(doc(timelineRef), autoLog);
-
-                    toast({ title: 'أتمتة ذكية', description: `تم توليد مستخلص تلقائي لإكمال مرحلة: ${stage.name}` });
                 }
             }
 
@@ -244,6 +240,34 @@ export default function TransactionDetailPage() {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث المرحلة.' }); 
         }
         finally { setIsProcessing(false); }
+  };
+
+  const handleSaveSignature = async (signatureDataUrl: string) => {
+    if (!firestore || !transactionRef || !transaction) return;
+    setIsProcessing(true);
+    try {
+        await updateDoc(transactionRef, {
+            'contract.signatureInfo': {
+                clientSignature: signatureDataUrl,
+                signedAt: serverTimestamp(),
+                signedByIP: 'client-device'
+            }
+        });
+        
+        const timelineRef = collection(transactionRef, 'timelineEvents');
+        await addDoc(timelineRef, {
+            type: 'log',
+            content: `قام المالك بتوقيع العقد إلكترونياً (بصمة حية).`,
+            userId: currentUser?.id || 'client',
+            userName: client?.nameAr || 'المالك',
+            createdAt: serverTimestamp()
+        });
+
+        toast({ title: 'تم التوقيع', description: 'تم اعتماد توقيع المالك وحفظه في العقد بنجاح.' });
+        setIsSignDialogOpen(false);
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التوقيع.' });
+    } finally { setIsProcessing(false); }
   };
 
   const enrichedStages = useMemo(() => {
@@ -269,7 +293,17 @@ export default function TransactionDetailPage() {
                     </CardTitle>
                     <CardDescription>العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link></CardDescription>
                 </div>
-                <Badge variant="outline" className={transactionStatusColors[transaction.status]}>{transactionStatusTranslations[transaction.status]}</Badge>
+                <div className="flex gap-2">
+                    {transaction.contract && (
+                        <Button onClick={() => setIsSignDialogOpen(true)} variant="outline" className="border-primary text-primary font-bold gap-2">
+                            <FileSignature className="h-4 w-4" />
+                            توقيع العقد إلكترونياً
+                        </Button>
+                    )}
+                    <Badge variant="outline" className={cn("flex items-center", transactionStatusColors[transaction.status])}>
+                        {transactionStatusTranslations[transaction.status]}
+                    </Badge>
+                </div>
             </CardHeader>
             <CardContent>
                 <InfoRow icon={<User />} label="المهندس المسؤول" value={transaction.assignedEngineerId ? employeesMap.get(transaction.assignedEngineerId) : 'لم يحدد'} />
@@ -348,6 +382,27 @@ export default function TransactionDetailPage() {
                 <TransactionTimeline clientId={clientId} transactionId={transactionId} filterType="log" showInput={false} title="السجل التاريخي" icon={<History className='text-primary'/>} client={client} transaction={transaction}/>
             </TabsContent>
         </Tabs>
+
+        <Dialog open={isSignDialogOpen} onOpenChange={setIsSignDialogOpen}>
+            <DialogContent className="max-w-lg rounded-3xl" dir="rtl">
+                <DialogHeader>
+                    <DialogTitle className="text-xl font-black flex items-center gap-2">
+                        <FileSignature className="text-primary" /> توقيع العقد إلكترونياً
+                    </DialogTitle>
+                    <DialogDescription>
+                        يرجى توقيع المالك في المساحة المخصصة أدناه لاعتماد العقد رقم {transaction.transactionNumber}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-6">
+                    <SignaturePad onSave={handleSaveSignature} />
+                </div>
+                {isProcessing && (
+                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center rounded-3xl z-50">
+                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }
