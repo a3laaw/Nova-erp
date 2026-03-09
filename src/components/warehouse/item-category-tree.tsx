@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import type { ItemCategory } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus, Minus, Folder, FolderOpen, Search } from 'lucide-react';
+import { Plus, Minus, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Loader2 } from 'lucide-react';
@@ -36,18 +35,10 @@ function CategoryTreeItem({
     e.stopPropagation();
     setOpenCategories(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(node.id!)) {
-        newSet.delete(node.id!);
-      } else {
-        newSet.add(node.id!);
-      }
+      if (newSet.has(node.id!)) newSet.delete(node.id!);
+      else newSet.add(node.id!);
       return newSet;
     });
-  };
-
-  const handleSelect = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelectCategory(node.id!);
   };
 
   return (
@@ -55,9 +46,9 @@ function CategoryTreeItem({
       <div 
         className={cn(
             "flex items-center justify-between p-2 rounded-md cursor-pointer group",
-            selectedCategoryId === node.id ? 'bg-primary/10' : 'hover:bg-muted/50'
+            selectedCategoryId === node.id ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted/50'
         )}
-        onClick={handleSelect}
+        onClick={() => onSelectCategory(node.id!)}
       >
         <div className="flex items-center gap-2">
           {node.children.length > 0 ? (
@@ -65,9 +56,9 @@ function CategoryTreeItem({
               {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             </Button>
           ) : (
-             <span className="w-6 h-6 inline-block" /> // Spacer
+             <span className="w-6 h-6 inline-block ml-2" />
           )}
-          <span className="font-medium">{node.name}</span>
+          <span className="text-sm">{node.name}</span>
         </div>
       </div>
       {isOpen && node.children.map(child => (
@@ -85,72 +76,47 @@ function CategoryTreeItem({
   );
 }
 
-
-interface ItemCategoryTreeProps {
+export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSelectCategory }: {
     categories: ItemCategory[];
     loading: boolean;
     selectedCategoryId: string | null;
     onSelectCategory: (id: string | null) => void;
-}
-
-export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSelectCategory }: ItemCategoryTreeProps) {
+}) {
     const [openCategories, setOpenCategories] = React.useState(new Set<string>());
     const [searchQuery, setSearchQuery] = React.useState('');
 
-    const categoryTree = React.useMemo(() => {
-        if (!categories) return [];
-
-        const categoryMap = new Map<string, ItemCategory & { parent?: string }>();
-        categories.forEach(cat => categoryMap.set(cat.id!, { ...cat, parent: cat.parentCategoryId || undefined }));
-
-        let filteredCategories = categories;
-
-        if (searchQuery.trim() !== '') {
-            const lowercasedQuery = searchQuery.toLowerCase();
-            const matchedCategoryIds = new Set<string>();
-
-            // Find categories that match the search query
-            for (const category of categories) {
-                if (category.name.toLowerCase().includes(lowercasedQuery)) {
-                    matchedCategoryIds.add(category.id!);
+    // Safe effect to handle search expansion without infinite loops
+    React.useEffect(() => {
+        if (searchQuery.trim() === '') return;
+        const lowerQuery = searchQuery.toLowerCase();
+        const toOpen = new Set<string>();
+        
+        categories.forEach(cat => {
+            if (cat.name.toLowerCase().includes(lowerQuery)) {
+                let current = cat;
+                while (current.parentCategoryId) {
+                    toOpen.add(current.parentCategoryId);
+                    const parent = categories.find(c => c.id === current.parentCategoryId);
+                    if (!parent) break;
+                    current = parent;
                 }
             }
-
-            // For each matched category, find all its ancestors and add them to the set
-            const allVisibleIds = new Set<string>(matchedCategoryIds);
-            matchedCategoryIds.forEach(id => {
-                let current = categoryMap.get(id);
-                while (current && current.parent) {
-                    allVisibleIds.add(current.parent);
-                    current = categoryMap.get(current.parent);
-                }
-            });
-            
-            // Expand all parents of matched items
-            const newOpenCategories = new Set<string>();
-            allVisibleIds.forEach(id => {
-                let current = categoryMap.get(id);
-                while (current && current.parent) {
-                    newOpenCategories.add(current.parent);
-                    current = categoryMap.get(current.parent);
-                }
-            });
-            setOpenCategories(newOpenCategories);
-
-
-            filteredCategories = categories.filter(cat => allVisibleIds.has(cat.id!));
-        } else {
-             setOpenCategories(new Set<string>());
+        });
+        
+        if (toOpen.size > 0) {
+            setOpenCategories(prev => new Set([...prev, ...toOpen]));
         }
+    }, [searchQuery, categories]);
 
-        const map = new Map<string, ItemCategory & { children: any[] }>();
-        const roots: (ItemCategory & { children: any[] })[] = [];
+    const categoryTree = React.useMemo(() => {
+        const map = new Map<string, CategoryNode>();
+        const roots: CategoryNode[] = [];
 
-        filteredCategories.forEach(cat => {
+        categories.forEach(cat => {
             map.set(cat.id!, { ...cat, children: [] });
         });
 
-        filteredCategories.forEach(cat => {
+        categories.forEach(cat => {
             if (cat.parentCategoryId && map.has(cat.parentCategoryId)) {
                 map.get(cat.parentCategoryId)!.children.push(map.get(cat.id!)!);
             } else {
@@ -158,46 +124,41 @@ export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSe
             }
         });
 
-        const sortRecursive = (nodes: (ItemCategory & { children: any[] })[]) => {
+        const sortRecursive = (nodes: CategoryNode[]) => {
             nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
-            nodes.forEach(node => {
-                if (node.children.length > 0) {
-                    sortRecursive(node.children);
-                }
-            });
+            nodes.forEach(node => { if (node.children.length > 0) sortRecursive(node.children); });
         };
         sortRecursive(roots);
-
         return roots;
-    }, [categories, searchQuery]);
+    }, [categories]);
 
     return (
-        <div className="border rounded-lg p-2 min-h-[300px]">
-            <div className="relative mb-2">
-                <Search className="absolute left-3 rtl:right-3 rtl:left-auto top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="border rounded-xl p-3 bg-card shadow-sm h-full">
+            <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                     placeholder="ابحث عن فئة..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 rtl:pr-10"
+                    className="pl-10 h-9 text-xs rounded-lg"
                 />
             </div>
 
             <Button
                 variant="ghost"
                 className={cn(
-                    "w-full justify-start p-2",
-                    selectedCategoryId === null && 'bg-primary/10'
+                    "w-full justify-start p-2 mb-2 font-bold",
+                    selectedCategoryId === null && 'bg-primary/10 text-primary'
                 )}
                 onClick={() => onSelectCategory(null)}
             >
                 جميع الفئات
             </Button>
             <Separator className="my-2" />
-            <div className="max-h-[60vh] overflow-y-auto">
-                {loading && <div className="p-4 text-center"><Loader2 className="animate-spin" /></div>}
-                {!loading && categoryTree.length === 0 && <p className="text-center text-muted-foreground p-4">لا توجد فئات تطابق البحث.</p>}
-                {!loading && categoryTree.map(node => (
+            <ScrollArea className="h-[calc(100vh-350px)]">
+                {loading ? <div className="p-4 text-center"><Loader2 className="animate-spin h-6 w-6 mx-auto text-primary" /></div> :
+                categoryTree.length === 0 ? <p className="text-center text-muted-foreground p-4 text-xs">لا توجد فئات.</p> :
+                categoryTree.map(node => (
                     <CategoryTreeItem 
                         key={node.id} 
                         node={node} 
@@ -208,7 +169,7 @@ export function ItemCategoryTree({ categories, loading, selectedCategoryId, onSe
                         setOpenCategories={setOpenCategories}
                     />
                 ))}
-            </div>
+            </ScrollArea>
         </div>
     )
 }

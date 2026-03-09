@@ -108,33 +108,30 @@
     }
 }
 
-/* Fix for dropdown/popover click issues */
-[data-radix-popper-content-wrapper] {
-  z-index: 99999 !important;
+/* Fix for dropdown/popover click issues without causing Infinite Loops */
+[data-radix-portal] {
   pointer-events: auto !important;
 }
 
 [role="listbox"],
 [role="menu"],
 [role="dialog"],
-[data-state="open"][data-radix-select-content],
-[data-state="open"][data-radix-popover-content] {
+[role="combobox"],
+[data-radix-popper-content-wrapper],
+.react-select__menu,
+.react-select__menu-portal {
   pointer-events: auto !important;
-  z-index: 99999 !important;
+  z-index: 999999 !important;
+}
+
+body[style*="pointer-events: none"] {
+  pointer-events: auto !important;
 }
 
 [role="option"],
 [role="menuitem"],
-[cmdk-item] {
+[cmdk-item],
+.react-select__option {
   cursor: pointer !important;
   pointer-events: auto !important;
-}
-
-.radix-themes {
-  pointer-events: auto !important;
-}
-
-/* Global Transition for smoother SPA feel */
-* {
-  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 }
