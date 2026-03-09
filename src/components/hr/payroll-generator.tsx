@@ -6,242 +6,188 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, Holiday, PermissionRequest, WorkShift } from '@/lib/types';
-import { Loader2, Sheet, Calculator, Info } from 'lucide-react';
-import { cleanFirestoreData } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { isSameDay, startOfMonth, endOfMonth, startOfDay, endOfDay, format } from 'date-fns';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import type { Employee, MonthlyAttendance, Payslip, AttendanceRecord } from '@/lib/types';
+import { Loader2, Calculator, ShieldCheck, AlertCircle, CheckCircle2, UserX } from 'lucide-react';
+import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '../ui/badge';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-import { Checkbox } from '../ui/checkbox';
-import { calculateWorkingDays } from '@/services/leave-calculator';
-import { useBranding } from '@/context/branding-context';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const { branding } = useBranding();
 
-  const [year, setYear] = useState('');
-  const [month, setMonth] = useState('');
-  const [isMounted, setIsMounted] = useState(false);
-
+  const [year, setYear] = useState(new Date().getFullYear().toString());
+  const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [processingResult, setProcessingResult] = useState<string | null>(null);
-  const [ignoreAttendance, setIgnoreAttendance] = useState(false);
+  const [isAuditing, setIsAuditing] = useState(true);
 
-  const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
-  const { data: allLeaves = [] } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', [where('status', 'in', ['approved', 'on-leave', 'returned'])]);
-  const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
-  const { data: shifts = [] } = useSubscription<WorkShift>(firestore, 'work_shifts');
+  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+  
+  const attendanceQuery = useMemo(() => [
+    where('year', '==', parseInt(year)),
+    where('month', '==', parseInt(month))
+  ], [year, month]);
+  
+  const { data: attendanceDocs, loading: attLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery);
 
-  useEffect(() => {
-    setIsMounted(true);
-    const now = new Date();
-    setYear(now.getFullYear().toString());
-    setMonth((now.getMonth() + 1).toString());
-  }, []);
+  // استخراج كافة السجلات التي تحتاج مراجعة
+  const anomalies = useMemo(() => {
+    const list: { docId: string, record: AttendanceRecord, empName: string }[] = [];
+    attendanceDocs.forEach(doc => {
+        const emp = employees.find(e => e.id === doc.employeeId);
+        doc.records?.forEach(r => {
+            if (r.status !== 'present' && r.auditStatus === 'pending') {
+                list.push({ docId: doc.id!, record: r, empName: emp?.fullName || 'موظف' });
+            }
+        });
+    });
+    return list;
+  }, [attendanceDocs, employees]);
+
+  const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
+    if (!firestore) return;
+    try {
+        const docRef = doc(firestore, 'attendance', docId);
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) return;
+        
+        const records = snap.data().records.map((r: any) => {
+            if (r.date.seconds === date.seconds) {
+                return { 
+                    ...r, 
+                    auditStatus: action === 'waive' ? 'waived' : 'verified',
+                    manualDeductionDays: action === 'waive' ? 0 : r.manualDeductionDays 
+                };
+            }
+            return r;
+        });
+        
+        await updateDoc(docRef, { records });
+        toast({ title: 'تم التحديث' });
+    } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
+  };
 
   const handleGeneratePayroll = async () => {
-    if (!firestore || !currentUser || !year || !month) return;
-
+    if (!firestore || !currentUser) return;
     setIsProcessing(true);
-    setProcessingResult(null);
-
     try {
-      const selectedYearNum = parseInt(year);
-      const selectedMonthNum = parseInt(month);
-      const payrollStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
-      const payrollEnd = endOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
+        const batch = writeBatch(firestore);
+        
+        for (const emp of employees) {
+            const att = attendanceDocs.find(a => a.employeeId === emp.id);
+            const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+            const dailyRate = fullSalary / 26;
 
-      const attendanceQuery = query(
-          collection(firestore, 'attendance'), 
-          where('year', '==', selectedYearNum), 
-          where('month', '==', selectedMonthNum)
-      );
-      const permissionsQuery = query(collection(firestore, 'permissionRequests'), where('status', '==', 'approved'));
-      
-      const [attendanceSnap, permissionsSnap] = await Promise.all([getDocs(attendanceQuery), getDocs(permissionsQuery)]);
-      
-      const attendanceMap = new Map<string, MonthlyAttendance>();
-      attendanceSnap.forEach(doc => {
-          const data = doc.data() as MonthlyAttendance;
-          attendanceMap.set(data.employeeId, { id: doc.id, ...data });
-      });
+            let totalDeductionDays = 0;
+            att?.records?.forEach(r => {
+                if (r.auditStatus !== 'waived') {
+                    totalDeductionDays += (r.manualDeductionDays || 0);
+                }
+            });
 
-      const permissionsMap = new Map<string, Map<string, string>>();
-      permissionsSnap.forEach(doc => {
-        const perm = doc.data() as PermissionRequest;
-        const rawDate = toFirestoreDate(perm.date);
-        if (rawDate && rawDate >= payrollStart && rawDate <= payrollEnd) {
-            const dateKey = format(rawDate, 'yyyy-MM-dd');
-            if (!permissionsMap.has(perm.employeeId)) permissionsMap.set(perm.employeeId, new Map());
-            permissionsMap.get(perm.employeeId)!.set(dateKey, perm.type);
+            const deductionAmount = totalDeductionDays * dailyRate;
+            const netSalary = Math.max(0, fullSalary - deductionAmount);
+
+            const payslipId = `${year}-${month}-${emp.id}`;
+            batch.set(doc(firestore, 'payroll', payslipId), cleanFirestoreData({
+                employeeId: emp.id, employeeName: emp.fullName, year: parseInt(year), month: parseInt(month),
+                earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 },
+                deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 },
+                netSalary, status: 'draft', type: 'Monthly', createdAt: serverTimestamp(), createdBy: currentUser.id
+            }), { merge: true });
         }
-      });
-      
-      const batch = writeBatch(firestore);
-      const companyHolidays = branding?.work_hours?.holidays || [];
 
-      let payslipsCreated = 0;
-
-      for (const employee of employees) {
-          if (!employee.id) continue;
-          
-          const fullSalary = (employee.basicSalary || 0) + (employee.housingAllowance || 0) + (employee.transportAllowance || 0);
-          const dailyRate = fullSalary > 0 ? fullSalary / 26 : 0;
-
-          let absenceDeduction = 0;
-          let lateDeduction = 0;
-          let chargeableLateDays = 0;
-          let actualAbsentDays = 0;
-          let logs: string[] = [];
-
-          const attendance = attendanceMap.get(employee.id);
-          const employeePermissions = permissionsMap.get(employee.id);
-
-          if (!ignoreAttendance) {
-              // الدوران على كل يوم في الشهر لفحص الحضور
-              for (let d = new Date(payrollStart); d <= payrollEnd; d.setDate(d.getDate() + 1)) {
-                  const dateKey = format(d, 'yyyy-MM-dd');
-                  
-                  // فحص هل هو يوم عمل؟
-                  const { workingDays } = calculateWorkingDays(d, d, companyHolidays, publicHolidays);
-                  if (workingDays === 0) continue;
-
-                  // البحث عن سجل بصمة
-                  const record = attendance?.records?.find((r: any) => {
-                      const punchDate = toFirestoreDate(r.date);
-                      return punchDate && isSameDay(punchDate, d);
-                  });
-                  
-                  if (record && record.checkIn1) {
-                      // الموظف حضر -> فحص التأخير بناءً على منطق الدوام الذكي
-                      let effectiveStart = '08:00';
-                      if (record.isRamadan) {
-                          effectiveStart = branding?.work_hours?.ramadan?.start_time || '09:30';
-                      } else if (employee.shiftId) {
-                          const shift = shifts.find(s => s.id === employee.shiftId);
-                          effectiveStart = shift?.startTime || '08:00';
-                      } else if (employee.workStartTime) {
-                          effectiveStart = employee.workStartTime;
-                      } else {
-                          effectiveStart = branding?.work_hours?.general?.morning_start_time || '08:00';
-                      }
-
-                      if (record.checkIn1 > effectiveStart) {
-                          if (employeePermissions?.get(dateKey) !== 'late_arrival') {
-                              chargeableLateDays++;
-                          }
-                      }
-                  } else {
-                      // الموظف غائب -> فحص الإجازات
-                      const isOnApprovedLeave = allLeaves.some(leave => {
-                          if (leave.employeeId !== employee.id) return false;
-                          const lStart = startOfDay(toFirestoreDate(leave.startDate)!);
-                          const lEnd = endOfDay(toFirestoreDate(leave.endDate)!);
-                          return d >= lStart && d <= lEnd;
-                      });
-
-                      if (!isOnApprovedLeave) actualAbsentDays++;
-                  }
-              }
-
-              absenceDeduction = actualAbsentDays * dailyRate;
-              // قاعدة الشركة: كل 3 تأخيرات تخصم يوم واحد
-              lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate; 
-
-              if (actualAbsentDays > 0) logs.push(`خصم ${actualAbsentDays} يوم غياب.`);
-              if (chargeableLateDays > 0) logs.push(`رصد ${chargeableLateDays} تأخير (خصم ${Math.floor(chargeableLateDays / 3)} يوم).`);
-          }
-
-          const earnings = { 
-              basicSalary: employee.basicSalary || 0, 
-              housingAllowance: employee.housingAllowance || 0, 
-              transportAllowance: employee.transportAllowance || 0, 
-              commission: 0 
-          };
-          const totalEarnings = Object.values(earnings).reduce((sum, val) => sum + val, 0);
-          const deductions = { absenceDeduction: absenceDeduction + lateDeduction, otherDeductions: 0 };
-          const totalDeductions = Object.values(deductions).reduce((sum, val) => sum + val, 0);
-
-          const payslipId = `${year}-${month}-${employee.id}`;
-          const payslipRef = doc(firestore, 'payroll', payslipId);
-
-          batch.set(payslipRef, cleanFirestoreData({
-              employeeId: employee.id, 
-              employeeName: employee.fullName, 
-              year: selectedYearNum, 
-              month: selectedMonthNum,
-              salaryPaymentType: employee.salaryPaymentType, 
-              earnings, 
-              deductions, 
-              netSalary: Math.max(0, totalEarnings - totalDeductions),
-              status: 'draft', 
-              createdAt: serverTimestamp(), 
-              type: 'Monthly', 
-              notes: logs.join(' '),
-          }), { merge: true });
-          payslipsCreated++;
-      }
-      
-      await batch.commit();
-      setProcessingResult(`تمت المعالجة بنجاح لـ ${payslipsCreated} موظف.`);
-      toast({ title: 'نجاح المعالجة', description: 'تم توليد الرواتب بناءً على فحص الحضور الذكي.' });
-
-    } catch (error: any) {
-      setProcessingResult(`خطأ: ${error.message}`);
-      toast({ variant: 'destructive', title: 'خطأ', description: error.message });
-    } finally {
-      setIsProcessing(false);
-    }
+        await batch.commit();
+        toast({ title: 'نجاح', description: 'تم توليد مسودة الرواتب بنجاح.' });
+        setIsAuditing(false);
+    } catch (e) { toast({ variant: 'destructive', title: 'خطأ في التوليد' }); }
+    finally { setIsProcessing(false); }
   };
-  
-  if (!isMounted) return null;
 
   return (
-    <div className="grid lg:grid-cols-2 gap-8 items-start" dir="rtl">
-        <div className="space-y-6">
-            <h3 className="font-semibold text-lg">تحديد فترة المعالجة</h3>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label>السنة</Label>
-                    <Select value={year} onValueChange={setYear}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <div className="grid gap-2">
-                    <Label>الشهر</Label>
-                    <Select value={month} onValueChange={setMonth}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{Array.from({ length: 12 }, (_, i) => i + 1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-            </div>
-            <div className="flex items-center space-x-2 rtl:space-x-reverse pt-2">
-                <Checkbox id="ignoreAttendance" checked={ignoreAttendance} onCheckedChange={(checked) => setIgnoreAttendance(checked as boolean)} />
-                <Label htmlFor="ignoreAttendance" className="cursor-pointer font-bold text-xs text-red-600">تجاوز الرقابة وصرف الراتب كاملاً</Label>
-            </div>
+    <div className="space-y-8" dir="rtl">
+        <div className="flex gap-4 p-4 bg-muted/50 rounded-2xl border no-print">
+            <div className="grid gap-1.5"><Label className="text-xs">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-9 w-32"><SelectValue/></SelectTrigger><SelectContent>{[2025, 2026].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
+            <div className="grid gap-1.5"><Label className="text-xs">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-9 w-32"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
         </div>
 
-        <div className="border rounded-[2.5rem] p-8 bg-primary/5 space-y-6 border-primary/10 shadow-inner">
-            <div className="flex items-center gap-3">
-                <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Calculator className="h-6 w-6"/></div>
-                <h3 className="font-black text-xl">محرك الرواتب والرقابة الذكية</h3>
+        {isAuditing ? (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-black flex items-center gap-2">
+                        <ShieldCheck className="text-primary"/> مراجعة مخالفات البصمة ({anomalies.length})
+                    </h3>
+                    <Button onClick={handleGeneratePayroll} disabled={isProcessing || anomalies.length > 0} className="rounded-xl font-black h-12 px-10 shadow-xl">
+                        {isProcessing ? <Loader2 className="animate-spin ml-2"/> : <Calculator className="ml-2"/>} اعتماد الحضور وتوليد الرواتب
+                    </Button>
+                </div>
+
+                {anomalies.length > 0 ? (
+                    <div className="border-2 rounded-[2rem] overflow-hidden bg-white shadow-lg">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead>الموظف</TableHead>
+                                    <TableHead>التاريخ</TableHead>
+                                    <TableHead>الحالة المرصودة</TableHead>
+                                    <TableHead>البصمات</TableHead>
+                                    <TableHead>الخصم المقترح</TableHead>
+                                    <TableHead className="text-center">إجراء المدير</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {anomalies.map((item, idx) => (
+                                    <TableRow key={idx} className="h-20 hover:bg-muted/20">
+                                        <TableCell className="font-black">{item.empName}</TableCell>
+                                        <TableCell className="font-bold text-xs">{format(toFirestoreDate(item.record.date)!, 'eeee, dd MMMM', { locale: ar })}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                <Badge variant="destructive" className="w-fit text-[10px]">{item.record.status === 'half_day' ? 'نص يوم' : 'بصمة ناقصة'}</Badge>
+                                                <span className="text-[10px] font-bold text-red-600">{item.record.anomalyDescription}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                                {item.record.allPunches.map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] px-1 h-4">{p}</Badge>)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="font-black text-primary">{item.record.manualDeductionDays || 0} يوم</TableCell>
+                                        <TableCell className="text-center">
+                                            <div className="flex justify-center gap-2">
+                                                <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 font-bold" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>
+                                                    <CheckCircle2 className="h-3 w-3 ml-1"/> تغاضي
+                                                </Button>
+                                                <Button size="sm" className="bg-red-600 font-bold" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>
+                                                    اعتماد الخصم
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ) : (
+                    <div className="p-20 text-center border-2 border-dashed rounded-[3rem] bg-green-50/50">
+                        <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                        <p className="text-xl font-black text-green-800">لا توجد مخالفات تحتاج مراجعة لهذا الشهر!</p>
+                        <p className="text-sm text-green-700 mt-2">يمكنك الآن ضغط زر التوليد في الأعلى لإصدار كشوف الرواتب.</p>
+                    </div>
+                )}
             </div>
-            <p className="text-sm leading-relaxed text-muted-foreground font-bold">
-                المحرك يقوم بتحليل كل يوم عمل على حدة؛ حيث يدمج كافة بصمات اليوم ليستخرج وقت الحضور الفعلي ووقت الانصراف النهائي، ويقارنها بوردية الموظف أو دوام المكتب الرسمي.
-            </p>
-            <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading || !year || !month} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl gap-2">
-                {isProcessing ? <Loader2 className="animate-spin h-5 w-5" /> : <Sheet className="h-5 w-5" />}
-                بدء فحص الحضور وتوليد الرواتب
-            </Button>
-             {processingResult && <Alert className="rounded-2xl border-green-200 bg-green-50"><AlertDescription className="font-bold text-green-800">{processingResult}</AlertDescription></Alert>}
-        </div>
+        ) : (
+            <div className="p-20 text-center space-y-6">
+                <CheckCircle2 className="h-20 w-20 text-green-600 mx-auto" />
+                <h3 className="text-2xl font-black">تم توليد الرواتب بنجاح</h3>
+                <Button onClick={() => setIsAuditing(true)} variant="outline">العودة للتدقيق</Button>
+            </div>
+        )}
     </div>
   );
 }

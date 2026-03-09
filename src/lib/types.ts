@@ -253,7 +253,30 @@ export interface ConstructionType extends BaseEntity { name: string; }
 export interface WorkStage extends BaseEntity { name: string; order?: number; stageType: 'sequential' | 'parallel'; trackingType: 'duration' | 'occurrence' | 'none'; expectedDurationDays?: number | null; maxOccurrences?: number | null; allowedRoles?: string[]; allowedDuringStages?: string[]; nextStageIds?: string[]; enableModificationTracking?: boolean; }
 export interface PermissionRequest extends BaseEntity { employeeId: string; employeeName: string; type: 'late_arrival' | 'early_departure'; date: any; reason: string; status: 'pending' | 'approved' | 'rejected'; approvedBy?: string; approvedAt?: any; rejectionReason?: string; }
 export interface Holiday extends BaseEntity { name: string; date: any; }
-export interface MonthlyAttendance extends BaseEntity { employeeId: string; year: number; month: number; records: any[]; summary: { presentDays: number; absentDays: number; lateDays: number; leaveDays: number; totalDays: number; }; }
+
+export interface AttendanceRecord {
+    date: Timestamp | any;
+    employeeId: string;
+    checkIn1: string | null;
+    checkOut1: string | null;
+    checkIn2: string | null;
+    checkOut2: string | null;
+    allPunches: string[];
+    status: 'present' | 'late' | 'half_day' | 'missing_punch' | 'absent';
+    isRamadan?: boolean;
+    auditStatus?: 'pending' | 'verified' | 'waived';
+    manualDeductionDays?: number; // 0.5, 1, etc.
+    anomalyDescription?: string;
+}
+
+export interface MonthlyAttendance extends BaseEntity { 
+    employeeId: string; 
+    year: number; 
+    month: number; 
+    records: AttendanceRecord[]; 
+    summary: { presentDays: number; absentDays: number; lateDays: number; leaveDays: number; totalDays: number; }; 
+}
+
 export interface Payslip extends BaseEntity { employeeId: string; employeeName: string; year: number; month: number; type: 'Monthly' | 'Leave'; earnings: { basicSalary: number; housingAllowance: number; transportAllowance: number; commission: number; }; deductions: { absenceDeduction: number; otherDeductions: number; }; netSalary: number; status: 'draft' | 'processed' | 'paid'; notes?: string; attendanceId?: string; leaveRequestId?: string; paidAt?: any; salaryPaymentType?: string; }
 export interface LeaveRequest extends BaseEntity { employeeId: string; employeeName: string; leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid'; startDate: any; endDate: any; days: number; workingDays: number; unpaidDays?: number; status: 'pending' | 'approved' | 'rejected' | 'on-leave' | 'returned'; approvedBy?: string; approvedAt?: any; rejectionReason?: string; notes?: string; passportReceived?: boolean; isSalaryPaid?: boolean; actualStartDate?: any; actualReturnDate?: any; }
 export interface Notification extends BaseEntity { userId: string; title: string; body: string; link?: string; isRead: boolean; }
