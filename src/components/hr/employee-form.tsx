@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { collection, query, where, getDocs, collectionGroup, orderBy } from 'fir
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import type { Employee, Department, Job, WorkShift } from '@/lib/types';
+import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -54,7 +54,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         hireDate: new Date(),
         department: '',
         jobTitle: '',
-        shiftId: '',
         contractType: 'permanent',
         basicSalary: 0,
         housingAllowance: 0,
@@ -68,8 +67,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         dob: undefined,
         nationality: '',
         residencyExpiry: undefined,
-        workStartTime: '08:00',
-        workEndTime: '17:00',
+        workStartTime: null,
+        workEndTime: null,
         pieceRateMode: 'salary_with_target',
         targetDescription: 0,
         pieceRate: 0,
@@ -85,8 +84,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
     const [refDataLoading, setRefDataLoading] = useState(true);
 
-    const { data: shifts = [] } = useSubscription<WorkShift>(firestore, 'work_shifts', [orderBy('name')]);
-    
     const isDayLaborer = formData.contractType === 'day_laborer';
 
     useEffect(() => {
@@ -105,10 +102,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 contractPercentage: Number(initialData.contractPercentage || 0),
                 salaryPaymentType: initialData.salaryPaymentType || 'cash',
                 nationality: initialData.nationality || '',
+                workStartTime: initialData.workStartTime || null,
+                workEndTime: initialData.workEndTime || null,
             });
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
             setShowTransportAllowance(Number(initialData.transportAllowance) > 0);
-            setIsCustomHours(!!initialData.workStartTime && !initialData.shiftId);
+            setIsCustomHours(!!initialData.workStartTime);
         }
     }, [initialData]);
 
@@ -168,23 +167,12 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         }
     };
 
-    const handleShiftSelect = (sId: string) => {
-        if (sId === "_NONE_") {
-            setFormData(prev => ({ ...prev, shiftId: '' }));
-            return;
-        }
-        const shift = shifts.find(s => s.id === sId);
-        if (shift) {
-            setFormData(prev => ({ ...prev, shiftId: sId, workStartTime: shift.startTime, workEndTime: shift.endTime }));
-            setIsCustomHours(false); // تفعيل الوردية يلغي التخصيص اليدوي
-        }
-    };
-
     const handleCustomHoursToggle = (checked: boolean) => {
         setIsCustomHours(checked);
         if (checked) {
-            // تفعيل التخصيص اليدوي يلغي الوردية المحددة
-            setFormData(prev => ({ ...prev, shiftId: '' }));
+            setFormData(prev => ({ ...prev, workStartTime: '08:00', workEndTime: '17:00' }));
+        } else {
+            setFormData(prev => ({ ...prev, workStartTime: null, workEndTime: null }));
         }
     };
 
@@ -321,30 +309,28 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                     <Separator className="my-4" />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                        <div className="grid gap-2">
-                            <Label className="font-bold mr-1">الوردية (Shift)</Label>
-                            <Select value={formData.shiftId || '_NONE_'} onValueChange={handleShiftSelect} disabled={isCustomHours}>
-                                <SelectTrigger className="h-11 rounded-xl bg-white">
-                                    <SelectValue placeholder="اختر الوردية..." />
-                                </SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="_NONE_">بدون وردية (توقيت مخصص)</SelectItem>
-                                    {shifts.map(s => <SelectItem key={s.id} value={s.id!}>{s.name} ({s.startTime}-{s.endTime})</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 bg-white rounded-xl border mb-0.5">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-4 bg-white rounded-2xl border shadow-sm">
                             <Checkbox id="custom-h" checked={isCustomHours} onCheckedChange={(c) => handleCustomHoursToggle(!!c)} />
-                            <Label htmlFor="custom-h" className="cursor-pointer font-bold text-xs">تخصيص ساعات دوام للموظف</Label>
+                            <div className="space-y-0.5">
+                                <Label htmlFor="custom-h" className="cursor-pointer font-black text-sm">تخصيص ساعات دوام لهذا الموظف</Label>
+                                <p className="text-[10px] text-muted-foreground font-bold">إذا لم يتم التفعيل، سيتبع الموظف الدوام الرسمي للمكتب.</p>
+                            </div>
                         </div>
+                        
+                        {isCustomHours && (
+                            <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2 p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20">
+                                <div className="grid gap-1.5">
+                                    <Label className="text-[10px] uppercase font-black mr-1 text-primary">يبدأ الدوام الساعة</Label>
+                                    <Input type="time" value={formData.workStartTime || '08:00'} onChange={e => setFormData(p => ({...p, workStartTime: e.target.value}))} className="h-11 rounded-xl border-2 font-black text-lg text-center" />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label className="text-[10px] uppercase font-black mr-1 text-primary">ينتهي الدوام الساعة</Label>
+                                    <Input type="time" value={formData.workEndTime || '17:00'} onChange={e => setFormData(p => ({...p, workEndTime: e.target.value}))} className="h-11 rounded-xl border-2 font-black text-xl text-center" />
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    {isCustomHours && (
-                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 border-t pt-4">
-                            <div className="grid gap-1.5"><Label className="text-[10px] uppercase font-bold mr-1">بداية الدوام</Label><Input type="time" value={formData.workStartTime} onChange={e => setFormData(p => ({...p, workStartTime: e.target.value}))} className="h-10 rounded-lg bg-white" /></div>
-                            <div className="grid gap-1.5"><Label className="text-[10px] uppercase font-bold mr-1">نهاية الدوام</Label><Input type="time" value={formData.workEndTime} onChange={e => setFormData(p => ({...p, workEndTime: e.target.value}))} className="h-10 rounded-lg bg-white" /></div>
-                        </div>
-                    )}
                 </section>
 
                 <section className="space-y-6 p-6 border rounded-[2.5rem] bg-emerald-50/20 border-emerald-100 shadow-sm">

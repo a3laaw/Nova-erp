@@ -112,7 +112,6 @@ export function AttendanceUploader() {
   const [processingResult, setProcessingResult] = useState<{ success: boolean, message: string, skippedCount?: number, validCount?: number } | null>(null);
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
-  const { data: shifts = [] } = useSubscription<WorkShift>(firestore, 'work_shifts');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -232,13 +231,10 @@ export function AttendanceUploader() {
                                  entry.date >= startOfDay(ramStart) && 
                                  entry.date <= startOfDay(ramEnd);
             
-            // تحديد وقت البداية بناءً على (شيفت -> موظف -> إعدادات عامة)
+            // تحديد وقت البداية بناءً على (موظف مخصص -> إعدادات عامة)
             let effectiveWorkStart = '08:00';
             if (isRamadanDay) {
                 effectiveWorkStart = ramadan.start_time || '09:30';
-            } else if (emp?.shiftId) {
-                const shift = shifts.find(s => s.id === emp.shiftId);
-                effectiveWorkStart = shift?.startTime || '08:00';
             } else if (emp?.workStartTime) {
                 effectiveWorkStart = emp.workStartTime;
             } else {
@@ -253,10 +249,10 @@ export function AttendanceUploader() {
                 date: entry.date,
                 employeeId: entry.employeeId,
                 checkIn1: checkIn || null,
-                checkOut1: checkIn === checkOut ? null : checkOut, // إذا بصم مرة واحدة فقط يعتبر خروج null
+                checkOut1: checkIn === checkOut ? null : checkOut, 
                 status: isLate ? 'late' : 'present',
                 isRamadan: isRamadanDay,
-                allPunches: sortedPunches // الاحتفاظ بكافة البصمات للتدقيق
+                allPunches: sortedPunches 
             };
 
             const docKey = `${selectedYearNum}-${selectedMonthNum}-${entry.employeeId}`;
@@ -362,7 +358,7 @@ export function AttendanceUploader() {
                 <AlertDescription className="text-xs font-bold leading-relaxed">
                     النظام سيقوم بدمج البصمات المتعددة لليوم الواحد آلياً.
                     <br/>
-                    تم استبعاد {skippedCount || 0} بصمة لا تخص شهر {month}.
+                    تم استبعاد {processingResult?.skippedCount || 0} بصمة لا تخص شهر {month}.
                 </AlertDescription>
             </Alert>
         </div>

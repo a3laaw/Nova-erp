@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
  */
@@ -232,9 +231,8 @@ export interface Employee extends BaseEntity {
     bankName?: string;
     accountNumber?: string;
     iban?: string;
-    shiftId?: string;           // ربط الموظف بفترة دوام
-    workStartTime: string;      // وقت البداية الفعلي (قد يكون مخصصاً)
-    workEndTime: string;        // وقت النهاية الفعلي
+    workStartTime?: string | null;      // وقت البداية المخصص (إذا وجد)
+    workEndTime?: string | null;        // وقت النهاية المخصص
     pieceRateMode?: 'salary_with_target' | 'per_piece';
     targetDescription?: number;
     pieceRate?: number;
