@@ -46,11 +46,7 @@ export function CompanyManager({ onBack }: CompanyManagerProps) {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const companiesQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [orderBy('name')];
-    }, [firestore]);
-    const { data: companies, loading, error } = useSubscription<Company>(firestore, 'companies', companiesQuery || []);
+    const { data: companies, loading, error } = useSubscription<Company>(firestore, 'companies', [orderBy('name')]);
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);

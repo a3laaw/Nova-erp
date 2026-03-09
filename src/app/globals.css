@@ -36,10 +36,8 @@
     --input: 240 6% 90%;
     --ring: 262 83% 58%;
     
-    /* Uniform Corner Radius */
-    --radius: 1rem; /* 16px */
+    --radius: 1rem;
 
-    /* Streamlined Sidebar Variables */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 244 10% 30%;
     --sidebar-primary: 262 83% 58%;
@@ -52,9 +50,7 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
   body {
     @apply bg-background text-foreground;
     font-family: 'Tajawal', sans-serif;
@@ -63,54 +59,17 @@
 }
 
 @layer utilities {
-    .glass-surface {
-        @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm;
-    }
-    
-    .hover-lift {
-        @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
-    }
-
-    [data-sidebar="sidebar"] {
-        @apply border-l border-sidebar-border bg-white shadow-sm !important;
-    }
-
-    /* Table Customizations */
-    .table-header-lavender {
-        @apply bg-[#F3E8FF]/40 text-[#7209B7] font-black uppercase text-[11px] tracking-wider;
-    }
-
-    input[type=number]::-webkit-inner-spin-button,
-    input[type=number]::-webkit-outer-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    
-    @media print {
-        .no-print { display: none !important; }
-        main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
-    }
-
-    /* Hide scrollbar arrows/buttons globally for cleaner UI */
-    .scrollbar-none::-webkit-scrollbar-button {
-        display: none !important;
-        width: 0;
-        height: 0;
-    }
-    
-    .scrollbar-none::-webkit-scrollbar {
-        width: 4px;
-    }
-    
-    .scrollbar-none::-webkit-scrollbar-thumb {
-        background: rgba(0,0,0,0.1);
-        border-radius: 10px;
-    }
+    .glass-surface { @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm; }
+    .hover-lift { @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md; }
+    [data-sidebar="sidebar"] { @apply border-l border-sidebar-border bg-white shadow-sm !important; }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    @media print { .no-print { display: none !important; } main { margin: 0 !important; padding: 0 !important; width: 100% !important; } }
 }
 
-/* Fix for dropdown/popover click issues without causing Infinite Loops */
+/* FIX: الحل الجذري لمشكلة النقر بالماوس وعدم استجابة الأزرار */
 [data-radix-portal] {
   pointer-events: auto !important;
+  z-index: 999999 !important;
 }
 
 [role="listbox"],
@@ -124,6 +83,7 @@
   z-index: 999999 !important;
 }
 
+/* فك حصار الطبقة الشفافة التي تمنع الضغط */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }

@@ -10,37 +10,30 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
-import { ClipboardList, Clock, AlertTriangle } from 'lucide-react';
+import { ClipboardList, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isPast, differenceInDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 
-/**
- * مكون قائمة الأولويات الذكية: 
- * يحلل سير العمل في الموقع ويستخرج التنبيهات الحرجة.
- */
 export function TaskPrioritization() {
   const { transactions, projects, loading } = useAnalyticalData();
   const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
 
   useEffect(() => {
+    // FIX: Check dependencies properly to prevent infinite loops
     if (loading || !transactions || !projects) return;
     
     const now = new Date();
     const tasks: any[] = [];
-
-    // إنشاء خريطة للمشاريع النشطة للتحقق السريع
     const activeProjectIds = new Set(projects.map(p => p.id));
 
     transactions.forEach(tx => {
-        // الرقابة 1: استبعاد المعاملات المتوقفة أو المكتملة أو غير المرتبطة بمشروع فني موجود
         if (tx.status !== 'in-progress') return;
         if (tx.projectId && !activeProjectIds.has(tx.projectId)) return;
 
         (tx.stages || []).forEach(stage => {
             const expectedEnd = toFirestoreDate(stage.expectedEndDate);
-            // الرقابة 2: التركيز فقط على المراحل التي تجاوزت مدتها ولا تزال "قيد التنفيذ"
             if (stage.status === 'in-progress' && expectedEnd && isPast(expectedEnd)) {
                 tasks.push({
                     id: `${tx.id}-${stage.stageId}`,
@@ -54,11 +47,14 @@ export function TaskPrioritization() {
         });
     });
 
-    // ترتيب المهام حسب عدد أيام التأخير (الأكثر تأخراً أولاً)
     const sortedTasks = tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
     
-    setUrgentTasks(sortedTasks);
-  }, [transactions, projects, loading]); // مصفوفة التبعيات تمنع الحلقة اللانهائية
+    // Only update state if results actually changed to avoid unnecessary re-renders
+    setUrgentTasks(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(sortedTasks)) return prev;
+        return sortedTasks;
+    });
+  }, [transactions, projects, loading]); 
 
   return (
     <Card className="h-full flex flex-col rounded-3xl border-none shadow-sm overflow-hidden">

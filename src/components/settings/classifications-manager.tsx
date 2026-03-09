@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup } from 'firebase/firestore';
 import type { ItemCategory, CompanyActivityType, BoqReferenceItem } from '@/lib/types';
@@ -50,11 +49,8 @@ function CategoryItem({
   const toggleOpen = () => {
     setOpenCategories(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(node.id!)) {
-        newSet.delete(node.id!);
-      } else {
-        newSet.add(node.id!);
-      }
+      if (newSet.has(node.id!)) newSet.delete(node.id!);
+      else newSet.add(node.id!);
       return newSet;
     });
   };
@@ -123,37 +119,22 @@ export function ClassificationsManager() {
 
     const categoryTree = useMemo(() => {
         if (!categories) return [];
-        
         let filteredList = categories;
         if (activityFilter !== 'all') {
             filteredList = categories.filter(cat => cat.activityTypeIds?.includes(activityFilter));
         }
-
         const map = new Map<string, ItemCategory & { children: any[] }>();
         const roots: (ItemCategory & { children: any[] })[] = [];
-
+        filteredList.forEach(cat => { map.set(cat.id!, { ...cat, children: [] }); });
         filteredList.forEach(cat => {
-            map.set(cat.id!, { ...cat, children: [] });
+            if (cat.parentCategoryId && map.has(cat.parentCategoryId)) map.get(cat.parentCategoryId)!.children.push(map.get(cat.id!)!);
+            else roots.push(map.get(cat.id!)!);
         });
-
-        filteredList.forEach(cat => {
-            if (cat.parentCategoryId && map.has(cat.parentCategoryId)) {
-                map.get(cat.parentCategoryId)!.children.push(map.get(cat.id!)!);
-            } else {
-                roots.push(map.get(cat.id!)!);
-            }
-        });
-
-        const sortRecursive = (nodes: (ItemCategory & { children: any[] })[]) => {
+        const sortRecursive = (nodes: any[]) => {
             nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
-            nodes.forEach(node => {
-                if (node.children.length > 0) {
-                    sortRecursive(node.children);
-                }
-            });
+            nodes.forEach(node => { if (node.children.length > 0) sortRecursive(node.children); });
         };
         sortRecursive(roots);
-
         return roots;
     }, [categories, activityFilter]);
 
@@ -171,10 +152,8 @@ export function ClassificationsManager() {
     
     const isLeafAndConstruction = useMemo(() => {
         if (!editingItem && !parentCategory) return false; 
-        
         const isCurrentlyALeaf = editingItem ? !categories.some(c => c.parentCategoryId === editingItem.id) : true;
         if (!isCurrentlyALeaf) return false;
-
         const getRootParent = (currentId: string | null): ItemCategory | null => {
             if (!currentId) return null;
             const current = categories.find(c => c.id === currentId);
@@ -182,101 +161,46 @@ export function ClassificationsManager() {
             if (!current.parentCategoryId) return current;
             return getRootParent(current.parentCategoryId);
         };
-
         const rootParent = getRootParent(editingItem?.parentCategoryId || parentCategory?.id || null);
         if (!rootParent) {
             const selfIsRoot = editingItem && !editingItem.parentCategoryId;
-            if (selfIsRoot) {
-                return selectedActivityTypeIds.some(id => activityTypeMap.get(id)?.includes('مقاولات') || activityTypeMap.get(id)?.toLowerCase().includes('construction'));
-            }
-            return false;
+            return selfIsRoot && selectedActivityTypeIds.some(id => activityTypeMap.get(id)?.includes('مقاولات'));
         }
-
-        return rootParent.activityTypeIds?.some(id => 
-            activityTypeMap.get(id)?.includes('مقاولات') || 
-            activityTypeMap.get(id)?.toLowerCase().includes('construction')
-        ) || false;
-
+        return rootParent.activityTypeIds?.some(id => activityTypeMap.get(id)?.includes('مقاولات')) || false;
     }, [editingItem, parentCategory, categories, activityTypeMap, selectedActivityTypeIds]);
 
-    const categoryOptions = useMemo(() => {
-        if (!categories) return [];
-        return categories
-          .filter(cat => cat.id !== editingItem?.id) 
-          .map(cat => ({ value: cat.id!, label: cat.name }));
-    }, [categories, editingItem]);
-
-    const openDialog = (item: ItemCategory | null, parent: ItemCategory | null = null) => {
-        setEditingItem(item);
-        
-        let effectiveParent = parent;
-        if (item && !parent && item.parentCategoryId) {
-            effectiveParent = categories.find(c => c.id === item.parentCategoryId) || null;
-        }
-        
-        setParentCategory(effectiveParent);
-        setItemName(item?.name || '');
-        setSelectedActivityTypeIds(item?.activityTypeIds || effectiveParent?.activityTypeIds || []);
-        setSelectedBoqItemIds(item?.boqReferenceItemIds || []);
-        setIsDialogOpen(true);
-    };
-
-    const closeDialog = () => {
-        setIsDialogOpen(false);
-        setEditingItem(null);
-        setParentCategory(null);
-        setItemName('');
-        setSelectedActivityTypeIds([]);
-        setSelectedBoqItemIds([]);
-    };
-
     const handleSave = async () => {
-        if (!firestore || !itemName.trim()) return;
+        if (!firestore || !itemName.trim()) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'اسم الفئة مطلوب.' });
+            return;
+        }
         setIsSaving(true);
         try {
-            const dataToSave: Partial<ItemCategory> = { 
+            const dataToSave = { 
                 name: itemName,
                 activityTypeIds: selectedActivityTypeIds,
                 parentCategoryId: parentCategory?.id || null,
                 boqReferenceItemIds: isLeafAndConstruction ? selectedBoqItemIds : []
             };
-
-            if (editingItem) {
-                if(parentCategory && parentCategory.id === editingItem.id) {
-                    toast({variant: 'destructive', title: 'خطأ', description: 'لا يمكن أن تكون الفئة أماً لنفسها.'});
-                    setIsSaving(false);
-                    return;
-                }
-                await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
-                toast({ title: 'نجاح', description: 'تم تحديث الفئة بنجاح.' });
-            } else {
+            if (editingItem) await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
+            else {
                 const currentList = parentCategory ? categories.filter(c => c.parentCategoryId === parentCategory.id) : categories.filter(c => !c.parentCategoryId);
-                const order = currentList.length;
-                await addDoc(collection(firestore, 'itemCategories'), { ...dataToSave, order });
-                toast({ title: 'نجاح', description: 'تمت إضافة الفئة بنجاح.' });
+                await addDoc(collection(firestore, 'itemCategories'), { ...dataToSave, order: currentList.length });
             }
-            closeDialog();
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الفئة.' });
-        } finally {
-            setIsSaving(false);
-        }
+            toast({ title: 'تم الحفظ' });
+            setIsDialogOpen(false);
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); }
+        finally { setIsSaving(false); }
     };
-    
+
     const handleDelete = async () => {
         if (!firestore || !itemToDelete) return;
         setIsSaving(true);
-        try {
-            await deleteDoc(doc(firestore, 'itemCategories', itemToDelete.id!));
-            toast({ title: 'نجاح', description: 'تم حذف الفئة.' });
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الفئة. قد تكون مرتبطة بأصناف أخرى.' });
-        } finally {
-            setIsSaving(false);
-            setItemToDelete(null);
-        }
+        try { await deleteDoc(doc(firestore, 'itemCategories', itemToDelete.id!)); toast({ title: 'نجاح' }); }
+        catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
+        finally { setIsSaving(false); setItemToDelete(null); }
     };
-    
+
     const handleImportDefaults = async () => {
         if(!firestore) return;
         setIsImporting(true);
@@ -284,19 +208,12 @@ export function ClassificationsManager() {
             const batch = writeBatch(firestore);
             const existingSnap = await getDocs(query(collection(firestore, 'itemCategories')));
             existingSnap.forEach(doc => batch.delete(doc.ref));
-
             for (const category of defaultItemCategories) {
-                const docRef = doc(collection(firestore, 'itemCategories'));
-                batch.set(docRef, category);
+                batch.set(doc(collection(firestore, 'itemCategories')), category);
             }
             await batch.commit();
-            toast({ title: 'نجاح', description: 'تم استيراد الفئات الافتراضية.' });
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استيراد الفئات.' });
-        } finally {
-            setIsImporting(false);
-            setIsImportConfirmOpen(false);
-        }
+            toast({ title: 'نجاح' });
+        } finally { setIsImporting(false); setIsImportConfirmOpen(false); }
     }
 
     const loading = categoriesLoading || activityTypesLoading || boqItemsLoading;
@@ -307,164 +224,77 @@ export function ClassificationsManager() {
                 <div className="flex justify-between items-start">
                     <div>
                         <CardTitle>إدارة فئات الأصناف</CardTitle>
-                        <CardDescription>
-                            تنظيم الأصناف في هيكل شجري وربطها بأنواع أنشطة الشركة وبنود الـ BOQ.
-                        </CardDescription>
+                        <CardDescription>تنظيم الأصناف في هيكل شجري وربطها بالأنشطة والـ BOQ.</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
-                            {isImporting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>} استيراد الافتراضي
+                            {isImporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>} استيراد
                         </Button>
-                        <Button onClick={() => openDialog(null)}><PlusCircle className="ml-2 h-4"/> إضافة فئة رئيسية</Button>
+                        <Button onClick={() => { setEditingItem(null); setParentCategory(null); setItemName(''); setSelectedActivityTypeIds([]); setSelectedBoqItemIds([]); setIsDialogOpen(true); }}><PlusCircle className="ml-2 h-4"/> إضافة رئيسية</Button>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <Filter className="h-4 w-4 text-muted-foreground" />
-                        <Label>فلترة حسب النشاط:</Label>
-                    </div>
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <Label>تصفية النشاط:</Label>
                     <Select value={activityFilter} onValueChange={setActivityFilter}>
-                        <SelectTrigger className="max-w-[250px]">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">كل الأنشطة</SelectItem>
-                            {activityTypes.map(type => (
-                                <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
-                            ))}
-                        </SelectContent>
+                        <SelectTrigger className="max-w-[200px]"><SelectValue /></SelectTrigger>
+                        <SelectContent dir="rtl"><SelectItem value="all">الكل</SelectItem>{activityTypes.map(t => <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
-
-                <div className="border rounded-xl p-4 min-h-[400px] bg-card shadow-sm">
-                    {loading ? (
-                        <div className="space-y-4">
-                            <Skeleton className="h-10 w-full" />
-                            <Skeleton className="h-10 w-5/6 mr-auto" />
-                            <Skeleton className="h-10 w-4/5 mr-auto" />
-                        </div>
-                    ) : categoryTree.length === 0 ? (
-                        <p className="text-center text-muted-foreground p-12">لا توجد فئات معرفة لهذا النشاط.</p>
-                    ) : (
-                        <div className="space-y-1">
-                            {categoryTree.map(node => (
-                                <CategoryItem 
-                                    key={node.id} 
-                                    node={node} 
-                                    level={0}
-                                    onEdit={item => openDialog(item)}
-                                    onDelete={setItemToDelete}
-                                    onAddSub={parent => openDialog(null, parent)}
-                                    openCategories={openCategories}
-                                    setOpenCategories={setOpenCategories}
-                                    activityTypeMap={activityTypeMap}
-                                />
-                            ))}
-                        </div>
-                    )}
+                <div className="border rounded-xl p-4 bg-card shadow-sm min-h-[400px]">
+                    {loading ? <Loader2 className="animate-spin mx-auto h-8 w-8 text-primary mt-20" /> : 
+                    categoryTree.length === 0 ? <p className="text-center text-muted-foreground p-12">لا توجد فئات.</p> :
+                    categoryTree.map(node => <CategoryItem key={node.id} node={node} level={0} onEdit={i => { setEditingItem(i); setItemName(i.name); setSelectedActivityTypeIds(i.activityTypeIds || []); setSelectedBoqItemIds(i.boqReferenceItemIds || []); setIsDialogOpen(true); }} onDelete={setItemToDelete} onAddSub={p => { setEditingItem(null); setParentCategory(p); setItemName(''); setSelectedActivityTypeIds(p.activityTypeIds || []); setIsDialogOpen(true); }} openCategories={openCategories} setOpenCategories={setOpenCategories} activityTypeMap={activityTypeMap} />)}
                 </div>
             </CardContent>
 
-            <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent 
-                    dir="rtl"
-                    className="max-w-2xl"
-                    onInteractOutside={(e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.closest('[cmdk-root]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                            e.preventDefault();
-                        }
-                    }}
-                >
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent dir="rtl" className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>{editingItem ? 'تعديل فئة' : 'إضافة فئة جديدة'}</DialogTitle>
-                        <DialogDescription>أدخل بيانات الفئة وقم بربطها بالأنشطة المناسبة.</DialogDescription>
                     </DialogHeader>
                     <div className="py-4 space-y-6">
                         <div className="grid gap-2">
                             <Label>الفئة الأب (اختياري)</Label>
-                            <InlineSearchList 
-                                value={parentCategory?.id || ''}
-                                onSelect={(val) => setParentCategory(categories.find(c => c.id === val) || null)}
-                                options={categoryOptions}
-                                placeholder="اتركها فارغة لتكون فئة رئيسية"
-                            />
+                            <InlineSearchList value={parentCategory?.id || ''} onSelect={v => setParentCategory(categories.find(c => c.id === v) || null)} options={categories.map(c => ({value: c.id!, label: c.name}))} placeholder="رئيسية" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="item-name">اسم الفئة <span className="text-destructive">*</span></Label>
-                            <Input id="item-name" value={itemName} onChange={(e) => setItemName(e.target.value)} required placeholder="مثال: مواد بناء، خدمات استشارية..." />
+                            <Label>اسم الفئة *</Label>
+                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required />
                         </div>
                         <div className="grid gap-2">
-                            <Label>ربط بأنواع النشاط</Label>
-                            <MultiSelect 
-                                options={activityTypeOptions}
-                                selected={selectedActivityTypeIds}
-                                onChange={setSelectedActivityTypeIds}
-                                placeholder="اختر نشاطاً واحداً أو أكثر..."
-                            />
+                            <Label>نوع النشاط</Label>
+                            <MultiSelect options={activityTypeOptions} selected={selectedActivityTypeIds} onChange={setSelectedActivityTypeIds} />
                         </div>
-
                         {isLeafAndConstruction && (
-                            <div className="p-4 border-2 border-primary/10 bg-primary/5 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center gap-2">
-                                    <Badge className="bg-primary/20 text-primary border-none">قسم المقاولات</Badge>
-                                    <Label className="font-bold">ربط مع بنود جداول الكميات (BOQ)</Label>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground">بما أن هذه الفئة هي "ابنة أخيرة" وتتبع نشاط المقاولات، يمكنك ربطها ببنود المقايسات المرجعية.</p>
-                                <MultiSelect 
-                                    options={boqItemOptions}
-                                    selected={selectedBoqItemIds}
-                                    onChange={setSelectedBoqItemIds}
-                                    placeholder="اختر البنود المرجعية المرتبطة..."
-                                />
+                            <div className="p-4 border-2 border-primary/10 bg-primary/5 rounded-2xl space-y-4">
+                                <Label className="font-bold">ربط ببنود المقايسة (BOQ)</Label>
+                                <MultiSelect options={boqItemOptions} selected={selectedBoqItemIds} onChange={setSelectedBoqItemIds} />
                             </div>
                         )}
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={closeDialog} disabled={isSaving}>إلغاء</Button>
+                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
                         <Button onClick={handleSave} disabled={isSaving || !itemName.trim()}>
-                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                            حفظ الفئة
+                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>} حفظ
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيتم حذف الفئة "{itemToDelete?.name}" بشكل دائم. 
-                            <br />
-                            <span className="text-destructive font-semibold">تنبيه: سيؤدي هذا إلى فصل الأصناف والروابط المرتبطة بهذه الفئة.</span>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isSaving}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">
-                             {isSaving ? 'جاري الحذف...' : 'نعم، قم بالحذف'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف الفئة "{itemToDelete?.name}" نهائياً.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">{isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-                <AlertDialogContent dir="rtl">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>تأكيد استيراد الفئات الافتراضية؟</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            سيؤدي هذا الإجراء إلى مسح جميع الفئات الحالية واستبدالها بالقائمة الافتراضية الأولية.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isImporting}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-destructive hover:bg-destructive/90">
-                            {isImporting ? 'جاري الاستيراد...' : 'نعم، قم بالاستيراد'}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader><AlertDialogTitle>تأكيد الاستيراد؟</AlertDialogTitle><AlertDialogDescription>سيتم مسح الفئات الحالية واستبدالها بالافتراضية.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-destructive">استيراد</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </Card>

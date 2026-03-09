@@ -10,23 +10,22 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 
-const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
-
-/**
- * خطاف مطور ومستقر لجلب البيانات من Firestore في الوقت الفعلي.
- * يدعم الآن الـ Collection Group لضمان شمولية البيانات في لوحة التحكم.
- */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
-  collectionPath: string | null, 
-  constraints: QueryConstraint[] = EMPTY_CONSTRAINTS,
+  collectionPath: string | null,
+  constraints: QueryConstraint[] = [],
   isGroup: boolean = false
 ): { data: T[], loading: boolean, error: Error | null } {
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
-    
-    const lastPath = useRef<string | null>(null);
+
+    const constraintsRef = useRef(constraints);
+    const lastPathRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        constraintsRef.current = constraints;
+    });
 
     useEffect(() => {
         if (!firestore || !collectionPath) {
@@ -35,17 +34,16 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        if (lastPath.current !== collectionPath) {
+        if (lastPathRef.current !== collectionPath) {
             setLoading(true);
-            lastPath.current = collectionPath;
+            lastPathRef.current = collectionPath;
         }
 
-        // تحديد ما إذا كان البحث في مجموعة محددة أم في كل المجموعات التي تحمل نفس الاسم (Group)
-        const baseRef = isGroup 
-            ? collectionGroup(firestore, collectionPath) 
+        const baseRef = isGroup
+            ? collectionGroup(firestore, collectionPath)
             : collection(firestore, collectionPath);
 
-        const q = query(baseRef, ...constraints);
+        const q = query(baseRef, ...constraintsRef.current);
 
         const unsubscribe = onSnapshot(
             q,
@@ -63,7 +61,7 @@ export function useSubscription<T extends { id?: string }>(
         );
 
         return () => unsubscribe();
-    }, [firestore, collectionPath, constraints, isGroup]);
+    }, [firestore, collectionPath, isGroup]);
 
     return { data, loading, error };
 }
