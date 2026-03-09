@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,7 +22,6 @@ export function TaskPrioritization() {
   const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    // تم إضافة مصفوفة التبعيات لمنع الحلقة اللانهائية
     if (loading || !transactions || !projects) return;
     
     const now = new Date();
@@ -49,7 +49,7 @@ export function TaskPrioritization() {
 
     const sortedTasks = tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
     
-    // تحديث الحالة فقط عند تغير النتائج لضمان استقرار الرندرة
+    // Safety check to prevent infinite loop
     setUrgentTasks(prev => {
         if (JSON.stringify(prev) === JSON.stringify(sortedTasks)) return prev;
         return sortedTasks;

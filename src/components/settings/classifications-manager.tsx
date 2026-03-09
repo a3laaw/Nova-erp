@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -141,10 +142,13 @@ export function ClassificationsManager() {
             }
             
             toast({ title: 'تم الحفظ بنجاح' });
+            // Close dialog FIRST, then clear state
             setIsDialogOpen(false);
-            setItemName('');
-            setEditingItem(null);
-            setParentCategory(null);
+            setTimeout(() => {
+                setItemName('');
+                setEditingItem(null);
+                setParentCategory(null);
+            }, 100);
         } catch (e) { 
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); 
         } finally { 

@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 @import "react-day-picker/dist/style.css";
 
@@ -66,10 +67,12 @@
     @media print { .no-print { display: none !important; } main { margin: 0 !important; padding: 0 !important; width: 100% !important; } }
 }
 
-/* 🛡️ Nuclear Fix for Pointer Events & Clicks 🛡️ */
-/* This ensures buttons are always clickable regardless of Radix UI overlays */
+/* 🛡️ Global Click Fix 🛡️ */
+/* This ensures all buttons and interactive elements remain clickable despite library behaviors */
 
-[data-radix-portal] {
+[data-radix-portal],
+[data-radix-popper-content-wrapper],
+.react-select__menu-portal {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }
@@ -78,14 +81,7 @@
 [role="menu"],
 [role="dialog"],
 [role="combobox"],
-[data-radix-popper-content-wrapper],
-.react-select__menu,
-.react-select__menu-portal {
-  pointer-events: auto !important;
-  z-index: 999999 !important;
-}
-
-body[style*="pointer-events: none"] {
+[data-state="open"] {
   pointer-events: auto !important;
 }
 
@@ -94,5 +90,10 @@ body[style*="pointer-events: none"] {
 [cmdk-item],
 .react-select__option {
   cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* Force body clicks if library locks them */
+body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }
