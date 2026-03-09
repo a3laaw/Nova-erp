@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -15,7 +14,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Award, Loader2, CheckCircle2, Undo2, Calculator, Printer, ArrowRight, Star } from 'lucide-react';
+import { Award, Loader2, CheckCircle2, Undo2, Calculator, Printer, ArrowRight, Star, Sparkles, Zap, ShieldCheck, Truck, Percent, Ban } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +27,7 @@ import { Logo } from '../layout/logo';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
@@ -73,6 +73,26 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
     }
     return chunks;
   }, [allVendors]);
+
+  // محرك تحليل المميزات والعيوب (Intelligence Analysis)
+  const vendorIntelligence = useMemo(() => {
+    const analysis: Record<string, any> = {};
+    
+    allVendors.forEach(v => {
+        const quote = supplierQuotations.find(q => q.vendorId === v.id);
+        if (!quote) return;
+
+        analysis[v.id!] = {
+            isFastest: quote.deliveryTimeDays === Math.min(...supplierQuotations.map(q => q.deliveryTimeDays || 999)),
+            isCheapestNet: false, // Calculated per item usually
+            highestDiscount: quote.discountAmount === Math.max(...supplierQuotations.map(q => q.discountAmount || 0)) && quote.discountAmount > 0,
+            hasFreeDelivery: (quote.deliveryFees || 0) === 0,
+            isCredit: quote.paymentTerms?.includes('آجل') || quote.paymentTerms?.toLowerCase().includes('credit'),
+        };
+    });
+    
+    return analysis;
+  }, [allVendors, supplierQuotations]);
 
   const isLocked = useMemo(() => {
     return rfq.status === 'cancelled' || (rfq.awardedPoIds && rfq.awardedPoIds.length > 0);
@@ -181,7 +201,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                 const newPoRef = doc(collection(firestore, 'purchaseOrders'));
                 newPoIds.push(newPoRef.id);
 
-                // حساب الصافي النهائي المعتمد في أمر الشراء
                 const itemsSum = poItems.reduce((sum, i) => sum + i.total, 0);
                 const finalTotal = itemsSum - (quote.discountAmount || 0) + (quote.deliveryFees || 0);
 
@@ -231,82 +250,17 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
   return (
     <div className="space-y-6">
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          html, body { background: white !important; height: auto !important; overflow: visible !important; }
-          .no-print { display: none !important; }
-          
-          #printable-multi-page-area {
-            display: block !important;
-            visibility: visible !important;
-            width: 100% !important;
-          }
-
-          .print-page-container {
-            break-after: page;
-            page-break-after: always;
-            width: 100% !important;
-            padding: 0 !important;
-            margin-bottom: 40px;
-          }
-
-          table { 
-            width: 100% !important; 
-            border-collapse: collapse !important; 
-            border: 1px solid #000 !important; 
-            table-layout: auto !important;
-          }
-          
-          th, td { 
-            border: 1px solid #ddd !important; 
-            padding: 8px !important; 
-            -webkit-print-color-adjust: exact !important; 
-            print-color-adjust: exact !important; 
-          }
-          
-          .text-green-print { color: #16a34a !important; font-weight: bold !important; }
-          .text-red-print { color: #dc2626 !important; font-weight: bold !important; }
-          .text-blue-print { color: #2563eb !important; font-weight: bold !important; }
-          .bg-muted-print { background-color: #f8fafc !important; }
-          
-          .desc-col-print { 
-            width: 1% !important; 
-            white-space: normal !important; 
-            min-width: 200px !important; 
-            text-align: right !important;
-          }
-          .qty-col-print { 
-            width: 1% !important; 
-            white-space: nowrap !important; 
-            text-align: center !important; 
-          }
-          
-          .awarded-cell-print { 
-            border: 3px solid #eab308 !important; 
-            background-color: #fefce8 !important; 
-          }
-          .awarded-badge-print { 
-            display: inline-block !important; 
-            font-size: 7pt !important; 
-            background: #eab308 !important; 
-            color: #000 !important; 
-            padding: 2px 6px !important; 
-            border-radius: 4px !important; 
-            margin-bottom: 4px !important; 
-            font-weight: bold !important;
-          }
-        }
-      `}} />
-
       <div className="no-print space-y-6">
-        <div className="border-2 rounded-[2rem] shadow-sm overflow-x-auto bg-card">
+        <div className="border-2 rounded-[2.5rem] shadow-xl overflow-x-auto bg-card scrollbar-none">
           <Table className="w-full border-collapse table-auto">
             <TableHeader className="bg-muted/80 backdrop-blur-sm sticky top-0 z-30">
               <TableRow className="border-b-2">
-                <TableHead className="px-4 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto min-w-[200px]">بيان الصنف المطلوب</TableHead>
+                <TableHead className="px-6 text-right sticky right-0 bg-muted/95 border-l font-black text-foreground w-auto min-w-[250px]">بيان الصنف المطلوب</TableHead>
                 <TableHead className="text-center font-bold px-4 w-auto whitespace-nowrap">الكمية</TableHead>
                 {allVendors.map(vendor => {
                   const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
+                  const intel = vendorIntelligence[vendor.id!] || {};
+                  
                   const itemsTotal = rfq.items.reduce((sum, item) => {
                       const price = quote?.items.find(i => i.rfqItemId === item.id)?.unitPrice || 0;
                       return sum + (price * item.quantity);
@@ -314,32 +268,49 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
                   const netTotal = itemsTotal - (quote?.discountAmount || 0) + (quote?.deliveryFees || 0);
 
                   return (
-                    <TableHead key={vendor.id} className="p-3 border-r align-top min-w-[180px]">
-                      <div className="flex flex-col h-full gap-2">
+                    <TableHead key={vendor.id} className="p-4 border-r align-top min-w-[220px]">
+                      <div className="flex flex-col h-full gap-3">
                         <div className="text-center">
-                          <p className="font-black text-primary text-sm leading-tight h-10 flex items-center justify-center">{vendor.name}</p>
-                          <Button 
-                              variant="ghost" size="sm" 
-                              className={cn("h-6 text-[10px] mt-1 rounded-full", isLocked ? "opacity-0" : "text-muted-foreground hover:text-primary hover:bg-primary/10")}
-                              onClick={() => handleAwardToVendor(vendor.id!)}
-                              disabled={isLocked || rfq.status === 'cancelled'}
-                          >
-                              ترسية الكل هنا
-                          </Button>
+                          <p className="font-black text-primary text-base leading-tight h-12 flex items-center justify-center">{vendor.name}</p>
+                          <div className="flex flex-wrap justify-center gap-1 mt-1">
+                             {intel.isFastest && <Badge className="bg-orange-500 hover:bg-orange-500 text-[8px] font-black h-4 px-1.5 gap-1"><Zap className="h-2 w-2"/> الأسرع</Badge>}
+                             {intel.highestDiscount && <Badge className="bg-green-600 hover:bg-green-600 text-[8px] font-black h-4 px-1.5 gap-1"><Percent className="h-2 w-2"/> خصم عالٍ</Badge>}
+                             {intel.isCredit && <Badge variant="outline" className="text-[8px] font-black h-4 px-1.5 border-blue-200 text-blue-700 bg-blue-50">آجل</Badge>}
+                             {intel.hasFreeDelivery && <Badge variant="outline" className="text-[8px] font-black h-4 px-1.5 border-teal-200 text-teal-700 bg-teal-50">توصيل مجاني</Badge>}
+                          </div>
                         </div>
-                        <div className="space-y-1 bg-background/50 p-2 rounded-xl border shadow-inner">
-                          <div className="flex justify-between text-[9px]">
-                            <span className="text-muted-foreground">التوريد:</span> 
-                            <span className="font-bold">
-                                {quote?.deliveryTimeDays === 0 ? 'في نفس اليوم' : quote?.deliveryTimeDays ? `${quote.deliveryTimeDays} يوم` : '-'}
+                        <div className="space-y-1.5 bg-background/50 p-3 rounded-2xl border shadow-inner">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-muted-foreground font-bold">التوريد:</span> 
+                            <span className={cn("font-black", intel.isFastest ? "text-orange-600" : "")}>
+                                {quote?.deliveryTimeDays === 0 ? 'فوري' : quote?.deliveryTimeDays ? `${quote.deliveryTimeDays} يوم` : '-'}
                             </span>
                           </div>
-                          <div className="flex justify-between text-[9px]"><span className="text-muted-foreground">الدفع:</span> <span className="font-bold text-blue-600 truncate max-w-[80px]">{quote?.paymentTerms || 'نقدي'}</span></div>
-                          <div className="flex justify-between text-[9px] text-green-600"><span>الخصم:</span> <span className="font-bold">{formatCurrency(quote?.discountAmount || 0)}</span></div>
-                          <div className="flex justify-between text-[9px] text-red-600"><span>التوصيل:</span> <span className="font-bold">{formatCurrency(quote?.deliveryFees || 0)}</span></div>
-                          <Separator className="my-1"/>
-                          <div className="flex justify-between text-[10px] font-black text-primary"><span>الصافي:</span> <span>{formatCurrency(netTotal)}</span></div>
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-muted-foreground font-bold">طريقة الدفع:</span> 
+                            <span className={cn("font-black", intel.isCredit ? "text-blue-600" : "")}>{quote?.paymentTerms || 'نقدي'}</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-green-600">
+                            <span className="font-bold">إجمالي الخصم:</span> 
+                            <span className="font-black">{formatCurrency(quote?.discountAmount || 0)}</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-red-600">
+                            <span className="font-bold">التوصيل:</span> 
+                            <span className="font-black">{intel.hasFreeDelivery ? 'مجاني' : formatCurrency(quote?.deliveryFees || 0)}</span>
+                          </div>
+                          <Separator className="my-1.5"/>
+                          <div className="flex justify-between text-xs font-black text-primary"><span>الصافي المعتمد:</span> <span>{formatCurrency(netTotal)}</span></div>
                         </div>
+                        {!isLocked && (
+                            <Button 
+                                variant="outline" size="sm" 
+                                className="h-8 text-[10px] font-black border-primary/20 text-primary hover:bg-primary hover:text-white rounded-xl"
+                                onClick={() => handleAwardToVendor(vendor.id!)}
+                                disabled={isLocked || rfq.status === 'cancelled'}
+                            >
+                                اختيار كامل العرض للترسية
+                            </Button>
+                        )}
                       </div>
                     </TableHead>
                   );
@@ -348,20 +319,26 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
             </TableHeader>
             <TableBody>
               {tableData.map(({ item, quotes, minPrice }) => (
-                <TableRow key={item.id} className="h-14 hover:bg-muted/5 transition-colors border-b last:border-0">
-                  <TableCell className="font-bold px-4 text-right sticky right-0 bg-background/95 z-10 border-l">{item.itemName}</TableCell>
-                  <TableCell className="text-center font-mono font-bold bg-muted/5 px-4 whitespace-nowrap">{item.quantity}</TableCell>
+                <TableRow key={item.id} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
+                  <TableCell className="font-black px-6 text-right sticky right-0 bg-background/95 z-10 border-l text-sm">{item.itemName}</TableCell>
+                  <TableCell className="text-center font-mono font-black bg-muted/5 px-4 whitespace-nowrap text-muted-foreground">{item.quantity}</TableCell>
                   {allVendors.map(vendor => {
                     const quote = quotes.find(q => q.vendorId === vendor.id);
                     const isBest = quote?.price === minPrice && minPrice !== Infinity;
                     const isSelected = selectedAwards[item.id] === vendor.id;
                     return (
-                      <TableCell key={vendor.id} className={cn("text-center border-r p-0 min-w-[120px]", !isLocked && rfq.status !== 'cancelled' && "cursor-pointer", isSelected && "bg-primary/10 border-2 border-primary shadow-inner")} onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}>
+                      <TableCell key={vendor.id} className={cn("text-center border-r p-0 min-w-[140px] transition-all", !isLocked && rfq.status !== 'cancelled' && "cursor-pointer", isSelected && "bg-primary/5 border-2 border-primary shadow-inner")} onClick={() => handleCellClick(item.id, vendor.id!, quote?.price || 0)}>
                         {quote?.price ? (
-                          <div className={cn("font-mono font-black", isSelected ? "text-primary scale-110" : isBest ? "text-green-700" : "text-foreground/60")}>
-                            {formatCurrency(quote.price)}
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <div className={cn("font-mono font-black text-lg", isSelected ? "text-primary scale-110" : isBest ? "text-green-700" : "text-foreground/60")}>
+                                {formatCurrency(quote.price)}
+                            </div>
+                            {isBest && !isSelected && <Badge className="h-3 text-[7px] font-black bg-green-100 text-green-700 border-none px-1">الأقل سعراً</Badge>}
+                            {isSelected && <Badge className="h-4 text-[8px] font-black bg-primary text-white border-none px-2 rounded-full shadow-sm animate-in zoom-in">مختار للترسية</Badge>}
                           </div>
-                        ) : "-"}
+                        ) : (
+                            <div className="opacity-20 flex flex-col items-center"><Ban className="h-4 w-4"/> <span className="text-[8px] font-bold">لم يسعّر</span></div>
+                        )}
                       </TableCell>
                     );
                   })}
@@ -373,118 +350,35 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
 
         <div className="space-y-6">
             {rfq.status !== 'cancelled' && !isLocked ? (
-                <div className="flex justify-between items-center p-6 bg-primary/5 rounded-3xl border-2 border-primary/10 shadow-lg">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-2xl text-primary h-14 w-14 flex items-center justify-center"><Calculator className="h-8 w-8" /></div>
+                <div className="flex justify-between items-center p-8 bg-primary/5 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl animate-in slide-in-from-bottom-4">
+                    <div className="flex items-center gap-6">
+                        <div className="p-4 bg-primary/10 rounded-3xl text-primary shadow-inner"><Calculator className="h-10 w-10" /></div>
                         <div>
-                            <h4 className="font-black text-lg text-primary">اعتماد الترسية وإصدار الأوامر</h4>
-                            <p className="text-xs text-muted-foreground font-medium">سيتم إنشاء أوامر شراء منفصلة لكل مورد تم اختياره تلقائياً بنظام معامل التكلفة الصافي.</p>
+                            <h4 className="font-black text-2xl text-primary tracking-tight">اعتماد قرار الشراء</h4>
+                            <p className="text-sm text-muted-foreground font-bold mt-1">سيقوم النظام آلياً بفرز الأصناف المختارة وتوليد أوامر شراء منفصلة (POs) لكل مورد تم اختياره.</p>
                         </div>
                     </div>
-                    <Button onClick={handleConfirmSplitAward} disabled={isAwarding || Object.values(selectedAwards).filter(Boolean).length === 0} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3">
+                    <Button onClick={handleConfirmSplitAward} disabled={isAwarding || Object.values(selectedAwards).filter(Boolean).length === 0} className="h-16 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 gap-3 min-w-[350px]">
                         {isAwarding ? <Loader2 className="h-6 w-6 animate-spin" /> : <Award className="h-6 w-6" />}
-                        اعتماد وتحويل لأوامر شراء
+                        اعتماد الترسية وإصدار الأوامر
                     </Button>
                 </div>
             ) : isLocked && (
-                <div className="p-6 bg-green-50 border-2 border-dashed border-green-200 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <CheckCircle2 className="h-10 w-10 text-green-600" />
+                <div className="p-8 bg-green-50 border-2 border-dashed border-green-200 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-green-100 rounded-2xl text-green-600"><CheckCircle2 className="h-10 w-10" /></div>
                         <div>
-                            <p className="font-black text-green-800 text-lg">تمت الترسية وإصدار أوامر الشراء بنجاح.</p>
-                            <p className="text-xs text-green-700 font-medium">المصفوفة الآن في وضع المراجعة والأرشفة.</p>
+                            <p className="font-black text-green-800 text-2xl tracking-tight">تمت الترسية وتحويل الطلب لأوامر شراء</p>
+                            <p className="text-sm text-green-700 font-bold">المصفوفة الآن مؤرشفة ومرتبطة بـ {rfq.awardedPoIds?.length} أوامر شراء صادرة.</p>
                         </div>
                     </div>
-                    <Button onClick={handleReopenRfq} disabled={isReopening} variant="ghost" className="rounded-xl text-orange-700 hover:bg-orange-50 font-bold gap-2">
+                    <Button onClick={handleReopenRfq} disabled={isReopening} variant="outline" className="h-12 px-8 rounded-xl text-orange-700 border-orange-200 hover:bg-orange-50 font-black gap-2 transition-all">
                         {isReopening ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4" />}
-                        إعادة فتح الترسية (للمدير)
+                        تراجع عن الترسية (إعادة تحرير)
                     </Button>
                 </div>
             )}
         </div>
-      </div>
-
-      <div id="printable-multi-page-area" className="hidden print:block">
-        {vendorChunks.map((chunk, chunkIndex) => (
-          <div key={chunkIndex} className="print-page-container">
-            <div className="flex justify-between items-start mb-6 border-b-4 border-primary/20 pb-4">
-              <div className="flex items-center gap-4">
-                <Logo className="h-14 w-14 !p-1 bg-white border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                <div>
-                  <h1 className="text-xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                  <p className="text-[9px] text-muted-foreground">{branding?.address}</p>
-                </div>
-              </div>
-              <div className="text-left space-y-1">
-                <h2 className="text-2xl font-black text-primary">مصفوفة مقارنة عروض الأسعار</h2>
-                <p className="text-[10px] font-bold font-mono">الطلب: {rfq.rfqNumber} | صفحة {chunkIndex + 1} من {vendorChunks.length}</p>
-                <p className="text-[9px] text-muted-foreground">تاريخ التحليل: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ar })}</p>
-              </div>
-            </div>
-
-            <table>
-              <thead>
-                <tr className="bg-muted-print">
-                  <th className="desc-col-print">بيان الصنف المطلوب</th>
-                  <th className="qty-col-print">الكمية</th>
-                  {chunk.map(vendor => {
-                    const quote = supplierQuotations.find(q => q.vendorId === vendor.id);
-                    const itemsTotal = rfq.items.reduce((sum, item) => {
-                        const price = quote?.items.find(i => i.rfqItemId === item.id)?.unitPrice || 0;
-                        return sum + (price * item.quantity);
-                    }, 0);
-                    const netTotal = itemsTotal - (quote?.discountAmount || 0) + (quote?.deliveryFees || 0);
-
-                    return (
-                      <th key={vendor.id} className="text-center align-top">
-                        <div className="space-y-1 min-w-[150px]">
-                          <p className="font-black text-blue-print border-b-2 pb-1 mb-2 text-sm">{vendor.name}</p>
-                          <div className="text-[8pt] font-normal space-y-1 text-right px-2">
-                            <div><span className="opacity-60">التوريد:</span> <b>
-                                {quote?.deliveryTimeDays === 0 ? 'في نفس اليوم' : quote?.deliveryTimeDays ? `${quote.deliveryTimeDays} يوم` : '-'}
-                            </b></div>
-                            <div className="text-blue-print"><span className="opacity-60">الدفع:</span> <b>{quote?.paymentTerms || 'نقدي'}</b></div>
-                            <div className="text-green-print"><span className="opacity-60">الخصم:</span> <b>{formatCurrency(quote?.discountAmount || 0)}</b></div>
-                            <div className="text-red-print"><span className="opacity-60">التوصيل:</span> <b>{formatCurrency(quote?.deliveryFees || 0)}</b></div>
-                            <Separator className="my-1 border-gray-300"/>
-                            <div className="font-black text-blue-print text-sm pt-1">الصافي: {formatCurrency(netTotal)}</div>
-                          </div>
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {tableData.map(({ item, quotes, minPrice }) => (
-                  <tr key={item.id}>
-                    <td className="font-bold text-right text-sm">{item.itemName}</td>
-                    <td className="text-center font-mono font-bold">{item.quantity}</td>
-                    {chunk.map(vendor => {
-                      const quote = quotes.find(q => q.vendorId === vendor.id);
-                      const isBest = quote?.price === minPrice && minPrice !== Infinity;
-                      const isSelected = selectedAwards[item.id] === vendor.id;
-                      return (
-                        <td key={vendor.id} className={cn("text-center font-mono font-black text-base", isSelected && "awarded-cell-print")}>
-                          {isSelected && <div className="awarded-badge-print">[ تم الاختيار ]</div>}
-                          <div className={cn(isBest && !isSelected && "text-green-print")}>
-                            {quote?.price ? formatCurrency(quote.price) : "-"}
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="grid grid-cols-3 gap-12 mt-16 text-center text-[9pt] border-t-2 pt-6">
-                <div><p className="font-black mb-10">إعداد / قسم المشتريات</p><div className="border-t border-dashed pt-1">التوقيع والتاريخ</div></div>
-                <div><p className="font-black mb-10">مراجعة / الإدارة المالية</p><div className="border-t border-dashed pt-1">الختم والاعتماد</div></div>
-                <div><p className="font-black mb-10">اعتماد / مدير العمليات</p><div className="border-t border-dashed pt-1">الموافقة النهائية</div></div>
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
