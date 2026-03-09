@@ -55,8 +55,9 @@ ${input.rfqItems.map(item => `- ${item.name} (ID: ${item.id})`).join('\n')}
   } catch (error: any) {
     console.error("AI Quote Analysis Error:", error);
     
+    // تغيير الرسالة عند تجاوز الحصة حسب طلب المستخدم
     if (error.message?.includes('429') || error.message?.includes('Resource has been exhausted')) {
-        throw new Error("تنبيه: تم استنفاد حصة الطلبات المجانية. يرجى تحويل مفتاح الـ API إلى 'مدفوع' لضمان عمل تحليل الصور بكفاءة.");
+        throw new Error("خطأ يرجى الاتصال بالمطور");
     }
     
     throw new Error(`خطأ AI: ${error.message}`);

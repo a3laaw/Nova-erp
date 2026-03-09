@@ -47,8 +47,8 @@ export async function GET() {
         userFriendlyError = "تم رفض الوصول (403).";
         solution = "المفتاح غير صالح أو تم تقييد استخدامه. تأكد من إعدادات الفوترة أو قيود المفتاح.";
     } else if (error.message?.includes('429')) {
-        userFriendlyError = "تجاوز حد الاستخدام (429 - Resource Exhausted).";
-        solution = "لقد وصلت للحد الأقصى للطلبات المجانية. يجب تفعيل 'الخطة المدفوعة' (Pay-as-you-go) لرفع قيود الحجم والسرعة.";
+        userFriendlyError = "خطأ يرجى الاتصال بالمطور";
+        solution = "تنبيه: تم استنفاد حصة الطلبات المجانية (429 Quota Exceeded).";
     }
 
     return NextResponse.json({ 

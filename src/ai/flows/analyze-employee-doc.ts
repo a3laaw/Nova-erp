@@ -58,9 +58,9 @@ export async function analyzeEmployeeDocument(input: {
   } catch (error: any) {
     console.error("AI Employee Doc Analysis Error:", error);
     
-    // التعرف على خطأ تجاوز الحصة 429
+    // التعرف على خطأ تجاوز الحصة 429 وتغيير الرسالة حسب طلب المستخدم
     if (error.message?.includes('429') || error.message?.includes('Resource has been exhausted')) {
-        throw new Error("عذراً، تم تجاوز حصة الاستخدام المجانية (Quota). يرجى تفعيل الحساب 'المدفوع' (Pay-as-you-go) في Google AI Studio لرفع القيود.");
+        throw new Error("خطأ يرجى الاتصال بالمطور");
     }
     
     throw new Error(error.message || "فشل التحليل الذكي للوثيقة.");
