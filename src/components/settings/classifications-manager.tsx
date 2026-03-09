@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, query } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, query, orderBy } from 'firebase/firestore';
 import type { ItemCategory } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '../ui/button';
@@ -118,26 +118,40 @@ export function ClassificationsManager() {
     const [isImporting, setIsImporting] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
-    const handleSave = async () => {
-        if (!firestore || !itemName.trim()) {
+    const handleSave = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        
+        const trimmedName = itemName.trim();
+        if (!firestore || !trimmedName) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'اسم الفئة مطلوب.' });
             return;
         }
+
         setIsSaving(true);
         try {
             const dataToSave = { 
-                name: itemName,
+                name: trimmedName,
                 parentCategoryId: parentCategory?.id || null
             };
-            if (editingItem) await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
-            else {
+            
+            if (editingItem) {
+                await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
+            } else {
                 const currentList = parentCategory ? categories.filter(c => c.parentCategoryId === parentCategory.id) : categories.filter(c => !c.parentCategoryId);
                 await addDoc(collection(firestore, 'itemCategories'), { ...dataToSave, order: currentList.length });
             }
-            toast({ title: 'تم الحفظ' });
+            
+            toast({ title: 'تم الحفظ بنجاح' });
+            // Close but don't reset state immediately to prevent race conditions
             setIsDialogOpen(false);
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); }
-        finally { setIsSaving(false); }
+            setItemName('');
+            setEditingItem(null);
+            setParentCategory(null);
+        } catch (e) { 
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); 
+        } finally { 
+            setIsSaving(false); 
+        }
     };
 
     const handleDelete = async () => {
@@ -187,31 +201,45 @@ export function ClassificationsManager() {
                 <div className="border rounded-xl p-4 bg-card shadow-sm min-h-[400px]">
                     {loading ? <Loader2 className="animate-spin mx-auto h-8 w-8 text-primary mt-20" /> : 
                     categoryTree.length === 0 ? <p className="text-center text-muted-foreground p-12">لا توجد فئات.</p> :
-                    categoryTree.map(node => <CategoryItem key={node.id} node={node} level={0} onEdit={i => { setEditingItem(i); setItemName(i.name); setIsDialogOpen(true); }} onDelete={setItemToDelete} onAddSub={p => { setEditingItem(null); setParentCategory(p); setItemName(''); setIsDialogOpen(true); }} openCategories={openCategories} setOpenCategories={setOpenCategories} />)}
+                    categoryTree.map(node => <CategoryItem key={node.id} node={node} level={0} onEdit={i => { setEditingItem(i); setItemName(i.name); setParentCategory(categories.find(c => c.id === i.parentCategoryId) || null); setIsDialogOpen(true); }} onDelete={setItemToDelete} onAddSub={p => { setEditingItem(null); setParentCategory(p); setItemName(''); setIsDialogOpen(true); }} openCategories={openCategories} setOpenCategories={setOpenCategories} />)}
                 </div>
             </CardContent>
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => { if(!open && !isSaving) setIsDialogOpen(false); }}>
                 <DialogContent dir="rtl" className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{editingItem ? 'تعديل فئة' : 'إضافة فئة جديدة'}</DialogTitle>
-                    </DialogHeader>
-                    <div className="py-4 space-y-6">
-                        <div className="grid gap-2">
-                            <Label>الفئة الأب (اختياري)</Label>
-                            <InlineSearchList value={parentCategory?.id || ''} onSelect={v => setParentCategory(categories.find(c => c.id === v) || null)} options={categories.map(c => ({value: c.id!, label: c.name}))} placeholder="رئيسية" />
+                    <form onSubmit={handleSave}>
+                        <DialogHeader>
+                            <DialogTitle>{editingItem ? 'تعديل فئة' : 'إضافة فئة جديدة'}</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4 space-y-6">
+                            <div className="grid gap-2">
+                                <Label>الفئة الأب (اختياري)</Label>
+                                <InlineSearchList 
+                                    value={parentCategory?.id || ''} 
+                                    onSelect={v => setParentCategory(categories.find(c => c.id === v) || null)} 
+                                    options={categories.filter(c => c.id !== editingItem?.id).map(c => ({value: c.id!, label: c.name}))} 
+                                    placeholder="رئيسية" 
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="item-name">اسم الفئة *</Label>
+                                <Input 
+                                    id="item-name" 
+                                    value={itemName} 
+                                    onChange={e => setItemName(e.target.value)} 
+                                    required 
+                                    autoFocus
+                                />
+                            </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label>اسم الفئة *</Label>
-                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
-                        <Button onClick={handleSave} disabled={isSaving || !itemName.trim()}>
-                             {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>} حفظ
-                        </Button>
-                    </DialogFooter>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
+                            <Button type="submit" disabled={isSaving || !itemName.trim()}>
+                                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>} 
+                                حفظ
+                            </Button>
+                        </DialogFooter>
+                    </form>
                 </DialogContent>
             </Dialog>
 
@@ -224,7 +252,7 @@ export function ClassificationsManager() {
 
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl">
-                    <AlertDialogHeader><AlertDialogTitle>تأكيد الاستيراد؟</AlertDialogTitle><AlertDialogDescription>سيتم مسح الفئات الحالية واستبدالها بالافتراضية.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogHeader><AlertDialogTitle>تأكيد الاستيراد؟</AlertDialogTitle><AlertDialogDescription>سيقوم هذا الإجراء بمسح الفئات الحالية واستبدالها بالافتراضية لضمان توافق النظام.</AlertDialogDescription></AlertDialogHeader>
                     <AlertDialogFooter><AlertDialogCancel>إلغاء</AlertDialogCancel><AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-destructive">استيراد</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
