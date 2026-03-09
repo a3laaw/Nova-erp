@@ -236,6 +236,7 @@ export interface Employee extends BaseEntity {
 }
 
 export interface Warehouse extends BaseEntity { name: string; location?: string; isDefault?: boolean; }
+export interface ItemCategory extends BaseEntity { name: string; parentCategoryId: string | null; order?: number; }
 export interface Item extends BaseEntity { name: string; sku: string; categoryId: string; unitOfMeasure: string; costPrice?: number; sellingPrice?: number; inventoryTracked?: boolean; isSubsidyEligible?: boolean; warrantyYears?: number; }
 export interface Vendor extends BaseEntity { name: string; phone: string; contactPerson?: string; }
 export interface Account extends BaseEntity { code: string; name: string; type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; level: number; parentCode: string | null; isPayable: boolean; statement: 'Balance Sheet' | 'Income Statement'; balanceType: 'Debit' | 'Credit'; }

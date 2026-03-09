@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -12,9 +13,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, deleteDoc, where } from 'firebase/firestore';
-import type { Item, ItemCategory, CompanyActivityType } from '@/lib/types';
+import type { Item, ItemCategory } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Package, MoreHorizontal, Pencil, Trash2, Search, PlusCircle, History, Filter } from 'lucide-react';
+import { Package, MoreHorizontal, Pencil, Trash2, Search, PlusCircle, History } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -25,7 +26,6 @@ import { Input } from '../ui/input';
 import { searchItems } from '@/lib/cache/fuse-search';
 import { ItemForm } from './item-form';
 import Link from 'next/link';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface ItemsListProps {
   selectedCategoryId: string | null;
@@ -53,7 +53,6 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [activityFilter, setActivityFilter] = useState('all');
 
   const itemsQueryConstraints = useMemo(() => {
     const constraints = [];
@@ -65,7 +64,6 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
 
   const { data: items, loading: itemsLoading, error: itemsError } = useSubscription<Item>(firestore, 'items', itemsQueryConstraints);
   const { data: categories, loading: categoriesLoading, error: categoriesError } = useSubscription<ItemCategory>(firestore, 'itemCategories');
-  const { data: activityTypes } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes', [orderBy('name')]);
 
   const loading = itemsLoading || categoriesLoading;
 
@@ -74,24 +72,17 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
     return new Map(categories.map(cat => [cat.id, cat]));
   }, [categories]);
 
-  const activityTypeMap = useMemo(() => new Map((activityTypes || []).map(t => [t.id, t.name])), [activityTypes]);
-
   const filteredItems = useMemo(() => {
     let augmentedItems = (items || []).map(item => {
         const cat = categoryMap.get(item.categoryId);
         return {
             ...item,
-            categoryName: cat?.name || 'غير مصنف',
-            activityTypeIds: cat?.activityTypeIds || []
+            categoryName: cat?.name || 'غير مصنف'
         };
     });
 
-    if (activityFilter !== 'all') {
-        augmentedItems = augmentedItems.filter(i => i.activityTypeIds.includes(activityFilter));
-    }
-
     return searchItems(augmentedItems, searchQuery).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
-  }, [items, searchQuery, categoryMap, activityFilter]);
+  }, [items, searchQuery, categoryMap]);
   
   const handleDelete = async () => {
     if (!itemToDelete || !firestore) return;
@@ -138,31 +129,13 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
                     <PlusCircle className="h-5 w-5"/> إضافة صنف جديد
                 </Button>
             </div>
-            
-            <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-xl border border-dashed">
-                <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-                    <Filter className="h-3 w-3" />
-                    <span>تصفية حسب نوع النشاط:</span>
-                </div>
-                <Select value={activityFilter} onValueChange={setActivityFilter}>
-                    <SelectTrigger className="w-[200px] h-8 text-xs bg-background">
-                        <SelectValue placeholder="كل الأنشطة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">كل الأنشطة</SelectItem>
-                        {(activityTypes || []).map(t => (
-                            <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
         </div>
 
         <div className="border rounded-2xl overflow-hidden shadow-sm">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead>الاسم والنشاط</TableHead>
+                <TableHead>الاسم</TableHead>
                 <TableHead>الكود (SKU)</TableHead>
                 <TableHead>النوع</TableHead>
                 <TableHead>الفئة</TableHead>
@@ -191,13 +164,6 @@ export function ItemsList({ selectedCategoryId }: ItemsListProps) {
                             <TableRow key={item.id} className="group hover:bg-muted/30 transition-colors">
                                 <TableCell className="font-bold text-foreground/80">
                                     {item.name}
-                                    <div className="flex flex-wrap gap-1 mt-1">
-                                        {(item as any).activityTypeIds?.map((id: string) => (
-                                            <Badge key={id} variant="outline" className="text-[8px] h-3.5 py-0 px-1 border-blue-200 text-blue-600">
-                                                {activityTypeMap.get(id)}
-                                            </Badge>
-                                        ))}
-                                    </div>
                                 </TableCell>
                                 <TableCell className="font-mono text-xs opacity-60">{item.sku}</TableCell>
                                 <TableCell>

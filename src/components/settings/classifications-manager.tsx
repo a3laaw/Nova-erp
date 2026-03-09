@@ -1,25 +1,21 @@
+
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup } from 'firebase/firestore';
-import type { ItemCategory, CompanyActivityType, BoqReferenceItem } from '@/lib/types';
+import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, query } from 'firebase/firestore';
+import type { ItemCategory } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ScrollArea } from '../ui/scroll-area';
-import { PlusCircle, Pencil, Trash2, Loader2, Save, Plus, Minus, DownloadCloud, Filter } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, Loader2, Save, Plus, Minus, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
-import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
 import { defaultItemCategories } from '@/lib/default-reference-data';
-import { Badge } from '../ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface CategoryNode extends ItemCategory {
   children: CategoryNode[];
@@ -33,7 +29,6 @@ function CategoryItem({
   onAddSub,
   openCategories,
   setOpenCategories,
-  activityTypeMap,
 }: {
   node: CategoryNode;
   level: number;
@@ -42,7 +37,6 @@ function CategoryItem({
   onAddSub: (parent: ItemCategory) => void;
   openCategories: Set<string>;
   setOpenCategories: React.Dispatch<React.SetStateAction<Set<string>>>;
-  activityTypeMap: Map<string, string>;
 }) {
   const isOpen = openCategories.has(node.id!);
 
@@ -66,18 +60,7 @@ function CategoryItem({
           ) : (
             <span className="w-6 h-6 inline-block ml-2" />
           )}
-          <div className="flex flex-col">
-            <span className={cn("font-medium", node.children.length === 0 && "ml-2")}>{node.name}</span>
-            {node.activityTypeIds && node.activityTypeIds.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                    {node.activityTypeIds.map(id => (
-                        <Badge key={id} variant="outline" className="text-[10px] h-4 py-0 px-1 border-blue-200 text-blue-600 bg-blue-50/50">
-                            {activityTypeMap.get(id) || '...'}
-                        </Badge>
-                    ))}
-                </div>
-            )}
-          </div>
+          <span className={cn("font-medium", node.children.length === 0 && "ml-2")}>{node.name}</span>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(node)} title="إضافة فئة فرعية"><PlusCircle className="h-4 w-4 text-primary" /></Button>
@@ -95,7 +78,6 @@ function CategoryItem({
           onAddSub={onAddSub}
           openCategories={openCategories}
           setOpenCategories={setOpenCategories}
-          activityTypeMap={activityTypeMap}
         />
       ))}
     </div>
@@ -106,27 +88,15 @@ export function ClassificationsManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
 
-    const { data: categories, loading: categoriesLoading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
-    const { data: activityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes', useMemo(() => [orderBy('name')], []));
-    const { data: boqReferenceItems, loading: boqItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', useMemo(() => [orderBy('name')], []));
-    
+    const { data: categories, loading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
     const [openCategories, setOpenCategories] = useState(new Set<string>());
-    const [activityFilter, setActivityFilter] = useState('all');
-
-    const activityTypeMap = useMemo(() => new Map(activityTypes.map(t => [t.id, t.name])), [activityTypes]);
-    const activityTypeOptions: MultiSelectOption[] = useMemo(() => activityTypes.map(t => ({ value: t.id, label: t.name })), [activityTypes]);
-    const boqItemOptions: MultiSelectOption[] = useMemo(() => boqReferenceItems.map(item => ({ value: item.id!, label: item.name })), [boqReferenceItems]);
 
     const categoryTree = useMemo(() => {
         if (!categories) return [];
-        let filteredList = categories;
-        if (activityFilter !== 'all') {
-            filteredList = categories.filter(cat => cat.activityTypeIds?.includes(activityFilter));
-        }
         const map = new Map<string, ItemCategory & { children: any[] }>();
         const roots: (ItemCategory & { children: any[] })[] = [];
-        filteredList.forEach(cat => { map.set(cat.id!, { ...cat, children: [] }); });
-        filteredList.forEach(cat => {
+        categories.forEach(cat => { map.set(cat.id!, { ...cat, children: [] }); });
+        categories.forEach(cat => {
             if (cat.parentCategoryId && map.has(cat.parentCategoryId)) map.get(cat.parentCategoryId)!.children.push(map.get(cat.id!)!);
             else roots.push(map.get(cat.id!)!);
         });
@@ -136,7 +106,7 @@ export function ClassificationsManager() {
         };
         sortRecursive(roots);
         return roots;
-    }, [categories, activityFilter]);
+    }, [categories]);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<ItemCategory | null>(null);
@@ -144,31 +114,10 @@ export function ClassificationsManager() {
     const [parentCategory, setParentCategory] = useState<ItemCategory | null>(null);
     
     const [itemName, setItemName] = useState('');
-    const [selectedActivityTypeIds, setSelectedActivityTypeIds] = useState<string[]>([]);
-    const [selectedBoqItemIds, setSelectedBoqItemIds] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
-    const isLeafAndConstruction = useMemo(() => {
-        if (!editingItem && !parentCategory) return false; 
-        const isCurrentlyALeaf = editingItem ? !categories.some(c => c.parentCategoryId === editingItem.id) : true;
-        if (!isCurrentlyALeaf) return false;
-        const getRootParent = (currentId: string | null): ItemCategory | null => {
-            if (!currentId) return null;
-            const current = categories.find(c => c.id === currentId);
-            if (!current) return null;
-            if (!current.parentCategoryId) return current;
-            return getRootParent(current.parentCategoryId);
-        };
-        const rootParent = getRootParent(editingItem?.parentCategoryId || parentCategory?.id || null);
-        if (!rootParent) {
-            const selfIsRoot = editingItem && !editingItem.parentCategoryId;
-            return selfIsRoot && selectedActivityTypeIds.some(id => activityTypeMap.get(id)?.includes('مقاولات'));
-        }
-        return rootParent.activityTypeIds?.some(id => activityTypeMap.get(id)?.includes('مقاولات')) || false;
-    }, [editingItem, parentCategory, categories, activityTypeMap, selectedActivityTypeIds]);
-
     const handleSave = async () => {
         if (!firestore || !itemName.trim()) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'اسم الفئة مطلوب.' });
@@ -178,9 +127,7 @@ export function ClassificationsManager() {
         try {
             const dataToSave = { 
                 name: itemName,
-                activityTypeIds: selectedActivityTypeIds,
-                parentCategoryId: parentCategory?.id || null,
-                boqReferenceItemIds: isLeafAndConstruction ? selectedBoqItemIds : []
+                parentCategoryId: parentCategory?.id || null
             };
             if (editingItem) await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
             else {
@@ -209,14 +156,16 @@ export function ClassificationsManager() {
             const existingSnap = await getDocs(query(collection(firestore, 'itemCategories')));
             existingSnap.forEach(doc => batch.delete(doc.ref));
             for (const category of defaultItemCategories) {
-                batch.set(doc(collection(firestore, 'itemCategories')), category);
+                batch.set(doc(collection(firestore, 'itemCategories')), {
+                    name: category.name,
+                    parentCategoryId: category.parentCategoryId,
+                    order: category.order
+                });
             }
             await batch.commit();
             toast({ title: 'نجاح' });
         } finally { setIsImporting(false); setIsImportConfirmOpen(false); }
     }
-
-    const loading = categoriesLoading || activityTypesLoading || boqItemsLoading;
 
     return (
         <Card dir="rtl">
@@ -224,34 +173,26 @@ export function ClassificationsManager() {
                 <div className="flex justify-between items-start">
                     <div>
                         <CardTitle>إدارة فئات الأصناف</CardTitle>
-                        <CardDescription>تنظيم الأصناف في هيكل شجري وربطها بالأنشطة والـ BOQ.</CardDescription>
+                        <CardDescription>تنظيم الأصناف في هيكل شجري مبسط (الفئة والفئة الأب).</CardDescription>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
-                            {isImporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>} استيراد
+                            {isImporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>} استيراد الافتراضي
                         </Button>
-                        <Button onClick={() => { setEditingItem(null); setParentCategory(null); setItemName(''); setSelectedActivityTypeIds([]); setSelectedBoqItemIds([]); setIsDialogOpen(true); }}><PlusCircle className="ml-2 h-4"/> إضافة رئيسية</Button>
+                        <Button onClick={() => { setEditingItem(null); setParentCategory(null); setItemName(''); setIsDialogOpen(true); }}><PlusCircle className="ml-2 h-4"/> إضافة فئة رئيسية</Button>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/30">
-                    <Filter className="h-4 w-4 text-muted-foreground" />
-                    <Label>تصفية النشاط:</Label>
-                    <Select value={activityFilter} onValueChange={setActivityFilter}>
-                        <SelectTrigger className="max-w-[200px]"><SelectValue /></SelectTrigger>
-                        <SelectContent dir="rtl"><SelectItem value="all">الكل</SelectItem>{activityTypes.map(t => <SelectItem key={t.id} value={t.id!}>{t.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
+            <CardContent>
                 <div className="border rounded-xl p-4 bg-card shadow-sm min-h-[400px]">
                     {loading ? <Loader2 className="animate-spin mx-auto h-8 w-8 text-primary mt-20" /> : 
                     categoryTree.length === 0 ? <p className="text-center text-muted-foreground p-12">لا توجد فئات.</p> :
-                    categoryTree.map(node => <CategoryItem key={node.id} node={node} level={0} onEdit={i => { setEditingItem(i); setItemName(i.name); setSelectedActivityTypeIds(i.activityTypeIds || []); setSelectedBoqItemIds(i.boqReferenceItemIds || []); setIsDialogOpen(true); }} onDelete={setItemToDelete} onAddSub={p => { setEditingItem(null); setParentCategory(p); setItemName(''); setSelectedActivityTypeIds(p.activityTypeIds || []); setIsDialogOpen(true); }} openCategories={openCategories} setOpenCategories={setOpenCategories} activityTypeMap={activityTypeMap} />)}
+                    categoryTree.map(node => <CategoryItem key={node.id} node={node} level={0} onEdit={i => { setEditingItem(i); setItemName(i.name); setIsDialogOpen(true); }} onDelete={setItemToDelete} onAddSub={p => { setEditingItem(null); setParentCategory(p); setItemName(''); setIsDialogOpen(true); }} openCategories={openCategories} setOpenCategories={setOpenCategories} />)}
                 </div>
             </CardContent>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent dir="rtl" className="max-w-2xl">
+                <DialogContent dir="rtl" className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>{editingItem ? 'تعديل فئة' : 'إضافة فئة جديدة'}</DialogTitle>
                     </DialogHeader>
@@ -264,16 +205,6 @@ export function ClassificationsManager() {
                             <Label>اسم الفئة *</Label>
                             <Input value={itemName} onChange={e => setItemName(e.target.value)} required />
                         </div>
-                        <div className="grid gap-2">
-                            <Label>نوع النشاط</Label>
-                            <MultiSelect options={activityTypeOptions} selected={selectedActivityTypeIds} onChange={setSelectedActivityTypeIds} />
-                        </div>
-                        {isLeafAndConstruction && (
-                            <div className="p-4 border-2 border-primary/10 bg-primary/5 rounded-2xl space-y-4">
-                                <Label className="font-bold">ربط ببنود المقايسة (BOQ)</Label>
-                                <MultiSelect options={boqItemOptions} selected={selectedBoqItemIds} onChange={setSelectedBoqItemIds} />
-                            </div>
-                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
