@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -80,6 +79,9 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'field-visits': 'الزيارات الميدانية',
     'contracts': 'عروض الأسعار والعقود',
     'workStages': 'سير العمل مكتب هندسي',
+    'price-history': 'تاريخ أسعار الأصناف',
+    'compare': 'مصفوفة المقارنة',
+    'lc': 'الاعتمادات المستندية',
   },
   en: {
     dashboard: 'Dashboard',
@@ -135,6 +137,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'field-visits': 'Field Visits',
     'contracts': 'Quotations & Contracts',
     'workStages': 'Engineering Office Workflow',
+    'price-history': 'Price Archive',
+    'lc': 'Letters of Credit',
   },
 };
 

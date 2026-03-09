@@ -79,7 +79,9 @@ import {
   ShoppingBag,
   FileStack,
   Wallet,
-  Calculator
+  Calculator,
+  History,
+  Sparkles
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -154,6 +156,7 @@ const navItems = {
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: SearchCode },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
+        { href: '/dashboard/purchasing/reports/price-history', label: 'تاريخ أسعار الأصناف', icon: History },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: Landmark },
       ]
@@ -170,7 +173,7 @@ const navItems = {
         { href: '/dashboard/warehouse/warehouses', label: 'المستودعات والأفرع', icon: Building2 },
         { href: '/dashboard/warehouse/transfers', label: 'تحويلات بين المخازن', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات العجز والتلف', icon: Ban },
-        { href: '/dashboard/warehouse/reports/balances', label: 'تقرير أرصدة الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: PieChart },
       ]
     },
 
