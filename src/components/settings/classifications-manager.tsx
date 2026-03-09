@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, query, orderBy } from 'firebase/firestore';
 import type { ItemCategory } from '@/lib/types';
@@ -10,7 +10,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { PlusCircle, Pencil, Trash2, Loader2, Save, Plus, Minus, DownloadCloud } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, Loader2, Save, Plus, Minus, DownloadCloud, FolderOpen, Folder } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -117,8 +117,8 @@ export function ClassificationsManager() {
     const [isImporting, setIsImporting] = useState(false);
     const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
     
-    const handleSave = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
         
         const trimmedName = itemName.trim();
         if (!firestore || !trimmedName) {
@@ -155,9 +155,15 @@ export function ClassificationsManager() {
     const handleDelete = async () => {
         if (!firestore || !itemToDelete) return;
         setIsSaving(true);
-        try { await deleteDoc(doc(firestore, 'itemCategories', itemToDelete.id!)); toast({ title: 'نجاح' }); }
-        catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
-        finally { setIsSaving(false); setItemToDelete(null); }
+        try { 
+            await deleteDoc(doc(firestore, 'itemCategories', itemToDelete.id!)); 
+            toast({ title: 'نجاح' }); 
+        } catch (e) { 
+            toast({ variant: 'destructive', title: 'خطأ' }); 
+        } finally { 
+            setIsSaving(false); 
+            setItemToDelete(null); 
+        }
     };
 
     const handleImportDefaults = async () => {
@@ -175,9 +181,19 @@ export function ClassificationsManager() {
                 });
             }
             await batch.commit();
-            toast({ title: 'نجاح' });
-        } finally { setIsImporting(false); setIsImportConfirmOpen(false); }
-    }
+            toast({ title: 'نجاح الاستيراد' });
+        } finally { 
+            setIsImporting(false); 
+            setIsImportConfirmOpen(false); 
+        }
+    };
+
+    const categoryOptions = useMemo(() => {
+        if (!categories) return [];
+        return categories
+          .filter(cat => cat.id !== editingItem?.id)
+          .map(cat => ({ value: cat.id!, label: cat.name }));
+    }, [categories, editingItem]);
 
     return (
         <Card dir="rtl">
@@ -191,7 +207,9 @@ export function ClassificationsManager() {
                         <Button variant="outline" size="sm" onClick={() => setIsImportConfirmOpen(true)} disabled={isImporting}>
                             {isImporting ? <Loader2 className="h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4"/>} استيراد الافتراضي
                         </Button>
-                        <Button onClick={() => { setEditingItem(null); setParentCategory(null); setItemName(''); setIsDialogOpen(true); }}><PlusCircle className="ml-2 h-4"/> إضافة فئة رئيسية</Button>
+                        <Button onClick={() => { setEditingItem(null); setParentCategory(null); setItemName(''); setIsDialogOpen(true); }}>
+                            <PlusCircle className="ml-2 h-4"/> إضافة فئة رئيسية
+                        </Button>
                     </div>
                 </div>
             </CardHeader>
@@ -215,8 +233,8 @@ export function ClassificationsManager() {
                                 <InlineSearchList 
                                     value={parentCategory?.id || ''} 
                                     onSelect={v => setParentCategory(categories.find(c => c.id === v) || null)} 
-                                    options={categories.filter(c => c.id !== editingItem?.id).map(c => ({value: c.id!, label: c.name}))} 
-                                    placeholder="رئيسية" 
+                                    options={categoryOptions} 
+                                    placeholder="فئة رئيسية (بدون أب)" 
                                 />
                             </div>
                             <div className="grid gap-2">
@@ -226,15 +244,15 @@ export function ClassificationsManager() {
                                     value={itemName} 
                                     onChange={e => setItemName(e.target.value)} 
                                     required 
-                                    autoFocus
+                                    placeholder="مثال: مواد غذائية، كابلات كهربائية..."
                                 />
                             </div>
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button>
-                            <Button type="submit" disabled={isSaving || !itemName.trim()}>
+                            <Button type="submit" disabled={isSaving}>
                                 {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>} 
-                                حفظ
+                                حفظ الفئة
                             </Button>
                         </DialogFooter>
                     </form>

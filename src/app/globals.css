@@ -66,8 +66,9 @@
     @media print { .no-print { display: none !important; } main { margin: 0 !important; padding: 0 !important; width: 100% !important; } }
 }
 
-/* FIX: الحل الجذري لمشكلة النقر بالماوس وعدم استجابة الأزرار */
-/* نضمن أن أي عنصر يحمل خاصية بورتال يكون متاحاً للنقر */
+/* 🛡️ Nuclear Fix for Pointer Events & Clicks 🛡️ */
+/* This ensures buttons are always clickable regardless of Radix UI overlays */
+
 [data-radix-portal] {
   pointer-events: auto !important;
   z-index: 999999 !important;
@@ -84,7 +85,6 @@
   z-index: 999999 !important;
 }
 
-/* فك حصار الطبقة الشفافة التي تمنع الضغط */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }
