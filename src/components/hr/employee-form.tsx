@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, Users, Clock, Banknote, Briefcase, User, ShieldCheck, Phone, Globe } from 'lucide-react';
+import { Save, X, Loader2, Users, Clock, Banknote, Briefcase, User, ShieldCheck, Phone, Globe, Camera, Sparkles } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,7 @@ import { Checkbox } from '../ui/checkbox';
 import { useBranding } from '@/context/branding-context';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
+import { analyzeEmployeeDocument } from '@/ai/flows/analyze-employee-doc';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -43,6 +44,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { branding } = useBranding();
+    const aiFileInputRef = useRef<HTMLInputElement>(null);
     
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '',
@@ -77,6 +79,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
     
     const [departments, setDepartments] = useState<Department[]>([]);
     const [jobs, setJobs] = useState<(Job & { departmentId: string })[]>([]);
@@ -86,7 +89,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     
     const isDayLaborer = formData.contractType === 'day_laborer';
 
-    // ✨ تحديث البيانات عند فتح شاشة التعديل
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -101,7 +103,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
-                // 🛡️ حماية حقل طريقة الدفع من الظهور فارغاً
                 salaryPaymentType: initialData.salaryPaymentType || 'cash',
                 nationality: initialData.nationality || '',
             });
@@ -125,6 +126,43 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         };
         fetchReferenceData();
     }, [firestore]);
+
+    const handleAiAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsAnalyzing(true);
+        try {
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const dataUri = evt.target?.result as string;
+                    const result = await analyzeEmployeeDocument({ fileDataUri: dataUri });
+
+                    if (result) {
+                        setFormData(prev => ({
+                            ...prev,
+                            fullName: result.fullName || prev.fullName,
+                            nameEn: result.nameEn || prev.nameEn,
+                            civilId: result.civilId || prev.civilId,
+                            nationality: result.nationality || prev.nationality,
+                            dob: result.dob ? new Date(result.dob) : prev.dob,
+                            residencyExpiry: result.residencyExpiry ? new Date(result.residencyExpiry) : prev.residencyExpiry,
+                            gender: result.gender || prev.gender,
+                        }));
+                        toast({ title: 'نجاح المسح', description: result.summary || 'تم استخراج بيانات الوثيقة آلياً.' });
+                    }
+                } catch (err: any) {
+                    toast({ variant: 'destructive', title: 'خطأ في التحليل', description: err.message });
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+            reader.readAsDataURL(file);
+        } catch (error) {
+            setIsAnalyzing(false);
+        }
+    };
 
     const handleShiftSelect = (sId: string) => {
         const shift = shifts.find(s => s.id === sId);
@@ -156,6 +194,35 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         <form onSubmit={handleSubmit} className="space-y-8">
             <div className="py-4 px-1 space-y-8 max-h-[75vh] overflow-y-auto scrollbar-none">
                 
+                {/* AI Document Scan Button */}
+                <div className="flex justify-center px-4">
+                    <input type="file" ref={aiFileInputRef} className="hidden" accept="image/*, .pdf" onChange={handleAiAnalysis} />
+                    <Button 
+                        type="button"
+                        variant="outline" 
+                        className="w-full h-16 rounded-[2rem] border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 transition-all gap-3 group"
+                        onClick={() => aiFileInputRef.current?.click()}
+                        disabled={isAnalyzing || isSaving}
+                    >
+                        {isAnalyzing ? (
+                            <>
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                <span className="text-lg font-black text-primary animate-pulse">جاري تحليل الوثيقة...</span>
+                            </>
+                        ) : (
+                            <>
+                                <div className="p-2 bg-primary/10 rounded-xl text-primary group-hover:scale-110 transition-transform">
+                                    <Sparkles className="h-6 w-6" />
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-base font-black text-primary">مسح وثيقة الهوية (AI Scan)</p>
+                                    <p className="text-[10px] text-muted-foreground font-bold">ارفع صورة البطاقة المدنية أو الجواز لتعبئة البيانات آلياً</p>
+                                </div>
+                            </>
+                        )}
+                    </Button>
+                </div>
+
                 {/* 1. المعلومات الأساسية والشخصية */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-card shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2"><User className="h-5 w-5 text-primary"/> المعلومات الشخصية والأساسية</h3>
@@ -330,7 +397,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
             <DialogFooter className="mt-6 pt-6 border-t bg-muted/10 rounded-b-[2rem] p-6">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
+                <Button type="submit" disabled={isSaving || isAnalyzing} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي
                 </Button>
