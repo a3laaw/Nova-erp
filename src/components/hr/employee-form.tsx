@@ -119,9 +119,11 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             try {
                 const deptsQuery = query(collection(firestore, 'departments'), orderBy('order'));
                 const jobsQuery = query(collectionGroup(firestore, 'jobs'));
-                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsQuery)]);
+                const [deptsSnapshot, jobsSnapshot] = await Promise.all([getDocs(deptsQuery), getDocs(jobsSnapshot)]);
                 setDepartments(deptsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Department)));
                 setJobs(jobsSnapshot.docs.map(doc => ({ id: doc.id, departmentId: doc.ref.parent.parent!.id, ...doc.data() } as Job & { departmentId: string })));
+            } catch (e) {
+                console.error("Reference data fetch failed:", e);
             } finally { setRefDataLoading(false); }
         };
         fetchReferenceData();
@@ -131,7 +133,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Reset file input so same file can be scanned again if needed
         if (aiFileInputRef.current) aiFileInputRef.current.value = '';
 
         setIsAnalyzing(true);
@@ -168,10 +169,22 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
 
     const handleShiftSelect = (sId: string) => {
+        if (sId === "_NONE_") {
+            setFormData(prev => ({ ...prev, shiftId: '' }));
+            return;
+        }
         const shift = shifts.find(s => s.id === sId);
         if (shift) {
             setFormData(prev => ({ ...prev, shiftId: sId, workStartTime: shift.startTime, workEndTime: shift.endTime }));
-            setIsCustomHours(false);
+            setIsCustomHours(false); // تفعيل الوردية يلغي التخصيص اليدوي
+        }
+    };
+
+    const handleCustomHoursToggle = (checked: boolean) => {
+        setIsCustomHours(checked);
+        if (checked) {
+            // تفعيل التخصيص اليدوي يلغي الوردية المحددة
+            setFormData(prev => ({ ...prev, shiftId: '' }));
         }
     };
 
@@ -197,7 +210,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         <form onSubmit={handleSubmit} className="space-y-8">
             <div className="py-4 px-1 space-y-8 max-h-[75vh] overflow-y-auto scrollbar-none">
                 
-                {/* AI Document Scan Button */}
                 <div className="flex justify-center px-4">
                     <input type="file" ref={aiFileInputRef} className="hidden" accept="image/*, .pdf" onChange={handleAiAnalysis} />
                     <Button 
@@ -226,7 +238,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </Button>
                 </div>
 
-                {/* 1. المعلومات الأساسية والشخصية */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-card shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2"><User className="h-5 w-5 text-primary"/> المعلومات الشخصية والأساسية</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -266,7 +277,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {/* 2. بيانات الإقامة والوثائق (تظهر فقط لغير الكويتيين) */}
                 {formData.nationality && formData.nationality !== 'كويتي' && (
                     <section className="space-y-6 p-6 border rounded-[2rem] bg-orange-50/10 border-orange-100 shadow-sm animate-in fade-in zoom-in-95">
                         <h3 className="font-black text-lg flex items-center gap-2 text-orange-800"><ShieldCheck className="h-5 w-5" /> الوثائق وتاريخ الإقامة</h3>
@@ -279,7 +289,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </section>
                 )}
 
-                {/* 3. المعلومات الوظيفية والدوام */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary"/> التعيين والدوام</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -315,25 +324,29 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">الوردية (Shift)</Label>
-                            <Select value={formData.shiftId} onValueChange={handleShiftSelect}>
-                                <SelectTrigger className="h-11 rounded-xl bg-white"><SelectValue placeholder="اختر الوردية..." /></SelectTrigger>
-                                <SelectContent dir="rtl">{shifts.map(s => <SelectItem key={s.id} value={s.id!}>{s.name} ({s.startTime}-{s.endTime})</SelectItem>)}</SelectContent>
+                            <Select value={formData.shiftId || '_NONE_'} onValueChange={handleShiftSelect} disabled={isCustomHours}>
+                                <SelectTrigger className="h-11 rounded-xl bg-white">
+                                    <SelectValue placeholder="اختر الوردية..." />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="_NONE_">بدون وردية (توقيت مخصص)</SelectItem>
+                                    {shifts.map(s => <SelectItem key={s.id} value={s.id!}>{s.name} ({s.startTime}-{s.endTime})</SelectItem>)}
+                                </SelectContent>
                             </Select>
                         </div>
                         <div className="flex items-center gap-2 p-3 bg-white rounded-xl border mb-0.5">
-                            <Checkbox id="custom-h" checked={isCustomHours} onCheckedChange={c => setIsCustomHours(!!c)} />
+                            <Checkbox id="custom-h" checked={isCustomHours} onCheckedChange={(c) => handleCustomHoursToggle(!!c)} />
                             <Label htmlFor="custom-h" className="cursor-pointer font-bold text-xs">تخصيص ساعات دوام للموظف</Label>
                         </div>
                     </div>
                     {isCustomHours && (
-                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2 border-t pt-4">
                             <div className="grid gap-1.5"><Label className="text-[10px] uppercase font-bold mr-1">بداية الدوام</Label><Input type="time" value={formData.workStartTime} onChange={e => setFormData(p => ({...p, workStartTime: e.target.value}))} className="h-10 rounded-lg bg-white" /></div>
                             <div className="grid gap-1.5"><Label className="text-[10px] uppercase font-bold mr-1">نهاية الدوام</Label><Input type="time" value={formData.workEndTime} onChange={e => setFormData(p => ({...p, workEndTime: e.target.value}))} className="h-10 rounded-lg bg-white" /></div>
                         </div>
                     )}
                 </section>
 
-                {/* 4. المعلومات المالية والرواتب */}
                 <section className="space-y-6 p-6 border rounded-[2.5rem] bg-emerald-50/20 border-emerald-100 shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800"><Banknote className="h-5 w-5" /> المعلومات المالية والرواتب</h3>
                     
