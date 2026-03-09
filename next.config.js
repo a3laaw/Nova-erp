@@ -12,7 +12,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb',
+      bodySizeLimit: '20mb', // Increased limit for high-res ID photos
     },
   },
   images: {

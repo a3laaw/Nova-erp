@@ -34,7 +34,7 @@ interface EmployeeFormProps {
 const commonNationalities = [
   "كويتي", "سعودي", "إماراتي", "بحريني", "قطري", "عماني",
   "مصري", "سوري", "لبناني", "أردني", "فلسطيني", "يمني",
-  "هندي", "باكستاني", "فلبيني", "بنغلاديشي", "نيبالي", "إإيراني",
+  "هندي", "باكستاني", "فلبيني", "بنغلاديشي", "نيبالي", "إيراني",
   "بريطاني", "أمريكي"
 ].sort((a,b) => a.localeCompare(b, 'ar'));
 
@@ -130,6 +130,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const handleAiAnalysis = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+
+        // Reset file input so same file can be scanned again if needed
+        if (aiFileInputRef.current) aiFileInputRef.current.value = '';
 
         setIsAnalyzing(true);
         try {
@@ -375,8 +378,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
                         <div className="grid gap-2">
                             <Label className="font-bold text-xs text-muted-foreground mr-1">طريقة دفع الراتب</Label>
-                            <Select value={formData.salaryPaymentType} onValueChange={v => setFormData(p => ({...p, salaryPaymentType: v as any}))}>
-                                <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
+                            <Select value={formData.salaryPaymentType || 'cash'} onValueChange={v => setFormData(p => ({...p, salaryPaymentType: v as any}))}>
+                                <SelectTrigger className="h-10 rounded-xl bg-white"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="cash">نقداً (كاش)</SelectItem>
                                     <SelectItem value="transfer">تحويل بنكي</SelectItem>
@@ -386,9 +389,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </div>
                         {formData.salaryPaymentType === 'transfer' && (
                             <>
-                                <div className="grid gap-2"><Label className="font-bold text-xs mr-1">اسم البنك</Label><Input id="bankName" value={formData.bankName} onChange={handleInputChange} className="h-10 bg-white" /></div>
-                                <div className="grid gap-2"><Label className="font-bold text-xs mr-1">رقم الحساب</Label><Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr" className="h-10 bg-white font-mono" /></div>
-                                <div className="grid gap-2"><Label className="font-bold text-xs mr-1">IBAN</Label><Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" className="h-10 bg-white font-mono" /></div>
+                                <div className="grid gap-2"><Label className="font-bold text-xs mr-1">اسم البنك</Label><Input id="bankName" value={formData.bankName || ''} onChange={handleInputChange} className="h-10 bg-white" /></div>
+                                <div className="grid gap-2"><Label className="font-bold text-xs mr-1">رقم الحساب</Label><Input id="accountNumber" value={formData.accountNumber || ''} onChange={handleInputChange} dir="ltr" className="h-10 bg-white font-mono" /></div>
+                                <div className="grid gap-2"><Label className="font-bold text-xs mr-1">IBAN</Label><Input id="iban" value={formData.iban || ''} onChange={handleInputChange} dir="ltr" className="h-10 bg-white font-mono" /></div>
                             </>
                         )}
                     </div>

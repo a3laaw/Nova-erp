@@ -19,7 +19,10 @@ export async function analyzeEmployeeDocument(input: {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
+      generationConfig: { 
+        responseMimeType: "application/json",
+        temperature: 0.1, // Low temperature for higher accuracy in data extraction
+      }
     });
 
     const [mimePart, base64Data] = input.fileDataUri.split(';base64,');
@@ -28,7 +31,7 @@ export async function analyzeEmployeeDocument(input: {
     const prompt = `أنت خبير في معالجة الوثائق الرسمية الكويتية (بطاقة مدنية، جواز سفر).
 قم بتحليل الصورة المرفقة واستخراج البيانات الشخصية منها بدقة تامة.
 
-المطلوب استخراج JSON بالصيغة التالية:
+المطلوب استخراج JSON بالصيغة التالية فقط:
 {
   "fullName": "الاسم الكامل بالعربية كما هو في الوثيقة",
   "nameEn": "Full name in English as in the document",
@@ -43,7 +46,8 @@ export async function analyzeEmployeeDocument(input: {
 ملاحظات:
 1. إذا كانت الوثيقة بطاقة مدنية كويتية، تأكد من استخراج الرقم المدني بدقة.
 2. إذا لم تجد حقلاً معيناً، اتركه فارغاً.
-3. التزم بصيغة التاريخ المحددة.`;
+3. التزم بصيغة التاريخ المحددة YYYY-MM-DD.
+4. لا تضف أي نصوص خارج الـ JSON.`;
 
     const result = await model.generateContent([
       {
@@ -56,10 +60,19 @@ export async function analyzeEmployeeDocument(input: {
     ]);
 
     const response = await result.response;
+    if (!response || !response.text()) {
+        throw new Error("لم يتمكن المحرك من قراءة النص من الصورة. يرجى المحاولة مرة أخرى بصورة أوضح.");
+    }
+
     const text = response.text().replace(/```json|```/g, "").trim();
-    return JSON.parse(text);
-  } catch (error) {
+    try {
+        return JSON.parse(text);
+    } catch (parseError) {
+        console.error("JSON Parse Error from AI response:", text);
+        throw new Error("حدث خطأ في معالجة بيانات الوثيقة. يرجى إدخال البيانات يدوياً.");
+    }
+  } catch (error: any) {
     console.error("AI Document Analysis Error:", error);
-    throw new Error("فشل التحليل الذكي للوثيقة. يرجى التأكد من وضوح الصورة.");
+    throw new Error(error.message || "فشل التحليل الذكي للوثيقة. يرجى التأكد من وضوح الصورة.");
   }
 }
