@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @fileOverview محرك تحليل وثائق الموظفين مع تحسين تبليغ الأخطاء التقنية.
+ * @fileOverview محرك تحليل وثائق الموظفين مع التعرف على أخطاء الحصص.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -57,7 +57,12 @@ export async function analyzeEmployeeDocument(input: {
     return JSON.parse(text);
   } catch (error: any) {
     console.error("AI Employee Doc Analysis Error:", error);
-    // تمرير الرسالة الأصلية من جوجل للمستخدم للتشخيص
+    
+    // التعرف على خطأ تجاوز الحصة 429
+    if (error.message?.includes('429') || error.message?.includes('Resource has been exhausted')) {
+        throw new Error("عذراً، تم تجاوز حصة الاستخدام المجانية (Quota). يرجى تفعيل الحساب 'المدفوع' (Pay-as-you-go) في Google AI Studio لرفع القيود.");
+    }
+    
     throw new Error(error.message || "فشل التحليل الذكي للوثيقة.");
   }
 }

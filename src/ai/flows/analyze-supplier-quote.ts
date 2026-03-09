@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @fileOverview محرك تحليل عروض الأسعار مع تمرير أخطاء جوجل المباشرة للتشخيص.
+ * @fileOverview محرك تحليل عروض الأسعار مع التعرف على أخطاء الحصص والفوترة.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -54,7 +54,11 @@ ${input.rfqItems.map(item => `- ${item.name} (ID: ${item.id})`).join('\n')}
     return JSON.parse(text);
   } catch (error: any) {
     console.error("AI Quote Analysis Error:", error);
-    // إظهار سبب الخطأ الحقيقي (مثل 429 للـ Quota أو 403 للصلاحية)
+    
+    if (error.message?.includes('429') || error.message?.includes('Resource has been exhausted')) {
+        throw new Error("تنبيه: تم استنفاد حصة الطلبات المجانية. يرجى تحويل مفتاح الـ API إلى 'مدفوع' لضمان عمل تحليل الصور بكفاءة.");
+    }
+    
     throw new Error(`خطأ AI: ${error.message}`);
   }
 }

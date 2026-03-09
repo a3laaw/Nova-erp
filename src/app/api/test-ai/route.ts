@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @fileOverview مسار تشخيصي متطور للتحقق من حالة اتصال الذكاء الاصطناعي وتحديد نوع الخلل.
+ * @fileOverview مسار تشخيصي متطور للتحقق من حالة اتصال الذكاء الاصطناعي والفوترة.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -47,8 +47,8 @@ export async function GET() {
         userFriendlyError = "تم رفض الوصول (403).";
         solution = "المفتاح غير صالح أو تم تقييد استخدامه. تأكد من إعدادات الفوترة أو قيود المفتاح.";
     } else if (error.message?.includes('429')) {
-        userFriendlyError = "تجاوز حد الاستخدام (429).";
-        solution = "لقد وصلت للحد الأقصى للطلبات المجانية. انتظر دقيقة أو قم بترقية الحساب.";
+        userFriendlyError = "تجاوز حد الاستخدام (429 - Resource Exhausted).";
+        solution = "لقد وصلت للحد الأقصى للطلبات المجانية. يجب تفعيل 'الخطة المدفوعة' (Pay-as-you-go) لرفع قيود الحجم والسرعة.";
     }
 
     return NextResponse.json({ 
