@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
  * @fileOverview محرك تحليل وثائق الموظفين (البطاقة المدنية / الجواز) باستخدام الذكاء الاصطناعي.
- * يستخرج البيانات الشخصية والتاريخية لتسريع عملية إدخال البيانات.
+ * تم التحديث لضمان التوافق مع النسخة المستقرة من Gemini 1.5 Flash.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -13,15 +13,16 @@ export async function analyzeEmployeeDocument(input: {
   fileDataUri: string;
 }) {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("مفتاح الـ API للذكاء الاصطناعي غير متوفر.");
+  if (!apiKey) throw new Error("مفتاح الـ API للذكاء الاصطناعي غير متوفر في ملف .env");
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
+    // نستخدم gemini-1.5-flash لضمان أفضل توافق مع الحسابات المجانية والمدفوعة
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
       generationConfig: { 
         responseMimeType: "application/json",
-        temperature: 0.1, // Low temperature for higher accuracy in data extraction
+        temperature: 0.1,
       }
     });
 
@@ -46,8 +47,7 @@ export async function analyzeEmployeeDocument(input: {
 ملاحظات:
 1. إذا كانت الوثيقة بطاقة مدنية كويتية، تأكد من استخراج الرقم المدني بدقة.
 2. إذا لم تجد حقلاً معيناً، اتركه فارغاً.
-3. التزم بصيغة التاريخ المحددة YYYY-MM-DD.
-4. لا تضف أي نصوص خارج الـ JSON.`;
+3. التزم بصيغة التاريخ المحددة YYYY-MM-DD.`;
 
     const result = await model.generateContent([
       {
@@ -60,19 +60,15 @@ export async function analyzeEmployeeDocument(input: {
     ]);
 
     const response = await result.response;
-    if (!response || !response.text()) {
-        throw new Error("لم يتمكن المحرك من قراءة النص من الصورة. يرجى المحاولة مرة أخرى بصورة أوضح.");
-    }
+    if (!response) throw new Error("لم يتم تلقي استجابة من محرك الذكاء الاصطناعي.");
 
     const text = response.text().replace(/```json|```/g, "").trim();
-    try {
-        return JSON.parse(text);
-    } catch (parseError) {
-        console.error("JSON Parse Error from AI response:", text);
-        throw new Error("حدث خطأ في معالجة بيانات الوثيقة. يرجى إدخال البيانات يدوياً.");
-    }
+    return JSON.parse(text);
   } catch (error: any) {
     console.error("AI Document Analysis Error:", error);
-    throw new Error(error.message || "فشل التحليل الذكي للوثيقة. يرجى التأكد من وضوح الصورة.");
+    if (error.message?.includes('404')) {
+        throw new Error("خطأ 404: النموذج غير متاح لهذا المفتاح. يرجى التأكد من تفعيل Generative Language API في مشروع جوجل الخاص بك.");
+    }
+    throw new Error(error.message || "فشل التحليل الذكي للوثيقة. تأكد من وضوح الصورة وصلاحية المفتاح.");
   }
 }
