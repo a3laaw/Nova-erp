@@ -14,7 +14,7 @@ export async function generateDelayReport(input: { projectTimelineData: string, 
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `أنت خبير في إدارة المشاريع الهندسية. قم بتحليل بيانات الجدول الزمني التالية وتوليد تقرير عن التأخيرات:
     

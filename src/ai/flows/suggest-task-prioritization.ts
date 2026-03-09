@@ -14,7 +14,7 @@ export async function suggestTaskPrioritization(input: { projectTimeline: string
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `أنت مساعد ذكي للمهندسين. قم بترتيب أولويات المهام بناءً على المعطيات التالية:
     الجدول الزمني: ${input.projectTimeline}

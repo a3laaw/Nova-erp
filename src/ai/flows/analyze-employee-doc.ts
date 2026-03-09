@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
  * @fileOverview محرك تحليل وثائق الموظفين (البطاقة المدنية / الجواز) باستخدام الذكاء الاصطناعي.
- * تم التحديث لضمان التوافق مع النسخة المستقرة من Gemini 1.5 Flash.
+ * تم التحديث لضمان التوافق مع النسخة المستقرة من Gemini 2.0 Flash.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -17,9 +17,9 @@ export async function analyzeEmployeeDocument(input: {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    // نستخدم gemini-1.5-flash لضمان أفضل توافق مع الحسابات المجانية والمدفوعة
+    // نستخدم gemini-2.0-flash لضمان أفضل توافق وأسرع أداء
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       generationConfig: { 
         responseMimeType: "application/json",
         temperature: 0.1,

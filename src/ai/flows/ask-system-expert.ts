@@ -15,7 +15,7 @@ export async function askSystemExpert(input: { question: string, history?: any[]
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
+      model: "gemini-2.0-flash",
       systemInstruction: "أنت المساعد الذكي لنظام Nova ERP. مهمتك هي مساعدة المستخدم في استخدام النظام والإجابة على استفساراته حول البيانات. كن مهذباً ومختصراً في إجاباتك باللغة العربية."
     });
 

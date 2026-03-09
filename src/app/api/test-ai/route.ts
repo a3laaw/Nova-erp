@@ -20,7 +20,7 @@ export async function GET() {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // فحص بسيط للتحقق من الاتصال
     const result = await model.generateContent("Test connection");
@@ -30,7 +30,7 @@ export async function GET() {
     return NextResponse.json({ 
       success: true,
       status: 'AI Engine is Online',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.0-flash',
       message: "تم الاتصال بنجاح. المفتاح يعمل والنموذج متاح.",
       aiResponse: text
     });
