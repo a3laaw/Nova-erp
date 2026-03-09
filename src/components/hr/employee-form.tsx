@@ -46,7 +46,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const { branding } = useBranding();
     const aiFileInputRef = useRef<HTMLInputElement>(null);
     
-    // استخدام البث اللحظي للقوائم المرجعية لضمان استقرار البيانات
+    // جلب البيانات اللحظية
     const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
     const { data: jobs, loading: jobsLoading } = useSubscription<Job>(firestore, 'jobs', [], true);
 
@@ -172,14 +172,14 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         departments.map(d => ({ value: d.name, label: d.name }))
     , [departments]);
 
+    // ✨ التعديل الجوهري: فلترة الوظائف بناءً على الـ parentId الذي وفره useSubscription
     const filteredJobOptions = useMemo(() => {
         if (!formData.department) return [];
         const selectedDept = departments.find(d => d.name === formData.department);
         if (!selectedDept) return [];
         
-        // تصفية الوظائف بناءً على الـ departmentId في بيانات الـ jobs
         return jobs
-            .filter(j => (j as any).departmentId === selectedDept.id)
+            .filter(j => (j as any).parentId === selectedDept.id)
             .map(j => ({ value: j.name, label: j.name }));
     }, [departments, jobs, formData.department]);
 

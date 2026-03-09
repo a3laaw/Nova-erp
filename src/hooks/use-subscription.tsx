@@ -10,6 +10,11 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 
+/**
+ * خطاف اشتراك لحظي مطور:
+ * يقوم آلياً بإلحاق معرف الأب (parentId) عند استخدام collectionGroup،
+ * مما يحل مشكلة ربط الوظائف بالأقسام والمناطق بالمحافظات.
+ */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
   collectionPath: string | null,
@@ -48,7 +53,16 @@ export function useSubscription<T extends { id?: string }>(
         const unsubscribe = onSnapshot(
             q,
             (snapshot) => {
-                const newData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+                const newData = snapshot.docs.map(doc => {
+                    const docData = doc.data() as any;
+                    // استخراج معرف الأب في حال كانت المجموعة فرعية (مثل الوظائف تحت الأقسام)
+                    const parentId = doc.ref.parent.parent?.id || null;
+                    return { 
+                        id: doc.id, 
+                        parentId, 
+                        ...docData 
+                    } as T;
+                });
                 setData(newData);
                 setLoading(false);
                 setError(null);
