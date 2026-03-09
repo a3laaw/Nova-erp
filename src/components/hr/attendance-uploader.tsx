@@ -30,24 +30,30 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, AlertTriangle, FileSpreadsheet, DownloadCloud, Save } from 'lucide-react';
-import type { Employee, MonthlyAttendance } from '@/lib/types';
+import type { Employee, MonthlyAttendance, WorkShift } from '@/lib/types';
 import { parse, format, isSameDay, isValid, compareAsc, startOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 
+/**
+ * دالة ذكية لتحليل التاريخ والوقت المدمج في خانة واحدة (مثل العينة المرسلة)
+ * التنسيق المتوقع: DD-MM-YY HH:mm
+ */
 const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
 
     let dateObj: Date | null = null;
     let timeStr: string = "";
 
+    // إذا كانت القيمة كائن تاريخ أصلي
     if (val instanceof Date && isValid(val)) {
         dateObj = startOfDay(val);
         timeStr = format(val, 'HH:mm');
         return { date: dateObj, timeStr };
     }
 
+    // إذا كانت القيمة رقمية (تنسيق إكسل للتاريخ)
     if (typeof val === 'number') {
         const date = XLSX.SSF.parse_date_code(val);
         dateObj = new Date(date.y, date.m - 1, date.d);
@@ -55,13 +61,16 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
         return { date: dateObj, timeStr };
     }
 
+    // إذا كانت القيمة نصية (01-02-26 10:06)
     if (typeof val === 'string') {
         const cleaned = val.trim();
+        // تقسيم النص لمعالجة التاريخ والوقت
         const parts = cleaned.split(/\s+/);
         const datePart = parts[0];
         const timePart = parts[1] || "";
 
-        const dateFormats = ['yyyy-MM-dd', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yy-MM-dd', 'dd-MM-yy', 'M/d/yyyy', 'MM/dd/yyyy'];
+        // محاولة تحليل الجزء الخاص بالتاريخ
+        const dateFormats = ['dd-MM-yy', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd', 'M/d/yy', 'MM/dd/yyyy'];
         for (const fmt of dateFormats) {
             const parsedDate = parse(datePart, fmt, new Date());
             if (isValid(parsedDate)) {
@@ -70,17 +79,20 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
             }
         }
 
-        if (!dateObj) {
-            const native = new Date(cleaned);
-            if (isValid(native)) {
-                dateObj = startOfDay(native);
-                timeStr = format(native, 'HH:mm');
+        // إذا نجحنا في الحصول على التاريخ، نستخرج الوقت
+        if (dateObj) {
+            if (timePart) {
+                // استخراج HH:mm
+                timeStr = timePart.substring(0, 5);
             }
-        } else if (timePart) {
-            timeStr = timePart.substring(0, 5);
+            return { date: dateObj, timeStr };
         }
-
-        if (dateObj) return { date: dateObj, timeStr };
+        
+        // محاولة أخيرة باستخدام المحلل الافتراضي
+        const native = new Date(cleaned);
+        if (isValid(native)) {
+            return { date: startOfDay(native), timeStr: format(native, 'HH:mm') };
+        }
     }
 
     return null;
@@ -100,6 +112,7 @@ export function AttendanceUploader() {
   const [processingResult, setProcessingResult] = useState<{ success: boolean, message: string, skippedCount?: number, validCount?: number } | null>(null);
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+  const { data: shifts = [] } = useSubscription<WorkShift>(firestore, 'work_shifts');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,14 +132,14 @@ export function AttendanceUploader() {
 
   const handleDownloadTemplate = () => {
     const data = [
-      { 'الرقم الوظيفي': '101', 'التاريخ': '2026-03-01', 'الوقت': '08:00' },
-      { 'الرقم الوظيفي': '101', 'التاريخ': '2026-03-01', 'الوقت': '17:00' },
-      { 'الرقم الوظيفي': '102', 'التاريخ': '2026-03-01', 'الوقت': '08:15' },
+      { 'الرقم الوظيفي': '101', 'التاريخ والوقت': '01-02-26 10:06' },
+      { 'الرقم الوظيفي': '101', 'التاريخ والوقت': '01-02-26 18:52' },
+      { 'الرقم الوظيفي': '102', 'التاريخ والوقت': '01-02-26 08:15' },
     ];
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Template");
-    XLSX.writeFile(workbook, "Attendance_Import_Template.xlsx");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Sample");
+    XLSX.writeFile(workbook, "Nova_ERP_Attendance_Sample.xlsx");
   };
 
   const handleUpload = async () => {
@@ -150,21 +163,41 @@ export function AttendanceUploader() {
         const worksheet = workbook.Sheets[sheetName];
         const json: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-        if (json.length === 0) throw new Error("المحتوى فارغ.");
+        if (json.length === 0) throw new Error("الملف فارغ.");
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
+        // خريطة لتجميع كل البصمات اليومية لكل موظف
         const punchesMap = new Map<string, { date: Date, employeeId: string, times: string[] }>();
         let skippedCount = 0;
         let validCount = 0;
 
         json.forEach(row => {
-            const empNo = String(row.employeeNumber || row['الرقم الوظيفي'] || row['ID'] || '');
+            // البحث عن الرقم الوظيفي في أي عمود محتمل
+            const empNo = String(row.employeeNumber || row['الرقم الوظيفي'] || row['ID'] || row['رقم الموظف'] || row[Object.keys(row)[0]] || '');
             const emp = employeeMap.get(empNo);
             if (!emp?.id) return;
 
-            const parsed = parseSmartDateTime(row.date || row['التاريخ'] || row['Time']) || parseSmartDateTime(row.time || row['الوقت']);
+            // البحث عن خانة التاريخ والوقت
+            let parsed = null;
+            const possibleDateKeys = ['Time', 'date', 'التاريخ', 'التاريخ والوقت', 'وقت البصمة'];
+            for (const key of possibleDateKeys) {
+                if (row[key]) {
+                    parsed = parseSmartDateTime(row[key]);
+                    if (parsed) break;
+                }
+            }
+            
+            // إذا لم نجد خانة محددة، نبحث في كل الأعمدة عن قيمة تاريخ صالحة
+            if (!parsed) {
+                for (const key in row) {
+                    parsed = parseSmartDateTime(row[key]);
+                    if (parsed) break;
+                }
+            }
+
             if (!parsed) return;
 
+            // الرقابة الصارمة على الشهر والسنة
             if (parsed.date.getFullYear() !== selectedYearNum || (parsed.date.getMonth() + 1) !== selectedMonthNum) {
                 skippedCount++;
                 return;
@@ -181,38 +214,49 @@ export function AttendanceUploader() {
         });
 
         if (punchesMap.size === 0) {
-            throw new Error(`لم يتم العثور على أي حركات تخص شهر ${selectedMonthNum}/${selectedYearNum} في هذا الملف.`);
+            throw new Error(`لم يتم العثور على أي حركات صالحة تخص شهر ${selectedMonthNum}/${selectedYearNum} في هذا الملف.`);
         }
 
         const batch = writeBatch(firestore);
         const groupedUpdates = new Map<string, any[]>();
         
         punchesMap.forEach((entry) => {
-            const emp = employeeMap.get(employees.find(e => e.id === entry.employeeId)?.employeeNumber || '');
+            const emp = employees.find(e => e.id === entry.employeeId);
             const sortedPunches = entry.times.sort();
             
+            // منطق الدوام الذكي
             const ramadan = branding?.work_hours?.ramadan;
             const ramStart = toFirestoreDate(ramadan?.start_date);
             const ramEnd = toFirestoreDate(ramadan?.end_date);
-            
             const isRamadanDay = ramadan?.is_enabled && ramStart && ramEnd && 
                                  entry.date >= startOfDay(ramStart) && 
                                  entry.date <= startOfDay(ramEnd);
             
-            const effectiveWorkStart = isRamadanDay 
-                ? (ramadan.start_time || '09:30') 
-                : (emp?.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00');
+            // تحديد وقت البداية بناءً على (شيفت -> موظف -> إعدادات عامة)
+            let effectiveWorkStart = '08:00';
+            if (isRamadanDay) {
+                effectiveWorkStart = ramadan.start_time || '09:30';
+            } else if (emp?.shiftId) {
+                const shift = shifts.find(s => s.id === emp.shiftId);
+                effectiveWorkStart = shift?.startTime || '08:00';
+            } else if (emp?.workStartTime) {
+                effectiveWorkStart = emp.workStartTime;
+            } else {
+                effectiveWorkStart = branding?.work_hours?.general?.morning_start_time || '08:00';
+            }
             
             const checkIn = sortedPunches[0];
+            const checkOut = sortedPunches[sortedPunches.length - 1];
             const isLate = checkIn && checkIn > effectiveWorkStart;
 
             const mergedRecord = {
                 date: entry.date,
                 employeeId: entry.employeeId,
                 checkIn1: checkIn || null,
-                checkOut1: sortedPunches[sortedPunches.length - 1] || null,
+                checkOut1: checkIn === checkOut ? null : checkOut, // إذا بصم مرة واحدة فقط يعتبر خروج null
                 status: isLate ? 'late' : 'present',
-                isRamadan: isRamadanDay
+                isRamadan: isRamadanDay,
+                allPunches: sortedPunches // الاحتفاظ بكافة البصمات للتدقيق
             };
 
             const docKey = `${selectedYearNum}-${selectedMonthNum}-${entry.employeeId}`;
@@ -256,11 +300,11 @@ export function AttendanceUploader() {
         await batch.commit();
         setProcessingResult({ 
             success: true, 
-            message: `تم بنجاح استيراد ${validCount} بصمة لشهر ${selectedMonthNum}.`,
+            message: `تم تحليل ${validCount} بصمة. تم دمج الحركات اليومية لـ ${punchesMap.size} أيام عمل.`,
             skippedCount,
             validCount
         });
-        toast({ title: 'نجاح الاستيراد', description: `تم استيراد بيانات شهر ${selectedMonthNum} بنجاح.` });
+        toast({ title: 'نجاح الاستيراد', description: `تمت معالجة بيانات شهر ${selectedMonthNum} بنجاح.` });
         setFile(null);
       } catch (error: any) {
         setProcessingResult({ success: false, message: error.message });
@@ -281,7 +325,7 @@ export function AttendanceUploader() {
                 <CardHeader className="bg-primary/5">
                     <CardTitle className="text-lg flex items-center gap-2 text-primary">
                         <DownloadCloud className="h-5 w-5 text-primary" />
-                        إعدادات الاستيراد
+                        إعدادات الاستيراد الذكي
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-4">
@@ -308,15 +352,17 @@ export function AttendanceUploader() {
                         </Select>
                     </div>
                     <Separator className="my-2"/>
-                    <Button onClick={handleDownloadTemplate} variant="outline" className="w-full h-11 rounded-xl border-dashed border-primary/30 text-primary font-bold">تنزيل نموذج الرفع</Button>
+                    <Button onClick={handleDownloadTemplate} variant="outline" className="w-full h-11 rounded-xl border-dashed border-primary/30 text-primary font-bold">تنزيل نموذج متوافق</Button>
                 </CardContent>
             </Card>
 
             <Alert className="rounded-2xl border-orange-200 bg-orange-50/50">
                 <AlertTriangle className="h-4 w-4 text-orange-600" />
-                <AlertTitle className="font-black">تنبيه رقابي</AlertTitle>
+                <AlertTitle className="font-black">تنبيه الرقابة الزمنية</AlertTitle>
                 <AlertDescription className="text-xs font-bold leading-relaxed">
-                    النظام سيتجاهل آلياً أي بصمة في الملف لا يوافق تاريخها شهر {month}/{year}. تأكد من اختيار الفترة الصحيحة قبل الرفع.
+                    النظام سيقوم بدمج البصمات المتعددة لليوم الواحد آلياً.
+                    <br/>
+                    تم استبعاد {skippedCount || 0} بصمة لا تخص شهر {month}.
                 </AlertDescription>
             </Alert>
         </div>
@@ -324,8 +370,8 @@ export function AttendanceUploader() {
         <div className="lg:col-span-2">
             <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-muted/30 border-b pb-8 px-8">
-                    <CardTitle className="text-xl font-black">رفع ملف البصمة</CardTitle>
-                    <CardDescription>قم باختيار ملف الإكسل المستخرج من جهاز البصمة للتحليل.</CardDescription>
+                    <CardTitle className="text-xl font-black">رفع وتحليل ملف البصمة</CardTitle>
+                    <CardDescription>يدعم التنسيقات المدمجة (تاريخ ووقت في خانة واحدة) والبصمات المتكررة.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8">
                     <div 
@@ -343,20 +389,19 @@ export function AttendanceUploader() {
                             {file ? (
                                 <div className="space-y-2">
                                     <p className="text-lg font-black text-primary">{file.name}</p>
-                                    <p className="text-sm font-bold text-green-600">الملف جاهز — اضغط على الزر بالأسفل للتحليل</p>
+                                    <p className="text-sm font-bold text-green-600">الملف جاهز للتحليل</p>
                                 </div>
                             ) : (
-                                <p className="text-lg font-black text-muted-foreground">اضغط هنا لاختيار الملف</p>
+                                <p className="text-lg font-black text-muted-foreground">اضغط هنا لاختيار ملف البصمة</p>
                             )}
                         </div>
                     </div>
                     {processingResult && (
                         <div className="mt-6 animate-in fade-in slide-in-from-top-2">
                             <Alert className={cn("rounded-2xl border-2", processingResult.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50")}>
-                                <AlertTitle className="font-black">{processingResult.success ? "تمت المعالجة بنجاح" : "فشل التحليل"}</AlertTitle>
+                                <AlertTitle className="font-black">{processingResult.success ? "تم تحليل البيانات بنجاح" : "فشل التحليل"}</AlertTitle>
                                 <AlertDescription className="font-bold text-sm">
                                     {processingResult.message}
-                                    {processingResult.skippedCount! > 0 && <span className="block mt-1 text-orange-700">تم استبعاد {processingResult.skippedCount} سطر لعدم مطابقتها للشهر المختار.</span>}
                                 </AlertDescription>
                             </Alert>
                         </div>

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, Holiday, PermissionRequest } from '@/lib/types';
+import type { Employee, MonthlyAttendance, Payslip, LeaveRequest, Holiday, PermissionRequest, WorkShift } from '@/lib/types';
 import { Loader2, Sheet, Calculator, Info } from 'lucide-react';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -36,6 +36,7 @@ export function PayrollGenerator() {
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const { data: allLeaves = [] } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', [where('status', 'in', ['approved', 'on-leave', 'returned'])]);
   const { data: publicHolidays = [] } = useSubscription<Holiday>(firestore, 'holidays');
+  const { data: shifts = [] } = useSubscription<WorkShift>(firestore, 'work_shifts');
 
   useEffect(() => {
     setIsMounted(true);
@@ -84,9 +85,6 @@ export function PayrollGenerator() {
       
       const batch = writeBatch(firestore);
       const companyHolidays = branding?.work_hours?.holidays || [];
-      const ramadan = branding?.work_hours?.ramadan;
-      const ramStart = toFirestoreDate(ramadan?.start_date);
-      const ramEnd = toFirestoreDate(ramadan?.end_date);
 
       let payslipsCreated = 0;
 
@@ -106,29 +104,41 @@ export function PayrollGenerator() {
           const employeePermissions = permissionsMap.get(employee.id);
 
           if (!ignoreAttendance) {
-              // 🛡️ الرقابة اليومية الصارمة: المرور على كل يوم في الشهر
+              // الدوران على كل يوم في الشهر لفحص الحضور
               for (let d = new Date(payrollStart); d <= payrollEnd; d.setDate(d.getDate() + 1)) {
                   const dateKey = format(d, 'yyyy-MM-dd');
                   
-                  // 1. هل هو يوم عمل أصلاً؟ (استثناء العطل والجمعة)
+                  // فحص هل هو يوم عمل؟
                   const { workingDays } = calculateWorkingDays(d, d, companyHolidays, publicHolidays);
                   if (workingDays === 0) continue;
 
-                  // 2. البحث عن بصمة لهذا اليوم تحديداً
+                  // البحث عن سجل بصمة
                   const record = attendance?.records?.find((r: any) => {
                       const punchDate = toFirestoreDate(r.date);
                       return punchDate && isSameDay(punchDate, d);
                   });
                   
                   if (record && record.checkIn1) {
-                      // الموظف حضر -> فحص التأخير
-                      if (record.status === 'late') {
+                      // الموظف حضر -> فحص التأخير بناءً على منطق الدوام الذكي
+                      let effectiveStart = '08:00';
+                      if (record.isRamadan) {
+                          effectiveStart = branding?.work_hours?.ramadan?.start_time || '09:30';
+                      } else if (employee.shiftId) {
+                          const shift = shifts.find(s => s.id === employee.shiftId);
+                          effectiveStart = shift?.startTime || '08:00';
+                      } else if (employee.workStartTime) {
+                          effectiveStart = employee.workStartTime;
+                      } else {
+                          effectiveStart = branding?.work_hours?.general?.morning_start_time || '08:00';
+                      }
+
+                      if (record.checkIn1 > effectiveStart) {
                           if (employeePermissions?.get(dateKey) !== 'late_arrival') {
                               chargeableLateDays++;
                           }
                       }
                   } else {
-                      // الموظف لم يحضر -> فحص الإجازات المعتمدة
+                      // الموظف غائب -> فحص الإجازات
                       const isOnApprovedLeave = allLeaves.some(leave => {
                           if (leave.employeeId !== employee.id) return false;
                           const lStart = startOfDay(toFirestoreDate(leave.startDate)!);
@@ -136,22 +146,16 @@ export function PayrollGenerator() {
                           return d >= lStart && d <= lEnd;
                       });
 
-                      if (!isOnApprovedLeave) {
-                          // غياب حقيقي وغير مبرر
-                          actualAbsentDays++;
-                      }
+                      if (!isOnApprovedLeave) actualAbsentDays++;
                   }
               }
 
               absenceDeduction = actualAbsentDays * dailyRate;
+              // قاعدة الشركة: كل 3 تأخيرات تخصم يوم واحد
               lateDeduction = Math.floor(chargeableLateDays / 3) * dailyRate; 
 
-              if (actualAbsentDays > 0) logs.push(`خصم ${actualAbsentDays} يوم غياب غير مبرر.`);
-              if (chargeableLateDays > 0) {
-                  logs.push(`رصد ${chargeableLateDays} أيام تأخير (خصم ${Math.floor(chargeableLateDays / 3)} أيام).`);
-              }
-          } else {
-              logs.push("صرف راتب كامل (تجاهل الرقابة).");
+              if (actualAbsentDays > 0) logs.push(`خصم ${actualAbsentDays} يوم غياب.`);
+              if (chargeableLateDays > 0) logs.push(`رصد ${chargeableLateDays} تأخير (خصم ${Math.floor(chargeableLateDays / 3)} يوم).`);
           }
 
           const earnings = { 
@@ -185,8 +189,8 @@ export function PayrollGenerator() {
       }
       
       await batch.commit();
-      setProcessingResult(`نجاح الرقابة: تم اكتشاف الغيابات وتوليد ${payslipsCreated} كشوف رواتب.`);
-      toast({ title: 'نجاح المعالجة', description: 'تم تحديث الرواتب بناءً على فحص الحضور اليومي.' });
+      setProcessingResult(`تمت المعالجة بنجاح لـ ${payslipsCreated} موظف.`);
+      toast({ title: 'نجاح المعالجة', description: 'تم توليد الرواتب بناءً على فحص الحضور الذكي.' });
 
     } catch (error: any) {
       setProcessingResult(`خطأ: ${error.message}`);
@@ -227,10 +231,10 @@ export function PayrollGenerator() {
         <div className="border rounded-[2.5rem] p-8 bg-primary/5 space-y-6 border-primary/10 shadow-inner">
             <div className="flex items-center gap-3">
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary"><Calculator className="h-6 w-6"/></div>
-                <h3 className="font-black text-xl">محرك الرقابة اليومية الصارم</h3>
+                <h3 className="font-black text-xl">محرك الرواتب والرقابة الذكية</h3>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground font-bold">
-                المحرك الآن لا يعتمد على ملخص الملف المرفوع؛ بل يقوم بمسح كل يوم عمل في الشهر. إذا لم يجد بصمة دخول للموظف في يوم عمل ولم يجد إجازة معتمدة تغطي ذلك التاريخ، سيتم احتسابه غياباً فوراً وخصم أجره.
+                المحرك يقوم بتحليل كل يوم عمل على حدة؛ حيث يدمج كافة بصمات اليوم ليستخرج وقت الحضور الفعلي ووقت الانصراف النهائي، ويقارنها بوردية الموظف أو دوام المكتب الرسمي.
             </p>
             <Button onClick={handleGeneratePayroll} disabled={isProcessing || employeesLoading || !year || !month} className="w-full h-14 rounded-2xl font-black text-lg shadow-xl gap-2">
                 {isProcessing ? <Loader2 className="animate-spin h-5 w-5" /> : <Sheet className="h-5 w-5" />}
