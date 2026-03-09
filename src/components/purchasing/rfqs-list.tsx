@@ -22,7 +22,7 @@ import {
   writeBatch,
   updateDoc,
 } from 'firebase/firestore';
-import type { RequestForQuotation } from '@/lib/types';
+import type { RequestForQuotation, SupplierQuotation } from '@/lib/types';
 import { format } from 'date-fns';
 import {
   FileText,
@@ -33,7 +33,9 @@ import {
   ClipboardList,
   Loader2,
   Undo2,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  BarChart
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import {
@@ -94,6 +96,9 @@ export function RfqsList() {
     rfqQueryConstraints
   );
 
+  // جلب عروض الأسعار لمعرفة أي الطلبات جاهزة للمقارنة
+  const { data: allQuotes } = useSubscription<SupplierQuotation>(firestore, 'supplierQuotations');
+
   const filteredRfqs = useMemo(() => {
     return searchRfqs(rfqs, searchQuery);
   }, [rfqs, searchQuery]);
@@ -126,57 +131,36 @@ export function RfqsList() {
     setIsDeleting(true);
     try {
       const rfqId = itemToDelete.id!;
-      
-      // 1. التحقق من حالة أوامر الشراء المرتبطة قبل الحذف
       const poRef = collection(firestore, 'purchaseOrders');
       const poQuery = query(poRef, where('rfqId', '==', rfqId));
       const poSnap = await getDocs(poQuery);
 
-      // فحص إذا كان هناك أي أمر شراء ولد قيوداً محاسبية (received)
       const hasFinancialImpact = poSnap.docs.some(d => ['received', 'partially_received'].includes(d.data().status));
       
       if (hasFinancialImpact) {
           toast({ 
               variant: 'destructive', 
               title: 'منع الحذف الرقابي', 
-              description: 'لا يمكن حذف طلب تسعير ولد أوامر شراء مرتبطة بقيود محاسبية قائمة. يجب إلغاء أذونات الاستلام المرتبطة أولاً.' 
+              description: 'لا يمكن حذف طلب تسعير ولد أوامر شراء مرتبطة بقيود محاسبية قائمة.' 
           });
           setIsDeleting(false);
           setItemToDelete(null);
           return;
       }
 
-      // 2. جلب عروض الأسعار المرتبطة لحذفها
       const quotesRef = collection(firestore, 'supplierQuotations');
       const quotesQuery = query(quotesRef, where('rfqId', '==', rfqId));
       const quotesSnap = await getDocs(quotesQuery);
 
       const batch = writeBatch(firestore);
-      
       batch.delete(doc(firestore, 'rfqs', rfqId));
-      
-      quotesSnap.docs.forEach((quoteDoc) => {
-        batch.delete(quoteDoc.ref);
-      });
-
-      // حذف أوامر الشراء المرتبطة (التي ليس لها أثر مالي بعد)
-      poSnap.docs.forEach((poDoc) => {
-          batch.delete(poDoc.ref);
-      });
+      quotesSnap.docs.forEach((quoteDoc) => batch.delete(quoteDoc.ref));
+      poSnap.docs.forEach((poDoc) => batch.delete(poDoc.ref));
 
       await batch.commit();
-
-      toast({
-        title: 'نجاح',
-        description: `تم حذف طلب التسعير و ${quotesSnap.size} عرض سعر بنجاح.`,
-      });
+      toast({ title: 'نجاح', description: `تم حذف الطلب وعروض الأسعار المرتبطة.` });
     } catch (error) {
-      console.error('Failed to delete RFQ:', error);
-      toast({
-        variant: 'destructive',
-        title: 'خطأ',
-        description: 'فشل حذف طلب التسعير.',
-      });
+      toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف طلب التسعير.' });
     } finally {
       setIsDeleting(false);
       setItemToDelete(null);
@@ -193,13 +177,6 @@ export function RfqsList() {
     );
   }
 
-  if (error)
-    return (
-      <div className="text-center py-10 text-destructive font-bold">
-        فشل تحميل قائمة طلبات التسعير.
-      </div>
-    );
-
   return (
     <>
       <div className="flex items-center mb-6">
@@ -209,125 +186,121 @@ export function RfqsList() {
             placeholder="ابحث برقم الطلب (مثال: RFQ-2024)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 rtl:pr-10 h-11 rounded-xl shadow-sm"
+            className="pl-10 rtl:pr-10 h-11 rounded-xl shadow-sm font-bold border-2"
           />
         </div>
       </div>
 
-      <div className="border rounded-2xl overflow-hidden shadow-sm">
+      <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm bg-white">
         <Table>
           <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead className="w-1/4">رقم الطلب</TableHead>
-              <TableHead>التاريخ</TableHead>
-              <TableHead className="text-center">الموردين</TableHead>
-              <TableHead className="text-center">الأصناف</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead className="w-[100px] text-center">الإجراءات</TableHead>
+            <TableRow className="h-14 border-b-2">
+              <TableHead className="px-8 font-black">رقم الطلب</TableHead>
+              <TableHead className="font-bold">التاريخ</TableHead>
+              <TableHead className="text-center font-bold">العروض المستلمة</TableHead>
+              <TableHead className="font-bold">الحالة</TableHead>
+              <TableHead className="w-[120px] text-center font-bold">الإجراء</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rfqs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={5}>
                   <div className="p-12 text-center border-2 border-dashed rounded-2xl bg-muted/10 m-4">
                     <ClipboardList className="mx-auto h-16 w-16 text-muted-foreground/30" />
                     <h3 className="mt-4 text-xl font-black">لا توجد طلبات تسعير بعد</h3>
-                    <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto">
-                      ابدأ بإنشاء طلب تسعير جديد لإرساله لمورديك والمفاضلة بين أسعارهم.
-                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">ابدأ بإنشاء طلب تسعير جديد لإرساله للموردين.</p>
                   </div>
                 </TableCell>
               </TableRow>
-            ) : filteredRfqs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground font-bold">
-                  لا توجد نتائج تطابق بحثك الحالي.
-                </TableCell>
-              </TableRow>
             ) : (
-              filteredRfqs.map((rfq) => (
-                <TableRow key={rfq.id} className="group hover:bg-muted/30 transition-colors">
-                  <TableCell className="font-mono font-bold text-primary">
-                    <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="hover:underline">
-                      {rfq.rfqNumber}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="font-medium text-foreground/70">{formatDate(rfq.date)}</TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="secondary">{rfq.vendorIds?.length || 0}</Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline">{rfq.items?.length || 0}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn('px-2 font-bold', statusColors[rfq.status])}>
-                      {statusTranslations[rfq.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isProcessing}>
-                          {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" dir="rtl">
-                        <DropdownMenuLabel>خيارات الطلب</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => router.push(`/dashboard/purchasing/rfqs/${rfq.id}`)}
-                        >
-                          <Eye className="ml-2 h-4 w-4" /> إدارة العروض
-                        </DropdownMenuItem>
-                        
-                        {rfq.status === 'closed' && (
-                          <DropdownMenuItem onClick={() => handleReopen(rfq.id!)} className="text-orange-600 focus:text-orange-700">
-                            <Undo2 className="ml-2 h-4 w-4" /> إعادة فتح للتحرير
-                          </DropdownMenuItem>
+              filteredRfqs.map((rfq) => {
+                const quoteCount = allQuotes?.filter(q => q.rfqId === rfq.id).length || 0;
+                return (
+                  <TableRow key={rfq.id} className="group hover:bg-primary/5 transition-colors h-16">
+                    <TableCell className="px-8 font-mono font-black text-primary text-base">
+                      <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="hover:underline">
+                        {rfq.rfqNumber}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="font-bold opacity-60 text-xs">{formatDate(rfq.date)}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge variant={quoteCount > 0 ? "default" : "secondary"} className={cn("px-3 rounded-full font-black", quoteCount > 0 && "bg-green-600")}>
+                            {quoteCount} عروض
+                        </Badge>
+                        {quoteCount > 0 && rfq.status !== 'draft' && (
+                            <Link href={`/dashboard/purchasing/rfqs/${rfq.id}/compare`} className="p-1.5 bg-primary/10 rounded-lg text-primary hover:bg-primary hover:text-white transition-all shadow-sm">
+                                <Sparkles className="h-4 w-4" />
+                            </Link>
                         )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn('px-3 py-1 font-black text-[10px]', statusColors[rfq.status])}>
+                        {statusTranslations[rfq.status]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border group-hover:border-primary/20" disabled={isProcessing}>
+                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" dir="rtl" className="rounded-xl shadow-xl p-2 border-none">
+                          <DropdownMenuLabel className="font-black px-3 py-2">خيارات الطلب</DropdownMenuLabel>
+                          <DropdownMenuItem asChild className="rounded-lg py-3">
+                            <Link href={`/dashboard/purchasing/rfqs/${rfq.id}`} className="gap-2 font-bold"><Eye className="h-4 w-4" /> إدارة العروض</Link>
+                          </DropdownMenuItem>
+                          
+                          {quoteCount > 0 && (
+                            <DropdownMenuItem asChild className="rounded-lg py-3 text-primary font-black bg-primary/5">
+                                <Link href={`/dashboard/purchasing/rfqs/${rfq.id}/compare`} className="gap-2"><BarChart className="h-4 w-4" /> مصفوفة المقارنة</Link>
+                            </DropdownMenuItem>
+                          )}
 
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setItemToDelete(rfq)}
-                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                        >
-                          <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                          {rfq.status === 'closed' && (
+                            <DropdownMenuItem onClick={() => handleReopen(rfq.id!)} className="text-orange-600 rounded-lg py-3 font-bold gap-2">
+                              <Undo2 className="h-4 w-4" /> إعادة فتح للتحرير
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setItemToDelete(rfq)}
+                            className="text-destructive rounded-lg py-3 font-bold gap-2 focus:bg-red-50"
+                          >
+                            <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب نهائياً
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
       <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-[2rem] shadow-2xl border-none p-10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive font-black text-xl flex items-center gap-2">
-              <AlertTriangle className="h-6 w-6" />
-              تأكيد حذف طلب التسعير؟
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              سيتم حذف الطلب رقم{' '}
-              <span className="font-bold text-foreground">
-                &quot;{itemToDelete?.rfqNumber}&quot;
-              </span>{' '}
-              وكافة عروض الأسعار وأوامر الشراء المرتبطة به نهائياً. 
+            <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><AlertTriangle className="h-10 w-10" /></div>
+            <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد حذف طلب التسعير؟</AlertDialogTitle>
+            <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2">
+              سيتم حذف الطلب رقم <strong className="text-foreground">"{itemToDelete?.rfqNumber}"</strong> وكافة عروض الأسعار وأوامر الشراء المبرمة بناءً عليه نهائياً.
               <br/><br/>
-              <span className="font-bold text-destructive underline">تنبيه حماية البيانات:</span> لا يمكن حذف هذا الطلب إذا كان قد تم توريد بضائع بناءً على أوامر الشراء المنبثقة منه (أي يوجد قيد مالي قائم).
+              <span className="font-bold text-red-600 underline italic">تنبيه: لا يمكن حذف الطلبات التي تم توريد بضائعها فعلياً للمخازن.</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting} className="rounded-xl">
-              إلغاء
-            </AlertDialogCancel>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
-              className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold"
+              className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg"
             >
               {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : 'نعم، حذف نهائي'}
             </AlertDialogAction>

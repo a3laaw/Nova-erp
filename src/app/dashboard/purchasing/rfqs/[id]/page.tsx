@@ -9,7 +9,7 @@ import type { RequestForQuotation, Vendor, SupplierQuotation, PurchaseOrder } fr
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2, UserSearch, AlertCircle } from 'lucide-react';
+import { ArrowRight, FileText, GanttChartSquare, BarChart, XCircle, Send, UserPlus, Loader2, Search, PlusCircle, Undo2, UserSearch, AlertCircle, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
@@ -74,7 +74,6 @@ export default function RfqDetailsPage() {
 
         setIsUpdatingStatus(true);
         try {
-            // الرقابة الصارمة: التحقق من وجود بضاعة مستلمة مرتبطة
             const poIds = rfq.awardedPoIds || [];
             if (poIds.length > 0) {
                 const grnsQuery = query(collection(firestore, 'grns'), where('purchaseOrderId', 'in', poIds));
@@ -93,13 +92,10 @@ export default function RfqDetailsPage() {
             }
 
             const batch = writeBatch(firestore);
-            
-            // 1. حذف أوامر الشراء التي لم يتم توريدها
             poIds.forEach(poId => {
                 batch.delete(doc(firestore, 'purchaseOrders', poId));
             });
 
-            // 2. تصفير بيانات الترسية وإعادة فتح الطلب
             batch.update(rfqRef, {
                 status: 'sent',
                 awardedVendorId: deleteField(),
@@ -166,6 +162,7 @@ export default function RfqDetailsPage() {
     if (!rfq) return <div className="text-center py-20 text-muted-foreground">لم يتم العثور على طلب التسعير.</div>;
 
     const safeDate = toFirestoreDate(rfq.date);
+    const hasQuotes = (supplierQuotations || []).length > 0;
 
     return (
         <div className="space-y-6" dir="rtl">
@@ -195,18 +192,21 @@ export default function RfqDetailsPage() {
                                     <XCircle className="h-4 w-4" /> إغلاق وبدء المقارنة
                                 </Button>
                             )}
+                            
+                            {/* زر المقارنة الذكية - يظهر الآن بمجرد وجود أي عرض سعر */}
+                            {hasQuotes && rfq.status !== 'draft' && (
+                                <Button asChild className="bg-gradient-to-r from-primary to-indigo-600 shadow-lg shadow-primary/20 gap-2 rounded-xl font-black text-base animate-in zoom-in-95">
+                                    <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
+                                        <Sparkles className="h-5 w-5" /> مصفوفة المقارنة والترسية
+                                    </Link>
+                                </Button>
+                            )}
+
                             {rfq.status === 'closed' && (
-                                <>
-                                    <Button onClick={handleReopenRfq} disabled={isUpdatingStatus} variant="outline" className="gap-2 rounded-xl font-bold border-orange-200 text-orange-700 hover:bg-orange-50">
-                                        {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4" />}
-                                        تراجع عن الترسية وإعادة الفتح
-                                    </Button>
-                                    <Button asChild className="bg-primary shadow-lg shadow-primary/20 gap-2 rounded-xl font-bold">
-                                        <Link href={`/dashboard/purchasing/rfqs/${id}/compare`}>
-                                            <BarChart className="h-4 w-4" /> مصفوفة المقارنة
-                                        </Link>
-                                    </Button>
-                                </>
+                                <Button onClick={handleReopenRfq} disabled={isUpdatingStatus} variant="outline" className="gap-2 rounded-xl font-bold border-orange-200 text-orange-700 hover:bg-orange-50">
+                                    {isUpdatingStatus ? <Loader2 className="h-4 w-4 animate-spin"/> : <Undo2 className="h-4 w-4" />}
+                                    تراجع عن الترسية
+                                </Button>
                             )}
                             <Button variant="ghost" onClick={() => router.back()} className="gap-2"><ArrowRight className="h-4 w-4"/> العودة</Button>
                          </div>
@@ -235,7 +235,7 @@ export default function RfqDetailsPage() {
 
             <div className="flex items-center gap-3 mb-2">
                 <GanttChartSquare className="text-primary h-6 w-6" />
-                <h3 className="text-xl font-black">عروض أسعار الموردين</h3>
+                <h3 className="text-xl font-black">عروض أسعار الموردين ({(supplierQuotations || []).length})</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
