@@ -199,7 +199,6 @@ export function AttendanceUploader() {
         
         if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
-        // 🛡️ حماية: استبعاد الموظفين الذين ليس لديهم رقم بصمة معرف لضمان عدم تداخل "الأشباح"
         const validEmployees = employees.filter(emp => emp.employeeNumber && emp.employeeNumber.trim() !== '');
         const employeeMap = new Map(validEmployees.map(emp => [String(emp.employeeNumber), emp]));
         const excelPunches = new Map<string, Set<string>>(); 
@@ -210,7 +209,6 @@ export function AttendanceUploader() {
             let empNo = '';
             for(let k=0; k<Math.min(keys.length, 15); k++) {
                 const val = String(row[keys[k]] || '').trim();
-                // 🛡️ فحص صارم: القيمة يجب ألا تكون فارغة ويجب أن تكون موجودة في خريطة الموظفين
                 if (val && employeeMap.has(val)) { empNo = val; break; }
             }
             
@@ -235,8 +233,6 @@ export function AttendanceUploader() {
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
         
         const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
-        
-        // 🛡️ كشف يوم السبت (أو أي يوم نصف دوام) لتعطيل قاعدة الخصم المزدوج فيه
         const halfDaySettings = branding?.work_hours?.half_day;
         const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
 
@@ -285,7 +281,6 @@ export function AttendanceUploader() {
                         anomaly = `تأخير عن الموعد (${startTimeLimit})`;
                     }
 
-                    // 🛡️ تعديل جوهري: إذا كان اليوم هو "نصف دوام رسمي" لا تطبق قاعدة الخصم المزدوج
                     if (!isCustomShift && !isSystemHalfDay) {
                         const hasMorning = sortedTimes.some(t => t <= mEnd);
                         const hasEvening = sortedTimes.some(t => t >= eStart);
@@ -303,13 +298,11 @@ export function AttendanceUploader() {
                             anomaly = 'بصمة ناقصة (دخول وخروج مطلوب)';
                         }
                     } else if (isSystemHalfDay) {
-                        // في يوم نصف الدوام (مثل السبت)، نكتفي ببصمة واحدة أو اثنتين دون خصم "نصف يوم"
                         if (sortedTimes.length < 2) {
                             status = 'missing_punch';
                             anomaly = 'بصمة ناقصة ليوم السبت';
                         }
                     } else {
-                        // للموظف المخصص (Shift):
                         if (sortedTimes.length < 2) {
                             status = 'missing_punch';
                             anomaly = anomaly ? `${anomaly} + بصمة واحدة فقط` : 'بصمة ناقصة (تحتاج دخول وخروج)';
@@ -357,7 +350,7 @@ export function AttendanceUploader() {
 
         await batch.commit();
         setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب آلياً مع احترام أيام السبت.` });
+        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب آلياً.` });
         setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
@@ -455,9 +448,9 @@ export function AttendanceUploader() {
                         <div className="space-y-1">
                             <CardTitle className="text-2xl font-black flex items-center gap-3">
                                 <Fingerprint className="text-primary h-7 w-7" />
-                                مطابقة البصمة وساعات الدوام
+                                مطابقة البصمة والدوام
                             </CardTitle>
-                            <CardDescription>تحديد أرقام البصمة وساعات الدوام الخاصة لكل موظف (اترك ساعات الدوام فارغة للكامل).</CardDescription>
+                            <CardDescription>تحديد أرقام البصمة وساعات الدوام الخاصة لكل موظف.</CardDescription>
                         </div>
                         <div className="relative w-full md:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
