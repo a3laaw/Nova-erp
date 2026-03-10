@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark } from 'lucide-react';
+import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark, FileText } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -75,7 +76,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
 
-    // التحقق هل النشاط غذائي لتفعيل الحقول الإضافية
     const isFoodActivity = useMemo(() => branding?.activityType === 'food_delivery', [branding]);
 
     useEffect(() => {
@@ -169,7 +169,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         <form onSubmit={handleSubmit}>
             <div className="space-y-8 py-4 px-1 max-h-[75vh] overflow-y-auto scrollbar-none">
                 
-                {/* AI Analysis Trigger */}
                 <div className="px-4">
                     <input type="file" ref={aiFileInputRef} className="hidden" accept="image/*, .pdf" onChange={handleAiAnalysis} />
                     <Button 
@@ -198,7 +197,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </Button>
                 </div>
 
-                {/* Personal Info Group */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-card shadow-sm">
                     <h3 className="font-black text-lg flex items-center gap-2 text-primary">
                         <User className="h-5 w-5" /> المعلومات الشخصية
@@ -242,7 +240,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {/* 🛡️ حقول النشاط الغذائي / التوصيل (الطلب الجديد) */}
                 {isFoodActivity && (
                     <section className="space-y-6 p-6 border-2 border-dashed border-indigo-200 bg-indigo-50/10 rounded-[2rem] animate-in zoom-in-95">
                         <h3 className="font-black text-lg flex items-center gap-2 text-indigo-800">
@@ -250,7 +247,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="grid gap-2">
-                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><FileCheck className="h-3 w-3" /> انتهاء الجواز</Label>
+                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><FileText className="h-3 w-3" /> انتهاء الجواز</Label>
                                 <DateInput value={formData.passportExpiry} onChange={d => handleSelectChange('passportExpiry', d)} className="bg-white" />
                             </div>
                             <div className="grid gap-2">
@@ -265,7 +262,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </section>
                 )}
 
-                {/* Job Info Group */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2">
                         <Briefcase className="h-5 w-5 text-primary" /> التعيين والدوام
@@ -322,7 +318,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     )}
                 </section>
 
-                {/* Financial Group */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-emerald-50/20 border-emerald-100">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800">
                         <Banknote className="h-5 w-5" /> الرواتب والبدلات
@@ -359,7 +354,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
             </div>
 
             <DialogFooter className="mt-6 pt-6 border-t bg-muted/10 rounded-b-[2rem] p-6">
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSaving || isAnalyzing} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي
