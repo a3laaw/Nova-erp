@@ -29,6 +29,7 @@ import { parse, format, isValid, startOfDay } from 'date-fns';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 
 /**
  * محرك تحليل التاريخ والوقت العالمي (Global DateTime Parser):
@@ -315,7 +316,7 @@ export function AttendanceUploader() {
         <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl">
             <CardHeader>
                 <CardTitle className="font-black">رفع ملف البصمة الجديد</CardTitle>
-                <CardDescription>سيقوم النظام بفحص الملف واستخراج {punchesMapSize => punchesMapSize} بصمة.</CardDescription>
+                <CardDescription>سيقوم النظام بفحص الملف واستخراج البصمات المتاحة للفترة المحددة.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
