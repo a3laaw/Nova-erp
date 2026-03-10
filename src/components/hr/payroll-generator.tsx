@@ -18,11 +18,13 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { useBranding } from '@/context/branding-context';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+  const { branding } = useBranding();
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
@@ -171,6 +173,7 @@ export function PayrollGenerator() {
     }
 
     const summaryRows: any[] = [];
+    const workHours = branding?.work_hours?.general;
 
     employees.forEach(emp => {
       const att = attendanceDocs.find(a => a.employeeId === emp.id);
@@ -178,13 +181,26 @@ export function PayrollGenerator() {
 
       let totalAbsent = 0;
       let totalLate = 0;
+      let totalLateMinutes = 0;
       let totalHalfDay = 0;
       let totalDeductionDays = 0;
 
       att.records?.forEach(r => {
         if (r.auditStatus === 'waived') return;
         if (r.status === 'absent') totalAbsent++;
-        if (r.status === 'late') totalLate++;
+        
+        if (r.status === 'late') {
+            totalLate++;
+            // حساب دقائق التأخير الفعلي
+            const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
+            if (r.checkIn1 && r.checkIn1 > startTimeLimit) {
+                const [startH, startM] = startTimeLimit.split(':').map(Number);
+                const [checkH, checkM] = r.checkIn1.split(':').map(Number);
+                const diff = (checkH * 60 + checkM) - (startH * 60 + startM);
+                if (diff > 0) totalLateMinutes += diff;
+            }
+        }
+        
         if (r.status === 'half_day') totalHalfDay++;
         totalDeductionDays += (r.manualDeductionDays || 0);
       });
@@ -193,12 +209,17 @@ export function PayrollGenerator() {
       const dailyRate = fullSalary / 26;
       const deductionAmount = totalDeductionDays * dailyRate;
 
+      const lateHours = Math.floor(totalLateMinutes / 60);
+      const lateMins = totalLateMinutes % 60;
+
       summaryRows.push({
         'رقم الموظف': emp.employeeNumber || '',
         'اسم الموظف': emp.fullName || '',
         'الراتب الكامل': fullSalary,
         'أيام الغياب': totalAbsent,
-        'أيام التأخير': totalLate,
+        'عدد مرات التأخير': totalLate,
+        'إجمالي ساعات التأخير': `${lateHours}:${String(lateMins).padStart(2, '0')}`,
+        'إجمالي دقائق التأخير': totalLateMinutes,
         'أيام نصف يوم': totalHalfDay,
         'إجمالي أيام الخصم': totalDeductionDays,
         'المعدل اليومي': Math.round(dailyRate * 1000) / 1000,
@@ -212,8 +233,8 @@ export function PayrollGenerator() {
 
     ws['!cols'] = [
       { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 12 },
-      { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 15 },
-      { wch: 18 }, { wch: 18 }
+      { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, 
+      { wch: 16 }, { wch: 15 }, { wch: 18 }, { wch: 18 }
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, `حضور ${month}-${year}`);
