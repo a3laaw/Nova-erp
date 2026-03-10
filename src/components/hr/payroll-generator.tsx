@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -28,7 +27,7 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees');
+  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   
   const attendanceQuery = useMemo(() => [
     where('year', '==', parseInt(year)),
@@ -47,7 +46,7 @@ export function PayrollGenerator() {
     const selectedYear = parseInt(year);
 
     attendanceDocs.forEach(attendanceDoc => {
-        // التأكد من أن المستند ينتمي للفترة المختارة فعلياً
+        // التأكد من أن المستند ينتمي للفترة المختارة فعلياً (رقابة مزدوجة)
         if (attendanceDoc.month !== selectedMonth || attendanceDoc.year !== selectedYear) return;
 
         const emp = employees.find(e => e.id === attendanceDoc.employeeId);
@@ -56,7 +55,7 @@ export function PayrollGenerator() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
 
-            // رقابة إضافية: استبعاد أي بصمة لا تتبع الشهر المختار برمجياً
+            // رقابة إضافية: استبعاد أي بصمة لا تتبع الشهر المختار برمجياً (لمواجهة زحزحة التوقيت)
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
 
             if (r.status !== 'present') {

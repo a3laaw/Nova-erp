@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
@@ -24,20 +23,19 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Separator } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, setHours } from 'date-fns';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
   'Thursday': 4, 'Friday': 5, 'Saturday': 6
 };
 
-// دالة ذكية وشاملة لقراءة التاريخ والوقت مع تثبيت الساعة لمنع زحزحة المنطقة الزمنية
+// محرك قراءة التواريخ العالمي والشامل
 const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
@@ -47,11 +45,9 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
     if (typeof val === 'number') {
         try {
             const excelDate = XLSX.SSF.parse_date_code(val);
-            if (excelDate.y >= 2000) {
-                // نثبت الساعة عند الـ 12 ظهراً لمنع انتقال التاريخ لليوم التالي أو السابق عند التحويل لـ UTC
-                parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
-                timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
-            } else return null;
+            // تثبيت الساعة عند الـ 12 ظهراً لمنع زحزحة التاريخ بسبب الـ Timezones
+            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
+            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
         } catch { return null; }
     } 
     else if (typeof val === 'string') {
@@ -61,11 +57,14 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
 
         if (dateMatch) {
             const dateStr = dateMatch[0];
-            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy'];
+            const formats = [
+                'dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 
+                'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'
+            ];
             for (const fmt of formats) {
                 const p = parse(dateStr, fmt, new Date());
                 if (isValid(p) && p.getFullYear() >= 2000) {
-                    parsedDate = setHours(startOfDay(p), 12);
+                    parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
                     break;
                 }
             }
@@ -79,6 +78,7 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
     }
 
     if (parsedDate && isValid(parsedDate)) {
+        // رقابة صارمة: يجب أن يطابق التاريخ الشهر والسنة المختارين حصراً
         if (parsedDate.getFullYear() === targetYear && (parsedDate.getMonth() + 1) === targetMonth) {
             return { date: parsedDate, timeStr };
         }
@@ -123,10 +123,11 @@ export function AttendanceUploader() {
         const excelPunches = new Map<string, Set<string>>(); 
         let totalPunchesCount = 0;
 
+        // تحليل كافة أعمدة ملف الإكسيل بحثاً عن الموظفين والتواريخ
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
-            for(let k=0; k<Math.min(keys.length, 10); k++) {
+            for(let k=0; k<Math.min(keys.length, 15); k++) {
                 const val = String(row[keys[k]] || '').trim();
                 if (employeeMap.has(val)) { empNo = val; break; }
             }
@@ -147,6 +148,7 @@ export function AttendanceUploader() {
             }
         });
 
+        // توليد تقويم أيام العمل للشهر المختار
         const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
         const monthEnd = endOfMonth(monthStart);
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -156,6 +158,7 @@ export function AttendanceUploader() {
 
         const batch = writeBatch(firestore);
 
+        // تطهير البيانات السابقة (Purge)
         if (clearPrevious) {
             const existingQuery = query(
                 collection(firestore, 'attendance'),
@@ -172,12 +175,12 @@ export function AttendanceUploader() {
 
         let autoAbsencesCount = 0;
 
+        // تنفيذ "محرك المطابقة العكسية"
         for (const emp of employees) {
             const employeeRecords: AttendanceRecord[] = [];
             
             for (const day of workingDaysInMonth) {
-                // تثبيت اليوم عند الظهيرة لضمان عدم الزحزحة
-                const stableDay = setHours(day, 12);
+                const stableDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
                 const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
 
@@ -203,9 +206,9 @@ export function AttendanceUploader() {
                             status = 'half_day';
                             anomaly = 'بصمة مسائية فقط';
                             manualDeduction = 0.5;
-                        } else if (hasMorning && hasEvening && sortedTimes.length < 4) {
+                        } else if (hasMorning && hasEvening && sortedTimes.length < 2) {
                             status = 'missing_punch';
-                            anomaly = 'بصمة ناقصة (البريك)';
+                            anomaly = 'بصمة ناقصة';
                         }
                     }
 
@@ -222,6 +225,7 @@ export function AttendanceUploader() {
                         auditStatus: status === 'present' ? 'verified' : 'pending'
                     });
                 } else {
+                    // إثبات الغياب القسري
                     autoAbsencesCount++;
                     employeeRecords.push({
                         date: Timestamp.fromDate(stableDay),
@@ -279,9 +283,7 @@ export function AttendanceUploader() {
                     </Select>
                 </div>
                 
-                <Separator />
-                
-                <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border border-red-100 animate-in fade-in">
+                <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border border-red-100 animate-in fade-in mt-4">
                     <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
                     <div className="space-y-0.5">
                         <Label htmlFor="purge" className="font-black text-xs text-red-800 cursor-pointer">تطهير البيانات السابقة</Label>
@@ -290,7 +292,7 @@ export function AttendanceUploader() {
                 </div>
 
                 {summary && (
-                    <div className="p-4 bg-green-50 rounded-2xl border border-green-100 space-y-3 animate-in zoom-in-95">
+                    <div className="p-4 bg-green-50 rounded-2xl border border-green-100 space-y-3 animate-in zoom-in-95 mt-4">
                         <h4 className="font-black text-green-800 flex items-center gap-2 text-xs"><CheckCircle2 className="h-4 w-4"/> ملخص المعالجة الأخيرة:</h4>
                         <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
                             <div className="bg-white p-2 rounded-lg border">أيام العمل: {summary.workingDays}</div>
