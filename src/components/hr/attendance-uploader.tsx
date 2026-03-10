@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
@@ -267,24 +267,35 @@ export function AttendanceUploader() {
                     let manualDeduction = 0;
 
                     const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
+                    const isCustomShift = !!emp.workStartTime && !!emp.workEndTime;
+
                     if (sortedTimes[0] > startTimeLimit) {
                         status = 'late';
                         anomaly = `تأخير عن الموعد (${startTimeLimit})`;
-                    } else {
+                    }
+
+                    // 🛡️ منطق حماية الموظف المخصص من قاعدة "نصف اليوم"
+                    if (!isCustomShift) {
                         const hasMorning = sortedTimes.some(t => t <= mEnd);
                         const hasEvening = sortedTimes.some(t => t >= eStart);
 
                         if (hasMorning && !hasEvening) {
                             status = 'half_day';
-                            anomaly = 'بصمة صباحية فقط';
+                            anomaly = anomaly ? `${anomaly} + بصمة صباحية فقط` : 'بصمة صباحية فقط';
                             manualDeduction = 0.5;
                         } else if (!hasMorning && hasEvening) {
                             status = 'half_day';
-                            anomaly = 'بصمة مسائية فقط';
+                            anomaly = anomaly ? `${anomaly} + بصمة مسائية فقط` : 'بصمة مسائية فقط';
                             manualDeduction = 0.5;
                         } else if (hasMorning && hasEvening && sortedTimes.length < 2) {
                             status = 'missing_punch';
-                            anomaly = 'بصمة ناقصة';
+                            anomaly = 'بصمة ناقصة (دخول وخروج مطلوب)';
+                        }
+                    } else {
+                        // للموظف المخصص: نكتفي بالتأكد من وجود بصمتين على الأقل (بداية ونهاية)
+                        if (sortedTimes.length < 2) {
+                            status = 'missing_punch';
+                            anomaly = anomaly ? `${anomaly} + بصمة واحدة فقط` : 'بصمة ناقصة (تحتاج دخول وخروج)';
                         }
                     }
 

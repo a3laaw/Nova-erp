@@ -88,7 +88,6 @@ export function PayrollGenerator() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
 
-            // Strict check to ensure record belongs to the selected month/year
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
 
             if (r.status !== 'present') {
@@ -167,7 +166,6 @@ export function PayrollGenerator() {
     finally { setIsProcessing(false); }
   };
 
-  // مساعد لتحويل الوقت إلى دقائق مطلقة للمقارنة الدقيقة
   const timeToMinutes = (timeStr: string | null | undefined): number => {
     if (!timeStr || !timeStr.includes(':')) return 0;
     const parts = timeStr.trim().split(':');
@@ -205,7 +203,6 @@ export function PayrollGenerator() {
         if (r.status === 'absent') {
             totalAbsent++;
         } else {
-            // حساب التأخير الفعلي لأي يوم فيه بصمة
             if (r.checkIn1) {
                 const checkInMins = timeToMinutes(r.checkIn1);
                 const diff = checkInMins - limitMins;
