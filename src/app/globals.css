@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 @import "react-day-picker/dist/style.css";
 
@@ -96,4 +95,11 @@
 /* Force body clicks if library locks them */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
+}
+
+@media print {
+  nav, header, aside, .no-print { display: none !important; }
+  .printable-area { display: block !important; }
+  body { font-size: 12px; }
+  @page { margin: 1cm; size: A4 landscape; }
 }

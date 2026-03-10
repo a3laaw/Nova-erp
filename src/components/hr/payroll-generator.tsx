@@ -8,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -17,6 +17,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -27,7 +28,6 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // جلب الموظفين (نحتفظ بالاشتراك للموظفين لأنهم الأساس)
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
 
@@ -46,7 +46,6 @@ export function PayrollGenerator() {
     fetchEmployees();
   }, [firestore]);
 
-  // جلب سجلات الحضور يدوياً عند تغيير الفلتر
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
   const [attLoading, setAttLoading] = useState(false);
 
@@ -70,7 +69,6 @@ export function PayrollGenerator() {
     fetchAttendance();
   }, [firestore, year, month]);
 
-  // ✨ مركز تدقيق المخالفات المطور: فلترة صارمة حسب الشهر والسنة لضمان عدم تداخل البيانات
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
     
@@ -80,7 +78,6 @@ export function PayrollGenerator() {
     const selectedYear = parseInt(year);
 
     attendanceDocs.forEach(attendanceDoc => {
-        // التأكد من أن المستند ينتمي للفترة المختارة فعلياً (رقابة مزدوجة)
         if (attendanceDoc.month !== selectedMonth || attendanceDoc.year !== selectedYear) return;
 
         const emp = employees.find(e => e.id === attendanceDoc.employeeId);
@@ -89,14 +86,13 @@ export function PayrollGenerator() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
 
-            // رقابة إضافية: استبعاد أي بصمة لا تتبع الشهر المختار برمجياً (لمواجهة زحزحة التوقيت)
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
 
             if (r.status !== 'present') {
                 list.push({ 
                     docId: attendanceDoc.id!, 
                     record: r, 
-                    empName: emp?.fullName || 'موظف غير معرف', 
+                    empName: emp?.fullName || 'موظف غير معروف', 
                     employeeNumber: emp?.employeeNumber || '000'
                 });
             }
@@ -127,10 +123,7 @@ export function PayrollGenerator() {
         });
         
         await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
-        
-        // تحديث الحالة محلياً لسرعة الاستجابة
         setAttendanceDocs(prev => prev.map(doc => doc.id === docId ? { ...doc, records } : doc));
-        
         toast({ title: 'تم الحفظ', description: 'تم تحديث حالة المخالفة.' });
     } catch (e) { 
         toast({ variant: 'destructive', title: 'خطأ في التحديث' }); 
@@ -171,6 +164,62 @@ export function PayrollGenerator() {
     finally { setIsProcessing(false); }
   };
 
+  const handleExportExcel = () => {
+    if (!attendanceDocs || attendanceDocs.length === 0) {
+      toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
+      return;
+    }
+
+    const summaryRows: any[] = [];
+
+    employees.forEach(emp => {
+      const att = attendanceDocs.find(a => a.employeeId === emp.id);
+      if (!att) return;
+
+      let totalAbsent = 0;
+      let totalLate = 0;
+      let totalHalfDay = 0;
+      let totalDeductionDays = 0;
+
+      att.records?.forEach(r => {
+        if (r.auditStatus === 'waived') return;
+        if (r.status === 'absent') totalAbsent++;
+        if (r.status === 'late') totalLate++;
+        if (r.status === 'half_day') totalHalfDay++;
+        totalDeductionDays += (r.manualDeductionDays || 0);
+      });
+
+      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+      const dailyRate = fullSalary / 26;
+      const deductionAmount = totalDeductionDays * dailyRate;
+
+      summaryRows.push({
+        'رقم الموظف': emp.employeeNumber || '',
+        'اسم الموظف': emp.fullName || '',
+        'الراتب الكامل': fullSalary,
+        'أيام الغياب': totalAbsent,
+        'أيام التأخير': totalLate,
+        'أيام نصف يوم': totalHalfDay,
+        'إجمالي أيام الخصم': totalDeductionDays,
+        'المعدل اليومي': Math.round(dailyRate * 1000) / 1000,
+        'إجمالي الخصم (KD)': Math.round(deductionAmount * 1000) / 1000,
+        'صافي الراتب المتوقع': Math.round((fullSalary - deductionAmount) * 1000) / 1000,
+      });
+    });
+
+    const ws = XLSX.utils.json_to_sheet(summaryRows);
+    const wb = XLSX.utils.book_new();
+
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 12 },
+      { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 15 },
+      { wch: 18 }, { wch: 18 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, `حضور ${month}-${year}`);
+    XLSX.writeFile(wb, `تقرير_الحضور_${month}_${year}.xlsx`);
+  };
+
   const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
 
   return (
@@ -181,6 +230,7 @@ export function PayrollGenerator() {
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="flex gap-3">
+                <Button variant="outline" onClick={handleExportExcel} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
                 <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
                 <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
