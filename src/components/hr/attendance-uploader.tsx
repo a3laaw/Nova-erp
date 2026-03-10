@@ -36,6 +36,7 @@ const dayNameToIndex: Record<string, number> = {
   'Thursday': 4, 'Friday': 5, 'Saturday': 6
 };
 
+// دالة ذكية لاستخراج التاريخ والوقت من أي صيغة في إكسل
 const parseEntryData = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
@@ -176,9 +177,11 @@ export function AttendanceUploader() {
                     let anomaly = '';
                     let manualDeduction = 0;
 
-                    if (emp?.workStartTime && sortedTimes[0] > emp.workStartTime) {
+                    // تحقق من التأخير بناءً على ساعات عمل الموظف المخصصة أو العامة
+                    const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
+                    if (sortedTimes[0] > startTimeLimit) {
                         status = 'late';
-                        anomaly = `تأخير عن موعده المخصص (${emp.workStartTime})`;
+                        anomaly = `تأخير عن الموعد المحدد (${startTimeLimit})`;
                     } else {
                         const hasMorning = sortedTimes.some(t => t <= mEnd);
                         const hasEvening = sortedTimes.some(t => t >= eStart);
@@ -239,7 +242,7 @@ export function AttendanceUploader() {
         await batch.commit();
         toast({ 
             title: 'اكتملت المعالجة الرقابية', 
-            description: `تم تحليل الشهر بالكامل. تم إثبات حضور الملتزمين وتسجيل غياب تلقائي لمن لم تظهر بصمتهم في أيام العمل.` 
+            description: `تم تحليل الشهر بالكامل ومطابقته مع أيام العمل الرسمية. تم إثبات غياب الموظفين آلياً للأيام المفقودة.` 
         });
         setFile(null);
       } catch (error: any) {
