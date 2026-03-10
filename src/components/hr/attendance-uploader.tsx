@@ -26,7 +26,7 @@ import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Ti
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, setHours } from 'date-fns';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -37,28 +37,25 @@ const dayNameToIndex: Record<string, number> = {
   'Thursday': 4, 'Friday': 5, 'Saturday': 6
 };
 
-// دالة ذكية وشاملة لقراءة التاريخ والوقت من الإكسيل بكافة تنسيقاته
+// دالة ذكية وشاملة لقراءة التاريخ والوقت مع تثبيت الساعة لمنع زحزحة المنطقة الزمنية
 const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
     let parsedDate: Date | null = null;
     let timeStr = "00:00";
 
-    // الحالة 1: قيمة رقمية (Excel Serial Date)
     if (typeof val === 'number') {
         try {
             const excelDate = XLSX.SSF.parse_date_code(val);
-            // التأكد أن السنة منطقية (بعد 2000) لتجنب قراءة أرقام المسلسل كتاريخ
             if (excelDate.y >= 2000) {
-                parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
+                // نثبت الساعة عند الـ 12 ظهراً لمنع انتقال التاريخ لليوم التالي أو السابق عند التحويل لـ UTC
+                parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
                 timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
             } else return null;
         } catch { return null; }
     } 
-    // الحالة 2: قيمة نصية
     else if (typeof val === 'string') {
         const cleaned = val.trim();
-        // محاولة استخراج الجزء الذي يشبه التاريخ (أرقام وفواصل)
         const dateMatch = cleaned.match(/(\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4})/);
         const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
 
@@ -68,7 +65,7 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
             for (const fmt of formats) {
                 const p = parse(dateStr, fmt, new Date());
                 if (isValid(p) && p.getFullYear() >= 2000) {
-                    parsedDate = startOfDay(p);
+                    parsedDate = setHours(startOfDay(p), 12);
                     break;
                 }
             }
@@ -82,7 +79,6 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
     }
 
     if (parsedDate && isValid(parsedDate)) {
-        // رقابة صارمة: يجب أن يطابق التاريخ الشهر والسنة المختارين في الواجهة
         if (parsedDate.getFullYear() === targetYear && (parsedDate.getMonth() + 1) === targetMonth) {
             return { date: parsedDate, timeStr };
         }
@@ -127,11 +123,9 @@ export function AttendanceUploader() {
         const excelPunches = new Map<string, Set<string>>(); 
         let totalPunchesCount = 0;
 
-        // 1. استخراج البصمات من الملف وربطها بالموظف والتاريخ
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
-            // البحث عن عمود رقم الموظف في أول 10 أعمدة
             for(let k=0; k<Math.min(keys.length, 10); k++) {
                 const val = String(row[keys[k]] || '').trim();
                 if (employeeMap.has(val)) { empNo = val; break; }
@@ -143,7 +137,6 @@ export function AttendanceUploader() {
             for (const key in row) {
                 const parsed = parseSmartDateTime(row[key], selectedMonthNum, selectedYearNum);
                 if (parsed) {
-                    // نستخدم سلسلة نصية كمفتاح لضمان التطابق التام دون مشاكل المناطق الزمنية
                     const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
                     if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
                     if (parsed.timeStr && parsed.timeStr !== "00:00") {
@@ -154,7 +147,6 @@ export function AttendanceUploader() {
             }
         });
 
-        // 2. توليد أيام العمل الرسمية (المطابقة العكسية)
         const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
         const monthEnd = endOfMonth(monthStart);
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -164,7 +156,6 @@ export function AttendanceUploader() {
 
         const batch = writeBatch(firestore);
 
-        // 3. تطهير البيانات القديمة إذا طلب المستخدم
         if (clearPrevious) {
             const existingQuery = query(
                 collection(firestore, 'attendance'),
@@ -181,12 +172,13 @@ export function AttendanceUploader() {
 
         let autoAbsencesCount = 0;
 
-        // 4. المحرك الرقابي: فحص كل موظف مقابل كل يوم عمل رسمي
         for (const emp of employees) {
             const employeeRecords: AttendanceRecord[] = [];
             
             for (const day of workingDaysInMonth) {
-                const dateKey = `${emp.id}_${format(day, 'yyyy-MM-dd')}`;
+                // تثبيت اليوم عند الظهيرة لضمان عدم الزحزحة
+                const stableDay = setHours(day, 12);
+                const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
 
                 if (punches && punches.size > 0) {
@@ -218,7 +210,7 @@ export function AttendanceUploader() {
                     }
 
                     employeeRecords.push({
-                        date: Timestamp.fromDate(day),
+                        date: Timestamp.fromDate(stableDay),
                         employeeId: emp.id!,
                         checkIn1: sortedTimes[0],
                         checkOut1: sortedTimes[sortedTimes.length - 1],
@@ -230,10 +222,9 @@ export function AttendanceUploader() {
                         auditStatus: status === 'present' ? 'verified' : 'pending'
                     });
                 } else {
-                    // 🛡️ إثبات الغياب القسري لليوم المفقود
                     autoAbsencesCount++;
                     employeeRecords.push({
-                        date: Timestamp.fromDate(day),
+                        date: Timestamp.fromDate(stableDay),
                         employeeId: emp.id!,
                         checkIn1: null, checkOut1: null, checkIn2: null, checkOut2: null,
                         allPunches: [],
@@ -270,21 +261,21 @@ export function AttendanceUploader() {
 
   return (
     <div className="grid lg:grid-cols-3 gap-8" dir="rtl">
-        <Card className="lg:col-span-1 rounded-[2rem] border-none shadow-sm">
+        <Card className="lg:col-span-1 rounded-[2.5rem] border-none shadow-sm">
             <CardHeader><CardTitle className="text-lg font-black">فترة التقرير والرقابة</CardTitle></CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-bold">السنة</Label>
                     <Select value={year} onValueChange={setYear}>
                         <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
-                        <SelectContent>{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                        <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                 <div className="grid gap-2">
                     <Label className="font-bold">الشهر</Label>
                     <Select value={month} onValueChange={setMonth}>
                         <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
-                        <SelectContent>{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                        <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                 
@@ -311,7 +302,7 @@ export function AttendanceUploader() {
             </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl">
+        <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl">
             <CardHeader>
                 <CardTitle className="font-black">رفع وتحليل ملف البصمة</CardTitle>
                 <CardDescription>ارفع ملف الإكسل ليقوم النظام بمطابقته مع أيام العمل الرسمية وكشف فجوات الغياب.</CardDescription>
