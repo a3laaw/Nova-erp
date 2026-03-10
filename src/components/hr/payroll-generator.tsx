@@ -8,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -107,7 +107,7 @@ export function PayrollGenerator() {
     return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(a.record.date)?.getTime() || 0));
   }, [attendanceDocs, employees, month, year]);
 
-  const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
+  const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser) return;
     try {
         const docRef = doc(firestore, 'attendance', docId);
@@ -116,12 +116,19 @@ export function PayrollGenerator() {
         
         const records = snap.data().records.map((r: any) => {
             if (r.date.seconds === date.seconds) {
+                let manualDeduction = r.manualDeductionDays;
+                if (action === 'waive') manualDeduction = 0;
+                else if (action === 'reset') {
+                    // Restore default deduction based on status
+                    manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                }
+
                 return { 
                     ...r, 
-                    auditStatus: action === 'waive' ? 'waived' : 'verified',
-                    manualDeductionDays: action === 'waive' ? 0 : r.manualDeductionDays,
-                    waivedBy: currentUser.fullName,
-                    waivedAt: new Date()
+                    auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'),
+                    manualDeductionDays: manualDeduction,
+                    waivedBy: action === 'reset' ? null : currentUser.fullName,
+                    waivedAt: action === 'reset' ? null : new Date()
                 };
             }
             return r;
@@ -135,16 +142,18 @@ export function PayrollGenerator() {
     }
   };
 
-  const handleBulkAuditAction = async (action: 'waive' | 'apply') => {
+  const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser || anomalies.length === 0) return;
     
-    const pendingAnomalies = anomalies.filter(a => a.record.auditStatus === 'pending');
-    if (pendingAnomalies.length === 0) return;
+    // For reset, we process all anomalies. For waive/apply, we only process pending ones.
+    const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
+    
+    if (targets.length === 0) return;
 
     setIsBulkProcessing(true);
     try {
         const batch = writeBatch(firestore);
-        const updatedDocIds = new Set(pendingAnomalies.map(a => a.docId));
+        const updatedDocIds = new Set(targets.map(a => a.docId));
         
         for (const docId of Array.from(updatedDocIds)) {
             const docRef = doc(firestore, 'attendance', docId);
@@ -152,14 +161,20 @@ export function PayrollGenerator() {
             if (!currentDoc) continue;
 
             const updatedRecords = currentDoc.records.map(r => {
-                const isPendingAnomaly = pendingAnomalies.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
-                if (isPendingAnomaly) {
+                const isTargetAnomaly = targets.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
+                if (isTargetAnomaly) {
+                    let manualDeduction = r.manualDeductionDays;
+                    if (action === 'waive') manualDeduction = 0;
+                    else if (action === 'reset') {
+                        manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                    }
+
                     return {
                         ...r,
-                        auditStatus: action === 'waive' ? 'waived' : 'verified',
-                        manualDeductionDays: action === 'waive' ? 0 : r.manualDeductionDays,
-                        waivedBy: currentUser.fullName,
-                        waivedAt: new Date()
+                        auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'),
+                        manualDeductionDays: manualDeduction,
+                        waivedBy: action === 'reset' ? null : currentUser.fullName,
+                        waivedAt: action === 'reset' ? null : new Date()
                     };
                 }
                 return r;
@@ -169,7 +184,12 @@ export function PayrollGenerator() {
         }
 
         await batch.commit();
-        toast({ title: 'نجاح الإجراء الجماعي', description: `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} جميع المخالفات المعلقة بنجاح.` });
+        toast({ 
+            title: 'نجاح الإجراء الجماعي', 
+            description: action === 'reset' 
+                ? 'تمت إعادة تعيين جميع المخالفات للتدقيق.' 
+                : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات المعلقة بنجاح.` 
+        });
         fetchAttendance();
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنفيذ الإجراء الجماعي.' });
@@ -354,6 +374,7 @@ export function PayrollGenerator() {
   };
 
   const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
+  const processedAnomaliesCount = anomalies.filter(a => a.record.auditStatus !== 'pending').length;
   const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
   return (
@@ -381,8 +402,13 @@ export function PayrollGenerator() {
         </div>
 
         {/* --- ملخص الرواتب المختصر (للطباعة) --- */}
-        {/* تم تغيير الكلاس من hidden إلى التموضع المطلق بعيداً عن الشاشة لضمان التقاطه بواسطة html2pdf */}
-        <div id="summary-printable-area" className="fixed -left-[9999px] top-0 w-[1120px] bg-white print:static print:block border-2 rounded-[2.5rem] overflow-hidden shadow-2xl">
+        {/* 🛡️ تقنية الطبقة الشفافة: نضع العنصر في مكان ثابت لكنه شفاف وتحت العناصر الأخرى 
+            هذا يسمح لـ html2pdf بالتقاطه وبنائه كأنه مرئي تماماً دون تداخل مع الواجهة */}
+        <div 
+            id="summary-printable-area" 
+            className="absolute top-0 right-0 w-[1120px] bg-white opacity-0 pointer-events-none -z-50 border-2 rounded-[2.5rem] overflow-hidden"
+            style={{ minHeight: '800px' }}
+        >
             <div className="p-8 border-b-4 border-primary bg-muted/10">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
@@ -431,8 +457,8 @@ export function PayrollGenerator() {
                 </TableFooter>
             </Table>
             <div className="p-12 grid grid-cols-2 gap-20 text-center">
-                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">التوقيع والتاريخ</div></div>
-                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">الختم والموافقة</div></div>
+                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
+                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
             </div>
         </div>
 
@@ -447,37 +473,58 @@ export function PayrollGenerator() {
                     <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> مراجعة المخالفات التفصيلية قبل الاعتماد المالي.</p>
                 </div>
                 
-                {pendingAnomaliesCount > 0 && (
-                    <div className="flex flex-wrap gap-2 animate-in slide-in-from-left-4 duration-500">
+                <div className="flex flex-wrap gap-2 animate-in slide-in-from-left-4 duration-500">
+                    {pendingAnomaliesCount > 0 && (
                         <Badge variant="destructive" className="animate-pulse rounded-lg h-9 px-4 font-black gap-2">
                             <AlertCircle className="h-4 w-4" />
                             يوجد {pendingAnomaliesCount} مخالفة
                         </Badge>
-                        <div className="flex bg-muted/50 p-1 rounded-xl border shadow-inner no-print">
-                            <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => handleBulkAuditAction('waive')}
-                                disabled={isBulkProcessing}
-                                className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1"
-                            >
-                                {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3" />}
-                                تغاضي عن الكل
-                            </Button>
-                            <Separator orientation="vertical" className="h-4 mx-1 my-auto" />
-                            <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => handleBulkAuditAction('apply')}
-                                disabled={isBulkProcessing}
-                                className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1"
-                            >
-                                {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShieldAlert className="h-3 w-3" />}
-                                اعتماد الخصم للكل
-                            </Button>
+                    )}
+                    {(pendingAnomaliesCount > 0 || processedAnomaliesCount > 0) && (
+                        <div className="flex bg-muted/50 p-1 rounded-xl border shadow-inner no-print items-center">
+                            {pendingAnomaliesCount > 0 && (
+                                <>
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={() => handleBulkAuditAction('waive')}
+                                        disabled={isBulkProcessing}
+                                        className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1"
+                                    >
+                                        {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3" />}
+                                        تغاضي عن الكل
+                                    </Button>
+                                    <Separator orientation="vertical" className="h-4 mx-1 my-auto" />
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={() => handleBulkAuditAction('apply')}
+                                        disabled={isBulkProcessing}
+                                        className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1"
+                                    >
+                                        {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShieldAlert className="h-3 w-3" />}
+                                        اعتماد الخصم للكل
+                                    </Button>
+                                </>
+                            )}
+                            {processedAnomaliesCount > 0 && (
+                                <>
+                                    {pendingAnomaliesCount > 0 && <Separator orientation="vertical" className="h-4 mx-1 my-auto" />}
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={() => handleBulkAuditAction('reset')}
+                                        disabled={isBulkProcessing}
+                                        className="h-7 text-[10px] font-black text-gray-600 hover:bg-gray-200 rounded-lg gap-1"
+                                    >
+                                        {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3" />}
+                                        إعادة تعيين للتدقيق
+                                    </Button>
+                                </>
+                            )}
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {attLoading ? (
@@ -515,7 +562,7 @@ export function PayrollGenerator() {
                                             <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
                                             <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
                                         </div>
-                                    ) : <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير</Button>}</TableCell>
+                                    ) : <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}</TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
