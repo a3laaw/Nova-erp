@@ -397,12 +397,27 @@ export function AttendanceUploader() {
             }
 
             if (employeeRecords.length > 0) {
+                // حساب الملخص آلياً من السجلات
+                const presentDays = employeeRecords.filter(r => r.status === 'present').length;
+                const absentDays = employeeRecords.filter(r => r.status === 'absent').length;
+                const lateDays = employeeRecords.filter(r => r.status === 'late').length;
+                const halfDays = employeeRecords.filter(r => r.status === 'half_day').length;
+                const totalDeductionDays = employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0);
+
                 const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
                 batch.set(doc(firestore, 'attendance', docId), {
                     employeeId: emp.id,
                     year: selectedYearNum,
                     month: selectedMonthNum,
                     records: employeeRecords,
+                    summary: {
+                        presentDays,
+                        absentDays,
+                        lateDays,
+                        halfDays,
+                        totalDeductionDays,
+                        totalWorkingDays: employeeRecords.length
+                    },
                     updatedAt: serverTimestamp()
                 });
             }
