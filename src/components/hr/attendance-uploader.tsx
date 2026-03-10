@@ -117,7 +117,6 @@ export function AttendanceUploader() {
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mapping state
   const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
   const [isSavingData, setIsSavingData] = useState(false);
   const [mappingSearch, setMappingSearch] = useState('');

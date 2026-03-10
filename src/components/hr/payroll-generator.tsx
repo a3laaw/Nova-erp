@@ -88,6 +88,7 @@ export function PayrollGenerator() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
 
+            // ضمان أن السجل ينتمي فعلياً للشهر والسنة المختارين (تجنباً لقفز التواريخ)
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
 
             if (r.status !== 'present') {
