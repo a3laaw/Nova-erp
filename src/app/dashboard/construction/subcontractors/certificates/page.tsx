@@ -1,10 +1,8 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileCheck } from 'lucide-react';
-import SubcontractorCertificatesPageContent from '@/app/dashboard/construction/subcontractors/certificates/page';
-import { SubcontractorCertificatesList } from '@/components/construction/subcontractor-certificates-list'; // Assuming you have this or similar
+import { SubcontractorCertificatesList } from '@/components/construction/subcontractor-certificates-list';
 
 // Note: I'm refactoring the existing page structure to match the new frame
 export default function SubcontractorCertificatesPage() {
@@ -29,7 +27,6 @@ export default function SubcontractorCertificatesPage() {
         {/* The actual table and logic now inside the frame */}
         <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
             <CardContent className="pt-8">
-                {/* We re-use the logic but within the new card structure */}
                 <div className="p-0">
                     <SubcontractorCertificatesTableInternal />
                 </div>
@@ -49,7 +46,7 @@ import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { MoreHorizontal, Eye, Trash2, Loader2, Search, PlusCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';

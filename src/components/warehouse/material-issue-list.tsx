@@ -21,7 +21,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -161,6 +161,7 @@ export function MaterialIssueList({ filterType }: MaterialIssueListProps) {
                                                 <DropdownMenuItem onClick={() => router.push(issue.issueType === 'direct_sale' ? `/dashboard/sales/invoices/${issue.id}` : `/dashboard/warehouse/material-issue/${issue.id}`)}>
                                                     <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                                 </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem onClick={() => setItemToDelete(issue)} className="text-destructive">
                                                     <Trash2 className="ml-2 h-4 w-4" /> حذف
                                                 </DropdownMenuItem>

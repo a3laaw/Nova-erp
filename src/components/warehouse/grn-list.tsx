@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -22,7 +21,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { JournalEntry } from '@/lib/types';
@@ -149,6 +148,7 @@ export function GrnList() {
                                                 <DropdownMenuItem onClick={() => router.push(`/dashboard/warehouse/grns/${grn.id}`)}>
                                                     <Eye className="ml-2 h-4 w-4" /> عرض / طباعة
                                                 </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem onClick={() => setItemToDelete(grn)} className="text-destructive">
                                                     <Trash2 className="ml-2 h-4 w-4" /> حذف
                                                 </DropdownMenuItem>
