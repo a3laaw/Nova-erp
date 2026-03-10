@@ -35,11 +35,11 @@ import {
 } from '@/components/ui/table';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, setHours } from 'date-fns';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -118,17 +118,21 @@ export function AttendanceUploader() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Mapping state
-  const [editableNumbers, setEditableNumbers] = useState<Record<string, string>>({});
-  const [isSavingNumbers, setIsSavingNumbers] = useState(false);
+  const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
+  const [isSavingData, setIsSavingData] = useState(false);
   const [mappingSearch, setMappingSearch] = useState('');
 
   useEffect(() => {
     if (employees.length > 0) {
-        const numbers: Record<string, string> = {};
+        const data: Record<string, any> = {};
         employees.forEach(emp => {
-            numbers[emp.id!] = emp.employeeNumber || '';
+            data[emp.id!] = {
+                employeeNumber: emp.employeeNumber || '',
+                workStartTime: emp.workStartTime || '',
+                workEndTime: emp.workEndTime || ''
+            };
         });
-        setEditableNumbers(numbers);
+        setEditableData(data);
     }
   }, [employees]);
 
@@ -141,29 +145,41 @@ export function AttendanceUploader() {
     );
   }, [employees, mappingSearch]);
 
-  const handleSaveNumbers = async () => {
+  const handleSaveMappingData = async () => {
     if (!firestore) return;
-    setIsSavingNumbers(true);
+    setIsSavingData(true);
     try {
         const batch = writeBatch(firestore);
         let count = 0;
-        for (const id in editableNumbers) {
+        for (const id in editableData) {
             const original = employees.find(e => e.id === id);
-            if (original && original.employeeNumber !== editableNumbers[id]) {
-                batch.update(doc(firestore, 'employees', id), { employeeNumber: editableNumbers[id] });
+            const current = editableData[id];
+            
+            const hasChanged = original && (
+                original.employeeNumber !== current.employeeNumber || 
+                (original.workStartTime || '') !== current.workStartTime || 
+                (original.workEndTime || '') !== current.workEndTime
+            );
+
+            if (hasChanged) {
+                batch.update(doc(firestore, 'employees', id), { 
+                    employeeNumber: current.employeeNumber,
+                    workStartTime: current.workStartTime || null,
+                    workEndTime: current.workEndTime || null
+                });
                 count++;
             }
         }
         if (count > 0) {
             await batch.commit();
-            toast({ title: 'تم التحديث', description: `تم تحديث أرقام البصمة لـ ${count} موظف بنجاح.` });
+            toast({ title: 'تم التحديث بنجاح', description: `تم حفظ بيانات ${count} موظف بنجاح.` });
         } else {
-            toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي أرقام للحفظ.' });
+            toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات للحفظ.' });
         }
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات.' });
     } finally {
-        setIsSavingNumbers(false);
+        setIsSavingData(false);
     }
   };
 
@@ -331,7 +347,7 @@ export function AttendanceUploader() {
             </TabsTrigger>
             <TabsTrigger value="mapping" className="rounded-xl font-black gap-2">
                 <Fingerprint className="h-4 w-4" />
-                مطابقة أرقام البصمة
+                مطابقة البصمة والدوام
             </TabsTrigger>
         </TabsList>
 
@@ -381,7 +397,7 @@ export function AttendanceUploader() {
                 <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl">
                     <CardHeader>
                         <CardTitle className="font-black">رفع وتحليل ملف البصمة</CardTitle>
-                        <CardDescription>ارفع ملف الإكسل ليقوم النظام بمطابقته مع أيام العمل الرسمية وكشف فجوات الغياب.</CardDescription>
+                        <CardDescription>ارفع ملف الإكسل ليقوم النظام بمطابقته مع أيام العمل الرسمية وكشف فجوات الحضور.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
@@ -389,7 +405,7 @@ export function AttendanceUploader() {
                             <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
                             <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار ملف الإكسل"}</p>
                             <p className="text-xs text-muted-foreground mt-2 font-bold leading-relaxed">
-                                سيقوم النظام بمقارنة محتوى الملف مع التقويم الرسمي.<br/>
+                                سيقوم النظام بمقارنة محتوى الملف مع التقويم الرسمي والمطابقات المسجلة في التبويب الثاني.<br/>
                                 <span className="text-primary">أي موظف مفقود من الملف في يوم عمل سيُسجل "غائباً" آلياً.</span>
                             </p>
                         </div>
@@ -411,9 +427,9 @@ export function AttendanceUploader() {
                         <div className="space-y-1">
                             <CardTitle className="text-2xl font-black flex items-center gap-3">
                                 <Fingerprint className="text-primary h-7 w-7" />
-                                مطابقة أرقام البصمة للموظفين
+                                مطابقة البصمة وساعات الدوام
                             </CardTitle>
-                            <CardDescription>قم بتعديل الرقم الوظيفي ليتطابق مع "رقم المستخدم" الموجود في جهاز البصمة لديك.</CardDescription>
+                            <CardDescription>تحديد أرقام البصمة وساعات الدوام الخاصة لكل موظف (اترك ساعات الدوام فارغة للكامل).</CardDescription>
                         </div>
                         <div className="relative w-full md:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -427,57 +443,92 @@ export function AttendanceUploader() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="max-h-[500px] overflow-y-auto">
+                    <div className="max-h-[550px] overflow-y-auto">
                         <Table>
                             <TableHeader className="bg-muted/50 sticky top-0 z-10">
                                 <TableRow>
                                     <TableHead className="px-8 py-4 font-black">اسم الموظف</TableHead>
-                                    <TableHead className="font-black">القسم</TableHead>
-                                    <TableHead className="w-48 font-black">رقم البصمة (المعرف الخارجي)</TableHead>
+                                    <TableHead className="font-black">رقم البصمة</TableHead>
+                                    <TableHead className="font-black text-center">بداية الدوام</TableHead>
+                                    <TableHead className="font-black text-center">نهاية الدوام</TableHead>
                                     <TableHead className="w-32 text-center font-black">الحالة</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {employeesLoading ? (
                                     Array.from({length: 5}).map((_, i) => (
-                                        <TableRow key={i}><TableCell colSpan={4} className="p-4"><Skeleton className="h-10 w-full rounded-lg"/></TableCell></TableRow>
+                                        <TableRow key={i}><TableCell colSpan={5} className="p-4"><Skeleton className="h-10 w-full rounded-lg"/></TableCell></TableRow>
                                     ))
                                 ) : filteredEmployees.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic">لا توجد سجلات للموظفين.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">لا توجد سجلات للموظفين.</TableCell></TableRow>
                                 ) : (
-                                    filteredEmployees.map((emp) => (
-                                        <TableRow key={emp.id} className="hover:bg-muted/30">
-                                            <TableCell className="px-8 font-bold">{emp.fullName}</TableCell>
-                                            <TableCell className="text-xs text-muted-foreground font-medium">{emp.department}</TableCell>
-                                            <TableCell>
-                                                <Input 
-                                                    value={editableNumbers[emp.id!] || ''} 
-                                                    onChange={(e) => setEditableNumbers(prev => ({...prev, [emp.id!]: e.target.value}))}
-                                                    className="font-mono h-9 rounded-lg border-2 focus:border-primary"
-                                                    placeholder="أدخل الرقم..."
-                                                />
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                {emp.employeeNumber === editableNumbers[emp.id!] ? (
-                                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100 text-[9px] font-black">
-                                                        <UserCheck className="h-2.5 w-2.5 ml-1"/> متوافق
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-100 text-[9px] font-black animate-pulse">
-                                                        بانتظار الحفظ
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                    filteredEmployees.map((emp) => {
+                                        const current = editableData[emp.id!] || { employeeNumber: '', workStartTime: '', workEndTime: '' };
+                                        const isChanged = emp.employeeNumber !== current.employeeNumber || (emp.workStartTime || '') !== current.workStartTime || (emp.workEndTime || '') !== current.workEndTime;
+                                        const isFullTime = !current.workStartTime && !current.workEndTime;
+
+                                        return (
+                                            <TableRow key={emp.id} className={cn("hover:bg-muted/30 transition-colors h-16", isFullTime ? "bg-white" : "bg-sky-50/20")}>
+                                                <TableCell className="px-8">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold">{emp.fullName}</span>
+                                                        <span className="text-[9px] text-muted-foreground font-bold">{emp.department}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input 
+                                                        value={current.employeeNumber} 
+                                                        onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, employeeNumber: e.target.value }}))}
+                                                        className="font-mono h-9 rounded-lg border-2 w-28 text-center"
+                                                        placeholder="000"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input 
+                                                        type="time"
+                                                        value={current.workStartTime} 
+                                                        onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workStartTime: e.target.value }}))}
+                                                        className="font-mono h-9 rounded-lg border-2 w-32 mx-auto text-center"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Input 
+                                                        type="time"
+                                                        value={current.workEndTime} 
+                                                        onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workEndTime: e.target.value }}))}
+                                                        className="font-mono h-9 rounded-lg border-2 w-32 mx-auto text-center"
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-center">
+                                                    {isChanged ? (
+                                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-100 text-[9px] font-black animate-pulse">
+                                                            بانتظار الحفظ
+                                                        </Badge>
+                                                    ) : isFullTime ? (
+                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100 text-[9px] font-black">
+                                                            كامل (رسمي)
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 text-[9px] font-black">
+                                                            جزئي (مخصص)
+                                                        </Badge>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
                     </div>
                 </CardContent>
                 <CardFooter className="justify-end border-t p-6 bg-muted/10">
-                    <Button onClick={handleSaveNumbers} disabled={isSavingNumbers} className="h-12 px-10 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
-                        {isSavingNumbers ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>}
+                    <div className="flex-1 text-xs text-muted-foreground font-medium pr-4">
+                        <Info className="h-3 w-3 inline ml-1" />
+                        اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.
+                    </div>
+                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-10 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
+                        {isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>}
                         حفظ كافة التغييرات
                     </Button>
                 </CardFooter>
@@ -486,3 +537,5 @@ export function AttendanceUploader() {
     </Tabs>
   );
 }
+
+import { Info } from 'lucide-react';
