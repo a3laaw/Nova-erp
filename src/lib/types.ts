@@ -251,7 +251,7 @@ export interface Department extends BaseEntity { name: string; order?: number; a
 export interface Governorate extends BaseEntity { name: string; order?: number; }
 export interface Area extends BaseEntity { name: string; order?: number; }
 export interface TransactionType extends BaseEntity { name: string; order?: number; activityType?: string; departmentIds?: string[]; }
-export interface Company extends BaseEntity { name: string; crNumber?: string; activityType?: string; }
+export interface Company extends BaseEntity { name: string; nameEn?: string; phone?: string; email?: string; crNumber?: string; parentCompanyId?: string | null; activityType?: string; address?: string; licenseExpiryDate?: any; adLicenseExpiryDate?: any; isActive?: boolean; }
 export interface ConstructionType extends BaseEntity { name: string; }
 export interface WorkStage extends BaseEntity { name: string; order?: number; stageType: 'sequential' | 'parallel'; trackingType: 'duration' | 'occurrence' | 'none'; expectedDurationDays?: number | null; maxOccurrences?: number | null; allowedRoles?: string[]; allowedDuringStages?: string[]; nextStageIds?: string[]; enableModificationTracking?: boolean; }
 export interface PermissionRequest extends BaseEntity { employeeId: string; employeeName: string; type: 'late_arrival' | 'early_departure'; date: any; reason: string; status: 'pending' | 'approved' | 'rejected'; approvedBy?: string; approvedAt?: any; rejectionReason?: string; }
