@@ -23,12 +23,16 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, Save, DownloadCloud } from 'lucide-react';
+import { Loader2, FileSpreadsheet, Save, DownloadCloud, AlertCircle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { parse, format, isValid, startOfDay } from 'date-fns';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 
+/**
+ * دالة تحليل التاريخ والوقت المطور:
+ * تدعم التواريخ الفردية مثل (1-2-2026) والمركبة (01-02-2026)
+ */
 const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     let dateObj: Date | null = null;
@@ -52,7 +56,14 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
         const parts = cleaned.split(/\s+/);
         const datePart = parts[0];
         const timePart = parts[1] || "";
-        const dateFormats = ['dd-MM-yy', 'dd-MM-yyyy', 'dd/MM/yyyy', 'yyyy-MM-dd', 'M/d/yy', 'MM/dd/yyyy'];
+        
+        // قائمة شاملة من التنسيقات لضمان قراءة ملفات الإكسل المختلفة
+        const dateFormats = [
+            'd-M-yyyy', 'dd-MM-yyyy', 'd-MM-yyyy', 'dd-M-yyyy',
+            'd/M/yyyy', 'dd/MM/yyyy', 'd/MM/yyyy', 'dd/M/yyyy',
+            'yyyy-MM-dd', 'dd-MM-yy', 'M/d/yy'
+        ];
+
         for (const fmt of dateFormats) {
             const parsedDate = parse(datePart, fmt, new Date());
             if (isValid(parsedDate)) {
@@ -60,10 +71,19 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
                 break;
             }
         }
+
         if (dateObj) {
-            if (timePart) timeStr = timePart.substring(0, 5);
+            if (timePart) {
+                // استخراج الوقت بشكل آمن (أول 5 خانات مثل 08:30)
+                timeStr = timePart.substring(0, 5).replace(/[^0-9:]/g, '');
+            } else {
+                // إذا كان الوقت في خانة التاريخ المدمجة كما في بعض ملفات CSV
+                const dateTimeMatch = cleaned.match(/(\d{1,2}:\d{2})/);
+                if (dateTimeMatch) timeStr = dateTimeMatch[1];
+            }
             return { date: dateObj, timeStr };
         }
+        
         const native = new Date(cleaned);
         if (isValid(native)) return { date: startOfDay(native), timeStr: format(native, 'HH:mm') };
     }
@@ -101,8 +121,15 @@ export function AttendanceUploader() {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        
+        if (json.length === 0) {
+            throw new Error("الملف فارغ أو لا يحتوي على بيانات صالحة.");
+        }
+
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         const punchesMap = new Map<string, { date: Date, employeeId: string, times: string[] }>();
+
+        let recordsFromOtherMonths = 0;
 
         json.forEach(row => {
             const empNo = String(row['الرقم الوظيفي'] || row['ID'] || row['رقم الموظف'] || row[Object.keys(row)[0]] || '');
@@ -110,17 +137,38 @@ export function AttendanceUploader() {
             if (!emp?.id) return;
 
             let parsed = null;
+            // البحث عن التاريخ والوقت في كافة أعمدة السطر لضمان المرونة
             for (const key in row) {
                 parsed = parseSmartDateTime(row[key]);
                 if (parsed) break;
             }
-            if (!parsed || parsed.date.getFullYear() !== selectedYearNum || (parsed.date.getMonth() + 1) !== selectedMonthNum) return;
+
+            if (!parsed) return;
+
+            // الرقابة الصارمة: التحقق من مطابقة الشهر والسنة
+            const isSamePeriod = parsed.date.getFullYear() === selectedYearNum && (parsed.date.getMonth() + 1) === selectedMonthNum;
+            
+            if (!isSamePeriod) {
+                recordsFromOtherMonths++;
+                return;
+            }
 
             const dateKey = `${emp.id}_${parsed.date.getTime()}`;
             const existing = punchesMap.get(dateKey) || { date: parsed.date, employeeId: emp.id, times: [] };
             if (parsed.timeStr && !existing.times.includes(parsed.timeStr)) existing.times.push(parsed.timeStr);
             punchesMap.set(dateKey, existing);
         });
+
+        // إذا كان الملف لا يحتوي على أي سجل يطابق الشهر المختار
+        if (punchesMap.size === 0 && json.length > 0) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'خطأ في مطابقة البيانات', 
+                description: `تم العثور على ${recordsFromOtherMonths} سجلات لشهور أخرى، ولكن لا توجد أي بصمة تطابق شهر ${selectedMonthNum} وسنة ${selectedYearNum}. يرجى مراجعة محتوى الملف المرفوع.` 
+            });
+            setIsProcessing(false);
+            return;
+        }
 
         const batch = writeBatch(firestore);
         const groupedUpdates = new Map<string, AttendanceRecord[]>();
@@ -193,10 +241,10 @@ export function AttendanceUploader() {
         }
 
         await batch.commit();
-        toast({ title: 'نجاح الاستيراد', description: `تم تحليل بيانات ${punchesMap.size} بصمة موظف.` });
+        toast({ title: 'نجاح الاستيراد', description: `تم تحليل بيانات ${punchesMap.size} بصمة موظف بنجاح.` });
         setFile(null);
       } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ', description: error.message });
+        toast({ variant: 'destructive', title: 'خطأ في المعالجة', description: error.message });
       } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
@@ -215,7 +263,7 @@ export function AttendanceUploader() {
                     </Select>
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-bold">الشهر</Label>
+                    <Label className="font-bold">الشهر المطلوب</Label>
                     <Select value={month} onValueChange={setMonth}>
                         <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                         <SelectContent>{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
@@ -226,20 +274,20 @@ export function AttendanceUploader() {
         <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl">
             <CardHeader>
                 <CardTitle className="font-black">رفع ملف البصمة (Excel)</CardTitle>
-                <CardDescription>ارفع ملف الحضور والغياب بصيغة Excel لتحليله ورصد المخالفات.</CardDescription>
+                <CardDescription>ارفع ملف الحضور والغياب بصيغة Excel. سيقوم النظام بمطابقة تواريخ الملف مع الشهر المختار أعلاه.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
                     <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls" />
                     <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
                     <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار الملف"}</p>
-                    <p className="text-xs text-muted-foreground mt-2">يدعم تنسيق: التاريخ والوقت في خانة واحدة</p>
+                    <p className="text-xs text-muted-foreground mt-2 font-bold">تنبيه: يجب أن يحتوي الملف على عمود "الرقم الوظيفي" و "التاريخ والوقت"</p>
                 </div>
             </CardContent>
             <CardFooter className="justify-end border-t p-6">
                 <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20">
                     {isProcessing ? <Loader2 className="animate-spin ml-2"/> : <Save className="ml-2"/>} 
-                    معالجة وتدقيق البيانات
+                    بدء المعالجة والتدقيق
                 </Button>
             </CardFooter>
         </Card>
