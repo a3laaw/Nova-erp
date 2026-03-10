@@ -32,6 +32,7 @@ export function PayrollGenerator() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingSummary, setIsExportingSummary] = useState(false);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
@@ -103,7 +104,7 @@ export function PayrollGenerator() {
         });
     });
     
-    return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(b.record.date)?.getTime() || 0));
+    return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(a.record.date)?.getTime() || 0));
   }, [attendanceDocs, employees, month, year]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
@@ -220,18 +221,13 @@ export function PayrollGenerator() {
     return h * 60 + m;
   };
 
-  const handleExportExcel = () => {
-    if (!attendanceDocs || attendanceDocs.length === 0) {
-      toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
-      return;
-    }
-
-    const summaryRows: any[] = [];
+  const summaryData = useMemo(() => {
+    if (!attendanceDocs || attendanceDocs.length === 0) return [];
+    
     const globalWorkHours = branding?.work_hours?.general;
-
-    employees.forEach(emp => {
+    return employees.map(emp => {
       const att = attendanceDocs.find(a => a.employeeId === emp.id);
-      if (!att) return;
+      if (!att) return null;
 
       let totalAbsent = 0;
       let totalLate = 0;
@@ -269,33 +265,70 @@ export function PayrollGenerator() {
       const lateHours = Math.floor(totalLateMinutes / 60);
       const lateMins = totalLateMinutes % 60;
 
-      summaryRows.push({
-        'رقم الموظف': emp.employeeNumber || '',
-        'اسم الموظف': emp.fullName || '',
-        'الراتب الكامل': fullSalary,
-        'أيام الغياب': totalAbsent,
-        'عدد مرات التأخير': totalLate,
-        'إجمالي ساعات التأخير': `${lateHours}:${String(lateMins).padStart(2, '0')}`,
-        'إجمالي دقائق التأخير': totalLateMinutes,
-        'أيام نصف يوم': totalHalfDay,
-        'إجمالي أيام الخصم': totalDeductionDays,
-        'المعدل اليومي': Math.round(dailyRate * 1000) / 1000,
-        'إجمالي الخصم (KD)': Math.round(deductionAmount * 1000) / 1000,
-        'صافي الراتب المتوقع': Math.round((fullSalary - deductionAmount) * 1000) / 1000,
-      });
-    });
+      return {
+        empNo: emp.employeeNumber || '',
+        name: emp.fullName || '',
+        fullSalary,
+        absent: totalAbsent,
+        lateCount: totalLate,
+        lateTime: `${lateHours}:${String(lateMins).padStart(2, '0')}`,
+        lateMins: totalLateMinutes,
+        halfDays: totalHalfDay,
+        deductionDays: totalDeductionDays,
+        dailyRate,
+        deductionAmount,
+        netSalary: fullSalary - deductionAmount
+      };
+    }).filter(Boolean);
+  }, [employees, attendanceDocs, branding]);
 
-    const ws = XLSX.utils.json_to_sheet(summaryRows);
+  const handleExportExcel = () => {
+    if (summaryData.length === 0) {
+      toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
+      return;
+    }
+
+    const excelRows = summaryData.map(s => ({
+        'رقم الموظف': s!.empNo,
+        'اسم الموظف': s!.name,
+        'الراتب الكامل': s!.fullSalary,
+        'أيام الغياب': s!.absent,
+        'عدد مرات التأخير': s!.lateCount,
+        'إجمالي ساعات التأخير': s!.lateTime,
+        'إجمالي دقائق التأخير': s!.lateMins,
+        'أيام نصف يوم': s!.halfDays,
+        'إجمالي أيام الخصم': s!.deductionDays,
+        'المعدل اليومي': Math.round(s!.dailyRate * 1000) / 1000,
+        'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
+        'صافي الراتب المتوقع': Math.round(s!.netSalary * 1000) / 1000,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(excelRows);
     const wb = XLSX.utils.book_new();
-
-    ws['!cols'] = [
-      { wch: 12 }, { wch: 25 }, { wch: 15 }, { wch: 12 },
-      { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, 
-      { wch: 16 }, { wch: 15 }, { wch: 18 }, { wch: 18 }
-    ];
-
     XLSX.utils.book_append_sheet(wb, ws, `حضور ${month}-${year}`);
     XLSX.writeFile(wb, `تقرير_الحضور_${month}_${year}.xlsx`);
+  };
+
+  const handleExportSummaryPDF = () => {
+    const element = document.getElementById('summary-printable-area');
+    if (!element) return;
+
+    setIsExportingSummary(true);
+    const opt = {
+      margin: [0.5, 0.5],
+      filename: `ملخص_رواتب_${month}_${year}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+    };
+
+    import('html2pdf.js').then(module => {
+      const html2pdf = module.default;
+      html2pdf().from(element).set(opt).save().then(() => {
+        setIsExportingSummary(false);
+        toast({ title: 'نجاح التصدير', description: 'تم إنشاء ملخص الرواتب PDF بنجاح.' });
+      });
+    });
   };
 
   const handleExportPDF = () => {
@@ -303,7 +336,6 @@ export function PayrollGenerator() {
     if (!element) return;
 
     setIsExportingPDF(true);
-    
     const opt = {
       margin: [0.5, 0.5],
       filename: `تقرير_مخالفات_الحضور_${month}_${year}.pdf`,
@@ -333,11 +365,14 @@ export function PayrollGenerator() {
             </div>
             <div className="flex flex-wrap gap-3">
                 <Button variant="outline" onClick={handleExportExcel} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
-                <Button variant="outline" onClick={handleExportPDF} disabled={isExportingPDF} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
-                    {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
-                    تصدير PDF
+                <Button variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
+                    {isExportingSummary ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
+                    تصدير PDF (ملخص)
                 </Button>
-                <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة</Button>
+                <Button variant="outline" onClick={handleExportPDF} disabled={isExportingPDF} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
+                    {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldAlert className="h-4 w-4"/>} 
+                    تقرير المخالفات PDF
+                </Button>
                 <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
                     {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
@@ -345,6 +380,62 @@ export function PayrollGenerator() {
             </div>
         </div>
 
+        {/* --- ملخص الرواتب المختصر (للطباعة) --- */}
+        <div id="summary-printable-area" className="hidden print:block border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
+            <div className="p-8 border-b-4 border-primary bg-muted/10">
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                        <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                        <div>
+                            <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
+                            <p className="text-sm font-bold text-muted-foreground">ملخص مستحقات الموظفين الشهرية</p>
+                        </div>
+                    </div>
+                    <div className="text-left">
+                        <h2 className="text-xl font-black text-primary">شهر {monthName} {year}</h2>
+                        <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
+                    </div>
+                </div>
+            </div>
+            <Table>
+                <TableHeader className="bg-muted/50">
+                    <TableRow>
+                        <TableHead className="px-6 font-black">الموظف</TableHead>
+                        <TableHead className="font-black text-center">الراتب الكامل</TableHead>
+                        <TableHead className="font-black text-center">الغياب</TableHead>
+                        <TableHead className="font-black text-center">التأخير (د)</TableHead>
+                        <TableHead className="font-black text-center">خصم (أيام)</TableHead>
+                        <TableHead className="text-left font-black">إجمالي الخصم</TableHead>
+                        <TableHead className="text-left font-black bg-primary/5 text-primary">صافي المستحق</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {summaryData.map((s, idx) => (
+                        <TableRow key={idx} className="h-14">
+                            <TableCell className="px-6 font-bold">{s?.name}</TableCell>
+                            <TableCell className="text-center font-mono">{formatCurrency(s?.fullSalary || 0)}</TableCell>
+                            <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
+                            <TableCell className="text-center font-mono">{s?.lateMins} د</TableCell>
+                            <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
+                            <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
+                            <TableCell className="text-left font-mono font-black text-primary bg-primary/5">{formatCurrency(s?.netSalary || 0)}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+                <TableFooter className="bg-muted/20 font-black h-16">
+                    <TableRow>
+                        <TableCell colSpan={6} className="text-right px-10">إجمالي الرواتب الصافية للصرف:</TableCell>
+                        <TableCell className="text-left font-mono text-xl">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
+                    </TableRow>
+                </TableFooter>
+            </Table>
+            <div className="p-12 grid grid-cols-2 gap-20 text-center">
+                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">التوقيع والتاريخ</div></div>
+                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">الختم والموافقة</div></div>
+            </div>
+        </div>
+
+        {/* --- مركز التدقيق التفصيلي (الوضع الحالي) --- */}
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 gap-4">
                 <div className="space-y-1">
@@ -352,7 +443,7 @@ export function PayrollGenerator() {
                         <ShieldCheck className="text-primary h-8 w-8"/> 
                         مركز تدقيق الحضور والمخالفات
                     </h3>
-                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> مراجعة المخالفات لشهر {month} سنة {year}.</p>
+                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> مراجعة المخالفات التفصيلية قبل الاعتماد المالي.</p>
                 </div>
                 
                 {pendingAnomaliesCount > 0 && (
@@ -391,37 +482,20 @@ export function PayrollGenerator() {
             {attLoading ? (
                 <div className="p-32 text-center"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /><p className="mt-4 font-bold text-muted-foreground">جاري فحص سجلات الحضور...</p></div>
             ) : attendanceDocs.length === 0 ? (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50"><CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" /><p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p><p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى رفع ملف البصمة أولاً من تبويب "رفع الحضور والانصراف".</p></div>
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50"><CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" /><p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p></div>
             ) : anomalies.length === 0 ? (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100"><CheckCircle className="h-24 w-24 text-green-600/20 mx-auto mb-6" /><p className="text-3xl font-black text-green-800">التزام كامل! لا توجد مخالفات</p><p className="text-lg font-medium text-green-700/60 mt-3">كافة الموظفين ملتزمون بالبصمة في كافة أيام العمل الرسمية لهذا الشهر.</p></div>
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100"><CheckCircle className="h-24 w-24 text-green-600/20 mx-auto mb-6" /><p className="text-3xl font-black text-green-800">التزام كامل! لا توجد مخالفات</p></div>
             ) : (
                 <div id="audit-printable-area" className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
-                    {/* Header only for PDF/Print */}
-                    <div className="hidden print:block p-8 border-b-4 border-primary bg-muted/10">
-                        <div className="flex justify-between items-start">
-                            <div className="flex items-center gap-4">
-                                <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                <div>
-                                    <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                                    <p className="text-sm font-bold text-muted-foreground">تقرير مخالفات حضور الموظفين</p>
-                                </div>
-                            </div>
-                            <div className="text-left">
-                                <h2 className="text-xl font-black text-primary">فترة التقرير: {monthName} {year}</h2>
-                                <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <Table>
                         <TableHeader className="bg-muted/50 h-16">
                             <TableRow className="border-none">
                                 <TableHead className="px-8 font-black text-[#7209B7]">الموظف</TableHead>
                                 <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">الحالة / المخالفة</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">سجل البصمات (Punches)</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">الخصم المستحق</TableHead>
-                                <TableHead className="text-center no-print font-black text-[#7209B7]">القرار الإداري</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
+                                <TableHead className="text-center no-print font-black text-[#7209B7]">القرار</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -429,49 +503,22 @@ export function PayrollGenerator() {
                                 const isAbsent = item.record.status === 'absent';
                                 const recordDate = toFirestoreDate(item.record.date);
                                 return (
-                                <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-lg text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
-                                    <TableCell className="font-bold text-sm text-gray-600">{recordDate ? format(recordDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</TableCell>
-                                    <TableCell><div className="flex flex-col gap-1.5"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[9px] font-black uppercase tracking-wider px-3", isAbsent && "bg-red-600 animate-pulse")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير صباحي'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
-                                    <TableCell>{isAbsent ? <div className="flex items-center gap-2 text-red-400 opacity-40"><Ban className="h-4 w-4"/> <span className="text-xs font-bold">لا يوجد سجل</span></div> : <div className="flex flex-wrap gap-1.5 max-w-[180px]">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm border-primary/20">{p}</Badge>)}</div>}</TableCell>
-                                    <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span>{item.record.auditStatus === 'waived' && <span className="text-[9px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5"/> تم التغاضي</span>}</div></TableCell>
+                                <TableRow key={idx} className={cn("h-20 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
+                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                    <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
+                                    <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
+                                    <TableCell>{isAbsent ? <Ban className="h-4 w-4 text-red-200" /> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-4 bg-background">{p}</Badge>)}</div>}</TableCell>
+                                    <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
                                     <TableCell className="text-center no-print">{item.record.auditStatus === 'pending' ? (
                                         <div className="flex justify-center gap-2">
-                                            <Button 
-                                                size="sm" 
-                                                variant="outline" 
-                                                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-600 hover:text-white rounded-xl font-black h-10 px-5 transition-all shadow-sm" 
-                                                onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}
-                                            >
-                                                <Check className="ml-1 h-4 w-4" /> تغاضي
-                                            </Button>
-                                            <Button 
-                                                size="sm" 
-                                                className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-black h-10 px-5 transition-all shadow-md shadow-red-100" 
-                                                onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}
-                                            >
-                                                <X className="ml-1 h-4 w-4" /> خصم
-                                            </Button>
+                                            <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
                                         </div>
-                                    ) : (
-                                        <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} className="text-muted-foreground h-10 rounded-xl gap-2 font-black hover:bg-muted/50"><History className="h-4 w-4" /> تغيير القرار</Button>
-                                    )}</TableCell>
+                                    ) : <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير</Button>}</TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
                     </Table>
-                    
-                    {/* Footer only for PDF/Print */}
-                    <div className="hidden print:grid grid-cols-2 gap-20 p-12 text-center mt-10">
-                        <div className="space-y-12">
-                            <p className="font-black border-b-2 border-slate-900 pb-2">قسم شؤون الموظفين</p>
-                            <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">التوقيع والتاريخ</div>
-                        </div>
-                        <div className="space-y-12">
-                            <p className="font-black border-b-2 border-slate-900 pb-2">الاعتماد الإداري</p>
-                            <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">الختم والموافقة</div>
-                        </div>
-                    </div>
                 </div>
             )}
         </div>
