@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -37,7 +38,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
@@ -199,7 +200,9 @@ export function AttendanceUploader() {
         
         if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
-        const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
+        // 🛡️ حماية: استبعاد الموظفين الذين ليس لديهم رقم بصمة معرف لضمان عدم تداخل "الأشباح"
+        const validEmployees = employees.filter(emp => emp.employeeNumber && emp.employeeNumber.trim() !== '');
+        const employeeMap = new Map(validEmployees.map(emp => [String(emp.employeeNumber), emp]));
         const excelPunches = new Map<string, Set<string>>(); 
         let totalPunchesCount = 0;
 
@@ -208,7 +211,8 @@ export function AttendanceUploader() {
             let empNo = '';
             for(let k=0; k<Math.min(keys.length, 15); k++) {
                 const val = String(row[keys[k]] || '').trim();
-                if (employeeMap.has(val)) { empNo = val; break; }
+                // 🛡️ فحص صارم: القيمة يجب ألا تكون فارغة ويجب أن تكون موجودة في خريطة الموظفين
+                if (val && employeeMap.has(val)) { empNo = val; break; }
             }
             
             const emp = employeeMap.get(empNo);
@@ -232,6 +236,11 @@ export function AttendanceUploader() {
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
         
         const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
+        
+        // 🛡️ كشف يوم السبت (أو أي يوم نصف دوام) لتعطيل قاعدة الخصم المزدوج فيه
+        const halfDaySettings = branding?.work_hours?.half_day;
+        const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
+
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
@@ -252,10 +261,13 @@ export function AttendanceUploader() {
 
         let autoAbsencesCount = 0;
 
-        for (const emp of employees) {
+        for (const emp of validEmployees) {
             const employeeRecords: AttendanceRecord[] = [];
             
             for (const day of workingDaysInMonth) {
+                const dayIdx = getDay(day);
+                const isSystemHalfDay = dayIdx === halfDayIndex;
+                
                 const stableDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
                 const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
@@ -274,8 +286,8 @@ export function AttendanceUploader() {
                         anomaly = `تأخير عن الموعد (${startTimeLimit})`;
                     }
 
-                    // 🛡️ منطق حماية الموظف المخصص من قاعدة "نصف اليوم"
-                    if (!isCustomShift) {
+                    // 🛡️ تعديل جوهري: إذا كان اليوم هو "نصف دوام رسمي" لا تطبق قاعدة الخصم المزدوج
+                    if (!isCustomShift && !isSystemHalfDay) {
                         const hasMorning = sortedTimes.some(t => t <= mEnd);
                         const hasEvening = sortedTimes.some(t => t >= eStart);
 
@@ -291,8 +303,14 @@ export function AttendanceUploader() {
                             status = 'missing_punch';
                             anomaly = 'بصمة ناقصة (دخول وخروج مطلوب)';
                         }
+                    } else if (isSystemHalfDay) {
+                        // في يوم نصف الدوام (مثل السبت)، نكتفي ببصمة واحدة أو اثنتين دون خصم "نصف يوم"
+                        if (sortedTimes.length < 2) {
+                            status = 'missing_punch';
+                            anomaly = 'بصمة ناقصة ليوم السبت';
+                        }
                     } else {
-                        // للموظف المخصص: نكتفي بالتأكد من وجود بصمتين على الأقل (بداية ونهاية)
+                        // للموظف المخصص (Shift):
                         if (sortedTimes.length < 2) {
                             status = 'missing_punch';
                             anomaly = anomaly ? `${anomaly} + بصمة واحدة فقط` : 'بصمة ناقصة (تحتاج دخول وخروج)';
@@ -309,7 +327,7 @@ export function AttendanceUploader() {
                         status,
                         anomalyDescription: anomaly,
                         manualDeductionDays: manualDeduction,
-                        auditStatus: status === 'present' ? 'verified' : 'pending'
+                        auditStatus: (status === 'present' || (isSystemHalfDay && status !== 'absent')) ? 'verified' : 'pending'
                     });
                 } else {
                     autoAbsencesCount++;
@@ -340,7 +358,7 @@ export function AttendanceUploader() {
 
         await batch.commit();
         setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب آلياً.` });
+        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب آلياً مع احترام أيام السبت.` });
         setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
@@ -548,5 +566,3 @@ export function AttendanceUploader() {
     </Tabs>
   );
 }
-
-import { Info } from 'lucide-react';
