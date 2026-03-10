@@ -47,7 +47,11 @@ export function PayrollGenerator() {
             }
         });
     });
-    return list.sort((a, b) => toFirestoreDate(a.record.date)!.getTime() - toFirestoreDate(b.record.date)!.getTime());
+    return list.sort((a, b) => {
+        const dateA = toFirestoreDate(a.record.date);
+        const dateB = toFirestoreDate(b.record.date);
+        return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
+    });
   }, [attendanceDocs, employees]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
@@ -183,7 +187,7 @@ export function PayrollGenerator() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-wrap gap-1.5 max-w-[180px]">
-                                            {item.record.allPunches.map((p, i) => (
+                                            {(item.record.allPunches || []).map((p, i) => (
                                                 <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm">{p}</Badge>
                                             ))}
                                         </div>
