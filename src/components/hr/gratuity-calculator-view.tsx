@@ -63,6 +63,7 @@ export function GratuityCalculatorView() {
   const [noticeStartDate, setNoticeStartDate] = useState<Date | undefined>(new Date());
   const [result, setResult] = useState<GratuityResult | null>(null);
 
+  // جلب كافة الموظفين (نشطين ومنتهيين) لتمكين المحاسب من حساب تسوية أي موظف
   const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
 
   useEffect(() => {
@@ -73,7 +74,13 @@ export function GratuityCalculatorView() {
   }, [searchParams]);
 
   const employeeOptions = useMemo(() => {
-    return (employees || []).map(e => ({ value: e.id!, label: e.fullName, searchKey: e.employeeNumber }));
+    return (employees || []).map(e => ({ 
+      value: e.id!, 
+      label: e.status === 'terminated' 
+        ? `${e.fullName} (منتهية خدمته)` 
+        : e.fullName, 
+      searchKey: e.employeeNumber 
+    }));
   }, [employees]);
 
   const selectedEmployee = useMemo(() => {
