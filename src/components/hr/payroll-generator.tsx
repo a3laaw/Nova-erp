@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
@@ -27,14 +27,48 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
-  
-  const attendanceQuery = useMemo(() => [
-    where('year', '==', parseInt(year)),
-    where('month', '==', parseInt(month))
-  ], [year, month]);
-  
-  const { data: attendanceDocs, loading: attLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery);
+  // جلب الموظفين (نحتفظ بالاشتراك للموظفين لأنهم الأساس)
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchEmployees = async () => {
+        setEmployeesLoading(true);
+        try {
+            const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+            const snap = await getDocs(q);
+            setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
+        } finally {
+            setEmployeesLoading(false);
+        }
+    };
+    fetchEmployees();
+  }, [firestore]);
+
+  // جلب سجلات الحضور يدوياً عند تغيير الفلتر
+  const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchAttendance = async () => {
+      setAttLoading(true);
+      try {
+        const snap = await getDocs(query(
+          collection(firestore, 'attendance'),
+          where('year', '==', parseInt(year)),
+          where('month', '==', parseInt(month))
+        ));
+        setAttendanceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance)));
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setAttLoading(false);
+      }
+    };
+    fetchAttendance();
+  }, [firestore, year, month]);
 
   // ✨ مركز تدقيق المخالفات المطور: فلترة صارمة حسب الشهر والسنة لضمان عدم تداخل البيانات
   const anomalies = useMemo(() => {
@@ -93,6 +127,10 @@ export function PayrollGenerator() {
         });
         
         await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
+        
+        // تحديث الحالة محلياً لسرعة الاستجابة
+        setAttendanceDocs(prev => prev.map(doc => doc.id === docId ? { ...doc, records } : doc));
+        
         toast({ title: 'تم الحفظ', description: 'تم تحديث حالة المخالفة.' });
     } catch (e) { 
         toast({ variant: 'destructive', title: 'خطأ في التحديث' }); 
@@ -144,7 +182,7 @@ export function PayrollGenerator() {
             </div>
             <div className="flex gap-3">
                 <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
-                <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
+                <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
                     {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
                 </Button>
