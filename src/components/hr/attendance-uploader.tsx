@@ -278,6 +278,7 @@ export function AttendanceUploader() {
                 const punches = excelPunches.get(dateKey);
 
                 // فحص الإجازات والاستئذانات لهذا اليوم
+                // تشمل كافة الأنواع: سنوية، مرضية، طارئة، بدون أجر
                 const activeLeave = approvedLeaves.find(l => 
                     l.employeeId === emp.id && 
                     stableDay >= toFirestoreDate(l.startDate)! && 
@@ -348,7 +349,7 @@ export function AttendanceUploader() {
                         auditStatus
                     });
                 } else {
-                    // لم توجد بصمة: فحص ما إذا كان في إجازة
+                    // لم توجد بصمة: فحص ما إذا كان في إجازة (سنوية، طارئة، مرضية، إلخ)
                     if (activeLeave) {
                         coveredByPolicyCount++;
                         employeeRecords.push({
