@@ -249,6 +249,7 @@ export function AttendanceUploader() {
         const batch = writeBatch(firestore);
 
         if (clearPrevious) {
+            // وضع الاستبدال الكامل: امسح كل شيء قديم
             const existingQuery = query(
                 collection(firestore, 'attendance'),
                 where('year', '==', selectedYearNum),
@@ -256,6 +257,31 @@ export function AttendanceUploader() {
             );
             const existingSnap = await getDocs(existingQuery);
             existingSnap.forEach(d => batch.delete(d.ref));
+        } else {
+            // وضع الدمج التكميلي: اقرأ البصمات القديمة وادمجها مع الجديدة
+            const existingQuery = query(
+                collection(firestore, 'attendance'),
+                where('year', '==', selectedYearNum),
+                where('month', '==', selectedMonthNum)
+            );
+            const existingSnap = await getDocs(existingQuery);
+            existingSnap.forEach(existingDoc => {
+                const existingData = existingDoc.data();
+                const empId = existingData.employeeId;
+                // لكل سجل قديم فيه بصمات حقيقية، أضفها للخريطة الجديدة
+                (existingData.records || []).forEach((r: any) => {
+                    if (r.allPunches && r.allPunches.length > 0) {
+                        const dateObj = r.date?.toDate ? r.date.toDate() : new Date(r.date);
+                        const dateKey = `${empId}_${format(dateObj, 'yyyy-MM-dd')}`;
+                        if (!excelPunches.has(dateKey)) {
+                            excelPunches.set(dateKey, new Set());
+                        }
+                        r.allPunches.forEach((p: string) => excelPunches.get(dateKey)!.add(p));
+                    }
+                });
+                // احذف القديم لأننا سنعيد بناءه بالبيانات المدموجة
+                batch.delete(existingDoc.ref);
+            });
         }
 
         const workHours = branding?.work_hours?.general;
@@ -390,7 +416,7 @@ export function AttendanceUploader() {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
       } finally { setIsProcessing(false); }
     };
-    reader.readAsBinaryString(file!);
+    reader.readAsDataURL(file!);
   };
 
   const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
