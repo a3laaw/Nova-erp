@@ -21,11 +21,11 @@ import {
 } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isValid, startOfDay, isSameMonth } from 'date-fns';
+import { parse, format, isValid, startOfDay } from 'date-fns';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -54,7 +54,7 @@ const parseEntryData = (val: any, targetMonth: number, targetYear: number): { da
         const cleaned = val.trim();
         const dateFormats = [
             'd-M-yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy',
-            'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy'
+            'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy', 'd-M-yyyy HH:mm', 'MM/dd/yyyy HH:mm'
         ];
 
         for (const fmt of dateFormats) {
