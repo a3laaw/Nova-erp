@@ -288,25 +288,29 @@ export function PayrollGenerator() {
     }).filter(Boolean);
   }, [employees, attendanceDocs, branding]);
 
-  // المصلح: دالة تصدير الإكسيل أصبحت الآن مرتبطة يدوياً فقط بالزر
-  const handleExportExcel = () => {
+  const handleExportExcel = useCallback(() => {
     if (summaryData.length === 0) {
         toast({ title: 'لا توجد بيانات', description: 'يرجى انتظار تحميل البيانات أولاً.' });
         return;
     }
     const excelRows = summaryData.map(s => ({
-        'رقم الموظف': s!.empNo, 'اسم الموظف': s!.name, 'الراتب الكامل': s!.fullSalary,
-        'أيام الغياب': s!.absent, 'عدد مرات التأخير': s!.lateCount, 'إجمالي دقائق التأخير': s!.lateMins,
-        'إجمالي أيام الخصم': s!.deductionDays, 'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
+        'رقم الموظف': s!.empNo, 
+        'اسم الموظف': s!.name, 
+        'الراتب الكامل': s!.fullSalary,
+        'أيام الغياب': s!.absent, 
+        'عدد مرات التأخير': s!.lateCount, 
+        'إجمالي دقائق التأخير': s!.lateMins,
+        'إجمالي أيام الخصم': s!.deductionDays, 
+        'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
         'صافي الراتب المتوقع': Math.round(s!.netSalary * 1000) / 1000,
     }));
     const ws = XLSX.utils.json_to_sheet(excelRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `حضور ${month}-${year}`);
     XLSX.writeFile(wb, `كشف_رواتب_مختصر_${month}_${year}.xlsx`);
-  };
+  }, [summaryData, month, year, toast]);
 
-  const handleExportSummaryPDF = () => {
+  const handleExportSummaryPDF = useCallback(() => {
     const element = document.getElementById('summary-printable-area');
     if (!element) return;
     setIsExportingSummary(true);
@@ -314,7 +318,7 @@ export function PayrollGenerator() {
       margin: [0.5, 0.5],
       filename: `ملخص_رواتب_${month}_${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
     import('html2pdf.js').then(module => {
@@ -322,11 +326,14 @@ export function PayrollGenerator() {
       html2pdf().from(element).set(opt).save().then(() => {
         setIsExportingSummary(false);
         toast({ title: 'نجاح التصدير' });
+      }).catch(() => {
+        setIsExportingSummary(false);
+        toast({ variant: 'destructive', title: 'خطأ في التصدير' });
       });
     });
-  };
+  }, [month, year, toast]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = useCallback(() => {
     const element = document.getElementById('audit-printable-area');
     if (!element) return;
     setIsExportingPDF(true);
@@ -334,14 +341,14 @@ export function PayrollGenerator() {
       margin: [0.5, 0.5],
       filename: `تقرير_مخالفات_${month}_${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
     import('html2pdf.js').then(module => {
       const html2pdf = module.default;
       html2pdf().from(element).set(opt).save().then(() => setIsExportingPDF(false));
     });
-  };
+  }, [month, year]);
 
   const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
   const processedAnomaliesCount = anomalies.filter(a => a.record.auditStatus !== 'pending').length;
@@ -371,10 +378,11 @@ export function PayrollGenerator() {
             </div>
         </div>
 
-        {/* 🛡️ المصلح: التقرير المخفي للطباعة يتم رندرته فقط عند توفر البيانات وبأسلوب خفيف */}
+        {/* 🛡️ منطقة الطباعة المخفية: تم تحسين التموضع والظهور للمحرك فقط */}
         <div 
             id="summary-printable-area" 
-            className="absolute -top-[10000px] left-0 w-[1120px] bg-white opacity-0 pointer-events-none"
+            className="fixed top-0 -left-[10000px] w-[1120px] bg-white opacity-0 pointer-events-none"
+            style={{ visibility: 'visible' }}
             dir="rtl"
         >
             {summaryData.length > 0 && (
