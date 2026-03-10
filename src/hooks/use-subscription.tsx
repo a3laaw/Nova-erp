@@ -12,8 +12,8 @@ import {
 
 /**
  * خطاف اشتراك لحظي مطور:
- * يقوم آلياً بإلحاق معرف الأب (parentId) عند استخدام collectionGroup،
- * مما يحل مشكلة ربط الوظائف بالأقسام والمناطق بالمحافظات.
+ * تم تحديثه ليدعم مراقبة التغيرات في فلاتر الاستعلام (Constraints) بشكل لحظي،
+ * مع الحفاظ على ميزة إلحاق معرف الأب (parentId) تلقائياً.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -28,6 +28,9 @@ export function useSubscription<T extends { id?: string }>(
     const constraintsRef = useRef(constraints);
     const lastPathRef = useRef<string | null>(null);
 
+    // توليد مفتاح فريد للقيود لضمان تفعيل useEffect عند تغيير قيم الفلتر (مثل السنة والشهر)
+    const constraintsKey = JSON.stringify(constraints.map(c => c.toString()));
+
     useEffect(() => {
         constraintsRef.current = constraints;
     });
@@ -39,10 +42,9 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        if (lastPathRef.current !== collectionPath) {
-            setLoading(true);
-            lastPathRef.current = collectionPath;
-        }
+        // إظهار حالة التحميل عند تغيير المسار أو الفلاتر
+        setLoading(true);
+        lastPathRef.current = collectionPath;
 
         const baseRef = isGroup
             ? collectionGroup(firestore, collectionPath)
@@ -56,6 +58,7 @@ export function useSubscription<T extends { id?: string }>(
                 const newData = snapshot.docs.map(doc => {
                     const docData = doc.data() as any;
                     // استخراج معرف الأب في حال كانت المجموعة فرعية (مثل الوظائف تحت الأقسام)
+                    // هذا الجزء جوهري لعمل شجرة البيانات المرجعية في النظام
                     const parentId = doc.ref.parent.parent?.id || null;
                     return { 
                         id: doc.id, 
@@ -75,7 +78,7 @@ export function useSubscription<T extends { id?: string }>(
         );
 
         return () => unsubscribe();
-    }, [firestore, collectionPath, isGroup]);
+    }, [firestore, collectionPath, isGroup, constraintsKey]);
 
     return { data, loading, error };
 }
