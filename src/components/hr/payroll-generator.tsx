@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
+import type { Employee, MonthlyAttendance, AttendanceRecord, Account } from '@/lib/types';
 import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -193,31 +193,33 @@ export function PayrollGenerator() {
     if (!firestore || !currentUser) return;
     setIsProcessing(true);
     try {
-        const batch = writeBatch(firestore);
-        for (const emp of employees) {
-            const att = attendanceDocs.find(a => a.employeeId === emp.id);
-            const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-            const dailyRate = fullSalary / 26;
+        await runTransaction(firestore, async (transaction) => {
+            for (const emp of employees) {
+                const att = attendanceDocs.find(a => a.employeeId === emp.id);
+                const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+                const dailyRate = fullSalary / 26;
 
-            let totalDeductionDays = 0;
-            att?.records?.forEach(r => {
-                if (r.auditStatus !== 'waived') {
-                    totalDeductionDays += (r.manualDeductionDays || 0);
-                }
-            });
+                let totalDeductionDays = 0;
+                att?.records?.forEach(r => {
+                    if (r.auditStatus !== 'waived') {
+                        totalDeductionDays += (r.manualDeductionDays || 0);
+                    }
+                });
 
-            const deductionAmount = totalDeductionDays * dailyRate;
-            const netSalary = Math.max(0, fullSalary - deductionAmount);
+                const deductionAmount = totalDeductionDays * dailyRate;
+                const netSalary = Math.max(0, fullSalary - deductionAmount);
 
-            const payslipId = `${year}-${month}-${emp.id}`;
-            batch.set(doc(firestore, 'payroll', payslipId), cleanFirestoreData({
-                employeeId: emp.id, employeeName: emp.fullName, year: parseInt(year), month: parseInt(month),
-                earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 },
-                deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 },
-                netSalary, status: 'draft', type: 'Monthly', createdAt: serverTimestamp(), createdBy: currentUser.id
-            }), { merge: true });
-        }
-        await batch.commit();
+                const payslipId = `${year}-${month}-${emp.id}`;
+                const pRef = doc(firestore, 'payroll', payslipId);
+                
+                transaction.set(pRef, cleanFirestoreData({
+                    employeeId: emp.id, employeeName: emp.fullName, year: parseInt(year), month: parseInt(month),
+                    earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 },
+                    deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 },
+                    netSalary, status: 'draft', type: 'Monthly', createdAt: serverTimestamp(), createdBy: currentUser.id
+                }), { merge: true });
+            }
+        });
         toast({ title: 'تم توليد الرواتب', description: 'مسودة الرواتب جاهزة الآن للمراجعة المالية.' });
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ في التوليد' }); }
     finally { setIsProcessing(false); }
@@ -286,8 +288,12 @@ export function PayrollGenerator() {
     }).filter(Boolean);
   }, [employees, attendanceDocs, branding]);
 
+  // المصلح: دالة تصدير الإكسيل أصبحت الآن مرتبطة يدوياً فقط بالزر
   const handleExportExcel = () => {
-    if (summaryData.length === 0) return;
+    if (summaryData.length === 0) {
+        toast({ title: 'لا توجد بيانات', description: 'يرجى انتظار تحميل البيانات أولاً.' });
+        return;
+    }
     const excelRows = summaryData.map(s => ({
         'رقم الموظف': s!.empNo, 'اسم الموظف': s!.name, 'الراتب الكامل': s!.fullSalary,
         'أيام الغياب': s!.absent, 'عدد مرات التأخير': s!.lateCount, 'إجمالي دقائق التأخير': s!.lateMins,
@@ -297,7 +303,7 @@ export function PayrollGenerator() {
     const ws = XLSX.utils.json_to_sheet(excelRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `حضور ${month}-${year}`);
-    XLSX.writeFile(wb, `تقرير_الحضور_${month}_${year}.xlsx`);
+    XLSX.writeFile(wb, `كشف_رواتب_مختصر_${month}_${year}.xlsx`);
   };
 
   const handleExportSummaryPDF = () => {
@@ -349,7 +355,7 @@ export function PayrollGenerator() {
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="flex flex-wrap gap-3">
-                <Button variant="outline" onClick={handleExportExcel} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
+                <Button variant="outline" onClick={handleExportExcel} disabled={summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
                 <Button variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary || summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
                     {isExportingSummary ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
                     تصدير PDF (ملخص)
@@ -365,15 +371,15 @@ export function PayrollGenerator() {
             </div>
         </div>
 
-        {/* 🛡️ منطقة الطباعة المحسنة: نستخدم رندرة مشروطة لمنع الحمل الزائد */}
-        {summaryData.length > 0 && (
-            <div 
-                id="summary-printable-area" 
-                className="fixed -left-[10000px] top-0 w-[1120px] bg-white border-2 rounded-[2.5rem] overflow-hidden"
-                style={{ visibility: 'hidden', pointerEvents: 'none' }}
-            >
-                <div className="p-8 border-b-4 border-primary bg-muted/10">
-                    <div className="flex justify-between items-start">
+        {/* 🛡️ المصلح: التقرير المخفي للطباعة يتم رندرته فقط عند توفر البيانات وبأسلوب خفيف */}
+        <div 
+            id="summary-printable-area" 
+            className="absolute -top-[10000px] left-0 w-[1120px] bg-white opacity-0 pointer-events-none"
+            dir="rtl"
+        >
+            {summaryData.length > 0 && (
+                <div className="p-10">
+                    <div className="flex justify-between items-start mb-10 border-b-4 border-primary pb-6">
                         <div className="flex items-center gap-4">
                             <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                             <div>
@@ -386,45 +392,47 @@ export function PayrollGenerator() {
                             <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
                         </div>
                     </div>
+                    <div className="border-2 rounded-3xl overflow-hidden mb-10">
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="px-6 font-black">الموظف</TableHead>
+                                    <TableHead className="font-black text-center">الراتب الكامل</TableHead>
+                                    <TableHead className="font-black text-center">الغياب</TableHead>
+                                    <TableHead className="font-black text-center">التأخير (د)</TableHead>
+                                    <TableHead className="font-black text-center">خصم (أيام)</TableHead>
+                                    <TableHead className="text-left font-black">إجمالي الخصم</TableHead>
+                                    <TableHead className="text-left font-black bg-primary/5 text-primary">صافي المستحق</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {summaryData.map((s, idx) => (
+                                    <TableRow key={idx} className="h-14">
+                                        <TableCell className="px-6 font-bold">{s?.name}</TableCell>
+                                        <TableCell className="text-center font-mono">{formatCurrency(s?.fullSalary || 0)}</TableCell>
+                                        <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
+                                        <TableCell className="text-center font-mono">{s?.lateMins} د</TableCell>
+                                        <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
+                                        <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
+                                        <TableCell className="text-left font-mono font-black text-primary bg-primary/5">{formatCurrency(s?.netSalary || 0)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                            <TableFooter className="bg-muted/20 font-black h-16">
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-right px-10">إجمالي الرواتب الصافية للصرف:</TableCell>
+                                    <TableCell className="text-left font-mono text-xl">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
+                                </TableRow>
+                            </TableFooter>
+                        </Table>
+                    </div>
+                    <div className="grid grid-cols-2 gap-20 text-center mt-20">
+                        <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
+                        <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
+                    </div>
                 </div>
-                <Table>
-                    <TableHeader className="bg-muted/50">
-                        <TableRow>
-                            <TableHead className="px-6 font-black">الموظف</TableHead>
-                            <TableHead className="font-black text-center">الراتب الكامل</TableHead>
-                            <TableHead className="font-black text-center">الغياب</TableHead>
-                            <TableHead className="font-black text-center">التأخير (د)</TableHead>
-                            <TableHead className="font-black text-center">خصم (أيام)</TableHead>
-                            <TableHead className="text-left font-black">إجمالي الخصم</TableHead>
-                            <TableHead className="text-left font-black bg-primary/5 text-primary">صافي المستحق</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {summaryData.map((s, idx) => (
-                            <TableRow key={idx} className="h-14">
-                                <TableCell className="px-6 font-bold">{s?.name}</TableCell>
-                                <TableCell className="text-center font-mono">{formatCurrency(s?.fullSalary || 0)}</TableCell>
-                                <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
-                                <TableCell className="text-center font-mono">{s?.lateMins} د</TableCell>
-                                <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
-                                <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
-                                <TableCell className="text-left font-mono font-black text-primary bg-primary/5">{formatCurrency(s?.netSalary || 0)}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                    <TableFooter className="bg-muted/20 font-black h-16">
-                        <TableRow>
-                            <TableCell colSpan={6} className="text-right px-10">إجمالي الرواتب الصافية للصرف:</TableCell>
-                            <TableCell className="text-left font-mono text-xl">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
-                        </TableRow>
-                    </TableFooter>
-                </Table>
-                <div className="p-12 grid grid-cols-2 gap-20 text-center">
-                    <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
-                    <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
-                </div>
-            </div>
-        )}
+            )}
+        </div>
 
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 gap-4">
