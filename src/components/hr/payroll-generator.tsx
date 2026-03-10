@@ -8,7 +8,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -26,7 +26,6 @@ export function PayrollGenerator() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAuditing, setIsAuditing] = useState(true);
 
   const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   
@@ -38,12 +37,18 @@ export function PayrollGenerator() {
   const { data: attendanceDocs, loading: attLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery);
 
   const anomalies = useMemo(() => {
-    const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
+    const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string, lastUpdated?: any }[] = [];
     attendanceDocs.forEach(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
         doc.records?.forEach(r => {
             if (r.status !== 'present') {
-                list.push({ docId: doc.id!, record: r, empName: emp?.fullName || 'موظف', employeeNumber: emp?.employeeNumber || '000' });
+                list.push({ 
+                    docId: doc.id!, 
+                    record: r, 
+                    empName: emp?.fullName || 'موظف', 
+                    employeeNumber: emp?.employeeNumber || '000',
+                    lastUpdated: doc.updatedAt
+                });
             }
         });
     });
@@ -74,13 +79,9 @@ export function PayrollGenerator() {
             return r;
         });
         
-        await updateDoc(docRef, { records });
-        toast({ title: 'تم حفظ القرار', description: 'تم تحديث حالة المخالفة وحفظها لوقت لاحق.' });
+        await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
+        toast({ title: 'تم حفظ القرار', description: 'تم تحديث حالة المخالفة.' });
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
-  };
-
-  const handlePrintAudit = () => {
-    window.print();
   };
 
   const handleGeneratePayroll = async () => {
@@ -115,7 +116,6 @@ export function PayrollGenerator() {
 
         await batch.commit();
         toast({ title: 'تم توليد الرواتب', description: 'مسودة الرواتب جاهزة الآن للمراجعة المالية.' });
-        setIsAuditing(false);
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ في التوليد' }); }
     finally { setIsProcessing(false); }
   };
@@ -130,20 +130,23 @@ export function PayrollGenerator() {
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="flex gap-3">
-                <Button variant="outline" onClick={handlePrintAudit} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
-                <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20">
+                <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
+                <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
-                    {pendingAnomaliesCount > 0 ? `بانتظار قرار المدير (${pendingAnomaliesCount})` : 'اعتماد الرواتب'}
+                    {pendingAnomaliesCount > 0 ? `بانتظار قرارك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
                 </Button>
             </div>
         </div>
 
         <div className="space-y-6">
             <div className="flex justify-between items-center px-4">
-                <h3 className="text-2xl font-black flex items-center gap-3">
-                    <ShieldCheck className="text-primary h-8 w-8"/> 
-                    مركز تدقيق الحضور والمخالفات
-                </h3>
+                <div className="space-y-1">
+                    <h3 className="text-2xl font-black flex items-center gap-3">
+                        <ShieldCheck className="text-primary h-8 w-8"/> 
+                        مركز تدقيق الحضور والمخالفات
+                    </h3>
+                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> يتم التحديث فورياً عند رفع ملف بصمة جديد.</p>
+                </div>
                 {pendingAnomaliesCount > 0 && (
                     <Badge variant="destructive" className="animate-pulse rounded-lg h-8 px-4 font-black">
                         <AlertCircle className="h-4 w-4 ml-2" />
@@ -159,19 +162,21 @@ export function PayrollGenerator() {
                             <TableRow>
                                 <TableHead className="px-8">الموظف</TableHead>
                                 <TableHead>التاريخ</TableHead>
-                                <TableHead>الحالة المرصودة</TableHead>
-                                <TableHead>البصمات المسجلة</TableHead>
+                                <TableHead>المخالفة المرصودة</TableHead>
+                                <TableHead>سجل البصمات (Punches)</TableHead>
                                 <TableHead>الخصم المقترح</TableHead>
                                 <TableHead className="text-center no-print">القرار الإداري</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {anomalies.map((item, idx) => (
+                            {anomalies.map((item, idx) => {
+                                const lastUpd = toFirestoreDate(item.lastUpdated);
+                                return (
                                 <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : item.record.auditStatus === 'verified' ? "bg-red-50/20" : "bg-white")}>
                                     <TableCell className="px-8">
                                         <div className="flex flex-col">
                                             <span className="font-black text-lg">{item.empName}</span>
-                                            <span className="font-mono text-[10px] text-muted-foreground">ID: {item.employeeNumber}</span>
+                                            <span className="font-mono text-[10px] text-muted-foreground">تحديث: {lastUpd ? format(lastUpd, 'HH:mm:ss') : '---'}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell className="font-bold text-sm">
@@ -215,7 +220,7 @@ export function PayrollGenerator() {
                                         )}
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                 </div>
