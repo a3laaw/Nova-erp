@@ -288,7 +288,9 @@ export function PayrollGenerator() {
     }).filter(Boolean);
   }, [employees, attendanceDocs, branding]);
 
-  const handleExportExcel = useCallback(() => {
+  const handleExportExcel = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (summaryData.length === 0) {
         toast({ title: 'لا توجد بيانات', description: 'يرجى انتظار تحميل البيانات أولاً.' });
         return;
@@ -310,30 +312,46 @@ export function PayrollGenerator() {
     XLSX.writeFile(wb, `كشف_رواتب_مختصر_${month}_${year}.xlsx`);
   }, [summaryData, month, year, toast]);
 
-  const handleExportSummaryPDF = useCallback(() => {
+  const handleExportSummaryPDF = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const element = document.getElementById('summary-printable-area');
     if (!element) return;
     setIsExportingSummary(true);
+    
     const opt = {
       margin: [0.5, 0.5],
       filename: `ملخص_رواتب_${month}_${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        letterRendering: true, 
+        scrollY: 0,
+        backgroundColor: '#ffffff'
+      },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
-    import('html2pdf.js').then(module => {
-      const html2pdf = module.default;
-      html2pdf().from(element).set(opt).save().then(() => {
-        setIsExportingSummary(false);
-        toast({ title: 'نجاح التصدير' });
-      }).catch(() => {
-        setIsExportingSummary(false);
-        toast({ variant: 'destructive', title: 'خطأ في التصدير' });
-      });
-    });
+
+    // نمنح المتصفح وقتاً قصيراً لضمان رندرة الجدول تماماً في منطقة الظل
+    setTimeout(() => {
+        import('html2pdf.js').then(module => {
+            const html2pdf = module.default;
+            html2pdf().from(element).set(opt).save().then(() => {
+              setIsExportingSummary(false);
+              toast({ title: 'نجاح التصدير' });
+            }).catch((err) => {
+              console.error(err);
+              setIsExportingSummary(false);
+              toast({ variant: 'destructive', title: 'خطأ في التصدير' });
+            });
+        });
+    }, 500);
   }, [month, year, toast]);
 
-  const handleExportPDF = useCallback(() => {
+  const handleExportPDF = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const element = document.getElementById('audit-printable-area');
     if (!element) return;
     setIsExportingPDF(true);
@@ -341,7 +359,7 @@ export function PayrollGenerator() {
       margin: [0.5, 0.5],
       filename: `تقرير_مخالفات_${month}_${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
     import('html2pdf.js').then(module => {
@@ -358,31 +376,43 @@ export function PayrollGenerator() {
     <div className="space-y-8" dir="rtl">
         <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2.5rem] border shadow-inner no-print justify-between items-end">
             <div className="flex gap-4">
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid gap-1.5">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label>
+                    <Select value={year} onValueChange={setYear}>
+                        <SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger>
+                        <SelectContent dir="rtl">{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-1.5">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label>
+                    <Select value={month} onValueChange={setMonth}>
+                        <SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger>
+                        <SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
             </div>
             <div className="flex flex-wrap gap-3">
-                <Button variant="outline" onClick={handleExportExcel} disabled={summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
-                <Button variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary || summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
+                <Button type="button" variant="outline" onClick={handleExportExcel} disabled={summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
+                <Button type="button" variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary || summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
                     {isExportingSummary ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
                     تصدير PDF (ملخص)
                 </Button>
-                <Button variant="outline" onClick={handleExportPDF} disabled={isExportingPDF || anomalies.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
+                <Button type="button" variant="outline" onClick={handleExportPDF} disabled={isExportingPDF || anomalies.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
                     {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldAlert className="h-4 w-4"/>} 
                     تقرير المخالفات PDF
                 </Button>
-                <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
+                <Button type="button" onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
                     {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
                 </Button>
             </div>
         </div>
 
-        {/* 🛡️ منطقة الطباعة المخفية: تم تحسين التموضع والظهور للمحرك فقط */}
+        {/* 🛡️ منطقة الطباعة: تم التحديث لضمان الظهور للمحرك فقط مع الحفاظ على الألوان والوضوح */}
         <div 
             id="summary-printable-area" 
-            className="fixed top-0 -left-[10000px] w-[1120px] bg-white opacity-0 pointer-events-none"
-            style={{ visibility: 'visible' }}
+            className="fixed -top-[20000px] left-0 w-[1120px] bg-white opacity-100 pointer-events-none"
+            style={{ visibility: 'visible', zIndex: -1000 }}
             dir="rtl"
         >
             {summaryData.length > 0 && (
@@ -400,43 +430,43 @@ export function PayrollGenerator() {
                             <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
                         </div>
                     </div>
-                    <div className="border-2 rounded-3xl overflow-hidden mb-10">
+                    <div className="border-2 rounded-3xl overflow-hidden mb-10 bg-white">
                         <Table>
-                            <TableHeader className="bg-muted/50">
+                            <TableHeader className="bg-gray-50 border-b">
                                 <TableRow>
-                                    <TableHead className="px-6 font-black">الموظف</TableHead>
-                                    <TableHead className="font-black text-center">الراتب الكامل</TableHead>
-                                    <TableHead className="font-black text-center">الغياب</TableHead>
-                                    <TableHead className="font-black text-center">التأخير (د)</TableHead>
-                                    <TableHead className="font-black text-center">خصم (أيام)</TableHead>
-                                    <TableHead className="text-left font-black">إجمالي الخصم</TableHead>
-                                    <TableHead className="text-left font-black bg-primary/5 text-primary">صافي المستحق</TableHead>
+                                    <TableHead className="px-6 font-black text-gray-900">الموظف</TableHead>
+                                    <TableHead className="font-black text-center text-gray-900">الراتب الكامل</TableHead>
+                                    <TableHead className="font-black text-center text-gray-900">الغياب</TableHead>
+                                    <TableHead className="font-black text-center text-gray-900">التأخير (د)</TableHead>
+                                    <TableHead className="font-black text-center text-gray-900">خصم (أيام)</TableHead>
+                                    <TableHead className="text-left font-black text-gray-900">إجمالي الخصم</TableHead>
+                                    <TableHead className="text-left font-black bg-blue-50 text-blue-700">صافي المستحق</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {summaryData.map((s, idx) => (
-                                    <TableRow key={idx} className="h-14">
-                                        <TableCell className="px-6 font-bold">{s?.name}</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(s?.fullSalary || 0)}</TableCell>
+                                    <TableRow key={idx} className="h-14 border-b">
+                                        <TableCell className="px-6 font-bold text-gray-800">{s?.name}</TableCell>
+                                        <TableCell className="text-center font-mono font-bold">{formatCurrency(s?.fullSalary || 0)}</TableCell>
                                         <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
                                         <TableCell className="text-center font-mono">{s?.lateMins} د</TableCell>
                                         <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
                                         <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
-                                        <TableCell className="text-left font-mono font-black text-primary bg-primary/5">{formatCurrency(s?.netSalary || 0)}</TableCell>
+                                        <TableCell className="text-left font-mono font-black text-blue-700 bg-blue-50/30">{formatCurrency(s?.netSalary || 0)}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
-                            <TableFooter className="bg-muted/20 font-black h-16">
+                            <TableFooter className="bg-gray-100 font-black h-16">
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-right px-10">إجمالي الرواتب الصافية للصرف:</TableCell>
-                                    <TableCell className="text-left font-mono text-xl">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
+                                    <TableCell colSpan={6} className="text-right px-10 text-lg">إجمالي الرواتب الصافية للصرف:</TableCell>
+                                    <TableCell className="text-left font-mono text-xl text-primary">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
                                 </TableRow>
                             </TableFooter>
                         </Table>
                     </div>
                     <div className="grid grid-cols-2 gap-20 text-center mt-20">
-                        <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
-                        <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
+                        <div className="space-y-16"><p className="font-black border-b-2 border-gray-800 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
+                        <div className="space-y-16"><p className="font-black border-b-2 border-gray-800 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
                     </div>
                 </div>
             )}
@@ -463,12 +493,12 @@ export function PayrollGenerator() {
                         <div className="flex bg-muted/50 p-1 rounded-xl border shadow-inner no-print items-center">
                             {pendingAnomaliesCount > 0 && (
                                 <>
-                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1">
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1">
                                         {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3" />}
                                         تغاضي عن الكل
                                     </Button>
                                     <Separator orientation="vertical" className="h-4 mx-1 my-auto" />
-                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1">
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1">
                                         {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShieldAlert className="h-3 w-3" />}
                                         اعتماد الخصم للكل
                                     </Button>
@@ -477,7 +507,7 @@ export function PayrollGenerator() {
                             {processedAnomaliesCount > 0 && (
                                 <>
                                     {pendingAnomaliesCount > 0 && <Separator orientation="vertical" className="h-4 mx-1 my-auto" />}
-                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-gray-600 hover:bg-gray-200 rounded-lg gap-1">
+                                    <Button type="button" size="sm" variant="ghost" onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-gray-600 hover:bg-gray-200 rounded-lg gap-1">
                                         {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3" />}
                                         إعادة تعيين للتدقيق
                                     </Button>
@@ -520,10 +550,10 @@ export function PayrollGenerator() {
                                     <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
                                     <TableCell className="text-center no-print">{item.record.auditStatus === 'pending' ? (
                                         <div className="flex justify-center gap-2">
-                                            <Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
+                                            <Button type="button" size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
                                         </div>
-                                    ) : <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}</TableCell>
+                                    ) : <Button type="button" variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}</TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
