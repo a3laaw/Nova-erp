@@ -8,7 +8,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -38,17 +38,24 @@ export function PayrollGenerator() {
 
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string, lastUpdated?: any }[] = [];
+    const targetMonth = parseInt(month);
+    const targetYear = parseInt(year);
+
     attendanceDocs.forEach(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
         doc.records?.forEach(r => {
-            if (r.status !== 'present') {
-                list.push({ 
-                    docId: doc.id!, 
-                    record: r, 
-                    empName: emp?.fullName || 'موظف', 
-                    employeeNumber: emp?.employeeNumber || '000',
-                    lastUpdated: doc.updatedAt
-                });
+            const rDate = toFirestoreDate(r.date);
+            // ضمان عرض فقط البصمات التي تخص الشهر والسنة المختارين فعلياً
+            if (rDate && (rDate.getMonth() + 1) === targetMonth && rDate.getFullYear() === targetYear) {
+                if (r.status !== 'present') {
+                    list.push({ 
+                        docId: doc.id!, 
+                        record: r, 
+                        empName: emp?.fullName || 'موظف', 
+                        employeeNumber: emp?.employeeNumber || '000',
+                        lastUpdated: doc.updatedAt
+                    });
+                }
             }
         });
     });
@@ -57,7 +64,7 @@ export function PayrollGenerator() {
         const dateB = toFirestoreDate(b.record.date);
         return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
     });
-  }, [attendanceDocs, employees]);
+  }, [attendanceDocs, employees, month, year]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
     if (!firestore || !currentUser) return;
@@ -126,7 +133,7 @@ export function PayrollGenerator() {
     <div className="space-y-8" dir="rtl">
         <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2rem] border shadow-inner no-print justify-between items-end">
             <div className="flex gap-4">
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{[2025, 2026].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="flex gap-3">
@@ -225,10 +232,10 @@ export function PayrollGenerator() {
                     </Table>
                 </div>
             ) : (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/20">
-                    <CheckCircle2 className="h-24 w-24 text-green-600/30 mx-auto mb-6" />
-                    <p className="text-3xl font-black text-green-800">السجل نظيف تماماً!</p>
-                    <p className="text-lg font-medium text-green-700 mt-3">لا توجد مخالفات مرصودة أو بانتظار قرارك لهذا الشهر.</p>
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50">
+                    <CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" />
+                    <p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p>
+                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى التأكد من اختيار الشهر الصحيح أو رفع ملف البصمة أولاً.</p>
                 </div>
             )}
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { 
   Card, 
   CardHeader, 
@@ -21,95 +21,66 @@ import {
 } from '@/components/ui/select';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, Save, DownloadCloud, AlertCircle, Trash2, RotateCcw } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isValid, startOfDay } from 'date-fns';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { parse, format, isValid, startOfDay, isSameMonth } from 'date-fns';
+import { cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 
 /**
- * محرك تحليل التاريخ والوقت العالمي (Global DateTime Parser):
- * يدعم كافة التنسيقات العربية والغربية، السنين المختصرة، ونظام AM/PM.
+ * محرك تحليل التاريخ والوقت المتطور:
+ * يقوم بفصل التاريخ عن الوقت بدقة لضمان عدم خلط الشهور.
  */
-const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
+const parseEntryData = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
-    if (val instanceof Date && isValid(val)) {
-        if (val.getFullYear() < 2000) return null;
-        return { date: startOfDay(val), timeStr: format(val, 'HH:mm') };
-    }
+    let parsedDate: Date | null = null;
+    let timeStr = "00:00";
 
+    // إذا كان التاريخ كود إكسل (رقم)
     if (typeof val === 'number') {
-        if (val < 30000 || val > 60000) return null; 
         try {
-            const date = XLSX.SSF.parse_date_code(val);
-            if (date.y < 2000 || date.y > 2100) return null;
-            return { 
-                date: startOfDay(new Date(date.y, date.m - 1, date.d)), 
-                timeStr: `${String(date.h).padStart(2, '0')}:${String(date.m).padStart(2, '0')}` 
-            };
+            const excelDate = XLSX.SSF.parse_date_code(val);
+            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d);
+            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
         } catch { return null; }
-    }
-
-    if (typeof val === 'string') {
+    } 
+    // إذا كان نصاً
+    else if (typeof val === 'string') {
         const cleaned = val.trim();
-        if (cleaned.length < 5) return null;
-
-        const native = new Date(cleaned);
-        if (isValid(native) && native.getFullYear() >= 2000) {
-            return { date: startOfDay(native), timeStr: format(native, 'HH:mm') };
-        }
-
-        const parts = cleaned.split(/\s+/);
-        const datePart = parts[0];
-        const timePart = parts.slice(1).join(' '); 
-        
         const dateFormats = [
-            'd-M-yyyy', 'dd-MM-yyyy', 'd-MM-yyyy', 'dd-M-yyyy',
-            'd/M/yyyy', 'dd/MM/yyyy', 'd/MM/yyyy', 'dd/M/yyyy',
-            'd.M.yyyy', 'dd.MM.yyyy',
-            'yyyy-MM-dd', 'yyyy/MM/dd', 'yyyy.MM.dd',
-            'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy', 'dd/MM/yy',
-            'M-d-yyyy', 'MM-dd-yyyy'
+            'd-M-yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy',
+            'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy'
         ];
 
-        const timeFormats = [
-            'HH:mm', 'H:mm', 'HH:mm:ss', 'H:mm:ss', 
-            'hh:mm a', 'h:mm a', 'hh:mm:ss a', 'h:mm:ss a',
-            'hh:mmA', 'h:mma'
-        ];
-
-        for (const dFmt of dateFormats) {
+        for (const fmt of dateFormats) {
             try {
-                const parsedDate = parse(datePart, dFmt, new Date());
-                if (isValid(parsedDate) && parsedDate.getFullYear() >= 2000) {
-                    let timeStr = "00:00";
-                    if (timePart) {
-                        for (const tFmt of timeFormats) {
-                            const parsedTime = parse(timePart, tFmt, new Date());
-                            if (isValid(parsedTime)) {
-                                timeStr = format(parsedTime, 'HH:mm');
-                                break;
-                            }
-                        }
-                    } else {
-                        const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
-                        if (timeMatch) {
-                            for (const tFmt of timeFormats) {
-                                const pt = parse(timeMatch[0], tFmt, new Date());
-                                if (isValid(pt)) { timeStr = format(pt, 'HH:mm'); break; }
-                            }
-                        }
+                const p = parse(cleaned.split(/\s+/)[0], fmt, new Date());
+                if (isValid(p) && p.getFullYear() >= 2000) {
+                    parsedDate = startOfDay(p);
+                    // محاولة استخراج الوقت إذا وجد في نفس الخانة
+                    const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
+                    if (timeMatch) {
+                        const tp = parse(timeMatch[0], 'HH:mm', new Date());
+                        if (isValid(tp)) timeStr = format(tp, 'HH:mm');
                     }
-                    return { date: startOfDay(parsedDate), timeStr };
+                    break;
                 }
             } catch { continue; }
         }
     }
+
+    if (parsedDate && isValid(parsedDate)) {
+        // التحقق الصارم من مطابقة الشهر والسنة لضمان عدم تداخل البيانات
+        if (parsedDate.getFullYear() === targetYear && (parsedDate.getMonth() + 1) === targetMonth) {
+            return { date: parsedDate, timeStr };
+        }
+    }
+    
     return null;
 };
 
@@ -140,16 +111,16 @@ export function AttendanceUploader() {
         const workbook = XLSX.read(data, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         
-        if (json.length === 0) throw new Error("الملف فارغ.");
+        if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
-        const punchesMap = new Map<string, { date: Date, employeeId: string, times: string[] }>();
-
-        let foundPeriods = new Set<string>();
+        // خريطة لتجميع البصمات: الموظف -> اليوم -> قائمة الساعات
+        const dailyPunches = new Map<string, Set<string>>(); 
 
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
+            // البحث عن رقم الموظف في أول 3 أعمدة
             for(let k=0; k<Math.min(keys.length, 3); k++) {
                 const val = String(row[keys[k]] || '');
                 if (employeeMap.has(val)) { empNo = val; break; }
@@ -158,42 +129,26 @@ export function AttendanceUploader() {
             const emp = employeeMap.get(empNo);
             if (!emp?.id) return;
 
-            let matchedDate: { date: Date, timeStr: string } | null = null;
+            // استخراج كافة البصمات الممكنة من السطر الحالي والتي تخص الشهر المختار
             for (const key in row) {
-                const parsed = parseSmartDateTime(row[key]);
+                const parsed = parseEntryData(row[key], selectedMonthNum, selectedYearNum);
                 if (parsed) {
-                    foundPeriods.add(`${parsed.date.getMonth()+1}/${parsed.date.getFullYear()}`);
-                    if (parsed.date.getFullYear() === selectedYearNum && (parsed.date.getMonth() + 1) === selectedMonthNum) {
-                        matchedDate = parsed;
-                        break; 
+                    const dateKey = `${emp.id}_${parsed.date.getTime()}`;
+                    if (!dailyPunches.has(dateKey)) dailyPunches.set(dateKey, new Set());
+                    if (parsed.timeStr && parsed.timeStr !== "00:00") {
+                        dailyPunches.get(dateKey)!.add(parsed.timeStr);
                     }
                 }
             }
-
-            if (!matchedDate) return;
-
-            const dateKey = `${emp.id}_${matchedDate.date.getTime()}`;
-            const existing = punchesMap.get(dateKey) || { date: matchedDate.date, employeeId: emp.id, times: [] };
-            if (matchedDate.timeStr && !existing.times.includes(matchedDate.timeStr)) {
-                existing.times.push(matchedDate.timeStr);
-            }
-            punchesMap.set(dateKey, existing);
         });
 
-        if (punchesMap.size === 0) {
-            const periods = Array.from(foundPeriods).join(', ');
-            toast({ 
-                variant: 'destructive', 
-                title: 'خطأ في مطابقة الفترة', 
-                description: `لم يتم العثور على بيانات لشهر ${selectedMonthNum}/${selectedYearNum} في الملف. الفترات المتاحة بالملف هي: [${periods}]` 
-            });
-            setIsProcessing(false);
-            return;
+        if (dailyPunches.size === 0) {
+            throw new Error(`لم يتم العثور على أي بصمات تخص شهر ${selectedMonthNum}/${selectedYearNum} في هذا الملف. يرجى التأكد من محتوى الملف أو الفترة المختارة.`);
         }
 
         const batch = writeBatch(firestore);
 
-        // --- ميزة التطهير (Month Purge) ---
+        // تطهير البيانات القديمة لمنع ظهور March في February
         if (clearPrevious) {
             const existingQuery = query(
                 collection(firestore, 'attendance'),
@@ -204,30 +159,27 @@ export function AttendanceUploader() {
             existingSnap.forEach(d => batch.delete(d.ref));
         }
 
-        const groupedUpdates = new Map<string, AttendanceRecord[]>();
+        const groupedByEmployee = new Map<string, AttendanceRecord[]>();
         const workHours = branding?.work_hours?.general;
         const mEnd = workHours?.morning_end_time || '13:00';
         const eStart = workHours?.evening_start_time || '16:00';
 
-        punchesMap.forEach((entry) => {
-            const emp = employees.find(e => e.id === entry.employeeId);
-            const sorted = entry.times.sort();
-            
-            const morningPunches = sorted.filter(t => t <= mEnd);
-            const eveningPunches = sorted.filter(t => t >= eStart);
+        dailyPunches.forEach((timesSet, compositeKey) => {
+            const [empId, timestamp] = compositeKey.split('_');
+            const date = new Date(parseInt(timestamp));
+            const sortedTimes = Array.from(timesSet).sort();
+            const emp = employees.find(e => e.id === empId);
 
             let status: AttendanceRecord['status'] = 'present';
             let anomaly = '';
             let manualDeduction = 0;
 
-            if (emp?.workStartTime) {
-                if (sorted[0] > emp.workStartTime) {
-                    status = 'late';
-                    anomaly = `تأخير عن الدوام المخصص (${emp.workStartTime})`;
-                }
-            } else {
-                const hasMorning = morningPunches.length > 0;
-                const hasEvening = eveningPunches.length > 0;
+            if (emp?.workStartTime && sortedTimes[0] > emp.workStartTime) {
+                status = 'late';
+                anomaly = `تأخير عن موعده المخصص (${emp.workStartTime})`;
+            } else if (!emp?.workStartTime) {
+                const hasMorning = sortedTimes.some(t => t <= mEnd);
+                const hasEvening = sortedTimes.some(t => t >= eStart);
 
                 if (hasMorning && !hasEvening) {
                     status = 'half_day';
@@ -237,46 +189,45 @@ export function AttendanceUploader() {
                     status = 'half_day';
                     anomaly = 'بصمة مسائية فقط (خصم نص يوم)';
                     manualDeduction = 0.5;
-                } else if (hasMorning && hasEvening && sorted.length < 4) {
+                } else if (hasMorning && hasEvening && sortedTimes.length < 4) {
                     status = 'missing_punch';
-                    anomaly = 'نسيان بصمة البريك (يوم كامل)';
-                } else if (!hasMorning && !hasEvening) {
-                    status = 'absent';
-                    anomaly = 'غياب كامل';
-                    manualDeduction = 1;
+                    anomaly = 'بصمة ناقصة (نسيان بصمة البريك)';
                 }
             }
 
             const record: AttendanceRecord = {
-                date: entry.date,
-                employeeId: entry.employeeId,
-                checkIn1: sorted[0] || null,
-                checkOut1: sorted.length > 1 ? sorted[sorted.length-1] : null,
+                date: Timestamp.fromDate(date),
+                employeeId: empId,
+                checkIn1: sortedTimes[0] || null,
+                checkOut1: sortedTimes.length > 1 ? sortedTimes[sortedTimes.length-1] : null,
                 checkIn2: null, checkOut2: null,
-                allPunches: sorted,
+                allPunches: sortedTimes,
                 status,
                 anomalyDescription: anomaly,
                 manualDeductionDays: manualDeduction,
                 auditStatus: status === 'present' ? 'verified' : 'pending'
             };
 
-            const docKey = `${selectedYearNum}-${selectedMonthNum}-${entry.employeeId}`;
-            if (!groupedUpdates.has(docKey)) groupedUpdates.set(docKey, []);
-            groupedUpdates.get(docKey)!.push(record);
+            const docId = `${selectedYearNum}-${selectedMonthNum}-${empId}`;
+            if (!groupedByEmployee.has(docId)) groupedByEmployee.set(docId, []);
+            groupedByEmployee.get(docId)!.push(record);
         });
 
-        for (const [docId, newRecords] of groupedUpdates.entries()) {
-            batch.set(doc(firestore, 'attendance', docId), cleanFirestoreData({
-                employeeId: docId.split('-')[2], year: selectedYearNum, month: selectedMonthNum,
-                records: newRecords, updatedAt: serverTimestamp()
-            }), { merge: true });
+        for (const [docId, records] of groupedByEmployee.entries()) {
+            batch.set(doc(firestore, 'attendance', docId), {
+                employeeId: docId.split('-')[2],
+                year: selectedYearNum,
+                month: selectedMonthNum,
+                records,
+                updatedAt: serverTimestamp()
+            });
         }
 
         await batch.commit();
-        toast({ title: 'نجاح الاستيراد', description: `تم تحليل ${punchesMap.size} سجل بنجاح. تم مسح البيانات القديمة لضمان دقة التدقيق.` });
+        toast({ title: 'نجاح المعالجة', description: `تم استيراد ${dailyPunches.size} يومية بنجاح لشهر ${selectedMonthNum}. تم تنظيف السجلات القديمة تلقائياً.` });
         setFile(null);
       } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ في المعالجة', description: error.message });
+        toast({ variant: 'destructive', title: 'خطأ في الاستيراد', description: error.message });
       } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
@@ -285,51 +236,49 @@ export function AttendanceUploader() {
   return (
     <div className="grid lg:grid-cols-3 gap-8" dir="rtl">
         <Card className="lg:col-span-1 rounded-[2rem] border-none shadow-sm">
-            <CardHeader><CardTitle className="text-lg font-black">إعدادات الفترة</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg font-black">فترة التقرير</CardTitle></CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid gap-2">
-                    <Label className="font-bold">السنة</Label>
+                    <Label className="font-bold">السنة المستهدفة</Label>
                     <Select value={year} onValueChange={setYear}>
                         <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                         <SelectContent>{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-bold">الشهر</Label>
+                    <Label className="font-bold">الشهر المستهدف</Label>
                     <Select value={month} onValueChange={setMonth}>
                         <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                         <SelectContent>{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
-                
                 <Separator />
-                
-                <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border border-red-100 animate-in fade-in">
+                <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border border-red-100">
                     <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
                     <div className="space-y-0.5">
-                        <Label htmlFor="purge" className="font-black text-xs text-red-800 cursor-pointer">تطهير الشهر قبل الرفع</Label>
-                        <p className="text-[9px] text-red-600 font-bold leading-tight">سيتم مسح أي بيانات سابقة للشهر المختار لضمان عدم وجود سجلات صفرية قديمة.</p>
+                        <Label htmlFor="purge" className="font-black text-xs text-red-800 cursor-pointer">تطهير البيانات السابقة</Label>
+                        <p className="text-[9px] text-red-600 font-bold leading-tight">سيتم مسح أي بصمات قديمة لهذا الشهر قبل الرفع الجديد لضمان الدقة.</p>
                     </div>
                 </div>
             </CardContent>
         </Card>
         <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl">
             <CardHeader>
-                <CardTitle className="font-black">رفع ملف البصمة الجديد</CardTitle>
-                <CardDescription>سيقوم النظام بفحص الملف واستخراج البصمات المتاحة للفترة المحددة.</CardDescription>
+                <CardTitle className="font-black">ملف البصمة الجديد</CardTitle>
+                <CardDescription>ارفع ملف الإكسل المستخرج من جهاز البصمة ليقوم النظام بتحليله آلياً.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
                     <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls, .csv" />
                     <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
                     <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار الملف"}</p>
-                    <p className="text-xs text-muted-foreground mt-2 font-bold">يدعم كافة تنسيقات التاريخ والوقت</p>
+                    <p className="text-xs text-muted-foreground mt-2 font-bold">يقوم النظام بفلترة البيانات حسب الشهر والسنة المختارين.</p>
                 </div>
             </CardContent>
             <CardFooter className="justify-end border-t p-6">
                 <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-2">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-5 w-5"/> : <RotateCcw className="h-5 w-5"/>} 
-                    بدء معالجة واستبدال البيانات
+                    بدء المعالجة الذكية
                 </Button>
             </CardFooter>
         </Card>
