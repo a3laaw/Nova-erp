@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useSubscription } from '@/hooks/use-subscription';
-import { useFirebase } from '@/firebase';
+import { useState, useMemo, useEffect } from 'react';
+import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, orderBy, doc, writeBatch, getDocs, serverTimestamp, runTransaction } from 'firebase/firestore';
 import type { Payslip, Employee, Account } from '@/lib/types';
 import {
@@ -26,6 +25,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useRouter } from 'next/navigation';
@@ -77,15 +77,30 @@ export function PayslipsList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const payslipsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [
-            where('year', '==', parseInt(year)),
-            where('month', '==', parseInt(month)),
-        ];
+    // استبدال useSubscription بـ useEffect و getDocs
+    const [payslips, setPayslips] = useState<Payslip[]>([]);
+    const [loadingPayslips, setLoadingPayslips] = useState(false);
+
+    useEffect(() => {
+        if (!firestore) return;
+        const fetchPayslips = async () => {
+            setLoadingPayslips(true);
+            try {
+                const snap = await getDocs(query(
+                    collection(firestore, 'payroll'),
+                    where('year', '==', parseInt(year)),
+                    where('month', '==', parseInt(month))
+                ));
+                setPayslips(snap.docs.map(d => ({ id: d.id, ...d.data() } as Payslip)));
+            } catch (e) {
+                console.error("Error fetching payslips:", e);
+            } finally {
+                setLoadingPayslips(false);
+            }
+        };
+        fetchPayslips();
     }, [firestore, year, month]);
 
-    const { data: payslips, loading: loadingPayslips } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
     const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
 
     const loading = loadingPayslips || loadingEmployees;
