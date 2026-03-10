@@ -38,14 +38,15 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info } from 'lucide-react';
-import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
+import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest } from '@/lib/types';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isWithinInterval } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { toFirestoreDate } from '@/services/date-converter';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -112,7 +113,7 @@ export function AttendanceUploader() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [clearPrevious, setClearPrevious] = useState(true);
   
-  const [summary, setSummary] = useState<{ workingDays: number, totalPunches: number, autoAbsences: number } | null>(null);
+  const [summary, setSummary] = useState<{ workingDays: number, totalPunches: number, autoAbsences: number, coveredByPolicy: number } | null>(null);
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,6 +199,18 @@ export function AttendanceUploader() {
         
         if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
+        // 1. جلب كافة الإجازات والاستئذانات المعتمدة للشهر المختار
+        const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
+        const monthEnd = endOfMonth(monthStart);
+
+        const [leavesSnap, permissionsSnap] = await Promise.all([
+            getDocs(query(collection(firestore, 'leaveRequests'), where('status', 'in', ['approved', 'on-leave', 'returned']))),
+            getDocs(query(collection(firestore, 'permissionRequests'), where('status', '==', 'approved')))
+        ]);
+
+        const approvedLeaves = leavesSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
+        const approvedPermissions = permissionsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PermissionRequest));
+
         const validEmployees = employees.filter(emp => emp.employeeNumber && emp.employeeNumber.trim() !== '');
         const employeeMap = new Map(validEmployees.map(emp => [String(emp.employeeNumber), emp]));
         const excelPunches = new Map<string, Set<string>>(); 
@@ -227,10 +240,7 @@ export function AttendanceUploader() {
             }
         });
 
-        const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
-        const monthEnd = endOfMonth(monthStart);
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-        
         const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
         const halfDaySettings = branding?.work_hours?.half_day;
         const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
@@ -254,6 +264,7 @@ export function AttendanceUploader() {
         const eStart = workHours?.evening_start_time || '16:00';
 
         let autoAbsencesCount = 0;
+        let coveredByPolicyCount = 0;
 
         for (const emp of validEmployees) {
             const employeeRecords: AttendanceRecord[] = [];
@@ -266,45 +277,62 @@ export function AttendanceUploader() {
                 const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
 
+                // فحص الإجازات والاستئذانات لهذا اليوم
+                const activeLeave = approvedLeaves.find(l => 
+                    l.employeeId === emp.id && 
+                    stableDay >= toFirestoreDate(l.startDate)! && 
+                    stableDay <= toFirestoreDate(l.endDate)!
+                );
+
+                const activePermission = approvedPermissions.find(p => 
+                    p.employeeId === emp.id && 
+                    isSameDay(stableDay, toFirestoreDate(p.date)!)
+                );
+
                 if (punches && punches.size > 0) {
                     const sortedTimes = Array.from(punches).sort();
                     let status: AttendanceRecord['status'] = 'present';
                     let anomaly = '';
                     let manualDeduction = 0;
+                    let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
 
                     const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
                     const isCustomShift = !!emp.workStartTime && !!emp.workEndTime;
 
+                    // منطق التأخير الصباحي + الاستئذان
                     if (sortedTimes[0] > startTimeLimit) {
-                        status = 'late';
-                        anomaly = `تأخير عن الموعد (${startTimeLimit})`;
+                        if (activePermission?.type === 'late_arrival') {
+                            status = 'present';
+                            anomaly = 'تأخير مسموح (إذن تأخير معتمد)';
+                            coveredByPolicyCount++;
+                        } else {
+                            status = 'late';
+                            anomaly = `تأخير عن الموعد (${startTimeLimit})`;
+                            auditStatus = 'pending';
+                        }
                     }
 
+                    // منطق الدوام المزدوج / نصف اليوم + الاستئذان
                     if (!isCustomShift && !isSystemHalfDay) {
                         const hasMorning = sortedTimes.some(t => t <= mEnd);
                         const hasEvening = sortedTimes.some(t => t >= eStart);
 
                         if (hasMorning && !hasEvening) {
-                            status = 'half_day';
-                            anomaly = anomaly ? `${anomaly} + بصمة صباحية فقط` : 'بصمة صباحية فقط';
-                            manualDeduction = 0.5;
+                            if (activePermission?.type === 'early_departure') {
+                                status = 'present';
+                                anomaly = anomaly ? `${anomaly} + خروج مسموح (إذن خروج)` : 'خروج مسموح (إذن خروج)';
+                                coveredByPolicyCount++;
+                            } else {
+                                status = 'half_day';
+                                anomaly = anomaly ? `${anomaly} + بصمة صباحية فقط` : 'بصمة صباحية فقط';
+                                manualDeduction = 0.5;
+                                auditStatus = 'pending';
+                            }
                         } else if (!hasMorning && hasEvening) {
                             status = 'half_day';
                             anomaly = anomaly ? `${anomaly} + بصمة مسائية فقط` : 'بصمة مسائية فقط';
                             manualDeduction = 0.5;
-                        } else if (hasMorning && hasEvening && sortedTimes.length < 2) {
-                            status = 'missing_punch';
-                            anomaly = 'بصمة ناقصة (دخول وخروج مطلوب)';
-                        }
-                    } else if (isSystemHalfDay) {
-                        if (sortedTimes.length < 2) {
-                            status = 'missing_punch';
-                            anomaly = 'بصمة ناقصة ليوم السبت';
-                        }
-                    } else {
-                        if (sortedTimes.length < 2) {
-                            status = 'missing_punch';
-                            anomaly = anomaly ? `${anomaly} + بصمة واحدة فقط` : 'بصمة ناقصة (تحتاج دخول وخروج)';
+                            auditStatus = 'pending';
                         }
                     }
 
@@ -313,25 +341,37 @@ export function AttendanceUploader() {
                         employeeId: emp.id!,
                         checkIn1: sortedTimes[0],
                         checkOut1: sortedTimes[sortedTimes.length - 1],
-                        checkIn2: null, checkOut2: null,
                         allPunches: sortedTimes,
                         status,
                         anomalyDescription: anomaly,
                         manualDeductionDays: manualDeduction,
-                        auditStatus: (status === 'present' || (isSystemHalfDay && status !== 'absent')) ? 'verified' : 'pending'
+                        auditStatus
                     });
                 } else {
-                    autoAbsencesCount++;
-                    employeeRecords.push({
-                        date: Timestamp.fromDate(stableDay),
-                        employeeId: emp.id!,
-                        checkIn1: null, checkOut1: null, checkIn2: null, checkOut2: null,
-                        allPunches: [],
-                        status: 'absent',
-                        anomalyDescription: 'غائب (لم تظهر بصمته في الملف)',
-                        manualDeductionDays: 1,
-                        auditStatus: 'pending'
-                    });
+                    // لم توجد بصمة: فحص ما إذا كان في إجازة
+                    if (activeLeave) {
+                        coveredByPolicyCount++;
+                        employeeRecords.push({
+                            date: Timestamp.fromDate(stableDay),
+                            employeeId: emp.id!,
+                            status: 'present',
+                            anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || 'رسمية'} معتمدة`,
+                            manualDeductionDays: 0,
+                            auditStatus: 'verified',
+                            allPunches: []
+                        });
+                    } else {
+                        autoAbsencesCount++;
+                        employeeRecords.push({
+                            date: Timestamp.fromDate(stableDay),
+                            employeeId: emp.id!,
+                            status: 'absent',
+                            anomalyDescription: 'غائب (لم تظهر بصمته في الملف)',
+                            manualDeductionDays: 1,
+                            auditStatus: 'pending',
+                            allPunches: []
+                        });
+                    }
                 }
             }
 
@@ -348,8 +388,8 @@ export function AttendanceUploader() {
         }
 
         await batch.commit();
-        setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب آلياً.` });
+        setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount, coveredByPolicy: coveredByPolicyCount });
+        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب، وتغطية ${coveredByPolicyCount} حالة بسياسات الإجازات.` });
         setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
@@ -357,6 +397,9 @@ export function AttendanceUploader() {
     };
     reader.readAsBinaryString(file!);
   };
+
+  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  const leaveTypeTranslations: any = { 'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر' };
 
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
@@ -407,7 +450,8 @@ export function AttendanceUploader() {
                                 <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
                                     <div className="bg-white p-2 rounded-lg border">أيام العمل: {summary.workingDays}</div>
                                     <div className="bg-white p-2 rounded-lg border">البصمات: {summary.totalPunches}</div>
-                                    <div className="col-span-2 bg-red-600 text-white p-2 rounded-lg text-center">إثبات غياب آلي: {summary.autoAbsences} يوم</div>
+                                    <div className="bg-blue-600 text-white p-2 rounded-lg text-center">إجازات/إذونات: {summary.coveredByPolicy}</div>
+                                    <div className="bg-red-600 text-white p-2 rounded-lg text-center">إثبات غياب: {summary.autoAbsences}</div>
                                 </div>
                             </div>
                         )}
@@ -417,7 +461,7 @@ export function AttendanceUploader() {
                 <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl">
                     <CardHeader>
                         <CardTitle className="font-black">رفع وتحليل ملف البصمة</CardTitle>
-                        <CardDescription>ارفع ملف الإكسل ليقوم النظام بمطابقته مع أيام العمل الرسمية وكشف فجوات الحضور.</CardDescription>
+                        <CardDescription>ارفع ملف الإكسل ليقوم النظام بمطابقته مع الإجازات والاستئذانات وكشف فجوات الحضور.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
@@ -425,8 +469,8 @@ export function AttendanceUploader() {
                             <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
                             <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار ملف الإكسل"}</p>
                             <p className="text-xs text-muted-foreground mt-2 font-bold leading-relaxed">
-                                سيقوم النظام بمقارنة محتوى الملف مع التقويم الرسمي والمطابقات المسجلة في التبويب الثاني.<br/>
-                                <span className="text-primary">أي موظف مفقود من الملف في يوم عمل سيُسجل "غائباً" آلياً.</span>
+                                سيقوم النظام بمقارنة محتوى الملف مع سجلات الإجازات والاستئذانات المعتمدة آلياً.<br/>
+                                <span className="text-primary font-black">الموظف الحاصل على إجازة مرضية أو إذن تأخير سيتم استثناؤه من الخصم فوراً.</span>
                             </p>
                         </div>
                     </CardContent>
@@ -457,7 +501,7 @@ export function AttendanceUploader() {
                                 placeholder="بحث بالاسم أو الرقم..." 
                                 value={mappingSearch}
                                 onChange={(e) => setMappingSearch(e.target.value)}
-                                className="pl-10 h-11 rounded-xl bg-white border-none shadow-inner"
+                                className="pl-10 h-11 rounded-xl bg-white border-none shadow-inner font-bold"
                             />
                         </div>
                     </div>
