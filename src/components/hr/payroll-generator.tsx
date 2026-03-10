@@ -8,15 +8,14 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown } from 'lucide-react';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert } from 'lucide-react';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useBranding } from '@/context/branding-context';
 
@@ -29,6 +28,7 @@ export function PayrollGenerator() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
@@ -51,25 +51,26 @@ export function PayrollGenerator() {
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
   const [attLoading, setAttLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchAttendance = useCallback(async () => {
     if (!firestore) return;
-    const fetchAttendance = async () => {
-      setAttLoading(true);
-      try {
-        const snap = await getDocs(query(
-          collection(firestore, 'attendance'),
-          where('year', '==', parseInt(year)),
-          where('month', '==', parseInt(month))
-        ));
-        setAttendanceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance)));
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setAttLoading(false);
-      }
-    };
-    fetchAttendance();
+    setAttLoading(true);
+    try {
+      const snap = await getDocs(query(
+        collection(firestore, 'attendance'),
+        where('year', '==', parseInt(year)),
+        where('month', '==', parseInt(month))
+      ));
+      setAttendanceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance)));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAttLoading(false);
+    }
   }, [firestore, year, month]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
 
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
@@ -80,15 +81,12 @@ export function PayrollGenerator() {
     const selectedYear = parseInt(year);
 
     attendanceDocs.forEach(attendanceDoc => {
-        if (attendanceDoc.month !== selectedMonth || attendanceDoc.year !== selectedYear) return;
-
         const emp = employees.find(e => e.id === attendanceDoc.employeeId);
         
         attendanceDoc.records?.forEach(r => {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
 
-            // ضمان أن السجل ينتمي فعلياً للشهر والسنة المختارين (تجنباً لقفز التواريخ)
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
 
             if (r.status !== 'present') {
@@ -130,6 +128,49 @@ export function PayrollGenerator() {
         toast({ title: 'تم الحفظ', description: 'تم تحديث حالة المخالفة.' });
     } catch (e) { 
         toast({ variant: 'destructive', title: 'خطأ في التحديث' }); 
+    }
+  };
+
+  const handleBulkAuditAction = async (action: 'waive' | 'apply') => {
+    if (!firestore || !currentUser || anomalies.length === 0) return;
+    
+    const pendingAnomalies = anomalies.filter(a => a.record.auditStatus === 'pending');
+    if (pendingAnomalies.length === 0) return;
+
+    setIsBulkProcessing(true);
+    try {
+        const batch = writeBatch(firestore);
+        const updatedDocIds = new Set(pendingAnomalies.map(a => a.docId));
+        
+        for (const docId of Array.from(updatedDocIds)) {
+            const docRef = doc(firestore, 'attendance', docId);
+            const currentDoc = attendanceDocs.find(d => d.id === docId);
+            if (!currentDoc) continue;
+
+            const updatedRecords = currentDoc.records.map(r => {
+                const isPendingAnomaly = pendingAnomalies.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
+                if (isPendingAnomaly) {
+                    return {
+                        ...r,
+                        auditStatus: action === 'waive' ? 'waived' : 'verified',
+                        manualDeductionDays: action === 'waive' ? 0 : r.manualDeductionDays,
+                        waivedBy: currentUser.fullName,
+                        waivedAt: new Date()
+                    };
+                }
+                return r;
+            });
+
+            batch.update(docRef, { records: updatedRecords, updatedAt: serverTimestamp() });
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح الإجراء الجماعي', description: `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} جميع المخالفات المعلقة بنجاح.` });
+        fetchAttendance();
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنفيذ الإجراء الجماعي.' });
+    } finally {
+        setIsBulkProcessing(false);
     }
   };
 
@@ -258,7 +299,7 @@ export function PayrollGenerator() {
 
   return (
     <div className="space-y-8" dir="rtl">
-        <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2rem] border shadow-inner no-print justify-between items-end">
+        <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2.5rem] border shadow-inner no-print justify-between items-end">
             <div className="flex gap-4">
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
@@ -274,7 +315,7 @@ export function PayrollGenerator() {
         </div>
 
         <div className="space-y-6">
-            <div className="flex justify-between items-center px-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 gap-4">
                 <div className="space-y-1">
                     <h3 className="text-2xl font-black flex items-center gap-3">
                         <ShieldCheck className="text-primary h-8 w-8"/> 
@@ -282,11 +323,37 @@ export function PayrollGenerator() {
                     </h3>
                     <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> مراجعة المخالفات لشهر {month} سنة {year}.</p>
                 </div>
+                
                 {pendingAnomaliesCount > 0 && (
-                    <Badge variant="destructive" className="animate-pulse rounded-lg h-8 px-4 font-black">
-                        <AlertCircle className="h-4 w-4 ml-2" />
-                        يوجد {pendingAnomaliesCount} مخالفة بانتظار قرارك
-                    </Badge>
+                    <div className="flex flex-wrap gap-2 animate-in slide-in-from-left-4 duration-500">
+                        <Badge variant="destructive" className="animate-pulse rounded-lg h-9 px-4 font-black gap-2">
+                            <AlertCircle className="h-4 w-4" />
+                            يوجد {pendingAnomaliesCount} مخالفة
+                        </Badge>
+                        <div className="flex bg-muted/50 p-1 rounded-xl border shadow-inner no-print">
+                            <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => handleBulkAuditAction('waive')}
+                                disabled={isBulkProcessing}
+                                className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1"
+                            >
+                                {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3" />}
+                                تغاضي عن الكل
+                            </Button>
+                            <Separator orientation="vertical" className="h-4 mx-1 my-auto" />
+                            <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                onClick={() => handleBulkAuditAction('apply')}
+                                disabled={isBulkProcessing}
+                                className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1"
+                            >
+                                {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShieldAlert className="h-3 w-3" />}
+                                اعتماد الخصم للكل
+                            </Button>
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -300,13 +367,13 @@ export function PayrollGenerator() {
                 <div className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl printable-area">
                     <Table>
                         <TableHeader className="bg-muted/50 h-16">
-                            <TableRow>
-                                <TableHead className="px-8">الموظف</TableHead>
-                                <TableHead>التاريخ</TableHead>
-                                <TableHead>الحالة / المخالفة</TableHead>
-                                <TableHead>سجل البصمات (Punches)</TableHead>
-                                <TableHead>الخصم المستحق</TableHead>
-                                <TableHead className="text-center no-print">القرار الإداري</TableHead>
+                            <TableRow className="border-none">
+                                <TableHead className="px-8 font-black text-[#7209B7]">الموظف</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">الحالة / المخالفة</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">سجل البصمات (Punches)</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">الخصم المستحق</TableHead>
+                                <TableHead className="text-center no-print font-black text-[#7209B7]">القرار الإداري</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -315,12 +382,32 @@ export function PayrollGenerator() {
                                 const recordDate = toFirestoreDate(item.record.date);
                                 return (
                                 <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-lg">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground">الملف: {item.employeeNumber}</span></div></TableCell>
-                                    <TableCell className="font-bold text-sm">{recordDate ? format(recordDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</TableCell>
-                                    <TableCell><div className="flex flex-col gap-1.5"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[9px] font-black uppercase", isAbsent && "bg-red-600 animate-pulse")}>{isAbsent ? 'غياب كامل (مكتشف آلياً)' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير صباحي'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
-                                    <TableCell>{isAbsent ? <div className="flex items-center gap-2 text-red-400 opacity-40"><Ban className="h-4 w-4"/> <span className="text-xs font-bold">لا يوجد سجل</span></div> : <div className="flex flex-wrap gap-1.5 max-w-[180px]">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm">{p}</Badge>)}</div>}</TableCell>
-                                    <TableCell><div className="flex flex-col"><span className="font-black text-xl text-primary">{item.record.manualDeductionDays || 0} يوم</span>{item.record.auditStatus === 'waived' && <span className="text-[9px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="h-2 w-2"/> تم التغاضي</span>}</div></TableCell>
-                                    <TableCell className="text-center no-print">{item.record.auditStatus === 'pending' ? <div className="flex justify-center gap-3"><Button size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-600 hover:text-white rounded-xl font-bold h-10 px-6" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button><Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold h-10 px-6" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد الخصم</Button></div> : <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} className="text-muted-foreground h-10 rounded-xl gap-2 font-bold"><History className="h-4 w-4" /> تغيير القرار</Button>}</TableCell>
+                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-lg text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                    <TableCell className="font-bold text-sm text-gray-600">{recordDate ? format(recordDate, 'eeee, dd MMMM', { locale: ar }) : '-'}</TableCell>
+                                    <TableCell><div className="flex flex-col gap-1.5"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[9px] font-black uppercase tracking-wider px-3", isAbsent && "bg-red-600 animate-pulse")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير صباحي'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
+                                    <TableCell>{isAbsent ? <div className="flex items-center gap-2 text-red-400 opacity-40"><Ban className="h-4 w-4"/> <span className="text-xs font-bold">لا يوجد سجل</span></div> : <div className="flex flex-wrap gap-1.5 max-w-[180px]">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm border-primary/20">{p}</Badge>)}</div>}</TableCell>
+                                    <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span>{item.record.auditStatus === 'waived' && <span className="text-[9px] text-green-600 font-bold flex items-center gap-1"><CheckCircle2 className="h-2.5 w-2.5"/> تم التغاضي</span>}</div></TableCell>
+                                    <TableCell className="text-center no-print">{item.record.auditStatus === 'pending' ? (
+                                        <div className="flex justify-center gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline" 
+                                                className="bg-green-50 text-green-700 border-green-200 hover:bg-green-600 hover:text-white rounded-xl font-black h-10 px-5 transition-all shadow-sm" 
+                                                onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}
+                                            >
+                                                <Check className="ml-1 h-4 w-4" /> تغاضي
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                className="bg-red-600 hover:bg-red-700 text-white rounded-xl font-black h-10 px-5 transition-all shadow-md shadow-red-100" 
+                                                onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}
+                                            >
+                                                <X className="ml-1 h-4 w-4" /> خصم
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} className="text-muted-foreground h-10 rounded-xl gap-2 font-black hover:bg-muted/50"><History className="h-4 w-4" /> تغيير القرار</Button>
+                                    )}</TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
