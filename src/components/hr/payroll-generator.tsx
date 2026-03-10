@@ -104,7 +104,7 @@ export function PayrollGenerator() {
         });
     });
     
-    return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(a.record.date)?.getTime() || 0));
+    return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(b.record.date)?.getTime() || 0));
   }, [attendanceDocs, employees, month, year]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply' | 'reset') => {
@@ -119,7 +119,6 @@ export function PayrollGenerator() {
                 let manualDeduction = r.manualDeductionDays;
                 if (action === 'waive') manualDeduction = 0;
                 else if (action === 'reset') {
-                    // Restore default deduction based on status
                     manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
                 }
 
@@ -144,10 +143,7 @@ export function PayrollGenerator() {
 
   const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser || anomalies.length === 0) return;
-    
-    // For reset, we process all anomalies. For waive/apply, we only process pending ones.
     const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
-    
     if (targets.length === 0) return;
 
     setIsBulkProcessing(true);
@@ -184,12 +180,7 @@ export function PayrollGenerator() {
         }
 
         await batch.commit();
-        toast({ 
-            title: 'نجاح الإجراء الجماعي', 
-            description: action === 'reset' 
-                ? 'تمت إعادة تعيين جميع المخالفات للتدقيق.' 
-                : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات المعلقة بنجاح.` 
-        });
+        toast({ title: 'نجاح الإجراء الجماعي', description: action === 'reset' ? 'تمت إعادة تعيين جميع المخالفات.' : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات.` });
         fetchAttendance();
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنفيذ الإجراء الجماعي.' });
@@ -260,28 +251,21 @@ export function PayrollGenerator() {
 
       att.records?.forEach(r => {
         if (r.auditStatus === 'waived') return;
-        
-        if (r.status === 'absent') {
-            totalAbsent++;
-        } else {
+        if (r.status === 'absent') totalAbsent++;
+        else {
             if (r.checkIn1) {
                 const checkInMins = timeToMinutes(r.checkIn1);
                 const diff = checkInMins - limitMins;
-                if (diff > 0) {
-                    totalLateMinutes += diff;
-                    totalLate++;
-                }
+                if (diff > 0) { totalLateMinutes += diff; totalLate++; }
             }
             if (r.status === 'half_day') totalHalfDay++;
         }
-        
         totalDeductionDays += (r.manualDeductionDays || 0);
       });
 
       const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
       const dailyRate = fullSalary / 26;
       const deductionAmount = totalDeductionDays * dailyRate;
-
       const lateHours = Math.floor(totalLateMinutes / 60);
       const lateMins = totalLateMinutes % 60;
 
@@ -303,26 +287,13 @@ export function PayrollGenerator() {
   }, [employees, attendanceDocs, branding]);
 
   const handleExportExcel = () => {
-    if (summaryData.length === 0) {
-      toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
-      return;
-    }
-
+    if (summaryData.length === 0) return;
     const excelRows = summaryData.map(s => ({
-        'رقم الموظف': s!.empNo,
-        'اسم الموظف': s!.name,
-        'الراتب الكامل': s!.fullSalary,
-        'أيام الغياب': s!.absent,
-        'عدد مرات التأخير': s!.lateCount,
-        'إجمالي ساعات التأخير': s!.lateTime,
-        'إجمالي دقائق التأخير': s!.lateMins,
-        'أيام نصف يوم': s!.halfDays,
-        'إجمالي أيام الخصم': s!.deductionDays,
-        'المعدل اليومي': Math.round(s!.dailyRate * 1000) / 1000,
-        'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
+        'رقم الموظف': s!.empNo, 'اسم الموظف': s!.name, 'الراتب الكامل': s!.fullSalary,
+        'أيام الغياب': s!.absent, 'عدد مرات التأخير': s!.lateCount, 'إجمالي دقائق التأخير': s!.lateMins,
+        'إجمالي أيام الخصم': s!.deductionDays, 'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
         'صافي الراتب المتوقع': Math.round(s!.netSalary * 1000) / 1000,
     }));
-
     const ws = XLSX.utils.json_to_sheet(excelRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `حضور ${month}-${year}`);
@@ -332,7 +303,6 @@ export function PayrollGenerator() {
   const handleExportSummaryPDF = () => {
     const element = document.getElementById('summary-printable-area');
     if (!element) return;
-
     setIsExportingSummary(true);
     const opt = {
       margin: [0.5, 0.5],
@@ -341,12 +311,11 @@ export function PayrollGenerator() {
       html2canvas: { scale: 2, useCORS: true, letterRendering: true },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
-
     import('html2pdf.js').then(module => {
       const html2pdf = module.default;
       html2pdf().from(element).set(opt).save().then(() => {
         setIsExportingSummary(false);
-        toast({ title: 'نجاح التصدير', description: 'تم إنشاء ملخص الرواتب PDF بنجاح.' });
+        toast({ title: 'نجاح التصدير' });
       });
     });
   };
@@ -354,22 +323,17 @@ export function PayrollGenerator() {
   const handleExportPDF = () => {
     const element = document.getElementById('audit-printable-area');
     if (!element) return;
-
     setIsExportingPDF(true);
     const opt = {
       margin: [0.5, 0.5],
-      filename: `تقرير_مخالفات_الحضور_${month}_${year}.pdf`,
+      filename: `تقرير_مخالفات_${month}_${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, letterRendering: true },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
-
     import('html2pdf.js').then(module => {
       const html2pdf = module.default;
-      html2pdf().from(element).set(opt).save().then(() => {
-        setIsExportingPDF(false);
-        toast({ title: 'نجاح التصدير', description: 'تم إنشاء ملف PDF بنجاح.' });
-      });
+      html2pdf().from(element).set(opt).save().then(() => setIsExportingPDF(false));
     });
   };
 
@@ -386,11 +350,11 @@ export function PayrollGenerator() {
             </div>
             <div className="flex flex-wrap gap-3">
                 <Button variant="outline" onClick={handleExportExcel} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
-                <Button variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
+                <Button variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary || summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
                     {isExportingSummary ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
                     تصدير PDF (ملخص)
                 </Button>
-                <Button variant="outline" onClick={handleExportPDF} disabled={isExportingPDF} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
+                <Button variant="outline" onClick={handleExportPDF} disabled={isExportingPDF || anomalies.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
                     {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldAlert className="h-4 w-4"/>} 
                     تقرير المخالفات PDF
                 </Button>
@@ -401,68 +365,67 @@ export function PayrollGenerator() {
             </div>
         </div>
 
-        {/* --- ملخص الرواتب المختصر (للطباعة) --- */}
-        {/* 🛡️ تقنية الطبقة الشفافة: نضع العنصر في مكان ثابت لكنه شفاف وتحت العناصر الأخرى 
-            هذا يسمح لـ html2pdf بالتقاطه وبنائه كأنه مرئي تماماً دون تداخل مع الواجهة */}
-        <div 
-            id="summary-printable-area" 
-            className="absolute top-0 right-0 w-[1120px] bg-white opacity-0 pointer-events-none -z-50 border-2 rounded-[2.5rem] overflow-hidden"
-            style={{ minHeight: '800px' }}
-        >
-            <div className="p-8 border-b-4 border-primary bg-muted/10">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                        <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                        <div>
-                            <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                            <p className="text-sm font-bold text-muted-foreground">ملخص مستحقات الموظفين الشهرية</p>
+        {/* 🛡️ منطقة الطباعة المحسنة: نستخدم رندرة مشروطة لمنع الحمل الزائد */}
+        {summaryData.length > 0 && (
+            <div 
+                id="summary-printable-area" 
+                className="fixed -left-[10000px] top-0 w-[1120px] bg-white border-2 rounded-[2.5rem] overflow-hidden"
+                style={{ visibility: 'hidden', pointerEvents: 'none' }}
+            >
+                <div className="p-8 border-b-4 border-primary bg-muted/10">
+                    <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-4">
+                            <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                            <div>
+                                <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
+                                <p className="text-sm font-bold text-muted-foreground">ملخص مستحقات الموظفين الشهرية</p>
+                            </div>
+                        </div>
+                        <div className="text-left">
+                            <h2 className="text-xl font-black text-primary">شهر {monthName} {year}</h2>
+                            <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
                         </div>
                     </div>
-                    <div className="text-left">
-                        <h2 className="text-xl font-black text-primary">شهر {monthName} {year}</h2>
-                        <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
-                    </div>
+                </div>
+                <Table>
+                    <TableHeader className="bg-muted/50">
+                        <TableRow>
+                            <TableHead className="px-6 font-black">الموظف</TableHead>
+                            <TableHead className="font-black text-center">الراتب الكامل</TableHead>
+                            <TableHead className="font-black text-center">الغياب</TableHead>
+                            <TableHead className="font-black text-center">التأخير (د)</TableHead>
+                            <TableHead className="font-black text-center">خصم (أيام)</TableHead>
+                            <TableHead className="text-left font-black">إجمالي الخصم</TableHead>
+                            <TableHead className="text-left font-black bg-primary/5 text-primary">صافي المستحق</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {summaryData.map((s, idx) => (
+                            <TableRow key={idx} className="h-14">
+                                <TableCell className="px-6 font-bold">{s?.name}</TableCell>
+                                <TableCell className="text-center font-mono">{formatCurrency(s?.fullSalary || 0)}</TableCell>
+                                <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
+                                <TableCell className="text-center font-mono">{s?.lateMins} د</TableCell>
+                                <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
+                                <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
+                                <TableCell className="text-left font-mono font-black text-primary bg-primary/5">{formatCurrency(s?.netSalary || 0)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                    <TableFooter className="bg-muted/20 font-black h-16">
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-right px-10">إجمالي الرواتب الصافية للصرف:</TableCell>
+                            <TableCell className="text-left font-mono text-xl">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
+                        </TableRow>
+                    </TableFooter>
+                </Table>
+                <div className="p-12 grid grid-cols-2 gap-20 text-center">
+                    <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
+                    <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
                 </div>
             </div>
-            <Table>
-                <TableHeader className="bg-muted/50">
-                    <TableRow>
-                        <TableHead className="px-6 font-black">الموظف</TableHead>
-                        <TableHead className="font-black text-center">الراتب الكامل</TableHead>
-                        <TableHead className="font-black text-center">الغياب</TableHead>
-                        <TableHead className="font-black text-center">التأخير (د)</TableHead>
-                        <TableHead className="font-black text-center">خصم (أيام)</TableHead>
-                        <TableHead className="text-left font-black">إجمالي الخصم</TableHead>
-                        <TableHead className="text-left font-black bg-primary/5 text-primary">صافي المستحق</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {summaryData.map((s, idx) => (
-                        <TableRow key={idx} className="h-14">
-                            <TableCell className="px-6 font-bold">{s?.name}</TableCell>
-                            <TableCell className="text-center font-mono">{formatCurrency(s?.fullSalary || 0)}</TableCell>
-                            <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
-                            <TableCell className="text-center font-mono">{s?.lateMins} د</TableCell>
-                            <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
-                            <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
-                            <TableCell className="text-left font-mono font-black text-primary bg-primary/5">{formatCurrency(s?.netSalary || 0)}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-                <TableFooter className="bg-muted/20 font-black h-16">
-                    <TableRow>
-                        <TableCell colSpan={6} className="text-right px-10">إجمالي الرواتب الصافية للصرف:</TableCell>
-                        <TableCell className="text-left font-mono text-xl">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
-                    </TableRow>
-                </TableFooter>
-            </Table>
-            <div className="p-12 grid grid-cols-2 gap-20 text-center">
-                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
-                <div className="space-y-16"><p className="font-black border-b-2 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
-            </div>
-        </div>
+        )}
 
-        {/* --- مركز التدقيق التفصيلي (الوضع الحالي) --- */}
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 gap-4">
                 <div className="space-y-1">
@@ -484,24 +447,12 @@ export function PayrollGenerator() {
                         <div className="flex bg-muted/50 p-1 rounded-xl border shadow-inner no-print items-center">
                             {pendingAnomaliesCount > 0 && (
                                 <>
-                                    <Button 
-                                        size="sm" 
-                                        variant="ghost" 
-                                        onClick={() => handleBulkAuditAction('waive')}
-                                        disabled={isBulkProcessing}
-                                        className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1"
-                                    >
+                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1">
                                         {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3" />}
                                         تغاضي عن الكل
                                     </Button>
                                     <Separator orientation="vertical" className="h-4 mx-1 my-auto" />
-                                    <Button 
-                                        size="sm" 
-                                        variant="ghost" 
-                                        onClick={() => handleBulkAuditAction('apply')}
-                                        disabled={isBulkProcessing}
-                                        className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1"
-                                    >
+                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1">
                                         {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShieldAlert className="h-3 w-3" />}
                                         اعتماد الخصم للكل
                                     </Button>
@@ -510,13 +461,7 @@ export function PayrollGenerator() {
                             {processedAnomaliesCount > 0 && (
                                 <>
                                     {pendingAnomaliesCount > 0 && <Separator orientation="vertical" className="h-4 mx-1 my-auto" />}
-                                    <Button 
-                                        size="sm" 
-                                        variant="ghost" 
-                                        onClick={() => handleBulkAuditAction('reset')}
-                                        disabled={isBulkProcessing}
-                                        className="h-7 text-[10px] font-black text-gray-600 hover:bg-gray-200 rounded-lg gap-1"
-                                    >
+                                    <Button size="sm" variant="ghost" onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-gray-600 hover:bg-gray-200 rounded-lg gap-1">
                                         {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3" />}
                                         إعادة تعيين للتدقيق
                                     </Button>
@@ -531,8 +476,6 @@ export function PayrollGenerator() {
                 <div className="p-32 text-center"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /><p className="mt-4 font-bold text-muted-foreground">جاري فحص سجلات الحضور...</p></div>
             ) : attendanceDocs.length === 0 ? (
                 <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50"><CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" /><p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p></div>
-            ) : anomalies.length === 0 ? (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100"><CheckCircle className="h-24 w-24 text-green-600/20 mx-auto mb-6" /><p className="text-3xl font-black text-green-800">التزام كامل! لا توجد مخالفات</p></div>
             ) : (
                 <div id="audit-printable-area" className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
                     <Table>
@@ -547,7 +490,9 @@ export function PayrollGenerator() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {anomalies.map((item, idx) => {
+                            {anomalies.length === 0 ? (
+                                <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-bold italic">لا توجد مخالفات في سجلات الحضور.</TableCell></TableRow>
+                            ) : anomalies.map((item, idx) => {
                                 const isAbsent = item.record.status === 'absent';
                                 const recordDate = toFirestoreDate(item.record.date);
                                 return (
