@@ -1,18 +1,19 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { calculateGratuity } from '@/services/leave-calculator';
 import { toFirestoreDate } from '@/services/date-converter';
-import { useSubscription, useFirebase } from '@/firebase';
-import { where } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { Payslip } from '@/lib/types';
 import { Wallet, Users, HandCoins, FileText, Banknote } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 const StatCard = ({ title, value, icon, loading }: { title: string, value: string, icon: React.ReactNode, loading: boolean }) => (
     <Card>
@@ -42,12 +43,27 @@ export function MonthlyCostsReport() {
     const { firestore } = useFirebase();
     const [year, setYear] = useState(new Date().getFullYear().toString());
     
-    const payslipsQuery = useMemo(() => {
-        if (!firestore || year === 'all') return null;
-        return [where('year', '==', parseInt(year))];
-    }, [firestore, year]);
+    const [payslips, setPayslips] = useState<Payslip[]>([]);
+    const [payslipsLoading, setPayslipsLoading] = useState(false);
 
-    const { data: payslips, loading: payslipsLoading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
+    useEffect(() => {
+        if (!firestore) return;
+        const fetch = async () => {
+            setPayslipsLoading(true);
+            try {
+                const snap = await getDocs(query(
+                    collection(firestore, 'payroll'),
+                    where('year', '==', parseInt(year))
+                ));
+                setPayslips(snap.docs.map(d => ({ id: d.id, ...d.data() } as Payslip)));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setPayslipsLoading(false);
+            }
+        };
+        fetch();
+    }, [firestore, year]);
 
     const loading = employeesLoading || payslipsLoading;
 
@@ -63,7 +79,7 @@ export function MonthlyCostsReport() {
 
         const gratuityPaid = employees
             .filter(e => e.status === 'terminated' && toFirestoreDate(e.terminationDate)?.getFullYear().toString() === year)
-            .reduce((sum, e) => sum + calculateGratuity(e, toFirestoreDate(e.terminationDate)!).total, 0);
+            .reduce((sum, e) => sum + calculateGratuity(e, toFirestoreDate(e.terminationDate)!, 'waived').total, 0);
 
         const totalCost = totalSalaryAndAllowances + totalCommissions + gratuityPaid;
         const avgCostPerEmployee = activeEmployees.length > 0 ? totalCost / activeEmployees.length : 0;
@@ -105,10 +121,10 @@ export function MonthlyCostsReport() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-                    <StatCard loading={loading} title="إجمالي الرواتب والبدلات" value={formatCurrency(reportData?.totalSalaryAndAllowances || 0)} icon={<Banknote />} colorClass="text-green-600" />
-                    <StatCard loading={loading} title="إجمالي العمولات" value={formatCurrency(reportData?.totalCommissions || 0)} icon={<FileText />} colorClass="text-indigo-600" />
-                    <StatCard loading={loading} title="إجمالي نهاية الخدمة" value={formatCurrency(reportData?.gratuityPaid || 0)} icon={<HandCoins />} colorClass="text-amber-600" />
-                    <StatCard loading={loading} title="متوسط التكلفة لكل موظف" value={formatCurrency(reportData?.avgCostPerEmployee || 0)} icon={<Users />} colorClass="text-blue-600" />
+                    <StatCard loading={loading} title="إجمالي الرواتب والبدلات" value={formatCurrency(reportData?.totalSalaryAndAllowances || 0)} icon={<Banknote />} />
+                    <StatCard loading={loading} title="إجمالي العمولات" value={formatCurrency(reportData?.totalCommissions || 0)} icon={<FileText />} />
+                    <StatCard loading={loading} title="إجمالي نهاية الخدمة" value={formatCurrency(reportData?.gratuityPaid || 0)} icon={<HandCoins />} />
+                    <StatCard loading={loading} title="متوسط التكلفة لكل موظف" value={formatCurrency(reportData?.avgCostPerEmployee || 0)} icon={<Users />} />
                 </div>
                 
                 <div className="grid gap-8 md:grid-cols-3">

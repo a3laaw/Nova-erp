@@ -1,7 +1,7 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import type { Employee, Payslip } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { Download } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
+import { Input } from '../ui/input';
 import Link from 'next/link';
 
 const statusColors: Record<string, string> = { draft: 'bg-yellow-100 text-yellow-800', processed: 'bg-blue-100 text-blue-800', paid: 'bg-green-100 text-green-800' };
@@ -30,11 +30,29 @@ export function MonthlyPayrollReport() {
     const [searchQuery, setSearchQuery] = useState('');
     
     const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
-    const payslipsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [where('year', '==', parseInt(year)), where('month', '==', parseInt(month))];
+    
+    const [payslips, setPayslips] = useState<Payslip[]>([]);
+    const [payslipsLoading, setPayslipsLoading] = useState(false);
+
+    useEffect(() => {
+        if (!firestore) return;
+        const fetch = async () => {
+            setPayslipsLoading(true);
+            try {
+                const snap = await getDocs(query(
+                    collection(firestore, 'payroll'),
+                    where('year', '==', parseInt(year)),
+                    where('month', '==', parseInt(month))
+                ));
+                setPayslips(snap.docs.map(d => ({ id: d.id, ...d.data() } as Payslip)));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setPayslipsLoading(false);
+            }
+        };
+        fetch();
     }, [firestore, year, month]);
-    const { data: payslips, loading: payslipsLoading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
 
     const loading = employeesLoading || payslipsLoading;
     
@@ -88,7 +106,7 @@ export function MonthlyPayrollReport() {
                         <TableBody>
                             {loading && Array.from({length:5}).map((_,i) => <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full"/></TableCell></TableRow>)}
                             {!loading && reportData.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد بيانات رواتب لهذا الشهر.</TableCell></TableRow>}
-                            {!loading && reportData.map(p => (<TableRow key={p.id}><TableCell className="font-medium"><Link href={`/dashboard/hr/payroll/${p.id}`} className="hover:underline">{p.employeeName}</Link></TableCell><TableCell><Badge variant="outline" className={payslipTypeColors[p.type || 'Monthly']}>{payslipTypeTranslations[p.type || 'Monthly']}</Badge></TableCell><TableCell>{formatCurrency(p.totalEarnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(p.totalDeductions)}</TableCell><TableCell className="font-bold">{formatCurrency(p.netSalary)}</TableCell><TableCell><Badge variant="outline" className={statusColors[p.status]}>{statusTranslations[p.status]}</Badge></TableCell></TableRow>))}
+                            {!loading && reportData.map(p => (<TableRow key={p.id}><TableCell className="font-medium">{p.employeeName}</TableCell><TableCell><Badge variant="outline" className={payslipTypeColors[p.type || 'Monthly']}>{payslipTypeTranslations[p.type || 'Monthly']}</Badge></TableCell><TableCell>{formatCurrency(p.totalEarnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(p.totalDeductions)}</TableCell><TableCell className="font-bold">{formatCurrency(p.netSalary)}</TableCell><TableCell><Badge variant="outline" className={statusColors[p.status]}>{statusTranslations[p.status]}</Badge></TableCell></TableRow>))}
                         </TableBody>
                         <TableFooter><TableRow className="font-bold text-base bg-muted"><TableCell colSpan={2}>الإجمالي</TableCell><TableCell>{formatCurrency(totals.earnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(totals.deductions)}</TableCell><TableCell>{formatCurrency(totals.net)}</TableCell><TableCell></TableCell></TableRow></TableFooter>
                     </Table>

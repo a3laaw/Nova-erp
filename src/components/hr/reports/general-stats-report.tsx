@@ -1,19 +1,19 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { toFirestoreDate } from '@/services/date-converter';
 import type { Employee, Payslip, MonthlyAttendance, LeaveRequest } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, cn } from '@/lib/utils';
 import { format, differenceInYears, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
-import { Users, UserPlus, Star, CalendarX, Percent, Wallet, UserX as UserXIcon, Briefcase, Loader2 } from 'lucide-react';
-import { where } from 'firebase/firestore';
+import { ar } from 'date-fns/locale';
+import { Users, UserPlus, Star, CalendarX, Percent, Wallet, UserX as UserXIcon, Briefcase } from 'lucide-react';
 
 const StatCard = ({ title, value, icon, description, loading, colorClass }: { title: string, value: string | number, icon: React.ReactNode, description?: string, loading: boolean, colorClass?: string }) => (
     <Card>
@@ -37,17 +37,38 @@ export function GeneralStatsReport() {
     const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
     const { data: allLeaves, loading: leavesLoading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests');
 
-    const payslipsQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [where('year', '==', parseInt(year)), where('month', '==', parseInt(month))];
+    const [monthlyPayslips, setMonthlyPayslips] = useState<Payslip[]>([]);
+    const [payslipsLoading, setPayslipsLoading] = useState(false);
+    const [monthlyAttendance, setMonthlyAttendance] = useState<MonthlyAttendance[]>([]);
+    const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+    useEffect(() => {
+        if (!firestore) return;
+        const fetch = async () => {
+            setPayslipsLoading(true);
+            setAttendanceLoading(true);
+            try {
+                const [payslipsSnap, attendanceSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'payroll'),
+                        where('year', '==', parseInt(year)),
+                        where('month', '==', parseInt(month))
+                    )),
+                    getDocs(query(collection(firestore, 'attendance'),
+                        where('year', '==', parseInt(year)),
+                        where('month', '==', parseInt(month))
+                    ))
+                ]);
+                setMonthlyPayslips(payslipsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payslip)));
+                setMonthlyAttendance(attendanceSnap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance)));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setPayslipsLoading(false);
+                setAttendanceLoading(false);
+            }
+        };
+        fetch();
     }, [firestore, year, month]);
-    const { data: monthlyPayslips, loading: payslipsLoading } = useSubscription<Payslip>(firestore, 'payroll', payslipsQuery || []);
-    
-    const attendanceQuery = useMemo(() => {
-        if (!firestore) return null;
-        return [where('year', '==', parseInt(year)), where('month', '==', parseInt(month))];
-    }, [firestore, year, month]);
-    const { data: monthlyAttendance, loading: attendanceLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery || []);
     
     const loading = employeesLoading || leavesLoading || payslipsLoading || attendanceLoading;
 
