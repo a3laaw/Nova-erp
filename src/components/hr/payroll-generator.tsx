@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -8,7 +9,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -36,6 +37,7 @@ export function PayrollGenerator() {
   
   const { data: attendanceDocs, loading: attLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery);
 
+  // استخراج كافة المخالفات والغيابات (بما فيها الغيابات الآلية)
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string, lastUpdated?: any }[] = [];
     const targetMonth = parseInt(month);
@@ -46,6 +48,7 @@ export function PayrollGenerator() {
         doc.records?.forEach(r => {
             const rDate = toFirestoreDate(r.date);
             if (rDate && (rDate.getMonth() + 1) === targetMonth && rDate.getFullYear() === targetYear) {
+                // أي يوم حالته ليست 'present' يعتبر مخالفة تستوجب التدقيق
                 if (r.status !== 'present') {
                     list.push({ 
                         docId: doc.id!, 
@@ -58,10 +61,11 @@ export function PayrollGenerator() {
             }
         });
     });
+    
     return list.sort((a, b) => {
-        const dateA = toFirestoreDate(a.record.date);
-        const dateB = toFirestoreDate(b.record.date);
-        return (dateA?.getTime() || 0) - (dateB?.getTime() || 0);
+        const dateA = toFirestoreDate(a.record.date)?.getTime() || 0;
+        const dateB = toFirestoreDate(b.record.date)?.getTime() || 0;
+        return dateA - dateB;
     });
   }, [attendanceDocs, employees, month, year]);
 
@@ -86,7 +90,7 @@ export function PayrollGenerator() {
         });
         
         await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
-        toast({ title: 'تم حفظ القرار', description: 'تم تحديث حالة المخالفة.' });
+        toast({ title: 'تم الحفظ', description: 'تم تحديث حالة المخالفة.' });
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
   };
 
@@ -151,7 +155,7 @@ export function PayrollGenerator() {
                         <ShieldCheck className="text-primary h-8 w-8"/> 
                         مركز تدقيق الحضور والمخالفات
                     </h3>
-                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> يتم التحديث فورياً عند رفع ملف بصمة جديد.</p>
+                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> يتم التحديث فورياً عند رفع ملف بصمة جديد وكشف فجوات الغياب.</p>
                 </div>
                 {pendingAnomaliesCount > 0 && (
                     <Badge variant="destructive" className="animate-pulse rounded-lg h-8 px-4 font-black">
@@ -164,19 +168,19 @@ export function PayrollGenerator() {
             {attLoading ? (
                 <div className="p-32 text-center">
                     <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
-                    <p className="mt-4 font-bold text-muted-foreground">جاري جلب بيانات الحضور والغياب...</p>
+                    <p className="mt-4 font-bold text-muted-foreground">جاري فحص فجوات الحضور والغياب...</p>
                 </div>
             ) : attendanceDocs.length === 0 ? (
                 <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50">
                     <CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" />
                     <p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p>
-                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى التأكد من اختيار الشهر الصحيح أو رفع ملف البصمة أولاً من تبويب الرفع.</p>
+                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى رفع ملف البصمة أولاً من تبويب "رفع الحضور".</p>
                 </div>
             ) : anomalies.length === 0 ? (
                 <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100">
                     <CheckCircle className="h-24 w-24 text-green-600/20 mx-auto mb-6" />
                     <p className="text-3xl font-black text-green-800">التزام كامل! لا توجد مخالفات</p>
-                    <p className="text-lg font-medium text-green-700/60 mt-3">كافة الموظفين الذين تم رفع بصمتهم ملتزمون بالجدول الزمني وليس لديهم غيابات أو تأخيرات.</p>
+                    <p className="text-lg font-medium text-green-700/60 mt-3">كافة الموظفين ملتزمون بالبصمة في كافة أيام العمل الرسمية لهذا الشهر.</p>
                 </div>
             ) : (
                 <div className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl printable-area">
@@ -185,21 +189,22 @@ export function PayrollGenerator() {
                             <TableRow>
                                 <TableHead className="px-8">الموظف</TableHead>
                                 <TableHead>التاريخ</TableHead>
-                                <TableHead>المخالفة المرصودة</TableHead>
+                                <TableHead>الحالة / المخالفة</TableHead>
                                 <TableHead>سجل البصمات (Punches)</TableHead>
-                                <TableHead>الخصم المقترح</TableHead>
+                                <TableHead>الخصم المستحق</TableHead>
                                 <TableHead className="text-center no-print">القرار الإداري</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {anomalies.map((item, idx) => {
                                 const lastUpd = toFirestoreDate(item.lastUpdated);
+                                const isAbsent = item.record.status === 'absent';
                                 return (
-                                <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : item.record.auditStatus === 'verified' ? "bg-red-50/20" : "bg-white")}>
+                                <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
                                     <TableCell className="px-8">
                                         <div className="flex flex-col">
                                             <span className="font-black text-lg">{item.empName}</span>
-                                            <span className="font-mono text-[10px] text-muted-foreground">تحديث: {lastUpd ? format(lastUpd, 'HH:mm:ss') : '---'}</span>
+                                            <span className="font-mono text-[10px] text-muted-foreground">الملف: {item.employeeNumber}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell className="font-bold text-sm">
@@ -207,18 +212,22 @@ export function PayrollGenerator() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col gap-1.5">
-                                            <Badge variant={item.record.status === 'absent' ? 'destructive' : 'outline'} className="w-fit text-[9px] font-black uppercase">
-                                                {item.record.status === 'half_day' ? 'نصف يوم' : item.record.status === 'absent' ? 'غياب كامل' : 'بصمة ناقصة'}
+                                            <Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[9px] font-black uppercase", isAbsent && "bg-red-600 animate-pulse")}>
+                                                {isAbsent ? 'غياب كامل (مكتشف آلياً)' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير صباحي'}
                                             </Badge>
                                             <span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex flex-wrap gap-1.5 max-w-[180px]">
-                                            {(item.record.allPunches || []).map((p, i) => (
-                                                <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm">{p}</Badge>
-                                            ))}
-                                        </div>
+                                        {isAbsent ? (
+                                            <div className="flex items-center gap-2 text-red-400 opacity-40"><Ban className="h-4 w-4"/> <span className="text-xs font-bold">لا يوجد سجل</span></div>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-1.5 max-w-[180px]">
+                                                {(item.record.allPunches || []).map((p, i) => (
+                                                    <Badge key={i} variant="outline" className="font-mono text-[10px] px-2 h-5 bg-background shadow-sm">{p}</Badge>
+                                                ))}
+                                            </div>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
