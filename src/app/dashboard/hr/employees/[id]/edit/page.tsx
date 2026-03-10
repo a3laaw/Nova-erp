@@ -78,6 +78,9 @@ export default function EditEmployeePage() {
             { key: 'contractType', changeType: 'JobChange', label: 'نوع العقد' },
             { key: 'contractPercentage', changeType: 'JobChange', label: 'نسبة العقد' },
             { key: 'residencyExpiry', changeType: 'ResidencyUpdate', label: 'تاريخ انتهاء الإقامة' },
+            { key: 'passportExpiry', changeType: 'DataUpdate', label: 'تاريخ انتهاء الجواز' },
+            { key: 'drivingLicenseExpiry', changeType: 'DataUpdate', label: 'تاريخ انتهاء الرخصة' },
+            { key: 'healthCardExpiry', changeType: 'DataUpdate', label: 'تاريخ كارت الصحة' },
         ];
 
         const contractTypeTranslations: Record<string, string> = {
@@ -150,15 +153,9 @@ export default function EditEmployeePage() {
 
     if (loading) {
         return (
-             <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader>
-                     <Skeleton className="h-8 w-48" />
-                     <Skeleton className="h-4 w-32 mt-2" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <Skeleton className="h-64 w-full rounded-2xl" />
-                </CardContent>
-            </Card>
+             <div className="p-8 max-w-4xl mx-auto space-y-6" dir="rtl">
+                <Skeleton className="h-64 w-full rounded-2xl" />
+            </div>
         )
     }
 
@@ -173,24 +170,24 @@ export default function EditEmployeePage() {
     }
 
     return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <CardHeader>
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+            <CardHeader className="bg-primary/5 pb-8 border-b">
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>تعديل بيانات الموظف</CardTitle>
-                        <CardDescription>
-                            تعديل الملف الشخصي لـ <span className="font-bold text-primary">{employee.fullName || (employee as any).nameAr}</span>.
+                        <CardTitle className="text-2xl font-black">تعديل بيانات الموظف</CardTitle>
+                        <CardDescription className="text-base font-medium">
+                            تعديل الملف الشخصي لـ <span className="font-bold text-primary">{employee.fullName}</span>.
                         </CardDescription>
                     </div>
-                    <div className="text-right bg-muted/50 px-4 py-2 rounded-xl border">
+                    <div className="text-right bg-white px-4 py-2 rounded-xl border shadow-sm">
                         <Label className="text-[10px] uppercase font-bold text-muted-foreground">رقم الملف الوظيفي</Label>
-                        <div className="font-mono text-lg font-semibold text-primary">
+                        <div className="font-mono text-lg font-black text-primary">
                             {employee.employeeNumber}
                         </div>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-8">
                 <EmployeeForm 
                     key={employee.id} 
                     initialData={employee}

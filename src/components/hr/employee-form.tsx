@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar } from 'lucide-react';
+import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +60,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         dob: undefined,
         nationality: '',
         residencyExpiry: undefined,
+        passportExpiry: undefined,
+        drivingLicenseExpiry: undefined,
+        healthCardExpiry: undefined,
         workStartTime: null,
         workEndTime: null,
         pieceRateMode: 'salary_with_target',
@@ -72,6 +75,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
 
+    // التحقق هل النشاط غذائي لتفعيل الحقول الإضافية
+    const isFoodActivity = useMemo(() => branding?.activityType === 'food_delivery', [branding]);
+
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -81,6 +87,9 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 hireDate: toFirestoreDate(initialData.hireDate) || new Date(),
                 dob: toFirestoreDate(initialData.dob) || undefined,
                 residencyExpiry: toFirestoreDate(initialData.residencyExpiry) || undefined,
+                passportExpiry: toFirestoreDate(initialData.passportExpiry) || undefined,
+                drivingLicenseExpiry: toFirestoreDate(initialData.drivingLicenseExpiry) || undefined,
+                healthCardExpiry: toFirestoreDate(initialData.healthCardExpiry) || undefined,
                 basicSalary: Number(initialData.basicSalary || 0),
                 housingAllowance: Number(initialData.housingAllowance || 0),
                 transportAllowance: Number(initialData.transportAllowance || 0),
@@ -233,6 +242,29 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
+                {/* 🛡️ حقول النشاط الغذائي / التوصيل (الطلب الجديد) */}
+                {isFoodActivity && (
+                    <section className="space-y-6 p-6 border-2 border-dashed border-indigo-200 bg-indigo-50/10 rounded-[2rem] animate-in zoom-in-95">
+                        <h3 className="font-black text-lg flex items-center gap-2 text-indigo-800">
+                            <FileCheck className="h-5 w-5" /> تراخيص ووثائق إضافية (نشاط غذائي)
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><FileCheck className="h-3 w-3" /> انتهاء الجواز</Label>
+                                <DateInput value={formData.passportExpiry} onChange={d => handleSelectChange('passportExpiry', d)} className="bg-white" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> انتهاء كارت الصحة</Label>
+                                <DateInput value={formData.healthCardExpiry} onChange={d => handleSelectChange('healthCardExpiry', d)} className="bg-white" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><Landmark className="h-3 w-3" /> انتهاء رخصة القيادة</Label>
+                                <DateInput value={formData.drivingLicenseExpiry} onChange={d => handleSelectChange('drivingLicenseExpiry', d)} className="bg-white" />
+                            </div>
+                        </div>
+                    </section>
+                )}
+
                 {/* Job Info Group */}
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2">
@@ -277,7 +309,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                     
                     {isCustomHours && (
-                        <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2 p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20">
+                        <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-4 p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20">
                             <div className="grid gap-1.5 text-center">
                                 <Label className="text-[10px] uppercase font-black text-primary">بداية الدوام</Label>
                                 <Input type="time" value={formData.workStartTime || '08:00'} onChange={e => handleSelectChange('workStartTime', e.target.value)} className="h-11 rounded-xl border-2 font-black text-lg text-center" />

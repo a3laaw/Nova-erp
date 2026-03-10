@@ -8,6 +8,7 @@ import type { PaymentMethod } from '@/lib/types';
 export interface BrandingSettings {
   id: string;
   company_name: string;
+  activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting'; // حقل النشاط الجديد
   logo_url?: string;
   address?: string;
   phone?: string;
@@ -63,6 +64,7 @@ interface BrandingContextType {
 const defaultBranding: BrandingSettings = {
     id: 'default',
     company_name: 'Nova ERP',
+    activityType: 'general'
 };
 
 const BrandingContext = createContext<BrandingContextType>({
@@ -87,12 +89,12 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
             const doc = snapshot.docs[0];
             setBranding({ id: doc.id, ...doc.data() } as BrandingSettings);
         } else {
-            setBranding(defaultBranding); // Fallback to default if no settings exist
+            setBranding(defaultBranding); 
         }
         setLoading(false);
     }, (error) => {
         console.error("Error fetching branding settings:", error);
-        setBranding(defaultBranding); // Fallback on error
+        setBranding(defaultBranding); 
         setLoading(false);
     });
 

@@ -11,14 +11,14 @@ import { useFirebase, useStorage } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, ImageIcon, Palette, ArrowRight } from 'lucide-react';
+import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
 import Image from 'next/image';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Reusable Image Upload Component
 function ImageUploadField({
   id,
   label,
@@ -170,8 +170,8 @@ export function BrandingManager() {
                                 <Palette className="h-8 w-8" />
                             </div>
                             <div>
-                                <CardTitle className="text-2xl font-black text-purple-900">إعدادات العلامة التجارية</CardTitle>
-                                <CardDescription className="text-base font-medium">تخصيص هوية النظام والشعارات المعتمدة في التقارير.</CardDescription>
+                                <CardTitle className="text-2xl font-black text-purple-900">إعدادات العلامة التجارية والنشاط</CardTitle>
+                                <CardDescription className="text-base font-medium">تخصيص هوية النظام وتحديد نشاط الشركة لتفعيل الحقول المرتبطة.</CardDescription>
                             </div>
                         </div>
                         <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2 text-purple-700 hover:bg-purple-50">
@@ -183,6 +183,32 @@ export function BrandingManager() {
 
             <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white">
                 <CardContent className="pt-10 space-y-12 px-10">
+                    
+                    <div className="space-y-8">
+                        <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4">النشاط التجاري الرئيسي</h3>
+                        <div className="p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/20">
+                            <div className="grid gap-3 max-w-md">
+                                <Label className="font-black text-primary flex items-center gap-2">
+                                    <Activity className="h-4 w-4" /> تصنيف نشاط الشركة
+                                </Label>
+                                <Select value={formData.activityType} onValueChange={(v: any) => handleFieldChange('activityType', v)}>
+                                    <SelectTrigger className="h-12 rounded-2xl border-2 bg-white shadow-sm font-bold">
+                                        <SelectValue placeholder="اختر النشاط..." />
+                                    </SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                        <SelectItem value="general">نشاط عام (تجاري/مكتب)</SelectItem>
+                                        <SelectItem value="food_delivery">مطاعم وتوصيل أغذية</SelectItem>
+                                        <SelectItem value="construction">مقاولات وبناء</SelectItem>
+                                        <SelectItem value="consulting">استشارات هندسية</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[10px] text-muted-foreground font-medium pr-1">تحديد النشاط الغذائي سيفعّل حقول (كارت الصحة ورخصة القيادة) في ملفات الموظفين.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Separator className="my-10" />
+
                     <div className="space-y-8">
                         <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4">الهوية البصرية</h3>
                         <div className="grid md:grid-cols-2 gap-8">

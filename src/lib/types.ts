@@ -215,6 +215,9 @@ export interface Employee extends BaseEntity {
     profilePicture?: string;
     hireDate: any;
     residencyExpiry?: any;
+    passportExpiry?: any;        // حقل جديد
+    drivingLicenseExpiry?: any;  // حقل جديد
+    healthCardExpiry?: any;      // حقل جديد
     dob?: any;
     terminationDate?: any;
     terminationReason?: string;
@@ -231,8 +234,8 @@ export interface Employee extends BaseEntity {
     bankName?: string;
     accountNumber?: string;
     iban?: string;
-    workStartTime?: string | null;      // وقت البداية المخصص (إذا وجد)
-    workEndTime?: string | null;        // وقت النهاية المخصص
+    workStartTime?: string | null;      
+    workEndTime?: string | null;        
     pieceRateMode?: 'salary_with_target' | 'per_piece';
     targetDescription?: number;
     pieceRate?: number;
@@ -265,7 +268,7 @@ export interface AttendanceRecord {
     status: 'present' | 'late' | 'half_day' | 'missing_punch' | 'absent';
     isRamadan?: boolean;
     auditStatus?: 'pending' | 'verified' | 'waived';
-    manualDeductionDays?: number; // 0.5, 1, etc.
+    manualDeductionDays?: number; 
     anomalyDescription?: string;
     waivedBy?: string;
     waivedAt?: any;

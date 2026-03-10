@@ -8,7 +8,7 @@ import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus, FileCheck, Calculator } from 'lucide-react';
+import { ArrowRight, Edit, User, Phone, Briefcase, Calendar as CalendarIcon, Banknote, FileSignature, RefreshCw, AlertCircle, CalendarPlus, FileCheck, Calculator, Landmark, ShieldCheck, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, differenceInDays } from 'date-fns';
@@ -46,7 +46,7 @@ export default function EmployeeProfilePage() {
         return doc(firestore, 'employees', id);
     }, [firestore, id]);
 
-    const { data: employee, loading, error } = useDocument<Employee>(firestore, employeeRef ? employeeRef.path : null);
+    const { data: employee, loading: employeeLoading, error } = useDocument<Employee>(firestore, employeeRef ? employeeRef.path : null);
 
     const formatDate = (date: any) => {
         const d = toFirestoreDate(date);
@@ -70,19 +70,11 @@ export default function EmployeeProfilePage() {
         return daysUntilExpiry < 90;
     }, [residencyExpiryDate, employee?.nationality]);
 
-    if (loading) {
+    if (employeeLoading) {
         return (
-            <Card className="max-w-4xl mx-auto" dir="rtl">
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-32 mt-2" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Skeleton className="h-6 w-full" />
-                    <Skeleton className="h-6 w-5/6" />
-                    <Skeleton className="h-6 w-full" />
-                </CardContent>
-            </Card>
+            <div className="space-y-6 max-w-4xl mx-auto" dir="rtl">
+                <Skeleton className="h-64 w-full rounded-[2.5rem]" />
+            </div>
         );
     }
     
@@ -125,95 +117,92 @@ export default function EmployeeProfilePage() {
                 </div>
 
                 <TabsContent value="profile">
-                    <Card>
-                        <CardHeader>
+                    <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden">
+                        <CardHeader className="bg-muted/10 pb-8 border-b">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <CardTitle className="text-2xl">{employee.fullName}</CardTitle>
-                                    <CardDescription>{employee.jobTitle} - {employee.department}</CardDescription>
+                                    <CardTitle className="text-2xl font-black text-gray-800">{employee.fullName}</CardTitle>
+                                    <CardDescription className="text-base font-bold text-primary">{employee.jobTitle} - {employee.department}</CardDescription>
                                 </div>
+                                <Badge variant="outline" className="font-mono text-lg font-black px-4 bg-white">{employee.employeeNumber}</Badge>
                             </div>
                         </CardHeader>
-                        <CardContent className="space-y-8">
+                        <CardContent className="space-y-10 p-8">
                             <section>
-                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الشخصية</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                                    <InfoRow label="الرقم المدني" value={employee.civilId} icon={<User className="h-4 w-4"/>} />
-                                    <InfoRow label="رقم الجوال" value={<span dir="ltr">{employee.mobile}</span>} icon={<Phone className="h-4 w-4"/>} />
-                                    <InfoRow label="تاريخ الميلاد" value={formatDate(employee.dob)} icon={<CalendarIcon className="h-4 w-4"/>} />
-                                    <InfoRow label="الجنسية" value={employee.nationality} icon={<User className="h-4 w-4"/>} />
-                                    {employee.nationality !== 'كويتي' && (
-                                        <InfoRow label="تاريخ انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} icon={<CalendarIcon className="h-4 w-4"/>}>
+                                <h3 className="font-black text-lg border-r-4 border-primary pr-3 mb-6">المعلومات الشخصية والوثائق</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-6">
+                                    <InfoRow label="الرقم المدني" value={employee.civilId} icon={<User className="h-4 w-4 text-primary"/>} />
+                                    <InfoRow label="رقم الجوال" value={<span dir="ltr">{employee.mobile}</span>} icon={<Phone className="h-4 w-4 text-primary"/>} />
+                                    <InfoRow label="الجنسية" value={employee.nationality} icon={<Globe className="h-4 w-4 text-primary"/>} />
+                                    
+                                    <InfoRow label="انتهاء الإقامة" value={formatDate(employee.residencyExpiry)} icon={<CalendarIcon className="h-4 w-4 text-primary"/>}>
+                                        {canRenewResidency && (
                                             <Button
-                                                variant={canRenewResidency ? "destructive" : "outline"}
+                                                variant="destructive"
                                                 size="sm"
-                                                className="h-7"
+                                                className="h-6 text-[9px] font-black rounded-full"
                                                 onClick={() => setIsRenewalDialogOpen(true)}
-                                                disabled={!canRenewResidency}
                                             >
-                                                <RefreshCw className="ml-2 h-3 w-3"/>
-                                                تجديد الإقامة
+                                                تجديد
                                             </Button>
-                                        </InfoRow>
+                                        )}
+                                    </InfoRow>
+
+                                    {/* 🛡️ عرض الوثائق الجديدة إذا كانت موجودة */}
+                                    {employee.passportExpiry && (
+                                        <InfoRow label="انتهاء الجواز" value={formatDate(employee.passportExpiry)} icon={<FileText className="h-4 w-4 text-indigo-600"/>} />
+                                    )}
+                                    {employee.drivingLicenseExpiry && (
+                                        <InfoRow label="رخصة القيادة" value={formatDate(employee.drivingLicenseExpiry)} icon={<Landmark className="h-4 w-4 text-indigo-600"/>} />
+                                    )}
+                                    {employee.healthCardExpiry && (
+                                        <InfoRow label="كارت الصحة" value={formatDate(employee.healthCardExpiry)} icon={<ShieldCheck className="h-4 w-4 text-indigo-600"/>} />
                                     )}
                                 </div>
                             </section>
+
+                            <Separator />
+
                             <section>
-                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات الوظيفية</h3>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                                    <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} icon={<Briefcase className="h-4 w-4"/>} />
-                                    <InfoRow label="تاريخ التعيين" value={formatDate(employee.hireDate)} icon={<CalendarIcon className="h-4 w-4"/>} />
-                                    <InfoRow label="نوع العقد" value={employee.contractType} icon={<FileSignature className="h-4 w-4"/>} />
+                                <h3 className="font-black text-lg border-r-4 border-primary pr-3 mb-6">المعلومات الوظيفية والمالية</h3>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-6">
+                                    <InfoRow label="تاريخ التعيين" value={formatDate(employee.hireDate)} icon={<CalendarIcon className="h-4 w-4 text-primary"/>} />
+                                    <InfoRow label="نوع العقد" value={employee.contractType} icon={<FileSignature className="h-4 w-4 text-primary"/>} />
+                                    <InfoRow label="الراتب الأساسي" value={<span className="font-black text-emerald-700">{formatCurrency(employee.basicSalary)}</span>} icon={<Banknote className="h-4 w-4 text-primary"/>} />
                                  </div>
                             </section>
-                             <section>
-                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">المعلومات المالية</h3>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                                    <InfoRow label="الراتب الأساسي" value={`${formatCurrency(employee.basicSalary)}`} icon={<Banknote className="h-4 w-4"/>} />
-                                    <InfoRow label="بدل السكن" value={`${formatCurrency(employee.housingAllowance || 0)}`} icon={<Banknote className="h-4 w-4"/>} />
-                                    <InfoRow label="بدل المواصلات" value={`${formatCurrency(employee.transportAllowance || 0)}`} icon={<Banknote className="h-4 w-4"/>} />
-                                 </div>
-                            </section>
-                             <section>
-                                <h3 className="font-semibold text-lg border-b pb-2 mb-4">رصيد الإجازات</h3>
-                                 {leaveData?.isLow && (
-                                     <Alert variant="destructive" className="mb-4">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertTitle>تنبيه: رصيد إجازات منخفض</AlertTitle>
-                                        <AlertDescription>
-                                            الرصيد المتبقي للموظف أقل من 5 أيام.
-                                        </AlertDescription>
-                                    </Alert>
-                                 )}
-                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                                      <div className="p-3 bg-muted rounded-lg">
-                                        <p className="text-sm text-muted-foreground">الرصيد المرحل</p>
-                                        <p className="text-2xl font-bold">{employee.carriedLeaveDays || 0}</p>
+
+                             <section className="bg-primary/5 p-8 rounded-3xl border-2 border-dashed border-primary/10">
+                                <h3 className="font-black text-lg text-primary mb-6 flex items-center gap-2">
+                                    <Briefcase className="h-5 w-5" /> رصيد الإجازات السنوية
+                                </h3>
+                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+                                      <div className="p-4 bg-white rounded-2xl shadow-sm border">
+                                        <p className="text-[10px] uppercase font-bold text-muted-foreground">المرحل</p>
+                                        <p className="text-2xl font-black">{employee.carriedLeaveDays || 0}</p>
                                       </div>
-                                      <div className="p-3 bg-muted rounded-lg">
-                                        <p className="text-sm text-muted-foreground">المكتسب</p>
-                                        <p className="text-2xl font-bold">{employee.annualLeaveAccrued || 0}</p>
+                                      <div className="p-4 bg-white rounded-2xl shadow-sm border">
+                                        <p className="text-[10px] uppercase font-bold text-muted-foreground">المكتسب</p>
+                                        <p className="text-2xl font-black">{employee.annualLeaveAccrued || 0}</p>
                                       </div>
-                                       <div className="p-3 bg-muted rounded-lg">
-                                        <p className="text-sm text-muted-foreground">المستخدم</p>
-                                        <p className="text-2xl font-bold text-destructive">{employee.annualLeaveUsed || 0}</p>
+                                       <div className="p-4 bg-white rounded-2xl shadow-sm border">
+                                        <p className="text-[10px] uppercase font-bold text-muted-foreground">المستخدم</p>
+                                        <p className="text-2xl font-black text-red-600">{employee.annualLeaveUsed || 0}</p>
                                       </div>
-                                       <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                                        <p className="text-sm text-green-700 dark:text-green-300">الرصيد المتبقي</p>
-                                        <p className="text-2xl font-bold text-green-800 dark:text-green-200">{leaveData?.balance || 0}</p>
+                                       <div className="p-4 bg-primary text-white rounded-2xl shadow-lg border-4 border-white/20">
+                                        <p className="text-[10px] uppercase font-bold opacity-80">المتبقي</p>
+                                        <p className="text-3xl font-black font-mono">{leaveData?.balance || 0}</p>
                                       </div>
                                  </div>
-                                  <div className="flex gap-4 mt-6">
-                                     <Button asChild>
+                                  <div className="flex gap-3 mt-8">
+                                     <Button asChild className="rounded-xl font-bold h-11 px-6">
                                         <Link href={`/dashboard/hr/leaves/new?employeeId=${id}`}>
-                                            <CalendarIcon className="ml-2 h-4 w-4" />
-                                            تقديم طلب إجازة
+                                            <CalendarIcon className="ml-2 h-4 w-4" /> تقديم طلب إجازة
                                         </Link>
                                      </Button>
-                                      <Button asChild variant="outline">
+                                      <Button asChild variant="outline" className="rounded-xl font-bold h-11 px-6 bg-white">
                                         <Link href={`/dashboard/hr/permissions?employeeId=${id}`}>
-                                            <CalendarPlus className="ml-2 h-4 w-4" />
-                                            تقديم طلب استئذان
+                                            <CalendarPlus className="ml-2 h-4 w-4" /> طلب استئذان
                                         </Link>
                                      </Button>
                                   </div>
