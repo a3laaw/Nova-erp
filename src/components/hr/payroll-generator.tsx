@@ -88,6 +88,7 @@ export function PayrollGenerator() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
 
+            // Strict check to ensure record belongs to the selected month/year
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
 
             if (r.status !== 'present') {
@@ -166,6 +167,16 @@ export function PayrollGenerator() {
     finally { setIsProcessing(false); }
   };
 
+  // مساعد لتحويل الوقت إلى دقائق مطلقة للمقارنة الدقيقة
+  const timeToMinutes = (timeStr: string | null | undefined): number => {
+    if (!timeStr || !timeStr.includes(':')) return 0;
+    const parts = timeStr.trim().split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return 0;
+    return h * 60 + m;
+  };
+
   const handleExportExcel = () => {
     if (!attendanceDocs || attendanceDocs.length === 0) {
       toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
@@ -173,7 +184,7 @@ export function PayrollGenerator() {
     }
 
     const summaryRows: any[] = [];
-    const workHours = branding?.work_hours?.general;
+    const globalWorkHours = branding?.work_hours?.general;
 
     employees.forEach(emp => {
       const att = attendanceDocs.find(a => a.employeeId === emp.id);
@@ -185,23 +196,27 @@ export function PayrollGenerator() {
       let totalHalfDay = 0;
       let totalDeductionDays = 0;
 
+      const empStartTimeLimit = emp.workStartTime || globalWorkHours?.morning_start_time || '08:00';
+      const limitMins = timeToMinutes(empStartTimeLimit);
+
       att.records?.forEach(r => {
         if (r.auditStatus === 'waived') return;
-        if (r.status === 'absent') totalAbsent++;
         
-        if (r.status === 'late') {
-            totalLate++;
-            // حساب دقائق التأخير الفعلي
-            const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
-            if (r.checkIn1 && r.checkIn1 > startTimeLimit) {
-                const [startH, startM] = startTimeLimit.split(':').map(Number);
-                const [checkH, checkM] = r.checkIn1.split(':').map(Number);
-                const diff = (checkH * 60 + checkM) - (startH * 60 + startM);
-                if (diff > 0) totalLateMinutes += diff;
+        if (r.status === 'absent') {
+            totalAbsent++;
+        } else {
+            // حساب التأخير الفعلي لأي يوم فيه بصمة
+            if (r.checkIn1) {
+                const checkInMins = timeToMinutes(r.checkIn1);
+                const diff = checkInMins - limitMins;
+                if (diff > 0) {
+                    totalLateMinutes += diff;
+                    totalLate++;
+                }
             }
+            if (r.status === 'half_day') totalHalfDay++;
         }
         
-        if (r.status === 'half_day') totalHalfDay++;
         totalDeductionDays += (r.manualDeductionDays || 0);
       });
 
