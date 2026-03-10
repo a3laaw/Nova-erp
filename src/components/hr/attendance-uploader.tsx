@@ -199,7 +199,6 @@ export function AttendanceUploader() {
         
         if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
-        // 1. جلب كافة الإجازات والاستئذانات المعتمدة للشهر المختار
         const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
         const monthEnd = endOfMonth(monthStart);
 
@@ -277,8 +276,6 @@ export function AttendanceUploader() {
                 const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
 
-                // فحص الإجازات والاستئذانات لهذا اليوم
-                // تشمل كافة الأنواع: سنوية، مرضية، طارئة، بدون أجر
                 const activeLeave = approvedLeaves.find(l => 
                     l.employeeId === emp.id && 
                     stableDay >= toFirestoreDate(l.startDate)! && 
@@ -300,7 +297,6 @@ export function AttendanceUploader() {
                     const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
                     const isCustomShift = !!emp.workStartTime && !!emp.workEndTime;
 
-                    // منطق التأخير الصباحي + الاستئذان
                     if (sortedTimes[0] > startTimeLimit) {
                         if (activePermission?.type === 'late_arrival') {
                             status = 'present';
@@ -313,7 +309,6 @@ export function AttendanceUploader() {
                         }
                     }
 
-                    // منطق الدوام المزدوج / نصف اليوم + الاستئذان
                     if (!isCustomShift && !isSystemHalfDay) {
                         const hasMorning = sortedTimes.some(t => t <= mEnd);
                         const hasEvening = sortedTimes.some(t => t >= eStart);
@@ -349,7 +344,6 @@ export function AttendanceUploader() {
                         auditStatus
                     });
                 } else {
-                    // لم توجد بصمة: فحص ما إذا كان في إجازة (سنوية، طارئة، مرضية، إلخ)
                     if (activeLeave) {
                         coveredByPolicyCount++;
                         employeeRecords.push({
@@ -404,97 +398,98 @@ export function AttendanceUploader() {
 
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 h-12 rounded-2xl bg-muted/50 p-1">
-            <TabsTrigger value="upload" className="rounded-xl font-black gap-2">
+        <TabsList className="grid w-full grid-cols-2 h-14 rounded-2xl bg-muted/50 p-1.5 shadow-inner">
+            <TabsTrigger value="upload" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
                 <FileSpreadsheet className="h-4 w-4" />
                 رفع ومعالجة الملف
             </TabsTrigger>
-            <TabsTrigger value="mapping" className="rounded-xl font-black gap-2">
+            <TabsTrigger value="mapping" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
                 <Fingerprint className="h-4 w-4" />
                 مطابقة البصمة والدوام
             </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="upload">
+        <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="grid lg:grid-cols-3 gap-8">
-                <Card className="lg:col-span-1 rounded-[2.5rem] border-none shadow-sm">
-                    <CardHeader><CardTitle className="text-lg font-black">فترة التقرير والرقابة</CardTitle></CardHeader>
-                    <CardContent className="space-y-6">
+                <Card className="lg:col-span-1 rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-muted/10 border-b pb-6">
+                        <CardTitle className="text-xl font-black text-gray-800">فترة التقرير والرقابة</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6 pt-8">
                         <div className="grid gap-2">
-                            <Label className="font-bold">السنة</Label>
+                            <Label className="font-bold text-gray-700 mr-1">السنة</Label>
                             <Select value={year} onValueChange={setYear}>
-                                <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label className="font-bold">الشهر</Label>
+                            <Label className="font-bold text-gray-700 mr-1">الشهر</Label>
                             <Select value={month} onValueChange={setMonth}>
-                                <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                         
                         <Separator />
 
-                        <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border border-red-100 animate-in fade-in">
+                        <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border-2 border-dashed border-red-100">
                             <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
                             <div className="space-y-0.5">
                                 <Label htmlFor="purge" className="font-black text-xs text-red-800 cursor-pointer">تطهير البيانات السابقة</Label>
-                                <p className="text-[9px] text-red-600 font-bold leading-tight">مساحة كافة البصمات القديمة المسجلة لهذا الشهر لضمان دقة الرقابة.</p>
+                                <p className="text-[9px] text-red-600 font-bold leading-tight">مسح كافة البصمات القديمة المسجلة لهذا الشهر لضمان دقة الرقابة.</p>
                             </div>
                         </div>
 
                         {summary && (
-                            <div className="p-4 bg-green-50 rounded-2xl border border-green-100 space-y-3 animate-in zoom-in-95">
+                            <div className="p-4 bg-green-50 rounded-2xl border-2 border-dashed border-green-100 space-y-3 animate-in zoom-in-95">
                                 <h4 className="font-black text-green-800 flex items-center gap-2 text-xs"><CheckCircle2 className="h-4 w-4"/> ملخص المعالجة الأخيرة:</h4>
-                                <div className="grid grid-cols-2 gap-2 text-[10px] font-bold">
+                                <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-center">
                                     <div className="bg-white p-2 rounded-lg border">أيام العمل: {summary.workingDays}</div>
                                     <div className="bg-white p-2 rounded-lg border">البصمات: {summary.totalPunches}</div>
-                                    <div className="bg-blue-600 text-white p-2 rounded-lg text-center">إجازات/إذونات: {summary.coveredByPolicy}</div>
-                                    <div className="bg-red-600 text-white p-2 rounded-lg text-center">إثبات غياب: {summary.autoAbsences}</div>
+                                    <div className="bg-blue-600 text-white p-2 rounded-lg">إجازات: {summary.coveredByPolicy}</div>
+                                    <div className="bg-red-600 text-white p-2 rounded-lg">إثبات غياب: {summary.autoAbsences}</div>
                                 </div>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl">
-                    <CardHeader>
-                        <CardTitle className="font-black">رفع وتحليل ملف البصمة</CardTitle>
-                        <CardDescription>ارفع ملف الإكسل ليقوم النظام بمطابقته مع الإجازات والاستئذانات وكشف فجوات الحضور.</CardDescription>
+                <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+                    <CardHeader className="bg-muted/10 border-b pb-6">
+                        <CardTitle className="text-xl font-black text-gray-800">رفع وتحليل ملف البصمة</CardTitle>
+                        <CardDescription className="text-sm font-medium">ارفع ملف الإكسل ليقوم النظام بمطابقته مع الإجازات والاستئذانات وكشف فجوات الحضور.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
+                    <CardContent className="pt-8">
+                        <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[3rem] p-16 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/20 group">
                             <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls, .csv" />
-                            <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
-                            <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار ملف الإكسل"}</p>
-                            <p className="text-xs text-muted-foreground mt-2 font-bold leading-relaxed">
-                                سيقوم النظام بمقارنة محتوى الملف مع سجلات الإجازات والاستئذانات المعتمدة آلياً.<br/>
-                                <span className="text-primary font-black">الموظف الحاصل على إجازة مرضية أو إذن تأخير سيتم استثناؤه من الخصم فوراً.</span>
+                            <FileSpreadsheet className="h-20 w-20 mx-auto opacity-20 mb-6 group-hover:scale-110 group-hover:opacity-40 transition-all text-primary" />
+                            <p className="font-black text-2xl text-gray-700">{file ? file.name : "اضغط هنا لاختيار ملف الإكسل"}</p>
+                            <p className="text-xs text-muted-foreground mt-4 font-bold leading-relaxed max-w-sm mx-auto">
+                                سيقوم النظام بمقارنة محتوى الملف مع سجلات الإجازات والاستئذانات المعتمدة آلياً لضمان عدم الخصم من الموظفين المبرر غيابهم.
                             </p>
                         </div>
                     </CardContent>
-                    <CardFooter className="justify-end border-t p-6">
-                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3">
+                    <CardFooter className="justify-end border-t p-8 bg-muted/10">
+                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3 min-w-[280px]">
                             {isProcessing ? <Loader2 className="animate-spin h-6 w-6"/> : <RotateCcw className="h-6 w-6"/>} 
-                            بدء المعالجة الرقابية الشاملة
+                            بدء المعالجة والتحليل الذكي
                         </Button>
                     </CardFooter>
                 </Card>
             </div>
         </TabsContent>
 
-        <TabsContent value="mapping">
-            <Card className="rounded-[2.5rem] border-none shadow-xl">
+        <TabsContent value="mapping" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
+            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="space-y-1">
                             <CardTitle className="text-2xl font-black flex items-center gap-3">
                                 <Fingerprint className="text-primary h-7 w-7" />
-                                مطابقة البصمة والدوام
+                                مطابقة البصمة والدوام المخصص
                             </CardTitle>
-                            <CardDescription>تحديد أرقام البصمة وساعات الدوام الخاصة لكل موظف.</CardDescription>
+                            <CardDescription className="text-base font-medium">تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.</CardDescription>
                         </div>
                         <div className="relative w-full md:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -502,30 +497,30 @@ export function AttendanceUploader() {
                                 placeholder="بحث بالاسم أو الرقم..." 
                                 value={mappingSearch}
                                 onChange={(e) => setMappingSearch(e.target.value)}
-                                className="pl-10 h-11 rounded-xl bg-white border-none shadow-inner font-bold"
+                                className="pl-10 h-12 rounded-2xl bg-white border-none shadow-inner font-bold"
                             />
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="max-h-[550px] overflow-y-auto">
+                    <div className="max-h-[550px] overflow-y-auto scrollbar-none">
                         <Table>
                             <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                                <TableRow>
-                                    <TableHead className="px-8 py-4 font-black">اسم الموظف</TableHead>
-                                    <TableHead className="font-black">رقم البصمة</TableHead>
-                                    <TableHead className="font-black text-center">بداية الدوام</TableHead>
-                                    <TableHead className="font-black text-center">نهاية الدوام</TableHead>
-                                    <TableHead className="w-32 text-center font-black">الحالة</TableHead>
+                                <TableRow className="h-14">
+                                    <TableHead className="px-10 py-4 font-black text-gray-800">اسم الموظف</TableHead>
+                                    <TableHead className="font-black text-gray-800">رقم البصمة</TableHead>
+                                    <TableHead className="font-black text-center text-gray-800">بداية الدوام</TableHead>
+                                    <TableHead className="font-black text-center text-gray-800">نهاية الدوام</TableHead>
+                                    <TableHead className="w-32 text-center font-black text-gray-800">الحالة</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {employeesLoading ? (
                                     Array.from({length: 5}).map((_, i) => (
-                                        <TableRow key={i}><TableCell colSpan={5} className="p-4"><Skeleton className="h-10 w-full rounded-lg"/></TableCell></TableRow>
+                                        <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl"/></TableCell></TableRow>
                                     ))
                                 ) : filteredEmployees.length === 0 ? (
-                                    <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">لا توجد سجلات للموظفين.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد سجلات للموظفين.</TableCell></TableRow>
                                 ) : (
                                     filteredEmployees.map((emp) => {
                                         const current = editableData[emp.id!] || { employeeNumber: '', workStartTime: '', workEndTime: '' };
@@ -533,18 +528,18 @@ export function AttendanceUploader() {
                                         const isFullTime = !current.workStartTime && !current.workEndTime;
 
                                         return (
-                                            <TableRow key={emp.id} className={cn("hover:bg-muted/30 transition-colors h-16", isFullTime ? "bg-white" : "bg-sky-50/20")}>
-                                                <TableCell className="px-8">
+                                            <TableRow key={emp.id} className={cn("hover:bg-primary/5 transition-colors h-20 border-b last:border-0", !isFullTime && "bg-sky-50/20")}>
+                                                <TableCell className="px-10">
                                                     <div className="flex flex-col">
-                                                        <span className="font-bold">{emp.fullName}</span>
-                                                        <span className="text-[9px] text-muted-foreground font-bold">{emp.department}</span>
+                                                        <span className="font-black text-gray-800">{emp.fullName}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-bold">{emp.department}</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <Input 
                                                         value={current.employeeNumber} 
                                                         onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, employeeNumber: e.target.value }}))}
-                                                        className="font-mono h-9 rounded-lg border-2 w-28 text-center"
+                                                        className="font-mono font-black h-10 rounded-xl border-2 w-32 text-center text-primary"
                                                         placeholder="000"
                                                     />
                                                 </TableCell>
@@ -553,7 +548,7 @@ export function AttendanceUploader() {
                                                         type="time"
                                                         value={current.workStartTime} 
                                                         onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workStartTime: e.target.value }}))}
-                                                        className="font-mono h-9 rounded-lg border-2 w-32 mx-auto text-center"
+                                                        className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"
                                                     />
                                                 </TableCell>
                                                 <TableCell>
@@ -561,22 +556,16 @@ export function AttendanceUploader() {
                                                         type="time"
                                                         value={current.workEndTime} 
                                                         onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workEndTime: e.target.value }}))}
-                                                        className="font-mono h-9 rounded-lg border-2 w-32 mx-auto text-center"
+                                                        className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"
                                                     />
                                                 </TableCell>
-                                                <TableCell className="text-center">
+                                                <TableCell className="text-center px-6">
                                                     {isChanged ? (
-                                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-100 text-[9px] font-black animate-pulse">
-                                                            بانتظار الحفظ
-                                                        </Badge>
+                                                        <Badge className="bg-orange-600 text-white font-black text-[9px] animate-pulse rounded-lg">بانتظار الحفظ</Badge>
                                                     ) : isFullTime ? (
-                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100 text-[9px] font-black">
-                                                            كامل (رسمي)
-                                                        </Badge>
+                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100 font-black text-[9px] rounded-lg">كامل (رسمي)</Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 text-[9px] font-black">
-                                                            جزئي (مخصص)
-                                                        </Badge>
+                                                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 font-black text-[9px] rounded-lg">جزئي (مخصص)</Badge>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
@@ -587,14 +576,14 @@ export function AttendanceUploader() {
                         </Table>
                     </div>
                 </CardContent>
-                <CardFooter className="justify-end border-t p-6 bg-muted/10">
-                    <div className="flex-1 text-xs text-muted-foreground font-medium pr-4">
-                        <Info className="h-3 w-3 inline ml-1" />
+                <CardFooter className="justify-end border-t p-8 bg-muted/10">
+                    <div className="flex-1 text-xs text-muted-foreground font-bold pr-4 flex items-center gap-2">
+                        <Info className="h-4 w-4 text-primary" />
                         اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.
                     </div>
-                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-10 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
+                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-12 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
                         {isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>}
-                        حفظ كافة التغييرات
+                        حفظ كافة البيانات
                     </Button>
                 </CardFooter>
             </Card>
