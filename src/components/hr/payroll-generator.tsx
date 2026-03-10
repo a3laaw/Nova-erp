@@ -28,7 +28,8 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+  // جلب كافة الموظفين لضمان عرض بياناتهم حتى لو تغيرت حالتهم
+  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees');
   
   const attendanceQuery = useMemo(() => [
     where('year', '==', parseInt(year)),
@@ -37,37 +38,36 @@ export function PayrollGenerator() {
   
   const { data: attendanceDocs, loading: attLoading } = useSubscription<MonthlyAttendance>(firestore, 'attendance', attendanceQuery);
 
-  // استخراج كافة المخالفات والغيابات (بما فيها الغيابات الآلية)
+  // ✨ مركز تدقيق المخالفات: تم تبسيط المنطق لضمان عدم ضياع أي سجل تم اكتشافه آلياً
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string, lastUpdated?: any }[] = [];
-    const targetMonth = parseInt(month);
-    const targetYear = parseInt(year);
+    
+    if (!attendanceDocs || attendanceDocs.length === 0) return [];
 
-    attendanceDocs.forEach(doc => {
-        const emp = employees.find(e => e.id === doc.employeeId);
-        doc.records?.forEach(r => {
-            const rDate = toFirestoreDate(r.date);
-            if (rDate && (rDate.getMonth() + 1) === targetMonth && rDate.getFullYear() === targetYear) {
-                // أي يوم حالته ليست 'present' يعتبر مخالفة تستوجب التدقيق
-                if (r.status !== 'present') {
-                    list.push({ 
-                        docId: doc.id!, 
-                        record: r, 
-                        empName: emp?.fullName || 'موظف', 
-                        employeeNumber: emp?.employeeNumber || '000',
-                        lastUpdated: doc.updatedAt
-                    });
-                }
+    attendanceDocs.forEach(attendanceDoc => {
+        const emp = employees.find(e => e.id === attendanceDoc.employeeId);
+        
+        attendanceDoc.records?.forEach(r => {
+            // أي سجل حالته ليست "حاضر" (present) يجب أن يظهر في قائمة التدقيق
+            if (r.status !== 'present') {
+                list.push({ 
+                    docId: attendanceDoc.id!, 
+                    record: r, 
+                    empName: emp?.fullName || 'موظف غير معرف', 
+                    employeeNumber: emp?.employeeNumber || '000',
+                    lastUpdated: attendanceDoc.updatedAt
+                });
             }
         });
     });
     
+    // ترتيب حسب التاريخ (من الأقدم للأحدث لمراجعة منطقية)
     return list.sort((a, b) => {
         const dateA = toFirestoreDate(a.record.date)?.getTime() || 0;
         const dateB = toFirestoreDate(b.record.date)?.getTime() || 0;
         return dateA - dateB;
     });
-  }, [attendanceDocs, employees, month, year]);
+  }, [attendanceDocs, employees]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply') => {
     if (!firestore || !currentUser) return;
@@ -91,7 +91,10 @@ export function PayrollGenerator() {
         
         await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
         toast({ title: 'تم الحفظ', description: 'تم تحديث حالة المخالفة.' });
-    } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
+    } catch (e) { 
+        console.error("Audit action failed:", e);
+        toast({ variant: 'destructive', title: 'خطأ في التحديث' }); 
+    }
   };
 
   const handleGeneratePayroll = async () => {
@@ -136,14 +139,14 @@ export function PayrollGenerator() {
     <div className="space-y-8" dir="rtl">
         <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2rem] border shadow-inner no-print justify-between items-end">
             <div className="flex gap-4">
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
-                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
+                <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="flex gap-3">
                 <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
                 <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
-                    {pendingAnomaliesCount > 0 ? `بانتظار قرارك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
+                    {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
                 </Button>
             </div>
         </div>
@@ -155,7 +158,7 @@ export function PayrollGenerator() {
                         <ShieldCheck className="text-primary h-8 w-8"/> 
                         مركز تدقيق الحضور والمخالفات
                     </h3>
-                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> يتم التحديث فورياً عند رفع ملف بصمة جديد وكشف فجوات الغياب.</p>
+                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> يعرض هذا المركز كافة الغيابات والتأخيرات المكتشفة في ملف البصمة المرفوع.</p>
                 </div>
                 {pendingAnomaliesCount > 0 && (
                     <Badge variant="destructive" className="animate-pulse rounded-lg h-8 px-4 font-black">
@@ -168,13 +171,13 @@ export function PayrollGenerator() {
             {attLoading ? (
                 <div className="p-32 text-center">
                     <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
-                    <p className="mt-4 font-bold text-muted-foreground">جاري فحص فجوات الحضور والغياب...</p>
+                    <p className="mt-4 font-bold text-muted-foreground">جاري فحص سجلات الحضور...</p>
                 </div>
             ) : attendanceDocs.length === 0 ? (
                 <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50">
                     <CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" />
                     <p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p>
-                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى رفع ملف البصمة أولاً من تبويب "رفع الحضور".</p>
+                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى رفع ملف البصمة أولاً من تبويب "رفع الحضور والانصراف".</p>
                 </div>
             ) : anomalies.length === 0 ? (
                 <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100">
@@ -197,8 +200,9 @@ export function PayrollGenerator() {
                         </TableHeader>
                         <TableBody>
                             {anomalies.map((item, idx) => {
-                                const lastUpd = toFirestoreDate(item.lastUpdated);
                                 const isAbsent = item.record.status === 'absent';
+                                const recordDate = toFirestoreDate(item.record.date);
+                                
                                 return (
                                 <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
                                     <TableCell className="px-8">
@@ -208,7 +212,7 @@ export function PayrollGenerator() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="font-bold text-sm">
-                                        {format(toFirestoreDate(item.record.date)!, 'eeee, dd MMMM', { locale: ar })}
+                                        {recordDate ? format(recordDate, 'eeee, dd MMMM', { locale: ar }) : '-'}
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col gap-1.5">
