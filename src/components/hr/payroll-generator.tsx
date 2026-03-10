@@ -8,9 +8,9 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -19,6 +19,7 @@ import { useAuth } from '@/context/auth-context';
 import * as XLSX from 'xlsx';
 import { useBranding } from '@/context/branding-context';
 import { Separator } from '@/components/ui/separator';
+import { Logo } from '../layout/logo';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -30,6 +31,7 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
@@ -296,7 +298,31 @@ export function PayrollGenerator() {
     XLSX.writeFile(wb, `تقرير_الحضور_${month}_${year}.xlsx`);
   };
 
+  const handleExportPDF = () => {
+    const element = document.getElementById('audit-printable-area');
+    if (!element) return;
+
+    setIsExportingPDF(true);
+    
+    const opt = {
+      margin: [0.5, 0.5],
+      filename: `تقرير_مخالفات_الحضور_${month}_${year}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
+    };
+
+    import('html2pdf.js').then(module => {
+      const html2pdf = module.default;
+      html2pdf().from(element).set(opt).save().then(() => {
+        setIsExportingPDF(false);
+        toast({ title: 'نجاح التصدير', description: 'تم إنشاء ملف PDF بنجاح.' });
+      });
+    });
+  };
+
   const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
+  const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
   return (
     <div className="space-y-8" dir="rtl">
@@ -305,9 +331,13 @@ export function PayrollGenerator() {
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
                 <div className="grid gap-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger><SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
                 <Button variant="outline" onClick={handleExportExcel} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
-                <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة تقرير المخالفات</Button>
+                <Button variant="outline" onClick={handleExportPDF} disabled={isExportingPDF} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
+                    {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
+                    تصدير PDF
+                </Button>
+                <Button variant="outline" onClick={() => window.print()} className="rounded-xl font-bold border-2 h-10 gap-2"><Printer className="h-4 w-4"/> طباعة</Button>
                 <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
                     {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
@@ -365,7 +395,24 @@ export function PayrollGenerator() {
             ) : anomalies.length === 0 ? (
                 <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100"><CheckCircle className="h-24 w-24 text-green-600/20 mx-auto mb-6" /><p className="text-3xl font-black text-green-800">التزام كامل! لا توجد مخالفات</p><p className="text-lg font-medium text-green-700/60 mt-3">كافة الموظفين ملتزمون بالبصمة في كافة أيام العمل الرسمية لهذا الشهر.</p></div>
             ) : (
-                <div className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl printable-area">
+                <div id="audit-printable-area" className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
+                    {/* Header only for PDF/Print */}
+                    <div className="hidden print:block p-8 border-b-4 border-primary bg-muted/10">
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-4">
+                                <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                <div>
+                                    <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
+                                    <p className="text-sm font-bold text-muted-foreground">تقرير مخالفات حضور الموظفين</p>
+                                </div>
+                            </div>
+                            <div className="text-left">
+                                <h2 className="text-xl font-black text-primary">فترة التقرير: {monthName} {year}</h2>
+                                <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <Table>
                         <TableHeader className="bg-muted/50 h-16">
                             <TableRow className="border-none">
@@ -413,6 +460,18 @@ export function PayrollGenerator() {
                             )})}
                         </TableBody>
                     </Table>
+                    
+                    {/* Footer only for PDF/Print */}
+                    <div className="hidden print:grid grid-cols-2 gap-20 p-12 text-center mt-10">
+                        <div className="space-y-12">
+                            <p className="font-black border-b-2 border-slate-900 pb-2">قسم شؤون الموظفين</p>
+                            <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">التوقيع والتاريخ</div>
+                        </div>
+                        <div className="space-y-12">
+                            <p className="font-black border-b-2 border-slate-900 pb-2">الاعتماد الإداري</p>
+                            <div className="pt-2 border-t border-dashed text-[10px] text-muted-foreground">الختم والموافقة</div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
