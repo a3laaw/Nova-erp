@@ -31,53 +31,65 @@ import { useBranding } from '@/context/branding-context';
 
 /**
  * دالة تحليل التاريخ والوقت المطور:
- * تدعم التواريخ الفردية مثل (1-2-2026) والمركبة (01-02-2026)
+ * ترفض القيم التي تنتج سنوات غير منطقية (قبل 2000) لمنع الخلط مع أرقام المسلسل.
  */
 const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     let dateObj: Date | null = null;
     let timeStr: string = "";
 
+    // 1. إذا كان كائن تاريخ جاهز
     if (val instanceof Date && isValid(val)) {
+        if (val.getFullYear() < 2000) return null;
         dateObj = startOfDay(val);
         timeStr = format(val, 'HH:mm');
         return { date: dateObj, timeStr };
     }
 
+    // 2. إذا كان رقماً (نظام تاريخ إكسيل)
     if (typeof val === 'number') {
-        const date = XLSX.SSF.parse_date_code(val);
-        dateObj = new Date(date.y, date.m - 1, date.d);
-        timeStr = `${String(date.h).padStart(2, '0')}:${String(date.m).padStart(2, '0')}`;
-        return { date: dateObj, timeStr };
+        // تواريخ إكسيل بعد سنة 2000 تكون قيمتها أكبر من 36526
+        if (val < 30000 || val > 60000) return null; 
+        
+        try {
+            const date = XLSX.SSF.parse_date_code(val);
+            if (date.y < 2000 || date.y > 2100) return null;
+            
+            dateObj = startOfDay(new Date(date.y, date.m - 1, date.d));
+            timeStr = `${String(date.h).padStart(2, '0')}:${String(date.m).padStart(2, '0')}`;
+            return { date: dateObj, timeStr };
+        } catch { return null; }
     }
 
+    // 3. إذا كان نصاً
     if (typeof val === 'string') {
         const cleaned = val.trim();
+        if (!cleaned || cleaned.length < 5) return null;
+
         const parts = cleaned.split(/\s+/);
         const datePart = parts[0];
         const timePart = parts[1] || "";
         
-        // قائمة شاملة من التنسيقات لضمان قراءة ملفات الإكسل المختلفة
         const dateFormats = [
             'd-M-yyyy', 'dd-MM-yyyy', 'd-MM-yyyy', 'dd-M-yyyy',
             'd/M/yyyy', 'dd/MM/yyyy', 'd/MM/yyyy', 'dd/M/yyyy',
-            'yyyy-MM-dd', 'dd-MM-yy', 'M/d/yy'
+            'yyyy-MM-dd', 'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy'
         ];
 
         for (const fmt of dateFormats) {
-            const parsedDate = parse(datePart, fmt, new Date());
-            if (isValid(parsedDate)) {
-                dateObj = startOfDay(parsedDate);
-                break;
-            }
+            try {
+                const parsedDate = parse(datePart, fmt, new Date());
+                if (isValid(parsedDate) && parsedDate.getFullYear() >= 2000) {
+                    dateObj = startOfDay(parsedDate);
+                    break;
+                }
+            } catch { continue; }
         }
 
         if (dateObj) {
             if (timePart) {
-                // استخراج الوقت بشكل آمن (أول 5 خانات مثل 08:30)
                 timeStr = timePart.substring(0, 5).replace(/[^0-9:]/g, '');
             } else {
-                // إذا كان الوقت في خانة التاريخ المدمجة كما في بعض ملفات CSV
                 const dateTimeMatch = cleaned.match(/(\d{1,2}:\d{2})/);
                 if (dateTimeMatch) timeStr = dateTimeMatch[1];
             }
@@ -85,7 +97,9 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
         }
         
         const native = new Date(cleaned);
-        if (isValid(native)) return { date: startOfDay(native), timeStr: format(native, 'HH:mm') };
+        if (isValid(native) && native.getFullYear() >= 2000) {
+            return { date: startOfDay(native), timeStr: format(native, 'HH:mm') };
+        }
     }
     return null;
 };
@@ -129,42 +143,48 @@ export function AttendanceUploader() {
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
         const punchesMap = new Map<string, { date: Date, employeeId: string, times: string[] }>();
 
-        let recordsFromOtherMonths = 0;
+        let recordsFromOtherPeriods = 0;
+        const foundYears = new Set<number>();
 
         json.forEach(row => {
             const empNo = String(row['الرقم الوظيفي'] || row['ID'] || row['رقم الموظف'] || row[Object.keys(row)[0]] || '');
             const emp = employeeMap.get(empNo);
             if (!emp?.id) return;
 
-            let parsed = null;
-            // البحث عن التاريخ والوقت في كافة أعمدة السطر لضمان المرونة
+            // استخراج كافة التواريخ الممكنة في السطر
+            const possibleDates: any[] = [];
             for (const key in row) {
-                parsed = parseSmartDateTime(row[key]);
-                if (parsed) break;
+                const parsed = parseSmartDateTime(row[key]);
+                if (parsed) possibleDates.push(parsed);
             }
 
-            if (!parsed) return;
+            // البحث عن التاريخ الذي يطابق الفترة المختارة في الواجهة
+            const matchingPeriodDate = possibleDates.find(p => 
+                p.date.getFullYear() === selectedYearNum && (p.date.getMonth() + 1) === selectedMonthNum
+            );
 
-            // الرقابة الصارمة: التحقق من مطابقة الشهر والسنة
-            const isSamePeriod = parsed.date.getFullYear() === selectedYearNum && (parsed.date.getMonth() + 1) === selectedMonthNum;
-            
-            if (!isSamePeriod) {
-                recordsFromOtherMonths++;
+            if (!matchingPeriodDate) {
+                if (possibleDates.length > 0) {
+                    recordsFromOtherPeriods++;
+                    foundYears.add(possibleDates[0].date.getFullYear());
+                }
                 return;
             }
 
-            const dateKey = `${emp.id}_${parsed.date.getTime()}`;
-            const existing = punchesMap.get(dateKey) || { date: parsed.date, employeeId: emp.id, times: [] };
-            if (parsed.timeStr && !existing.times.includes(parsed.timeStr)) existing.times.push(parsed.timeStr);
+            const dateKey = `${emp.id}_${matchingPeriodDate.date.getTime()}`;
+            const existing = punchesMap.get(dateKey) || { date: matchingPeriodDate.date, employeeId: emp.id, times: [] };
+            if (matchingPeriodDate.timeStr && !existing.times.includes(matchingPeriodDate.timeStr)) {
+                existing.times.push(matchingPeriodDate.timeStr);
+            }
             punchesMap.set(dateKey, existing);
         });
 
-        // إذا كان الملف لا يحتوي على أي سجل يطابق الشهر المختار
-        if (punchesMap.size === 0 && json.length > 0) {
+        if (punchesMap.size === 0) {
+            const yearInfo = foundYears.size > 0 ? ` (تم العثور على سنوات: ${Array.from(foundYears).join(', ')})` : '';
             toast({ 
                 variant: 'destructive', 
-                title: 'خطأ في مطابقة البيانات', 
-                description: `تم العثور على ${recordsFromOtherMonths} سجلات لشهور أخرى، ولكن لا توجد أي بصمة تطابق شهر ${selectedMonthNum} وسنة ${selectedYearNum}. يرجى مراجعة محتوى الملف المرفوع.` 
+                title: 'خطأ في مطابقة الفترة', 
+                description: `الملف يحتوي على ${recordsFromOtherPeriods} سجلات، ولكن لا يوجد أي منها يطابق شهر ${selectedMonthNum} وسنة ${selectedYearNum}${yearInfo}.` 
             });
             setIsProcessing(false);
             return;
