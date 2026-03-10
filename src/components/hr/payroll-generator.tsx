@@ -8,7 +8,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -45,7 +45,6 @@ export function PayrollGenerator() {
         const emp = employees.find(e => e.id === doc.employeeId);
         doc.records?.forEach(r => {
             const rDate = toFirestoreDate(r.date);
-            // ضمان عرض فقط البصمات التي تخص الشهر والسنة المختارين فعلياً
             if (rDate && (rDate.getMonth() + 1) === targetMonth && rDate.getFullYear() === targetYear) {
                 if (r.status !== 'present') {
                     list.push({ 
@@ -162,7 +161,24 @@ export function PayrollGenerator() {
                 )}
             </div>
 
-            {anomalies.length > 0 ? (
+            {attLoading ? (
+                <div className="p-32 text-center">
+                    <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
+                    <p className="mt-4 font-bold text-muted-foreground">جاري جلب بيانات الحضور والغياب...</p>
+                </div>
+            ) : attendanceDocs.length === 0 ? (
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50">
+                    <CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" />
+                    <p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p>
+                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى التأكد من اختيار الشهر الصحيح أو رفع ملف البصمة أولاً من تبويب الرفع.</p>
+                </div>
+            ) : anomalies.length === 0 ? (
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-green-50/10 border-green-100">
+                    <CheckCircle className="h-24 w-24 text-green-600/20 mx-auto mb-6" />
+                    <p className="text-3xl font-black text-green-800">التزام كامل! لا توجد مخالفات</p>
+                    <p className="text-lg font-medium text-green-700/60 mt-3">كافة الموظفين الذين تم رفع بصمتهم ملتزمون بالجدول الزمني وليس لديهم غيابات أو تأخيرات.</p>
+                </div>
+            ) : (
                 <div className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl printable-area">
                     <Table>
                         <TableHeader className="bg-muted/50 h-16">
@@ -230,12 +246,6 @@ export function PayrollGenerator() {
                             )})}
                         </TableBody>
                     </Table>
-                </div>
-            ) : (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50">
-                    <CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" />
-                    <p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p>
-                    <p className="text-lg font-medium text-muted-foreground/60 mt-3">يرجى التأكد من اختيار الشهر الصحيح أو رفع ملف البصمة أولاً.</p>
                 </div>
             )}
         </div>

@@ -52,20 +52,23 @@ const parseEntryData = (val: any, targetMonth: number, targetYear: number): { da
     // إذا كان نصاً
     else if (typeof val === 'string') {
         const cleaned = val.trim();
+        // محاولة تنظيف النص من أي رموز غريبة
+        const datePart = cleaned.split(/\s+/)[0].replace(/[^\d\/\.\-]/g, '');
+        
         const dateFormats = [
-            'd-M-yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy',
-            'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy', 'd-M-yyyy HH:mm', 'MM/dd/yyyy HH:mm'
+            'd-M-yyyy', 'dd-MM-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'd.M.yyyy',
+            'dd-MM-yy', 'd-M-yy', 'M/d/yy', 'MM/dd/yy', 'yyyy/MM/dd'
         ];
 
         for (const fmt of dateFormats) {
             try {
-                const p = parse(cleaned.split(/\s+/)[0], fmt, new Date());
+                const p = parse(datePart, fmt, new Date());
                 if (isValid(p) && p.getFullYear() >= 2000) {
                     parsedDate = startOfDay(p);
                     // محاولة استخراج الوقت إذا وجد في نفس الخانة
                     const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
                     if (timeMatch) {
-                        const tp = parse(timeMatch[0], 'HH:mm', new Date());
+                        const tp = parse(timeMatch[0].toUpperCase(), timeMatch[0].includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
                         if (isValid(tp)) timeStr = format(tp, 'HH:mm');
                     }
                     break;
@@ -120,9 +123,9 @@ export function AttendanceUploader() {
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
-            // البحث عن رقم الموظف في أول 3 أعمدة
-            for(let k=0; k<Math.min(keys.length, 3); k++) {
-                const val = String(row[keys[k]] || '');
+            // البحث عن رقم الموظف في أول 5 أعمدة (لزيادة الدقة)
+            for(let k=0; k<Math.min(keys.length, 5); k++) {
+                const val = String(row[keys[k]] || '').trim();
                 if (employeeMap.has(val)) { empNo = val; break; }
             }
             
