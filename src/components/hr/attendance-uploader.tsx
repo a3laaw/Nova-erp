@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
@@ -38,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
@@ -406,7 +405,7 @@ export function AttendanceUploader() {
                             <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
                             <div className="space-y-0.5">
                                 <Label htmlFor="purge" className="font-black text-xs text-red-800 cursor-pointer">تطهير البيانات السابقة</Label>
-                                <p className="text-[9px] text-red-600 font-bold leading-tight">مسح كافة البصمات القديمة المسجلة لهذا الشهر لضمان دقة الرقابة.</p>
+                                <p className="text-[9px] text-red-600 font-bold leading-tight">مساحة كافة البصمات القديمة المسجلة لهذا الشهر لضمان دقة الرقابة.</p>
                             </div>
                         </div>
 
