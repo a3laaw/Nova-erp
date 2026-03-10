@@ -25,23 +25,23 @@ import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Ti
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { parse, format, isValid, startOfDay } from 'date-fns';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { cleanFirestoreData } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * محرك تحليل التاريخ والوقت المتطور:
- * يقوم بفصل التاريخ عن الوقت بدقة لضمان عدم خلط الشهور.
- */
+const dayNameToIndex: Record<string, number> = {
+  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+  'Thursday': 4, 'Friday': 5, 'Saturday': 6
+};
+
 const parseEntryData = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
     let parsedDate: Date | null = null;
     let timeStr = "00:00";
 
-    // إذا كان التاريخ كود إكسل (رقم)
     if (typeof val === 'number') {
         try {
             const excelDate = XLSX.SSF.parse_date_code(val);
@@ -49,10 +49,8 @@ const parseEntryData = (val: any, targetMonth: number, targetYear: number): { da
             timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
         } catch { return null; }
     } 
-    // إذا كان نصاً
     else if (typeof val === 'string') {
         const cleaned = val.trim();
-        // محاولة تنظيف النص من أي رموز غريبة
         const datePart = cleaned.split(/\s+/)[0].replace(/[^\d\/\.\-]/g, '');
         
         const dateFormats = [
@@ -65,7 +63,6 @@ const parseEntryData = (val: any, targetMonth: number, targetYear: number): { da
                 const p = parse(datePart, fmt, new Date());
                 if (isValid(p) && p.getFullYear() >= 2000) {
                     parsedDate = startOfDay(p);
-                    // محاولة استخراج الوقت إذا وجد في نفس الخانة
                     const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
                     if (timeMatch) {
                         const tp = parse(timeMatch[0].toUpperCase(), timeMatch[0].includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
@@ -78,7 +75,6 @@ const parseEntryData = (val: any, targetMonth: number, targetYear: number): { da
     }
 
     if (parsedDate && isValid(parsedDate)) {
-        // التحقق الصارم من مطابقة الشهر والسنة لضمان عدم تداخل البيانات
         if (parsedDate.getFullYear() === targetYear && (parsedDate.getMonth() + 1) === targetMonth) {
             return { date: parsedDate, timeStr };
         }
@@ -117,14 +113,12 @@ export function AttendanceUploader() {
         if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
         const employeeMap = new Map(employees.map(emp => [String(emp.employeeNumber), emp]));
-        // خريطة لتجميع البصمات: الموظف -> اليوم -> قائمة الساعات
-        const dailyPunches = new Map<string, Set<string>>(); 
+        const excelPunches = new Map<string, Set<string>>(); 
 
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
-            // البحث عن رقم الموظف في أول 5 أعمدة (لزيادة الدقة)
-            for(let k=0; k<Math.min(keys.length, 5); k++) {
+            for(let k=0; k<Math.min(keys.length, 10); k++) {
                 const val = String(row[keys[k]] || '').trim();
                 if (employeeMap.has(val)) { empNo = val; break; }
             }
@@ -132,26 +126,28 @@ export function AttendanceUploader() {
             const emp = employeeMap.get(empNo);
             if (!emp?.id) return;
 
-            // استخراج كافة البصمات الممكنة من السطر الحالي والتي تخص الشهر المختار
             for (const key in row) {
                 const parsed = parseEntryData(row[key], selectedMonthNum, selectedYearNum);
                 if (parsed) {
                     const dateKey = `${emp.id}_${parsed.date.getTime()}`;
-                    if (!dailyPunches.has(dateKey)) dailyPunches.set(dateKey, new Set());
+                    if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
                     if (parsed.timeStr && parsed.timeStr !== "00:00") {
-                        dailyPunches.get(dateKey)!.add(parsed.timeStr);
+                        excelPunches.get(dateKey)!.add(parsed.timeStr);
                     }
                 }
             }
         });
 
-        if (dailyPunches.size === 0) {
-            throw new Error(`لم يتم العثور على أي بصمات تخص شهر ${selectedMonthNum}/${selectedYearNum} في هذا الملف. يرجى التأكد من محتوى الملف أو الفترة المختارة.`);
-        }
+        // --- محرك توليد أيام العمل الرسمية وإثبات الغياب ---
+        const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
+        const monthEnd = endOfMonth(monthStart);
+        const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+        
+        const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
+        const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
 
-        // تطهير البيانات القديمة لمنع ظهور March في February
         if (clearPrevious) {
             const existingQuery = query(
                 collection(firestore, 'attendance'),
@@ -162,75 +158,92 @@ export function AttendanceUploader() {
             existingSnap.forEach(d => batch.delete(d.ref));
         }
 
-        const groupedByEmployee = new Map<string, AttendanceRecord[]>();
         const workHours = branding?.work_hours?.general;
         const mEnd = workHours?.morning_end_time || '13:00';
         const eStart = workHours?.evening_start_time || '16:00';
 
-        dailyPunches.forEach((timesSet, compositeKey) => {
-            const [empId, timestamp] = compositeKey.split('_');
-            const date = new Date(parseInt(timestamp));
-            const sortedTimes = Array.from(timesSet).sort();
-            const emp = employees.find(e => e.id === empId);
+        // لكل موظف نشط، نمر على كل أيام العمل الرسمية
+        for (const emp of employees) {
+            const employeeRecords: AttendanceRecord[] = [];
+            
+            for (const day of workingDaysInMonth) {
+                const dateKey = `${emp.id}_${day.getTime()}`;
+                const punches = excelPunches.get(dateKey);
 
-            let status: AttendanceRecord['status'] = 'present';
-            let anomaly = '';
-            let manualDeduction = 0;
+                if (punches && punches.size > 0) {
+                    const sortedTimes = Array.from(punches).sort();
+                    let status: AttendanceRecord['status'] = 'present';
+                    let anomaly = '';
+                    let manualDeduction = 0;
 
-            if (emp?.workStartTime && sortedTimes[0] > emp.workStartTime) {
-                status = 'late';
-                anomaly = `تأخير عن موعده المخصص (${emp.workStartTime})`;
-            } else if (!emp?.workStartTime) {
-                const hasMorning = sortedTimes.some(t => t <= mEnd);
-                const hasEvening = sortedTimes.some(t => t >= eStart);
+                    if (emp?.workStartTime && sortedTimes[0] > emp.workStartTime) {
+                        status = 'late';
+                        anomaly = `تأخير عن موعده المخصص (${emp.workStartTime})`;
+                    } else {
+                        const hasMorning = sortedTimes.some(t => t <= mEnd);
+                        const hasEvening = sortedTimes.some(t => t >= eStart);
 
-                if (hasMorning && !hasEvening) {
-                    status = 'half_day';
-                    anomaly = 'بصمة صباحية فقط (خصم نص يوم)';
-                    manualDeduction = 0.5;
-                } else if (!hasMorning && hasEvening) {
-                    status = 'half_day';
-                    anomaly = 'بصمة مسائية فقط (خصم نص يوم)';
-                    manualDeduction = 0.5;
-                } else if (hasMorning && hasEvening && sortedTimes.length < 4) {
-                    status = 'missing_punch';
-                    anomaly = 'بصمة ناقصة (نسيان بصمة البريك)';
+                        if (hasMorning && !hasEvening) {
+                            status = 'half_day';
+                            anomaly = 'بصمة صباحية فقط (خصم نص يوم)';
+                            manualDeduction = 0.5;
+                        } else if (!hasMorning && hasEvening) {
+                            status = 'half_day';
+                            anomaly = 'بصمة مسائية فقط (خصم نص يوم)';
+                            manualDeduction = 0.5;
+                        } else if (hasMorning && hasEvening && sortedTimes.length < 4) {
+                            status = 'missing_punch';
+                            anomaly = 'بصمة ناقصة (نسيان بصمة البريك)';
+                        }
+                    }
+
+                    employeeRecords.push({
+                        date: Timestamp.fromDate(day),
+                        employeeId: emp.id!,
+                        checkIn1: sortedTimes[0],
+                        checkOut1: sortedTimes[sortedTimes.length - 1],
+                        checkIn2: null, checkOut2: null,
+                        allPunches: sortedTimes,
+                        status,
+                        anomalyDescription: anomaly,
+                        manualDeductionDays: manualDeduction,
+                        auditStatus: status === 'present' ? 'verified' : 'pending'
+                    });
+                } else {
+                    // 🛡️ الموظف لم يبصم في يوم عمل رسمي -> إثبات غياب آلي
+                    employeeRecords.push({
+                        date: Timestamp.fromDate(day),
+                        employeeId: emp.id!,
+                        checkIn1: null, checkOut1: null, checkIn2: null, checkOut2: null,
+                        allPunches: [],
+                        status: 'absent',
+                        anomalyDescription: 'غياب كامل عن يوم عمل رسمي',
+                        manualDeductionDays: 1,
+                        auditStatus: 'pending'
+                    });
                 }
             }
 
-            const record: AttendanceRecord = {
-                date: Timestamp.fromDate(date),
-                employeeId: empId,
-                checkIn1: sortedTimes[0] || null,
-                checkOut1: sortedTimes.length > 1 ? sortedTimes[sortedTimes.length-1] : null,
-                checkIn2: null, checkOut2: null,
-                allPunches: sortedTimes,
-                status,
-                anomalyDescription: anomaly,
-                manualDeductionDays: manualDeduction,
-                auditStatus: status === 'present' ? 'verified' : 'pending'
-            };
-
-            const docId = `${selectedYearNum}-${selectedMonthNum}-${empId}`;
-            if (!groupedByEmployee.has(docId)) groupedByEmployee.set(docId, []);
-            groupedByEmployee.get(docId)!.push(record);
-        });
-
-        for (const [docId, records] of groupedByEmployee.entries()) {
-            batch.set(doc(firestore, 'attendance', docId), {
-                employeeId: docId.split('-')[2],
-                year: selectedYearNum,
-                month: selectedMonthNum,
-                records,
-                updatedAt: serverTimestamp()
-            });
+            if (employeeRecords.length > 0) {
+                const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
+                batch.set(doc(firestore, 'attendance', docId), {
+                    employeeId: emp.id,
+                    year: selectedYearNum,
+                    month: selectedMonthNum,
+                    records: employeeRecords,
+                    updatedAt: serverTimestamp()
+                });
+            }
         }
 
         await batch.commit();
-        toast({ title: 'نجاح المعالجة', description: `تم استيراد ${dailyPunches.size} يومية بنجاح لشهر ${selectedMonthNum}. تم تنظيف السجلات القديمة تلقائياً.` });
+        toast({ 
+            title: 'اكتملت المعالجة الرقابية', 
+            description: `تم تحليل الشهر بالكامل. تم إثبات حضور الملتزمين وتسجيل غياب تلقائي لمن لم تظهر بصمتهم في أيام العمل.` 
+        });
         setFile(null);
       } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الاستيراد', description: error.message });
+        toast({ variant: 'destructive', title: 'خطأ في المعالجة', description: error.message });
       } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
@@ -268,20 +281,20 @@ export function AttendanceUploader() {
         <Card className="lg:col-span-2 rounded-[2rem] border-none shadow-xl">
             <CardHeader>
                 <CardTitle className="font-black">ملف البصمة الجديد</CardTitle>
-                <CardDescription>ارفع ملف الإكسل المستخرج من جهاز البصمة ليقوم النظام بتحليله آلياً.</CardDescription>
+                <CardDescription>ارفع ملف الإكسل المستخرج من جهاز البصمة ليقوم النظام بتحليله ومطابقته مع أيام العمل الرسمية.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[2.5rem] p-12 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/30 group">
                     <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls, .csv" />
                     <FileSpreadsheet className="h-16 w-16 mx-auto opacity-20 mb-4 group-hover:scale-110 transition-transform" />
                     <p className="font-black text-lg">{file ? file.name : "اضغط هنا لاختيار الملف"}</p>
-                    <p className="text-xs text-muted-foreground mt-2 font-bold">يقوم النظام بفلترة البيانات حسب الشهر والسنة المختارين.</p>
+                    <p className="text-xs text-muted-foreground mt-2 font-bold">سيقوم النظام آلياً بتسجيل "غياب" لأي موظف لم تظهر بصمته في يوم عمل رسمي.</p>
                 </div>
             </CardContent>
             <CardFooter className="justify-end border-t p-6">
                 <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-12 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-2">
                     {isProcessing ? <Loader2 className="animate-spin ml-2 h-5 w-5"/> : <RotateCcw className="h-5 w-5"/>} 
-                    بدء المعالجة الذكية
+                    بدء المعالجة الرقابية
                 </Button>
             </CardFooter>
         </Card>
