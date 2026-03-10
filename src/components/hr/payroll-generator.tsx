@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -382,7 +381,8 @@ export function PayrollGenerator() {
         </div>
 
         {/* --- ملخص الرواتب المختصر (للطباعة) --- */}
-        <div id="summary-printable-area" className="hidden print:block border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
+        {/* تم تغيير الكلاس من hidden إلى التموضع المطلق بعيداً عن الشاشة لضمان التقاطه بواسطة html2pdf */}
+        <div id="summary-printable-area" className="fixed -left-[9999px] top-0 w-[1120px] bg-white print:static print:block border-2 rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div className="p-8 border-b-4 border-primary bg-muted/10">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
