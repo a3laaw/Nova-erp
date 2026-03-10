@@ -315,10 +315,30 @@ export function PayrollGenerator() {
   const handleExportSummaryPDF = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const element = document.getElementById('summary-printable-area');
-    if (!element) return;
+    if (summaryData.length === 0) {
+        toast({ title: 'لا توجد بيانات للتصدير' });
+        return;
+    }
     setIsExportingSummary(true);
-    
+
+    // إنشاء عنصر مؤقت مرئي خارج الشاشة بطريقة صحيحة
+    const element = document.getElementById('summary-printable-area');
+    if (!element) {
+        setIsExportingSummary(false);
+        return;
+    }
+
+    // نسخ العنصر ووضعه في مكان يراه html2pdf
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '-9999px';
+    clone.style.width = '1120px';
+    clone.style.visibility = 'visible';
+    clone.style.opacity = '1';
+    clone.style.zIndex = '-1';
+    document.body.appendChild(clone);
+
     const opt = {
       margin: [0.5, 0.5],
       filename: `ملخص_رواتب_${month}_${year}.pdf`,
@@ -328,45 +348,80 @@ export function PayrollGenerator() {
         useCORS: true, 
         letterRendering: true, 
         scrollY: 0,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        windowWidth: 1120
       },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
 
-    // نمنح المتصفح وقتاً قصيراً لضمان رندرة الجدول تماماً في منطقة الظل
     setTimeout(() => {
         import('html2pdf.js').then(module => {
             const html2pdf = module.default;
-            html2pdf().from(element).set(opt).save().then(() => {
-              setIsExportingSummary(false);
-              toast({ title: 'نجاح التصدير' });
-            }).catch((err) => {
-              console.error(err);
-              setIsExportingSummary(false);
-              toast({ variant: 'destructive', title: 'خطأ في التصدير' });
+            html2pdf().from(clone).set(opt).save()
+            .then(() => {
+                document.body.removeChild(clone);
+                setIsExportingSummary(false);
+                toast({ title: 'نجاح التصدير' });
+            })
+            .catch((err: any) => {
+                if (document.body.contains(clone)) document.body.removeChild(clone);
+                console.error(err);
+                setIsExportingSummary(false);
+                toast({ variant: 'destructive', title: 'خطأ في التصدير' });
             });
         });
-    }, 500);
-  }, [month, year, toast]);
+    }, 300);
+  }, [summaryData, month, year, toast]);
 
   const handleExportPDF = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const element = document.getElementById('audit-printable-area');
-    if (!element) return;
+    if (!element) {
+        toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
+        return;
+    }
     setIsExportingPDF(true);
+
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '-9999px';
+    clone.style.width = '1120px';
+    clone.style.visibility = 'visible';
+    clone.style.opacity = '1';
+    document.body.appendChild(clone);
+
     const opt = {
       margin: [0.5, 0.5],
       filename: `تقرير_مخالفات_${month}_${year}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, backgroundColor: '#ffffff' },
+      html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          letterRendering: true, 
+          scrollY: 0, 
+          backgroundColor: '#ffffff',
+          windowWidth: 1120
+      },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
     };
+
     import('html2pdf.js').then(module => {
       const html2pdf = module.default;
-      html2pdf().from(element).set(opt).save().then(() => setIsExportingPDF(false));
+      html2pdf().from(clone).set(opt).save()
+      .then(() => {
+          document.body.removeChild(clone);
+          setIsExportingPDF(false);
+          toast({ title: 'نجاح التصدير' });
+      })
+      .catch((err: any) => {
+          if (document.body.contains(clone)) document.body.removeChild(clone);
+          setIsExportingPDF(false);
+          toast({ variant: 'destructive', title: 'خطأ في التصدير' });
+      });
     });
-  }, [month, year]);
+  }, [month, year, toast]);
 
   const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
   const processedAnomaliesCount = anomalies.filter(a => a.record.auditStatus !== 'pending').length;
@@ -408,7 +463,7 @@ export function PayrollGenerator() {
             </div>
         </div>
 
-        {/* 🛡️ منطقة الطباعة: تم التحديث لضمان الظهور للمحرك فقط مع الحفاظ على الألوان والوضوح */}
+        {/* 🛡️ منطقة الطباعة: مخفية عن المستخدم ولكن مرئية للمحرك */}
         <div 
             id="summary-printable-area" 
             className="fixed -top-[20000px] left-0 w-[1120px] bg-white opacity-100 pointer-events-none"
