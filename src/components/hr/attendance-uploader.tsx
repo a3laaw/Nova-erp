@@ -35,11 +35,12 @@ import {
 } from '@/components/ui/table';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, deleteDoc, collectionGroup } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -49,6 +50,7 @@ import { Badge } from '../ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useAuth } from '@/context/auth-context';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -108,6 +110,7 @@ export function AttendanceUploader() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const { branding } = useBranding();
+  const { user: currentUser } = useAuth();
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
@@ -117,6 +120,7 @@ export function AttendanceUploader() {
   const [clearPrevious, setClearPrevious] = useState(true);
   const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -284,7 +288,7 @@ export function AttendanceUploader() {
             }
         });
 
-        if (excelPunches.size === 0) throw new Error("لا توجد بصمات مطابقة للفترة المختارة في الملف.");
+        if (excelPunches.size === 0) throw new Error("لا توجد بصمات مطابقة للفترة المحددة في الملف.");
 
         let processingLimitDate = processingMode === 'full_month' ? monthEnd : (lastDateInFile || new Date());
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -292,6 +296,12 @@ export function AttendanceUploader() {
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
+
+        if (clearPrevious) {
+            const oldQ = query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum));
+            const oldSnap = await getDocs(oldQ);
+            oldSnap.forEach(d => batch.delete(d.ref));
+        }
 
         for (const emp of Array.from(employeeMap.values())) {
             const employeeRecords: AttendanceRecord[] = [];
@@ -332,20 +342,33 @@ export function AttendanceUploader() {
             }
 
             if (employeeRecords.length > 0) {
+                const presentDays = employeeRecords.filter(r => r.status === 'present').length;
+                const absentDays = employeeRecords.filter(r => r.status === 'absent').length;
+                const lateDays = employeeRecords.filter(r => r.status === 'late').length;
+                const halfDays = employeeRecords.filter(r => r.status === 'half_day').length;
+                const totalDeductionDays = employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0);
+
                 const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
-                const summary = {
-                    presentDays: employeeRecords.filter(r => r.status === 'present').length,
-                    absentDays: employeeRecords.filter(r => r.status === 'absent').length,
-                    lateDays: employeeRecords.filter(r => r.status === 'late').length,
-                    totalDeductionDays: employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0),
-                    totalWorkingDays: employeeRecords.length
-                };
-                batch.set(doc(firestore, 'attendance', docId), { employeeId: emp.id, year: selectedYearNum, month: selectedMonthNum, records: employeeRecords, summary, updatedAt: serverTimestamp() });
+                batch.set(doc(firestore, 'attendance', docId), {
+                    employeeId: emp.id,
+                    year: selectedYearNum,
+                    month: selectedMonthNum,
+                    records: employeeRecords,
+                    summary: {
+                        presentDays,
+                        absentDays,
+                        lateDays,
+                        halfDays,
+                        totalDeductionDays,
+                        totalWorkingDays: employeeRecords.length
+                    },
+                    updatedAt: serverTimestamp()
+                });
             }
         }
 
         await batch.commit();
-        toast({ title: 'نجاح التوليد', description: 'تم إنشاء سجلات الحضور. يمكنك الآن البدء بالتدقيق.' });
+        toast({ title: 'نجاح التوليد', description: 'تم إنشاء سجلات الحضور والملخصات الإحصائية بنجاح.' });
         setFile(null);
         fetchAttendance();
       } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ', description: error.message }); } finally { setIsProcessing(false); }
