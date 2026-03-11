@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip } from '@/lib/types';
 import { RefreshCw, Trash2, FileDown, Printer, CheckCircle2, XCircle, Loader2, Calculator, ShieldCheck, CheckCircle, Ban, FileText, Info, RotateCcw, Banknote, CalendarDays } from 'lucide-react';
-import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn, numberToArabicWords } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { format, startOfDay } from 'date-fns';
