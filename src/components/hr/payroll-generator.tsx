@@ -8,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw, XCircle, Banknote } from 'lucide-react';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw, XCircle, Banknote, Trash2 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -76,7 +76,7 @@ export function PayrollGenerator() {
     }
   };
 
-  // جلب البيانات عند تغيير الشهر أو السنة فقط إذا كانت هناك بيانات مسبقاً (إدارة الحالة)
+  // جلب البيانات عند تغيير الشهر أو السنة فقط إذا كانت هناك بيانات مسبقاً
   useEffect(() => {
     if (attendanceDocs.length > 0) {
       fetchAttendance();
@@ -109,7 +109,6 @@ export function PayrollGenerator() {
 
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
-    
     if (!attendanceDocs || attendanceDocs.length === 0) return [];
 
     const selectedMonth = parseInt(month);
@@ -117,13 +116,10 @@ export function PayrollGenerator() {
 
     attendanceDocs.forEach(attendanceDoc => {
         const emp = employees.find(e => e.id === attendanceDoc.employeeId);
-        
         attendanceDoc.records?.forEach(r => {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
-
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
-
             if (r.status !== 'present') {
                 list.push({ 
                     docId: attendanceDoc.id!, 
@@ -134,7 +130,6 @@ export function PayrollGenerator() {
             }
         });
     });
-    
     return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(b.record.date)?.getTime() || 0));
   }, [attendanceDocs, employees, month, year]);
 
@@ -144,32 +139,19 @@ export function PayrollGenerator() {
         const docRef = doc(firestore, 'attendance', docId);
         const snap = await getDoc(docRef);
         if (!snap.exists()) return;
-        
         const records = snap.data().records.map((r: any) => {
             if (r.date.seconds === date.seconds) {
                 let manualDeduction = r.manualDeductionDays;
                 if (action === 'waive') manualDeduction = 0;
-                else if (action === 'reset') {
-                    manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
-                }
-
-                return { 
-                    ...r, 
-                    auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'),
-                    manualDeductionDays: manualDeduction,
-                    waivedBy: action === 'reset' ? null : currentUser.fullName,
-                    waivedAt: action === 'reset' ? null : new Date()
-                };
+                else if (action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                return { ...r, auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), manualDeductionDays: manualDeduction, waivedBy: action === 'reset' ? null : currentUser.fullName, waivedAt: action === 'reset' ? null : new Date() };
             }
             return r;
         });
-        
         await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
         setAttendanceDocs(prev => prev.map(doc => doc.id === docId ? { ...doc, records } : doc));
-        toast({ title: 'تم الحفظ', description: 'تم تحديث حالة المخالفة.' });
-    } catch (e) { 
-        toast({ variant: 'destructive', title: 'خطأ في التحديث' }); 
-    }
+        toast({ title: 'تم الحفظ' });
+    } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
   };
 
   const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
@@ -256,69 +238,6 @@ export function PayrollGenerator() {
     finally { setIsProcessing(false); }
   };
 
-  const timeToMinutes = (timeStr: string | null | undefined): number => {
-    if (!timeStr || !timeStr.includes(':')) return 0;
-    const parts = timeStr.trim().split(':');
-    const h = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    if (isNaN(h) || isNaN(m)) return 0;
-    return h * 60 + m;
-  };
-
-  const summaryData = useMemo(() => {
-    if (!attendanceDocs || attendanceDocs.length === 0) return [];
-    
-    const globalWorkHours = branding?.work_hours?.general;
-    return employees.map(emp => {
-      const att = attendanceDocs.find(a => a.employeeId === emp.id);
-      if (!att) return null;
-
-      let totalAbsent = 0;
-      let totalLate = 0;
-      let totalLateMinutes = 0;
-      let totalHalfDay = 0;
-      let totalDeductionDays = 0;
-
-      const empStartTimeLimit = emp.workStartTime || globalWorkHours?.morning_start_time || '08:00';
-      const limitMins = timeToMinutes(empStartTimeLimit);
-
-      att.records?.forEach(r => {
-        if (r.auditStatus === 'waived') return;
-        if (r.status === 'absent') totalAbsent++;
-        else {
-            if (r.checkIn1 && r.checkIn1 !== "00:00") {
-                const checkInMins = timeToMinutes(r.checkIn1);
-                const diff = checkInMins - limitMins;
-                if (diff > 0) { totalLateMinutes += diff; totalLate++; }
-            }
-            if (r.status === 'half_day') totalHalfDay++;
-        }
-        totalDeductionDays += (r.manualDeductionDays || 0);
-      });
-
-      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-      const dailyRate = fullSalary / 26;
-      const deductionAmount = totalDeductionDays * dailyRate;
-      const lateHours = Math.floor(totalLateMinutes / 60);
-      const lateMins = totalLateMinutes % 60;
-
-      return {
-        empNo: emp.employeeNumber || '',
-        name: emp.fullName || '',
-        fullSalary,
-        absent: totalAbsent,
-        lateCount: totalLate,
-        lateTime: `${lateHours}:${String(lateMins).padStart(2, '0')}`,
-        lateMins: totalLateMinutes,
-        halfDays: totalHalfDay,
-        deductionDays: totalDeductionDays,
-        dailyRate,
-        deductionAmount,
-        netSalary: fullSalary - deductionAmount
-      };
-    }).filter(Boolean);
-  }, [employees, attendanceDocs, branding]);
-
   const handleExportExcel = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -402,57 +321,45 @@ export function PayrollGenerator() {
     }, 300);
   }, [summaryData, month, year, toast]);
 
-  const handleExportPDF = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const element = document.getElementById('audit-printable-area');
-    if (!element) {
-        toast({ variant: 'destructive', title: 'لا توجد بيانات للتصدير' });
-        return;
-    }
-    setIsExportingPDF(true);
+  const summaryData = useMemo(() => {
+    if (!attendanceDocs || attendanceDocs.length === 0) return [];
+    
+    return employees.map(emp => {
+      const att = attendanceDocs.find(a => a.employeeId === emp.id);
+      if (!att) return null;
 
-    const clone = element.cloneNode(true) as HTMLElement;
-    clone.style.position = 'absolute';
-    clone.style.top = '0';
-    clone.style.left = '-9999px';
-    clone.style.width = '1120px';
-    clone.style.visibility = 'visible';
-    clone.style.opacity = '1';
-    document.body.appendChild(clone);
+      let totalAbsent = 0;
+      let totalLate = 0;
+      let totalLateMinutes = 0;
+      let totalDeductionDays = 0;
 
-    const opt = {
-      margin: [0.5, 0.5],
-      filename: `تقرير_مخالفات_${month}_${year}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          letterRendering: true, 
-          scrollY: 0, 
-          backgroundColor: '#ffffff',
-          windowWidth: 1120
-      },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }
-    };
-
-    import('html2pdf.js').then(module => {
-      const html2pdf = module.default;
-      html2pdf().from(clone).set(opt).save()
-      .then(() => {
-          document.body.removeChild(clone);
-          setIsExportingPDF(false);
-          toast({ title: 'نجاح التصدير' });
-      })
-      .catch((err: any) => {
-          if (document.body.contains(clone)) document.body.removeChild(clone);
-          setIsExportingPDF(false);
-          toast({ variant: 'destructive', title: 'خطأ في التصدير' });
+      att.records?.forEach(r => {
+        if (r.auditStatus === 'waived') return;
+        if (r.status === 'absent') totalAbsent++;
+        else if (r.status === 'late') totalLate++;
+        totalDeductionDays += (r.manualDeductionDays || 0);
       });
-    });
-  }, [month, year, toast]);
 
-  const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
+      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+      const dailyRate = fullSalary / 26;
+      const deductionAmount = totalDeductionDays * dailyRate;
+
+      return {
+        empNo: emp.employeeNumber || '',
+        name: emp.fullName || '',
+        fullSalary,
+        absent: totalAbsent,
+        lateCount: totalLate,
+        lateMins: totalLateMinutes,
+        deductionDays: totalDeductionDays,
+        dailyRate,
+        deductionAmount,
+        netSalary: fullSalary - deductionAmount
+      };
+    }).filter(Boolean);
+  }, [employees, attendanceDocs, branding]);
+
+  const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
   const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
   return (
@@ -528,9 +435,9 @@ export function PayrollGenerator() {
             <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/50 flex flex-wrap gap-2 items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-purple-700">📋 مراجعة المخالفات</span>
-                {pendingAnomaliesCount > 0 && (
+                {pendingCount > 0 && (
                   <span className="bg-purple-600 text-white text-xs font-black px-3 py-1 rounded-full">
-                    {pendingAnomaliesCount} بانتظار مراجعتك
+                    {pendingCount} بانتظار مراجعتك
                   </span>
                 )}
               </div>
@@ -544,6 +451,68 @@ export function PayrollGenerator() {
               </div>
             </div>
           )}
+        </div>
+
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 gap-4">
+                <div className="space-y-1">
+                    <h3 className="text-2xl font-black flex items-center gap-3">
+                        <ShieldCheck className="text-primary h-8 w-8"/> 
+                        مركز تدقيق الحضور والمخالفات
+                    </h3>
+                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> مراجعة المخالفات التفصيلية قبل الاعتماد المالي.</p>
+                </div>
+            </div>
+
+            {attLoading ? (
+                <div className="p-32 text-center"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /><p className="mt-4 font-bold text-muted-foreground">جاري فحص سجلات الحضور...</p></div>
+            ) : attendanceDocs.length === 0 ? (
+                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50"><CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" /><p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p></div>
+            ) : (
+                <div id="audit-printable-area" className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
+                    <Table>
+                        <TableHeader className="bg-muted/50 h-16">
+                            <TableRow className="border-none">
+                                <TableHead className="px-8 font-black text-[#7209B7]">الموظف</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
+                                <TableHead className="text-center no-print font-black text-[#7209B7]">القرار</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {anomalies.length === 0 ? (
+                                <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-bold italic">لا توجد مخالفات في سجلات الحضور.</TableCell></TableRow>
+                            ) : anomalies.map((item, idx) => {
+                                const isAbsent = item.record.status === 'absent';
+                                const recordDate = toFirestoreDate(item.record.date);
+                                return (
+                                <TableRow key={idx} className={cn("h-20 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
+                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                    <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
+                                    <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
+                                    <TableCell>{isAbsent ? <Ban className="h-4 w-4 text-red-200" /> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-4 bg-background">{p}</Badge>)}</div>}</TableCell>
+                                    <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
+                                    <TableCell className="text-center no-print">{item.record.auditStatus === 'pending' ? (
+                                        <div className="flex justify-center gap-2">
+                                            <Button type="button" size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
+                                        </div>
+                                    ) : <Button type="button" variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}</TableCell>
+                                </TableRow>
+                            )})}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+        </div>
+
+        <div className="no-print pt-10 border-t flex justify-center">
+            <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingCount > 0 || attLoading} className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90 gap-4 min-w-[350px]">
+                {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <Banknote className="h-8 w-8"/>} 
+                {pendingCount > 0 ? `بانتظار مراجعتك (${pendingCount} مخالفة)` : 'اعتماد وصرف الرواتب النهائية'}
+            </Button>
         </div>
 
         <div 
@@ -607,77 +576,6 @@ export function PayrollGenerator() {
                     </div>
                 </div>
             )}
-        </div>
-
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4 gap-4">
-                <div className="space-y-1">
-                    <h3 className="text-2xl font-black flex items-center gap-3">
-                        <ShieldCheck className="text-primary h-8 w-8"/> 
-                        مركز تدقيق الحضور والمخالفات
-                    </h3>
-                    <p className="text-xs text-muted-foreground font-bold flex items-center gap-1"><RefreshCw className="h-3 w-3"/> مراجعة المخالفات التفصيلية قبل الاعتماد المالي.</p>
-                </div>
-                
-                <div className="flex flex-wrap gap-2 animate-in slide-in-from-left-4 duration-500">
-                    {pendingAnomaliesCount > 0 && (
-                        <Badge variant="destructive" className="animate-pulse rounded-lg h-9 px-4 font-black gap-2">
-                            <AlertCircle className="h-4 w-4" />
-                            يوجد {pendingAnomaliesCount} مخالفة
-                        </Badge>
-                    )}
-                </div>
-            </div>
-
-            {attLoading ? (
-                <div className="p-32 text-center"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /><p className="mt-4 font-bold text-muted-foreground">جاري فحص سجلات الحضور...</p></div>
-            ) : attendanceDocs.length === 0 ? (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50"><CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" /><p className="text-3xl font-black text-muted-foreground">لا توجد بيانات لهذا الشهر</p></div>
-            ) : (
-                <div id="audit-printable-area" className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
-                    <Table>
-                        <TableHeader className="bg-muted/50 h-16">
-                            <TableRow className="border-none">
-                                <TableHead className="px-8 font-black text-[#7209B7]">الموظف</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
-                                <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
-                                <TableHead className="text-center no-print font-black text-[#7209B7]">القرار</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {anomalies.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-bold italic">لا توجد مخالفات في سجلات الحضور.</TableCell></TableRow>
-                            ) : anomalies.map((item, idx) => {
-                                const isAbsent = item.record.status === 'absent';
-                                const recordDate = toFirestoreDate(item.record.date);
-                                return (
-                                <TableRow key={idx} className={cn("h-20 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
-                                    <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
-                                    <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
-                                    <TableCell>{isAbsent ? <Ban className="h-4 w-4 text-red-200" /> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-4 bg-background">{p}</Badge>)}</div>}</TableCell>
-                                    <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
-                                    <TableCell className="text-center no-print">{item.record.auditStatus === 'pending' ? (
-                                        <div className="flex justify-center gap-2">
-                                            <Button type="button" size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
-                                        </div>
-                                    ) : <Button type="button" variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}</TableCell>
-                                </TableRow>
-                            )})}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
-        </div>
-
-        <div className="no-print pt-10 border-t flex justify-center">
-            <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90 gap-4 min-w-[350px]">
-                {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <Banknote className="h-8 w-8"/>} 
-                {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب النهائية'}
-            </Button>
         </div>
     </div>
   );
