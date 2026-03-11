@@ -39,7 +39,7 @@ import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Ti
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isWithinInterval } from 'date-fns';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -194,10 +194,11 @@ export function AttendanceUploader() {
     reader.onload = async (e) => {
       try {
         const data = e.target?.result;
+        // قراءة الملف كسلسلة ثنائية لضمان دقة تحليل مكتبة XLSX
         const workbook = XLSX.read(data, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         
-        if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
+        if (json.length === 0) throw new Error("الملف المرفوع فارغ أو بتنسيق غير مدعوم.");
 
         const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
         const monthEnd = endOfMonth(monthStart);
@@ -397,7 +398,7 @@ export function AttendanceUploader() {
             }
 
             if (employeeRecords.length > 0) {
-                // حساب الملخص آلياً من السجلات
+                // حساب الملخص آلياً من السجلات لخدمة التقارير السريعة
                 const presentDays = employeeRecords.filter(r => r.status === 'present').length;
                 const absentDays = employeeRecords.filter(r => r.status === 'absent').length;
                 const lateDays = employeeRecords.filter(r => r.status === 'late').length;
@@ -431,7 +432,8 @@ export function AttendanceUploader() {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
       } finally { setIsProcessing(false); }
     };
-    reader.readAsDataURL(file!);
+    // استخدام readAsBinaryString لضمان توافق البيانات مع مكتبة XLSX.read
+    reader.readAsBinaryString(file!);
   };
 
   const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
