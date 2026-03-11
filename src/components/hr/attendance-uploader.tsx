@@ -67,6 +67,8 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
     if (typeof val === 'number') {
         try {
             const excelDate = XLSX.SSF.parse_date_code(val);
+            // Ignore pre-modern dates (anything before year 2000) to avoid Excel artifacts
+            if (excelDate.y < 2000) return null;
             parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
             timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
         } catch { return null; }
@@ -85,6 +87,8 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
             for (const fmt of formats) {
                 const p = parse(dateStr, fmt, new Date());
                 if (isValid(p)) {
+                    // Filter unrealistic years from string parsing too
+                    if (p.getFullYear() < 2000) break;
                     parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
                     break;
                 }
@@ -222,7 +226,6 @@ export function AttendanceUploader() {
         let totalPunchesCount = 0;
         let lastDateInFile: Date | null = null;
         
-        // --- حماية الفترة: التحقق من توافق الشهر والسنوات ---
         const detectedMonths = new Set<string>();
         
         json.forEach(row => {
@@ -241,9 +244,12 @@ export function AttendanceUploader() {
                 if (parsed) {
                     const pMonth = parsed.date.getMonth() + 1;
                     const pYear = parsed.date.getFullYear();
-                    detectedMonths.add(`${pYear}-${pMonth}`);
+                    
+                    // Only collect realistic years for warning display
+                    if (pYear > 2000) {
+                        detectedMonths.add(`${pYear}-${pMonth}`);
+                    }
 
-                    // فقط إذا كان التاريخ يطابق الفترة المختارة، نقوم بتسجيل البصمات
                     if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
                         const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
                         if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
@@ -259,11 +265,9 @@ export function AttendanceUploader() {
             }
         });
 
-        // التحقق من تضارب الأشهر (Audit Logic)
         const targetPeriod = `${selectedYearNum}-${selectedMonthNum}`;
         if (detectedMonths.size > 0 && !detectedMonths.has(targetPeriod)) {
-            const foundMonths = Array.from(detectedMonths).join(', ');
-            throw new Error(`الملف المرفوع لا يحتوي على بيانات لشهر ${selectedMonthNum}/${selectedYearNum}. تم العثور على بيانات للفترات التالية: (${foundMonths}). يرجى التأكد من اختيار الشهر الصحيح في الأعلى.`);
+            throw new Error("الشهر والسنة في الملف المرفوع لا يطابقان الفترة المختارة في الأعلى.");
         }
 
         if (excelPunches.size === 0) {
