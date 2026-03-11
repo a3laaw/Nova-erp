@@ -96,38 +96,53 @@ export function PayrollGenerator() {
     }
   };
 
-  // --- دالة حذف بيانات الشهر ---
+  // --- دالة حذف بيانات الشهر المصلحة ---
   const handleDeleteMonth = async () => {
     if (!firestore) return;
-    const confirmed = window.confirm(`هل أنت متأكد من حذف جميع بيانات الحضور لشهر ${month}/${year}؟ سيؤدي هذا لتصفير سجلات هذا الشهر تماماً.`);
+    const confirmed = window.confirm(`هل أنت متأكد من حذف جميع بيانات الحضور لشهر ${month}/${year}؟`);
     if (!confirmed) return;
     
     setAttLoading(true);
     try {
+      // حذف من Firestore
       const snap = await getDocs(query(
         collection(firestore, 'attendance'),
         where('year', '==', parseInt(year)),
         where('month', '==', parseInt(month))
       ));
       
-      const batch = writeBatch(firestore);
-      snap.forEach(d => batch.delete(d.ref));
-      await batch.commit();
+      if (snap.empty) {
+        toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على سجلات لهذا الشهر.' });
+        setAttendanceDocs([]);
+        return;
+      }
+
+      // Firestore batch يدعم 500 عملية كحد أقصى - نستخدم Chunking
+      const chunks = [];
+      const docs = snap.docs;
+      for (let i = 0; i < docs.length; i += 490) {
+        chunks.push(docs.slice(i, i + 490));
+      }
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(firestore);
+        chunk.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
       
       setAttendanceDocs([]);
-      toast({ title: 'تم الحذف', description: `تم تطهير بيانات شهر ${month}/${year} بنجاح.` });
+      toast({ title: '✅ تم الحذف', description: `تم تطهير ${snap.size} سجل لشهر ${month}/${year} بنجاح.` });
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+      console.error('Delete error:', e);
+      toast({ variant: 'destructive', title: 'خطأ في الحذف', description: e.message });
     } finally {
       setAttLoading(false);
     }
   };
 
-  // جلب تلقائي فقط عند تغيير الفترة وبشرط وجود داتا محملة مسبقاً (للتزامن)
+  // عند تغيير الشهر أو السنة: نصفّر البيانات المحملة (منع التحميل التلقائي)
   useEffect(() => {
-    if (attendanceDocs.length > 0) {
-      fetchAttendance();
-    }
+    setAttendanceDocs([]);
   }, [year, month]);
 
   // --- حساب المخالفات والأنوماليز للتدقيق ---
@@ -238,7 +253,7 @@ export function PayrollGenerator() {
     }
   };
 
-  // --- ملخص البيانات للتصدير (يجب تعريفه قبل الدوال التي تستخدمه) ---
+  // --- ملخص البيانات للتصدير ---
   const summaryData = useMemo(() => {
     if (!attendanceDocs || attendanceDocs.length === 0) return [];
     
@@ -360,10 +375,10 @@ export function PayrollGenerator() {
 
   return (
     <div className="space-y-8" dir="rtl">
-        {/* --- منطقة التحكم الرئيسية (Frames) --- */}
+        {/* منطقة التحكم الرئيسية */}
         <div className="space-y-3 mb-6 no-print">
           
-          {/* اختيار الفترة */}
+          {/* الصف الأول: اختيار الفترة */}
           <div className="flex items-center gap-3 flex-wrap p-2">
             <div className="flex items-center gap-2">
               <Label className="font-black text-sm text-muted-foreground">الفترة الرقابية:</Label>
@@ -402,7 +417,7 @@ export function PayrollGenerator() {
                         className="flex-1 h-10 rounded-xl font-bold text-xs gap-2 shadow-md active:translate-y-0.5 transition-all"
                     >
                         <Trash2 className="h-4 w-4"/>
-                        تصفير الشهر
+                        حذف بيانات الشهر
                     </Button>
                 </div>
               </div>
