@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isBefore, endOfDay, isAfter } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
@@ -47,6 +47,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -112,6 +113,9 @@ export function AttendanceUploader() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [clearPrevious, setClearPrevious] = useState(true);
+  
+  // ✨ خيار نظام المعالجة الجديد
+  const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
   
   const [summary, setSummary] = useState<{ workingDays: number, totalPunches: number, autoAbsences: number, coveredByPolicy: number } | null>(null);
   
@@ -217,6 +221,7 @@ export function AttendanceUploader() {
         let totalPunchesCount = 0;
         let lastDateInFile: Date | null = null;
 
+        // ✨ محرك المسح المسبق لتحديد آخر تاريخ في الملف
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
@@ -236,6 +241,7 @@ export function AttendanceUploader() {
                     if (parsed.timeStr && parsed.timeStr !== "00:00") {
                         excelPunches.get(dateKey)!.add(parsed.timeStr);
                         totalPunchesCount++;
+                        // تحديث أحدث تاريخ تم رصده في الملف
                         if (!lastDateInFile || parsed.date > lastDateInFile) {
                             lastDateInFile = parsed.date;
                         }
@@ -244,25 +250,26 @@ export function AttendanceUploader() {
             }
         });
 
+        // ✨ تحديد سقف الرقابة الزمني بناءً على الوضع المختار
+        let processingLimitDate: Date;
+        if (processingMode === 'full_month') {
+            processingLimitDate = monthEnd;
+        } else {
+            // أيام محددة: الحد هو آخر بصمة في الملف أو اليوم الحالي أيهما أقرب (للمنطق)
+            // ولكن بناءً على طلبك سنعتمد أقصى تاريخ في الجدول كمرجع صلب
+            processingLimitDate = lastDateInFile || today;
+        }
+
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
         const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
         const halfDaySettings = branding?.work_hours?.half_day;
         const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
 
-        // ✨ محرك تحديد سقف المعالجة الزمني (Inclusive Limit Logic)
-        let processingLimitDate: Date;
-        if (isBefore(monthEnd, today)) {
-            // شهر قديم: المعالجة حتى آخر يوم في الشهر
-            processingLimitDate = endOfDay(monthEnd);
-        } else {
-            // شهر جاري: المعالجة حتى (اليوم) أو (تاريخ آخر بصمة في الملف) أيهما أبعد
-            processingLimitDate = lastDateInFile && isAfter(lastDateInFile, today) ? endOfDay(lastDateInFile) : endOfDay(today);
-        }
-
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
 
+        // منطق التطهير أو الدمج
         if (clearPrevious) {
             const existingQuery = query(
                 collection(firestore, 'attendance'),
@@ -381,8 +388,8 @@ export function AttendanceUploader() {
                         auditStatus
                     });
                 } else {
-                    // ✨ الرقابة الزمنية المحدثة: المقارنة حتى نهاية اليوم المحدد (Inclusive)
-                    if (!isAfter(stableDay, processingLimitDate)) {
+                    // ✨ الرقابة الشمولية: استخدام نهاية اليوم لضمان شمول تاريخ الحد الأقصى
+                    if (!isAfter(stableDay, endOfDay(processingLimitDate))) {
                         if (activeLeave) {
                             coveredByPolicyCount++;
                             employeeRecords.push({
@@ -448,7 +455,6 @@ export function AttendanceUploader() {
   };
 
   const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-  const leaveTypeTranslations: any = { 'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر' };
 
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
@@ -467,31 +473,63 @@ export function AttendanceUploader() {
             <div className="grid lg:grid-cols-3 gap-8">
                 <Card className="lg:col-span-1 rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
                     <CardHeader className="bg-muted/10 border-b pb-6">
-                        <CardTitle className="text-xl font-black text-gray-800">فترة التقرير والرقابة</CardTitle>
+                        <CardTitle className="text-xl font-black text-gray-800">إعدادات المعالجة والرقابة</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6 pt-8">
-                        <div className="grid gap-2">
-                            <Label className="font-bold text-gray-700 mr-1">السنة</Label>
-                            <Select value={year} onValueChange={setYear}>
-                                <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label className="font-bold text-gray-700 mr-1">الشهر</Label>
-                            <Select value={month} onValueChange={setMonth}>
-                                <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                            </Select>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-1.5">
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label>
+                                <Select value={year} onValueChange={setYear}>
+                                    <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
+                                    <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label>
+                                <Select value={month} onValueChange={setMonth}>
+                                    <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
+                                    <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
                         </div>
                         
+                        <Separator />
+
+                        <div className="space-y-4">
+                            <Label className="font-black text-sm text-primary flex items-center gap-2">
+                                <CalendarRange className="h-4 w-4" /> نطاق الرقابة (سقف الغياب)
+                            </Label>
+                            <RadioGroup value={processingMode} onValueChange={(v: any) => setProcessingMode(v)} className="grid grid-cols-1 gap-3">
+                                <div className={cn(
+                                    "flex items-center space-x-3 space-x-reverse p-4 rounded-2xl border-2 transition-all cursor-pointer",
+                                    processingMode === 'limit_to_file' ? "bg-primary/5 border-primary shadow-sm" : "bg-muted/30 border-transparent hover:bg-muted/50"
+                                )} onClick={() => setProcessingMode('limit_to_file')}>
+                                    <RadioGroupItem value="limit_to_file" id="r1" className="h-5 w-5" />
+                                    <div className="flex-1 space-y-0.5">
+                                        <Label htmlFor="r1" className="font-black text-sm cursor-pointer">أيام محددة (بناءً على الملف)</Label>
+                                        <p className="text-[10px] text-muted-foreground font-bold">النظام سيتوقف عند أقصى تاريخ تم رصده في الملف المرفوع.</p>
+                                    </div>
+                                </div>
+                                <div className={cn(
+                                    "flex items-center space-x-3 space-x-reverse p-4 rounded-2xl border-2 transition-all cursor-pointer",
+                                    processingMode === 'full_month' ? "bg-primary/5 border-primary shadow-sm" : "bg-muted/30 border-transparent hover:bg-muted/50"
+                                )} onClick={() => setProcessingMode('full_month')}>
+                                    <RadioGroupItem value="full_month" id="r2" className="h-5 w-5" />
+                                    <div className="flex-1 space-y-0.5">
+                                        <Label htmlFor="r2" className="font-black text-sm cursor-pointer">الشهر كامل (إغلاق نهائي)</Label>
+                                        <p className="text-[10px] text-muted-foreground font-bold">النظام سيحسب الغياب حتى آخر يوم في الشهر المحدد.</p>
+                                    </div>
+                                </div>
+                            </RadioGroup>
+                        </div>
+
                         <Separator />
 
                         <div className="flex items-center gap-3 p-4 bg-amber-50/50 rounded-2xl border-2 border-dashed border-amber-200">
                             <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
                             <div className="space-y-0.5">
                                 <Label htmlFor="purge" className="font-black text-xs text-amber-800 cursor-pointer">تطهير البيانات السابقة</Label>
-                                <p className="text-[9px] text-amber-600 font-bold leading-tight">إلغاء التحديد سيؤدي لدمج الملف المرفوع مع بيانات الشهر الحالية في النظام.</p>
+                                <p className="text-[9px] text-amber-600 font-bold leading-tight">تفعيله يمسح بصمات الشهر القديمة. إيقافه يدمج الملف الجديد مع الموجود.</p>
                             </div>
                         </div>
 
