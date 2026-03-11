@@ -13,13 +13,13 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search, Banknote } from 'lucide-react';
+import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search, Banknote, Trash2, RefreshCw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,7 +76,6 @@ export function PayslipsList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
-    // جلب كشوف الرواتب بناءً على السنة والشهر المختاريين
     const [payslips, setPayslips] = useState<Payslip[]>([]);
     const [loadingPayslips, setLoadingPayslips] = useState(false);
 
@@ -90,16 +89,21 @@ export function PayslipsList() {
                 where('month', '==', parseInt(month))
             ));
             setPayslips(snap.docs.map(d => ({ id: d.id, ...d.data() } as Payslip)));
+            if (snap.empty) {
+                toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على كشوفات منشأة لهذه الفترة.' });
+            }
         } catch (e) {
             console.error("Error fetching payslips:", e);
+            toast({ variant: 'destructive', title: 'خطأ في التحميل' });
         } finally {
             setLoadingPayslips(false);
         }
     };
 
+    // عند تغيير الشهر أو السنة: نصفّر البيانات فقط
     useEffect(() => {
-        fetchPayslips();
-    }, [firestore, year, month]);
+        setPayslips([]);
+    }, [year, month]);
 
     const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees');
 
@@ -126,7 +130,6 @@ export function PayslipsList() {
         );
     }, [payslips, employees, searchQuery]);
 
-    // محرك الترحيل المالي: اعتماد الصرف وإنشاء القيد المحاسبي
     const handleConfirmAndPay = async () => {
         if (!firestore || !currentUser || sortedPayslips.length === 0) return;
         
@@ -141,8 +144,8 @@ export function PayslipsList() {
             const coaSnap = await getDocs(collection(firestore, 'chartOfAccounts'));
             const allAccounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account));
 
-            const salaryExpenseAccount = allAccounts.find(a => a.code === '5201'); // مصروف الرواتب
-            const bankAccount = allAccounts.find(a => a.code === '110102'); // حساب البنك
+            const salaryExpenseAccount = allAccounts.find(a => a.code === '5201');
+            const bankAccount = allAccounts.find(a => a.code === '110102');
 
             if (!salaryExpenseAccount || !bankAccount) {
                 throw new Error("حسابات الرواتب (5201) أو البنك (110102) غير موجودة في شجرة الحسابات.");
@@ -159,7 +162,6 @@ export function PayslipsList() {
 
                 const totalNetSalaries = draftPayslips.reduce((sum, p) => sum + p.netSalary, 0);
 
-                // إنشاء قيد اليومية المجمع
                 transaction.set(newJeRef, {
                     entryNumber: jeNumber,
                     date: serverTimestamp(),
@@ -175,7 +177,6 @@ export function PayslipsList() {
                     createdBy: currentUser.id
                 });
 
-                // تحديث حالة كل كشف راتب
                 draftPayslips.forEach(p => {
                     const pRef = doc(firestore, 'payroll', p.id!);
                     transaction.update(pRef, { status: 'paid', paidAt: serverTimestamp() });
@@ -185,7 +186,7 @@ export function PayslipsList() {
             });
 
             toast({ title: 'نجاح الترحيل المالي', description: `تم صرف ${draftPayslips.length} راتب وتوليد القيد المحاسبي بنجاح.` });
-            fetchPayslips(); // تحديث القائمة
+            fetchPayslips();
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ في الترحيل', description: error.message });
         } finally {
@@ -238,7 +239,7 @@ export function PayslipsList() {
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">شهر الكشف</Label>
                             <Select value={month} onValueChange={setMonth}>
-                                <SelectTrigger className="h-11 rounded-xl bg-white"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="w-28 rounded-xl h-9 font-bold"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
                                 </SelectContent>
@@ -252,7 +253,11 @@ export function PayslipsList() {
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                       <Button onClick={fetchPayslips} disabled={loadingPayslips} variant="outline" className="h-11 rounded-xl border-primary/30 text-primary hover:bg-primary/5 font-bold gap-2">
+                            {loadingPayslips ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
+                            تحميل الكشوفات
+                        </Button>
                        <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="h-11 rounded-xl border-green-600 text-green-700 hover:bg-green-50 font-bold gap-2">
                             <Download className="h-4 w-4" /> تصدير Excel
                         </Button>
@@ -284,7 +289,9 @@ export function PayslipsList() {
                             ))
                         ) : sortedPayslips.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد كشوفات رواتب منشأة لهذه الفترة.</TableCell>
+                                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-bold italic">
+                                    {loadingPayslips ? 'جاري التحميل...' : 'اضغط على "تحميل الكشوفات" لعرض البيانات.'}
+                                </TableCell>
                             </TableRow>
                         ) : (
                             sortedPayslips.map(payslip => {
