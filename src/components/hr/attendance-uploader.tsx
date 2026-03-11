@@ -58,7 +58,7 @@ const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
 };
 
-const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
+const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
     let parsedDate: Date | null = null;
@@ -84,7 +84,7 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
             ];
             for (const fmt of formats) {
                 const p = parse(dateStr, fmt, new Date());
-                if (isValid(p) && p.getFullYear() === targetYear) {
+                if (isValid(p)) {
                     parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
                     break;
                 }
@@ -99,9 +99,7 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
     }
 
     if (parsedDate && isValid(parsedDate)) {
-        if (parsedDate.getFullYear() === targetYear && (parsedDate.getMonth() + 1) === targetMonth) {
-            return { date: parsedDate, timeStr };
-        }
+        return { date: parsedDate, timeStr };
     }
     
     return null;
@@ -219,11 +217,14 @@ export function AttendanceUploader() {
 
         const validEmployees = employees.filter(emp => emp.employeeNumber && emp.employeeNumber.trim() !== '');
         const employeeMap = new Map(validEmployees.map(emp => [String(emp.employeeNumber), emp]));
+        
         const excelPunches = new Map<string, Set<string>>(); 
         let totalPunchesCount = 0;
         let lastDateInFile: Date | null = null;
-
-        // Pre-scan to find max date in file
+        
+        // --- حماية الفترة: التحقق من توافق الشهر والسنوات ---
+        const detectedMonths = new Set<string>();
+        
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
@@ -236,20 +237,38 @@ export function AttendanceUploader() {
             if (!emp?.id) return;
 
             for (const key in row) {
-                const parsed = parseSmartDateTime(row[key], selectedMonthNum, selectedYearNum);
+                const parsed = parseSmartDateTime(row[key]);
                 if (parsed) {
-                    const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
-                    if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
-                    if (parsed.timeStr && parsed.timeStr !== "00:00") {
-                        excelPunches.get(dateKey)!.add(parsed.timeStr);
-                        totalPunchesCount++;
-                        if (!lastDateInFile || parsed.date > lastDateInFile) {
-                            lastDateInFile = parsed.date;
+                    const pMonth = parsed.date.getMonth() + 1;
+                    const pYear = parsed.date.getFullYear();
+                    detectedMonths.add(`${pYear}-${pMonth}`);
+
+                    // فقط إذا كان التاريخ يطابق الفترة المختارة، نقوم بتسجيل البصمات
+                    if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
+                        const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
+                        if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
+                        if (parsed.timeStr && parsed.timeStr !== "00:00") {
+                            excelPunches.get(dateKey)!.add(parsed.timeStr);
+                            totalPunchesCount++;
+                            if (!lastDateInFile || parsed.date > lastDateInFile) {
+                                lastDateInFile = parsed.date;
+                            }
                         }
                     }
                 }
             }
         });
+
+        // التحقق من تضارب الأشهر (Audit Logic)
+        const targetPeriod = `${selectedYearNum}-${selectedMonthNum}`;
+        if (detectedMonths.size > 0 && !detectedMonths.has(targetPeriod)) {
+            const foundMonths = Array.from(detectedMonths).join(', ');
+            throw new Error(`الملف المرفوع لا يحتوي على بيانات لشهر ${selectedMonthNum}/${selectedYearNum}. تم العثور على بيانات للفترات التالية: (${foundMonths}). يرجى التأكد من اختيار الشهر الصحيح في الأعلى.`);
+        }
+
+        if (excelPunches.size === 0) {
+            throw new Error("لم يتم العثور على أي بصمات مطابقة للفترة المحددة داخل الملف.");
+        }
 
         let processingLimitDate: Date;
         if (processingMode === 'full_month') {
@@ -437,7 +456,7 @@ export function AttendanceUploader() {
         toast({ title: 'نجاح المعالجة', description: `تم تحليل الفترة بنجاح.` });
         setFile(null);
       } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ', description: error.message });
+        toast({ variant: 'destructive', title: 'خطأ في معالجة الملف', description: error.message });
       } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
