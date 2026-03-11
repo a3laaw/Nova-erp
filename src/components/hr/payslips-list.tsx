@@ -252,53 +252,66 @@ export function PayslipsList() {
 
     return (
         <div className="space-y-6">
-            <div className="bg-muted/30 p-6 rounded-[2rem] border-2 border-dashed no-print">
-                <div className="flex flex-col md:flex-row gap-6 justify-between items-end">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-grow w-full">
-                         <div className="grid gap-2">
-                            <Label className="font-bold mr-1">سنة الكشف</Label>
-                            <Select value={year} onValueChange={setYear}>
-                                <SelectTrigger className="h-11 rounded-xl bg-white"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label className="font-bold mr-1">شهر الكشف</Label>
-                            <Select value={month} onValueChange={setMonth}>
-                                <SelectTrigger className="w-28 rounded-xl h-9 font-bold"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    {months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2 col-span-2 md:col-span-1">
-                            <Label className="font-bold mr-1">بحث في الأسماء</Label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="ابحث..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-11 rounded-xl bg-white"/>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                       <Button onClick={fetchPayslips} disabled={loadingPayslips} variant="outline" className="h-11 rounded-xl border-primary/30 text-primary hover:bg-primary/5 font-bold gap-2">
-                            {loadingPayslips ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
-                            تحميل الكشوفات
-                        </Button>
-                       <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" disabled={isDeleting || loading || sortedPayslips.length === 0} className="h-11 rounded-xl border-red-300 text-red-700 hover:bg-red-50 font-bold gap-2">
-                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
-                            تراجع عن الشهر
-                        </Button>
-                       <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="h-11 rounded-xl border-green-600 text-green-700 hover:bg-green-50 font-bold gap-2">
-                            <Download className="h-4 w-4" /> تصدير Excel
-                        </Button>
-                       <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0} className="h-11 px-8 rounded-xl bg-primary text-white font-black shadow-lg shadow-primary/20 gap-2">
-                            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Banknote className="h-4 w-4" />}
-                            صرف الرواتب النهائية
-                        </Button>
-                    </div>
+            <div className="space-y-4 no-print" dir="rtl">
+
+              {/* الصف الأول: الفلاتر */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="font-black text-xs text-muted-foreground">سنة الكشف</Label>
+                  <Select value={year} onValueChange={setYear}>
+                    <SelectTrigger className="h-10 rounded-xl bg-white border-2"><SelectValue /></SelectTrigger>
+                    <SelectContent dir="rtl">{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                  </Select>
                 </div>
+                <div className="grid gap-1.5">
+                  <Label className="font-black text-xs text-muted-foreground">شهر الكشف</Label>
+                  <Select value={month} onValueChange={setMonth}>
+                    <SelectTrigger className="h-10 rounded-xl bg-white border-2"><SelectValue /></SelectTrigger>
+                    <SelectContent dir="rtl">{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5 col-span-2">
+                  <Label className="font-black text-xs text-muted-foreground">بحث في الأسماء</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input placeholder="ابحث عن موظف..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl bg-white border-2"/>
+                  </div>
+                </div>
+              </div>
+
+              {/* الصف الثاني: الأزرار في فريمات */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+
+                {/* فريم التحميل */}
+                <div className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 flex items-center gap-2">
+                  <span className="text-[10px] font-black text-slate-500 shrink-0">📂 البيانات</span>
+                  <Button onClick={fetchPayslips} disabled={loadingPayslips} className="flex-1 h-9 rounded-xl font-bold text-xs gap-2 bg-primary hover:bg-primary/90">
+                    {loadingPayslips ? <Loader2 className="h-3 w-3 animate-spin"/> : <RefreshCw className="h-3 w-3" />}
+                    تحميل الكشوفات
+                  </Button>
+                </div>
+
+                {/* فريم التصدير والتراجع */}
+                <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/50 flex items-center gap-2">
+                  <span className="text-[10px] font-black text-green-600 shrink-0">📊 أدوات</span>
+                  <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="flex-1 h-9 rounded-xl font-bold text-xs border-green-300 text-green-700 hover:bg-green-100 gap-1">
+                    <Download className="h-3 w-3" /> Excel
+                  </Button>
+                  <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" disabled={isDeleting || loading || sortedPayslips.length === 0} className="flex-1 h-9 rounded-xl font-bold text-xs border-red-200 text-red-600 hover:bg-red-50 gap-1">
+                    {isDeleting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Trash2 className="h-3 w-3" />}
+                    تراجع
+                  </Button>
+                </div>
+
+                {/* زر الصرف */}
+                <div className="p-3 rounded-2xl border-2 border-primary/20 bg-primary/5 flex items-center">
+                  <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0} className="w-full h-9 rounded-xl bg-primary text-white font-black text-xs shadow-md shadow-primary/20 gap-2">
+                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Banknote className="h-4 w-4" />}
+                    صرف الرواتب النهائية
+                  </Button>
+                </div>
+
+              </div>
             </div>
             
             <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
