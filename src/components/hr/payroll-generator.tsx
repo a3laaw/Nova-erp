@@ -12,6 +12,7 @@ import {
     RefreshCw, 
     Trash2, 
     FileDown, 
+    FileText,
     Printer, 
     CheckCircle2, 
     XCircle, 
@@ -20,7 +21,9 @@ import {
     Banknote, 
     CalendarDays,
     History,
-    AlertTriangle
+    AlertTriangle,
+    ShieldCheck,
+    Ban
 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -33,6 +36,10 @@ import * as XLSX from 'xlsx';
 import { useBranding } from '@/context/branding-context';
 import { Separator } from '@/components/ui/separator';
 import { Logo } from '../layout/logo';
+
+const leaveTypeTranslations: Record<string, string> = {
+    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
+};
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -95,7 +102,6 @@ export function PayrollGenerator() {
     
     setAttLoading(true);
     try {
-      // جلب كافة المستندات المرتبطة بالفترة المختارة
       const snap = await getDocs(query(
         collection(firestore, 'attendance'),
         where('year', '==', parseInt(year)),
@@ -108,7 +114,6 @@ export function PayrollGenerator() {
         return;
       }
 
-      // تقسيم العمليات إلى دفعات (Chunks) بحد أقصى 490 عملية لضمان تجاوز قيود Firestore
       const chunks = [];
       const docs = snap.docs;
       for (let i = 0; i < docs.length; i += 490) {
@@ -359,10 +364,7 @@ export function PayrollGenerator() {
 
   return (
     <div className="space-y-8" dir="rtl">
-        {/* منطقة التحكم الرئيسية */}
         <div className="space-y-3 mb-6 no-print">
-          
-          {/* الصف الأول: اختيار الفترة */}
           <div className="flex items-center gap-3 flex-wrap p-2">
             <div className="flex items-center gap-2">
               <Label className="font-black text-sm text-muted-foreground">الفترة الرقابية:</Label>
@@ -380,7 +382,6 @@ export function PayrollGenerator() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* الفريم الأول: إدارة البيانات — أحمر */}
               <div className="p-4 rounded-3xl border-2 border-red-100 bg-red-50/30 space-y-3 shadow-[0_4px_0_0_rgba(239,68,68,0.1)]">
                 <span className="text-[10px] font-black text-red-700 uppercase tracking-widest flex items-center gap-2">
                     <RotateCcw className="h-3 w-3"/> إدارة سجلات الشهر
@@ -406,7 +407,6 @@ export function PayrollGenerator() {
                 </div>
               </div>
 
-              {/* الفريم الثاني: التصدير — أخضر */}
               <div className="p-4 rounded-3xl border-2 border-green-100 bg-green-50/30 space-y-3 shadow-[0_4px_0_0_rgba(34,197,94,0.1)]">
                 <span className="text-[10px] font-black text-green-700 uppercase tracking-widest flex items-center gap-2">
                     <FileDown className="h-3 w-3"/> أدوات استخراج التقارير
@@ -433,7 +433,6 @@ export function PayrollGenerator() {
                 </div>
               </div>
 
-              {/* الفريم الثالث: المراجعة — بنفسجي */}
               {attendanceDocs.length > 0 && (
                 <div className="p-4 rounded-3xl border-2 border-purple-100 bg-purple-50/30 space-y-3 shadow-[0_4px_0_0_rgba(168,85,247,0.1)] animate-in fade-in zoom-in-95">
                     <div className="flex justify-between items-center">
