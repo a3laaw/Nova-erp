@@ -33,7 +33,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -276,13 +276,17 @@ export function AttendanceUploader() {
                 if (parsed) {
                     const pMonth = parsed.date.getMonth() + 1;
                     const pYear = parsed.date.getFullYear();
-                    if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
-                        const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
-                        if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
-                        if (parsed.timeStr && parsed.timeStr !== "00:00") {
-                            excelPunches.get(dateKey)!.add(parsed.timeStr);
-                            if (!lastDateInFile || parsed.date > lastDateInFile) lastDateInFile = parsed.date;
-                        }
+                    
+                    // درع حماية الفترة
+                    if (pYear !== selectedYearNum || pMonth !== selectedMonthNum) {
+                        throw new Error(`الملف يحتوي على تواريخ لشهر ${pMonth}/${pYear}. الرجاء اختيار الفترة الصحيحة.`);
+                    }
+
+                    const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
+                    if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
+                    if (parsed.timeStr && parsed.timeStr !== "00:00") {
+                        excelPunches.get(dateKey)!.add(parsed.timeStr);
+                        if (!lastDateInFile || parsed.date > lastDateInFile) lastDateInFile = parsed.date;
                     }
                 }
             }
@@ -371,7 +375,7 @@ export function AttendanceUploader() {
         toast({ title: 'نجاح التوليد', description: 'تم إنشاء سجلات الحضور والملخصات الإحصائية بنجاح.' });
         setFile(null);
         fetchAttendance();
-      } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ', description: error.message }); } finally { setIsProcessing(false); }
+      } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ في الملف', description: error.message }); } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
   };
