@@ -16,10 +16,6 @@ import {
     CheckCircle2, 
     XCircle, 
     Loader2, 
-    ShieldCheck, 
-    Ban, 
-    FileText, 
-    Info, 
     RotateCcw, 
     Banknote, 
     CalendarDays,
@@ -55,7 +51,6 @@ export function PayrollGenerator() {
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
   const [attLoading, setAttLoading] = useState(false);
 
-  // --- جلب بيانات الموظفين النشطين ---
   useEffect(() => {
     if (!firestore) return;
     const fetchEmployees = async () => {
@@ -71,7 +66,6 @@ export function PayrollGenerator() {
     fetchEmployees();
   }, [firestore]);
 
-  // --- دالة تحميل بيانات الحضور (يدوي) ---
   const fetchAttendance = async () => {
     if (!firestore) return;
     setAttLoading(true);
@@ -96,15 +90,12 @@ export function PayrollGenerator() {
     }
   };
 
-  // --- دالة حذف بيانات الشهر المصلحة ---
   const handleDeleteMonth = async () => {
     if (!firestore) return;
-    const confirmed = window.confirm(`هل أنت متأكد من حذف جميع بيانات الحضور لشهر ${month}/${year}؟`);
-    if (!confirmed) return;
     
     setAttLoading(true);
     try {
-      // حذف من Firestore
+      // جلب كافة المستندات المرتبطة بالفترة المختارة
       const snap = await getDocs(query(
         collection(firestore, 'attendance'),
         where('year', '==', parseInt(year)),
@@ -117,7 +108,7 @@ export function PayrollGenerator() {
         return;
       }
 
-      // Firestore batch يدعم 500 عملية كحد أقصى - نستخدم Chunking
+      // تقسيم العمليات إلى دفعات (Chunks) بحد أقصى 490 عملية لضمان تجاوز قيود Firestore
       const chunks = [];
       const docs = snap.docs;
       for (let i = 0; i < docs.length; i += 490) {
@@ -140,12 +131,10 @@ export function PayrollGenerator() {
     }
   };
 
-  // عند تغيير الشهر أو السنة: نصفّر البيانات المحملة (منع التحميل التلقائي)
   useEffect(() => {
     setAttendanceDocs([]);
   }, [year, month]);
 
-  // --- حساب المخالفات والأنوماليز للتدقيق ---
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
     if (!attendanceDocs || attendanceDocs.length === 0) return [];
@@ -173,7 +162,75 @@ export function PayrollGenerator() {
     return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(b.record.date)?.getTime() || 0));
   }, [attendanceDocs, employees, month, year]);
 
-  // --- دوال التدقيق الفردي ---
+  const summaryData = useMemo(() => {
+    if (!attendanceDocs || attendanceDocs.length === 0) return [];
+    
+    return employees.map(emp => {
+      const att = attendanceDocs.find(a => a.employeeId === emp.id);
+      if (!att) return null;
+
+      let totalAbsent = 0;
+      let totalLate = 0;
+      let totalDeductionDays = 0;
+
+      att.records?.forEach(r => {
+        if (r.auditStatus === 'waived') return;
+        if (r.status === 'absent') totalAbsent++;
+        else if (r.status === 'late') totalLate++;
+        totalDeductionDays += (r.manualDeductionDays || 0);
+      });
+
+      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+      const dailyRate = fullSalary / 26;
+      const deductionAmount = totalDeductionDays * dailyRate;
+
+      return {
+        empNo: emp.employeeNumber || '',
+        name: emp.fullName || '',
+        fullSalary,
+        absent: totalAbsent,
+        lateCount: totalLate,
+        deductionDays: totalDeductionDays,
+        dailyRate,
+        deductionAmount,
+        netSalary: fullSalary - deductionAmount
+      };
+    }).filter(Boolean);
+  }, [employees, attendanceDocs]);
+
+  const handleExportExcel = useCallback(() => {
+    if (summaryData.length === 0) {
+        toast({ title: 'لا توجد بيانات', description: 'يرجى تحميل البيانات أولاً.' });
+        return;
+    }
+    const excelRows = summaryData.map(s => ({
+        'رقم الموظف': s!.empNo, 
+        'اسم الموظف': s!.name, 
+        'الراتب الكامل': s!.fullSalary,
+        'أيام الغياب': s!.absent, 
+        'مرات التأخير': s!.lateCount, 
+        'إجمالي أيام الخصم': s!.deductionDays, 
+        'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
+        'صافي الراتب المتوقع': Math.round(s!.netSalary * 1000) / 1000,
+    }));
+    const ws = XLSX.utils.json_to_sheet(excelRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Payroll Summary");
+    XLSX.writeFile(wb, `Payroll_Summary_${month}_${year}.xlsx`);
+  }, [summaryData, month, year, toast]);
+
+  const handleExportSummaryPDF = useCallback(() => {
+    if (summaryData.length === 0) {
+        toast({ title: 'لا توجد بيانات للتصدير' });
+        return;
+    }
+    setIsExportingSummary(true);
+    setTimeout(() => {
+        window.print();
+        setIsExportingSummary(false);
+    }, 500);
+  }, [summaryData]);
+
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser) return;
     try {
@@ -204,7 +261,6 @@ export function PayrollGenerator() {
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
   };
 
-  // --- دوال التدقيق الجماعي ---
   const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser || anomalies.length === 0) return;
     const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
@@ -253,78 +309,6 @@ export function PayrollGenerator() {
     }
   };
 
-  // --- ملخص البيانات للتصدير ---
-  const summaryData = useMemo(() => {
-    if (!attendanceDocs || attendanceDocs.length === 0) return [];
-    
-    return employees.map(emp => {
-      const att = attendanceDocs.find(a => a.employeeId === emp.id);
-      if (!att) return null;
-
-      let totalAbsent = 0;
-      let totalLate = 0;
-      let totalDeductionDays = 0;
-
-      att.records?.forEach(r => {
-        if (r.auditStatus === 'waived') return;
-        if (r.status === 'absent') totalAbsent++;
-        else if (r.status === 'late') totalLate++;
-        totalDeductionDays += (r.manualDeductionDays || 0);
-      });
-
-      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-      const dailyRate = fullSalary / 26;
-      const deductionAmount = totalDeductionDays * dailyRate;
-
-      return {
-        empNo: emp.employeeNumber || '',
-        name: emp.fullName || '',
-        fullSalary,
-        absent: totalAbsent,
-        lateCount: totalLate,
-        deductionDays: totalDeductionDays,
-        dailyRate,
-        deductionAmount,
-        netSalary: fullSalary - deductionAmount
-      };
-    }).filter(Boolean);
-  }, [employees, attendanceDocs]);
-
-  // --- دوال التصدير ---
-  const handleExportExcel = useCallback(() => {
-    if (summaryData.length === 0) {
-        toast({ title: 'لا توجد بيانات', description: 'يرجى تحميل البيانات أولاً.' });
-        return;
-    }
-    const excelRows = summaryData.map(s => ({
-        'رقم الموظف': s!.empNo, 
-        'اسم الموظف': s!.name, 
-        'الراتب الكامل': s!.fullSalary,
-        'أيام الغياب': s!.absent, 
-        'مرات التأخير': s!.lateCount, 
-        'إجمالي أيام الخصم': s!.deductionDays, 
-        'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
-        'صافي الراتب المتوقع': Math.round(s!.netSalary * 1000) / 1000,
-    }));
-    const ws = XLSX.utils.json_to_sheet(excelRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Payroll Summary");
-    XLSX.writeFile(wb, `Payroll_Summary_${month}_${year}.xlsx`);
-  }, [summaryData, month, year, toast]);
-
-  const handleExportSummaryPDF = useCallback(() => {
-    if (summaryData.length === 0) {
-        toast({ title: 'لا توجد بيانات للتصدير' });
-        return;
-    }
-    setIsExportingSummary(true);
-    setTimeout(() => {
-        window.print();
-        setIsExportingSummary(false);
-    }, 500);
-  }, [summaryData]);
-
-  // --- محرك توليد الرواتب النهائي ---
   const handleGeneratePayroll = async () => {
     if (!firestore || !currentUser) return;
     setIsProcessing(true);
@@ -471,7 +455,6 @@ export function PayrollGenerator() {
           </div>
         </div>
 
-        {/* --- مركز تدقيق المخالفات --- */}
         <div className="space-y-6">
             <div className="flex items-center gap-3 px-4">
                 <div className="p-2 bg-primary/10 rounded-xl text-primary"><ShieldCheck className="h-6 w-6"/></div>
@@ -534,7 +517,6 @@ export function PayrollGenerator() {
             )}
         </div>
 
-        {/* --- زر الاعتماد النهائي --- */}
         <div className="no-print pt-10 border-t flex justify-center pb-20">
             <Button 
                 onClick={handleGeneratePayroll} 
@@ -546,7 +528,6 @@ export function PayrollGenerator() {
             </Button>
         </div>
 
-        {/* منطقة الطباعة المخفية */}
         <div id="summary-printable-area" className="fixed -top-[20000px] left-0 w-[1120px] bg-white opacity-100 pointer-events-none" style={{ visibility: 'visible', zIndex: -1000 }} dir="rtl">
             {summaryData.length > 0 && (
                 <div className="p-10">
