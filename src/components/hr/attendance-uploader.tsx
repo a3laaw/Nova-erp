@@ -44,7 +44,7 @@ import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from '../ui/skeleton';
 import { Badge } from '../ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -118,14 +118,15 @@ export function AttendanceUploader() {
   const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   
-  const [summary, setSummary] = useState<{ workingDays: number, totalPunches: number, autoAbsences: number, coveredByPolicy: number } | null>(null);
-  
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
   const [isSavingData, setIsSavingData] = useState(false);
   const [mappingSearch, setMappingSearch] = useState('');
+
+  const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
 
   useEffect(() => {
     if (employees.length > 0) {
@@ -140,9 +141,6 @@ export function AttendanceUploader() {
         setEditableData(data);
     }
   }, [employees]);
-
-  const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
-  const [attLoading, setAttLoading] = useState(false);
 
   const fetchAttendance = useCallback(async () => {
     if (!firestore) return;
@@ -258,7 +256,6 @@ export function AttendanceUploader() {
         const employeeMap = new Map(employees.filter(emp => !!emp.employeeNumber).map(emp => [String(emp.employeeNumber), emp]));
         const excelPunches = new Map<string, Set<string>>(); 
         let lastDateInFile: Date | null = null;
-        const detectedMonths = new Set<string>();
         
         json.forEach(row => {
             const keys = Object.keys(row);
@@ -275,7 +272,6 @@ export function AttendanceUploader() {
                 if (parsed) {
                     const pMonth = parsed.date.getMonth() + 1;
                     const pYear = parsed.date.getFullYear();
-                    if (pYear > 2000) detectedMonths.add(`${pYear}-${pMonth}`);
                     if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
                         const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
                         if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
@@ -288,8 +284,7 @@ export function AttendanceUploader() {
             }
         });
 
-        if (detectedMonths.size > 0 && !detectedMonths.has(`${selectedYearNum}-${selectedMonthNum}`)) throw new Error("الشهر في الملف غير مطابق للاختيار.");
-        if (excelPunches.size === 0) throw new Error("لا توجد بصمات مطابقة للفترة.");
+        if (excelPunches.size === 0) throw new Error("لا توجد بصمات مطابقة للفترة المختارة في الملف.");
 
         let processingLimitDate = processingMode === 'full_month' ? monthEnd : (lastDateInFile || new Date());
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
@@ -297,15 +292,6 @@ export function AttendanceUploader() {
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
-
-        if (clearPrevious) {
-            const existingSnap = await getDocs(query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum)));
-            existingSnap.forEach(d => batch.delete(d.ref));
-        }
-
-        const workHours = branding?.work_hours?.general;
-        const mEnd = workHours?.morning_end_time || '13:00';
-        const eStart = workHours?.evening_start_time || '16:00';
 
         for (const emp of Array.from(employeeMap.values())) {
             const employeeRecords: AttendanceRecord[] = [];
@@ -325,7 +311,7 @@ export function AttendanceUploader() {
                         let manualDeduction = 0;
                         let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
 
-                        const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
+                        const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
                         if (sortedTimes[0] > startTimeLimit) {
                             if (activePermission?.type === 'late_arrival') {
                                 anomaly = 'تأخير مسموح (إذن تأخير)';
@@ -336,20 +322,6 @@ export function AttendanceUploader() {
                             }
                         }
 
-                        if (!emp.workStartTime && !emp.workEndTime) {
-                            const hasMorning = sortedTimes.some(t => t <= mEnd);
-                            const hasEvening = sortedTimes.some(t => t >= eStart);
-                            if (hasMorning && !hasEvening) {
-                                if (activePermission?.type === 'early_departure') {
-                                    anomaly = anomaly ? `${anomaly} + خروج مسموح` : 'خروج مسموح';
-                                } else {
-                                    status = 'half_day';
-                                    anomaly = anomaly ? `${anomaly} + بصمة واحدة` : 'بصمة صباحية فقط';
-                                    manualDeduction = 0.5;
-                                    auditStatus = 'pending';
-                                }
-                            }
-                        }
                         employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
                     } else if (activeLeave) {
                         employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'present', anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''}`, manualDeductionDays: 0, auditStatus: 'verified', allPunches: [] } as any);
@@ -381,6 +353,49 @@ export function AttendanceUploader() {
     reader.readAsBinaryString(file!);
   };
 
+  const handleSaveMappingData = async () => {
+    if (!firestore || employees.length === 0) return;
+    setIsSavingData(true);
+    try {
+        const batch = writeBatch(firestore);
+        let hasChanges = false;
+
+        for (const empId in editableData) {
+            const current = editableData[empId];
+            const original = employees.find(e => e.id === empId);
+            
+            if (original) {
+                const needsUpdate = 
+                    original.employeeNumber !== current.employeeNumber ||
+                    (original.workStartTime || '') !== current.workStartTime ||
+                    (original.workEndTime || '') !== current.workEndTime;
+
+                if (needsUpdate) {
+                    const empRef = doc(firestore, 'employees', empId);
+                    batch.update(empRef, {
+                        employeeNumber: current.employeeNumber,
+                        workStartTime: current.workStartTime || null,
+                        workEndTime: current.workEndTime || null
+                    });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        if (hasChanges) {
+            await batch.commit();
+            toast({ title: 'تم حفظ البيانات', description: 'تم تحديث أرقام البصمة وساعات الدوام بنجاح.' });
+        } else {
+            toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات للحفظ.' });
+        }
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+    } finally {
+        setIsSavingData(false);
+    }
+  };
+
   const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply' | 'reset') => {
@@ -403,6 +418,60 @@ export function AttendanceUploader() {
         toast({ title: 'تم الحفظ' });
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
   };
+
+  const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
+    if (!firestore || !currentUser || anomalies.length === 0) return;
+    const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
+    if (targets.length === 0) return;
+
+    setIsBulkProcessing(true);
+    try {
+        const batch = writeBatch(firestore);
+        const updatedDocIds = new Set(targets.map(a => a.docId));
+        
+        for (const docId of Array.from(updatedDocIds)) {
+            const docRef = doc(firestore, 'attendance', docId);
+            const currentDoc = attendanceDocs.find(d => d.id === docId);
+            if (!currentDoc) continue;
+
+            const updatedRecords = currentDoc.records.map(r => {
+                const isTargetAnomaly = targets.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
+                if (isTargetAnomaly) {
+                    let manualDeduction = r.manualDeductionDays;
+                    if (action === 'waive') manualDeduction = 0;
+                    else if (action === 'reset') {
+                        manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                    }
+
+                    return {
+                        ...r,
+                        auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'),
+                        manualDeductionDays: manualDeduction,
+                        waivedBy: action === 'reset' ? null : currentUser.fullName,
+                        waivedAt: action === 'reset' ? null : new Date()
+                    };
+                }
+                return r;
+            });
+
+            batch.update(docRef, { records: updatedRecords, updatedAt: serverTimestamp() });
+        }
+
+        await batch.commit();
+        toast({ title: 'نجاح الإجراء الجماعي', description: action === 'reset' ? 'تمت إعادة تعيين جميع المخالفات.' : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات.` });
+        fetchAttendance();
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنفيذ الإجراء الجماعي.' });
+    } finally {
+        setIsBulkProcessing(false);
+    }
+  };
+
+  const filteredEmployees = useMemo(() => {
+    if (!mappingSearch) return employees;
+    const lower = mappingSearch.toLowerCase();
+    return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber.includes(lower));
+  }, [employees, mappingSearch]);
 
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
@@ -496,7 +565,6 @@ export function AttendanceUploader() {
                     </CardFooter>
                 </Card>
 
-                {/* --- مركز تدقيق الحضور والمخالفات --- */}
                 <div className="space-y-6">
                     <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
                         <CardHeader className="bg-slate-900 text-white pb-8 px-8">
@@ -636,7 +704,7 @@ export function AttendanceUploader() {
         <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
             <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
                 <AlertDialogHeader>
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><ShieldAlert className="h-10 w-10"/></div>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldAlert className="h-10 w-10"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد تصفير بيانات الفترة؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-base font-medium leading-relaxed">
                         أنت على وشك حذف جميع سجلات الحضور المعتمدة والمدققة لشهر <strong>{month}/{year}</strong> نهائياً. 
