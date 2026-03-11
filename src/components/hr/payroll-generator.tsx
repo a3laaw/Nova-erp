@@ -8,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw, XCircle, Banknote, Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, Printer, CheckCircle2, XCircle, Loader2, Calculator, ShieldCheck, CheckCircle, Ban, FileText, Info, RotateCcw, Banknote, CalendarDays } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
@@ -238,6 +238,44 @@ export function PayrollGenerator() {
     finally { setIsProcessing(false); }
   };
 
+  const summaryData = useMemo(() => {
+    if (!attendanceDocs || attendanceDocs.length === 0) return [];
+    
+    return employees.map(emp => {
+      const att = attendanceDocs.find(a => a.employeeId === emp.id);
+      if (!att) return null;
+
+      let totalAbsent = 0;
+      let totalLate = 0;
+      let totalLateMinutes = 0;
+      let totalDeductionDays = 0;
+
+      att.records?.forEach(r => {
+        if (r.auditStatus === 'waived') return;
+        if (r.status === 'absent') totalAbsent++;
+        else if (r.status === 'late') totalLate++;
+        totalDeductionDays += (r.manualDeductionDays || 0);
+      });
+
+      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+      const dailyRate = fullSalary / 26;
+      const deductionAmount = totalDeductionDays * dailyRate;
+
+      return {
+        empNo: emp.employeeNumber || '',
+        name: emp.fullName || '',
+        fullSalary,
+        absent: totalAbsent,
+        lateCount: totalLate,
+        lateMins: totalLateMinutes,
+        deductionDays: totalDeductionDays,
+        dailyRate,
+        deductionAmount,
+        netSalary: fullSalary - deductionAmount
+      };
+    }).filter(Boolean);
+  }, [employees, attendanceDocs, branding]);
+
   const handleExportExcel = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -320,44 +358,6 @@ export function PayrollGenerator() {
         });
     }, 300);
   }, [summaryData, month, year, toast]);
-
-  const summaryData = useMemo(() => {
-    if (!attendanceDocs || attendanceDocs.length === 0) return [];
-    
-    return employees.map(emp => {
-      const att = attendanceDocs.find(a => a.employeeId === emp.id);
-      if (!att) return null;
-
-      let totalAbsent = 0;
-      let totalLate = 0;
-      let totalLateMinutes = 0;
-      let totalDeductionDays = 0;
-
-      att.records?.forEach(r => {
-        if (r.auditStatus === 'waived') return;
-        if (r.status === 'absent') totalAbsent++;
-        else if (r.status === 'late') totalLate++;
-        totalDeductionDays += (r.manualDeductionDays || 0);
-      });
-
-      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-      const dailyRate = fullSalary / 26;
-      const deductionAmount = totalDeductionDays * dailyRate;
-
-      return {
-        empNo: emp.employeeNumber || '',
-        name: emp.fullName || '',
-        fullSalary,
-        absent: totalAbsent,
-        lateCount: totalLate,
-        lateMins: totalLateMinutes,
-        deductionDays: totalDeductionDays,
-        dailyRate,
-        deductionAmount,
-        netSalary: fullSalary - deductionAmount
-      };
-    }).filter(Boolean);
-  }, [employees, attendanceDocs, branding]);
 
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
   const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
