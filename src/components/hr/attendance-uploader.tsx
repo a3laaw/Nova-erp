@@ -35,11 +35,11 @@ import {
 } from '@/components/ui/table';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange } from 'lucide-react';
-import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isBefore, endOfDay, isAfter } from 'date-fns';
+import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -67,7 +67,6 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
     if (typeof val === 'number') {
         try {
             const excelDate = XLSX.SSF.parse_date_code(val);
-            // Ignore pre-modern dates (anything before year 2000) to avoid Excel artifacts
             if (excelDate.y < 2000) return null;
             parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
             timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
@@ -80,14 +79,10 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
 
         if (dateMatch) {
             const dateStr = dateMatch[0];
-            const formats = [
-                'dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 
-                'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'
-            ];
+            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'];
             for (const fmt of formats) {
                 const p = parse(dateStr, fmt, new Date());
                 if (isValid(p)) {
-                    // Filter unrealistic years from string parsing too
                     if (p.getFullYear() < 2000) break;
                     parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
                     break;
@@ -105,7 +100,6 @@ const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null =>
     if (parsedDate && isValid(parsedDate)) {
         return { date: parsedDate, timeStr };
     }
-    
     return null;
 };
 
@@ -147,10 +141,7 @@ export function AttendanceUploader() {
   const filteredEmployees = useMemo(() => {
     if (!mappingSearch) return employees;
     const lower = mappingSearch.toLowerCase();
-    return employees.filter(e => 
-        e.fullName.toLowerCase().includes(lower) || 
-        e.employeeNumber?.includes(lower)
-    );
+    return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber?.includes(lower));
   }, [employees, mappingSearch]);
 
   const handleSaveMappingData = async () => {
@@ -162,39 +153,19 @@ export function AttendanceUploader() {
         for (const id in editableData) {
             const original = employees.find(e => e.id === id);
             const current = editableData[id];
-            
-            const hasChanged = original && (
-                original.employeeNumber !== current.employeeNumber || 
-                (original.workStartTime || '') !== current.workStartTime || 
-                (original.workEndTime || '') !== current.workEndTime
-            );
-
+            const hasChanged = original && (original.employeeNumber !== current.employeeNumber || (original.workStartTime || '') !== current.workStartTime || (original.workEndTime || '') !== current.workEndTime);
             if (hasChanged) {
-                batch.update(doc(firestore, 'employees', id), { 
-                    employeeNumber: current.employeeNumber,
-                    workStartTime: current.workStartTime || null,
-                    workEndTime: current.workEndTime || null
-                });
+                batch.update(doc(firestore, 'employees', id), { employeeNumber: current.employeeNumber, workStartTime: current.workStartTime || null, workEndTime: current.workEndTime || null });
                 count++;
             }
         }
-        if (count > 0) {
-            await batch.commit();
-            toast({ title: 'تم التحديث بنجاح', description: `تم حفظ بيانات ${count} موظف بنجاح.` });
-        } else {
-            toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات للحفظ.' });
-        }
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ التغييرات.' });
-    } finally {
-        setIsSavingData(false);
-    }
+        if (count > 0) { await batch.commit(); toast({ title: 'تم التحديث بنجاح' }); }
+    } finally { setIsSavingData(false); }
   };
 
   const handleUpload = async () => {
     if (!file || !firestore || !year || !month) return;
     setIsProcessing(true);
-    setSummary(null);
     const selectedYearNum = parseInt(year);
     const selectedMonthNum = parseInt(month);
 
@@ -204,12 +175,10 @@ export function AttendanceUploader() {
         const data = e.target?.result;
         const workbook = XLSX.read(data, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-        
-        if (json.length === 0) throw new Error("الملف المرفوع فارغ أو بتنسيق غير مدعوم.");
+        if (json.length === 0) throw new Error("الملف المرفوع فارغ.");
 
         const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
         const monthEnd = endOfMonth(monthStart);
-        const today = startOfDay(new Date());
 
         const [leavesSnap, permissionsSnap] = await Promise.all([
             getDocs(query(collection(firestore, 'leaveRequests'), where('status', 'in', ['approved', 'on-leave', 'returned']))),
@@ -219,13 +188,11 @@ export function AttendanceUploader() {
         const approvedLeaves = leavesSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
         const approvedPermissions = permissionsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PermissionRequest));
 
-        const validEmployees = employees.filter(emp => emp.employeeNumber && emp.employeeNumber.trim() !== '');
-        const employeeMap = new Map(validEmployees.map(emp => [String(emp.employeeNumber), emp]));
+        const employeeMap = new Map(employees.filter(emp => !!emp.employeeNumber).map(emp => [String(emp.employeeNumber), emp]));
         
         const excelPunches = new Map<string, Set<string>>(); 
         let totalPunchesCount = 0;
         let lastDateInFile: Date | null = null;
-        
         const detectedMonths = new Set<string>();
         
         json.forEach(row => {
@@ -235,7 +202,6 @@ export function AttendanceUploader() {
                 const val = String(row[keys[k]] || '').trim();
                 if (val && employeeMap.has(val)) { empNo = val; break; }
             }
-            
             const emp = employeeMap.get(empNo);
             if (!emp?.id) return;
 
@@ -244,43 +210,24 @@ export function AttendanceUploader() {
                 if (parsed) {
                     const pMonth = parsed.date.getMonth() + 1;
                     const pYear = parsed.date.getFullYear();
-                    
-                    // Only collect realistic years for warning display
-                    if (pYear > 2000) {
-                        detectedMonths.add(`${pYear}-${pMonth}`);
-                    }
-
+                    if (pYear > 2000) detectedMonths.add(`${pYear}-${pMonth}`);
                     if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
                         const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
                         if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
                         if (parsed.timeStr && parsed.timeStr !== "00:00") {
                             excelPunches.get(dateKey)!.add(parsed.timeStr);
                             totalPunchesCount++;
-                            if (!lastDateInFile || parsed.date > lastDateInFile) {
-                                lastDateInFile = parsed.date;
-                            }
+                            if (!lastDateInFile || parsed.date > lastDateInFile) lastDateInFile = parsed.date;
                         }
                     }
                 }
             }
         });
 
-        const targetPeriod = `${selectedYearNum}-${selectedMonthNum}`;
-        if (detectedMonths.size > 0 && !detectedMonths.has(targetPeriod)) {
-            throw new Error("الشهر والسنة في الملف المرفوع لا يطابقان الفترة المختارة في الأعلى.");
-        }
+        if (detectedMonths.size > 0 && !detectedMonths.has(`${selectedYearNum}-${selectedMonthNum}`)) throw new Error("الشهر في الملف غير مطابق للاختيار.");
+        if (excelPunches.size === 0) throw new Error("لا توجد بصمات مطابقة للفترة.");
 
-        if (excelPunches.size === 0) {
-            throw new Error("لم يتم العثور على أي بصمات مطابقة للفترة المحددة داخل الملف.");
-        }
-
-        let processingLimitDate: Date;
-        if (processingMode === 'full_month') {
-            processingLimitDate = monthEnd;
-        } else {
-            processingLimitDate = lastDateInFile || today;
-        }
-
+        let processingLimitDate = processingMode === 'full_month' ? monthEnd : (lastDateInFile || new Date());
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
         const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
@@ -288,30 +235,17 @@ export function AttendanceUploader() {
         const batch = writeBatch(firestore);
 
         if (clearPrevious) {
-            const existingQuery = query(
-                collection(firestore, 'attendance'),
-                where('year', '==', selectedYearNum),
-                where('month', '==', selectedMonthNum)
-            );
-            const existingSnap = await getDocs(existingQuery);
+            const existingSnap = await getDocs(query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum)));
             existingSnap.forEach(d => batch.delete(d.ref));
         } else {
-            const existingQuery = query(
-                collection(firestore, 'attendance'),
-                where('year', '==', selectedYearNum),
-                where('month', '==', selectedMonthNum)
-            );
-            const existingSnap = await getDocs(existingQuery);
+            const existingSnap = await getDocs(query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum)));
             existingSnap.forEach(existingDoc => {
                 const existingData = existingDoc.data();
                 const empId = existingData.employeeId;
                 (existingData.records || []).forEach((r: any) => {
                     if (r.allPunches && r.allPunches.length > 0) {
-                        const dateObj = r.date?.toDate ? r.date.toDate() : new Date(r.date);
-                        const dateKey = `${empId}_${format(dateObj, 'yyyy-MM-dd')}`;
-                        if (!excelPunches.has(dateKey)) {
-                            excelPunches.set(dateKey, new Set());
-                        }
+                        const dateKey = `${empId}_${format(toFirestoreDate(r.date)!, 'yyyy-MM-dd')}`;
+                        if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
                         r.allPunches.forEach((p: string) => excelPunches.get(dateKey)!.add(p));
                     }
                 });
@@ -326,25 +260,16 @@ export function AttendanceUploader() {
         let autoAbsencesCount = 0;
         let coveredByPolicyCount = 0;
 
-        for (const emp of validEmployees) {
+        for (const emp of Array.from(employeeMap.values())) {
             const employeeRecords: AttendanceRecord[] = [];
-            
             for (const day of workingDaysInMonth) {
                 const stableDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
                 const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
 
                 if (!isAfter(stableDay, endOfDay(processingLimitDate))) {
-                    const activeLeave = approvedLeaves.find(l => 
-                        l.employeeId === emp.id && 
-                        stableDay >= toFirestoreDate(l.startDate)! && 
-                        stableDay <= toFirestoreDate(l.endDate)!
-                    );
-
-                    const activePermission = approvedPermissions.find(p => 
-                        p.employeeId === emp.id && 
-                        isSameDay(stableDay, toFirestoreDate(p.date)!)
-                    );
+                    const activeLeave = approvedLeaves.find(l => l.employeeId === emp.id && stableDay >= toFirestoreDate(l.startDate)! && stableDay <= toFirestoreDate(l.endDate)!);
+                    const activePermission = approvedPermissions.find(p => p.employeeId === emp.id && isSameDay(stableDay, toFirestoreDate(p.date)!));
 
                     if (punches && punches.size > 0) {
                         const sortedTimes = Array.from(punches).sort();
@@ -354,10 +279,8 @@ export function AttendanceUploader() {
                         let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
 
                         const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
-
                         if (sortedTimes[0] > startTimeLimit) {
                             if (activePermission?.type === 'late_arrival') {
-                                status = 'present';
                                 anomaly = 'تأخير مسموح (إذن تأخير معتمد)';
                                 coveredByPolicyCount++;
                             } else {
@@ -370,10 +293,8 @@ export function AttendanceUploader() {
                         if (!emp.workStartTime && !emp.workEndTime) {
                             const hasMorning = sortedTimes.some(t => t <= mEnd);
                             const hasEvening = sortedTimes.some(t => t >= eStart);
-
                             if (hasMorning && !hasEvening) {
                                 if (activePermission?.type === 'early_departure') {
-                                    status = 'present';
                                     anomaly = anomaly ? `${anomaly} + خروج مسموح` : 'خروج مسموح';
                                     coveredByPolicyCount++;
                                 } else {
@@ -390,78 +311,36 @@ export function AttendanceUploader() {
                             }
                         }
 
-                        employeeRecords.push({
-                            date: Timestamp.fromDate(stableDay),
-                            employeeId: emp.id!,
-                            checkIn1: sortedTimes[0],
-                            checkOut1: sortedTimes[sortedTimes.length - 1],
-                            allPunches: sortedTimes,
-                            status,
-                            anomalyDescription: anomaly,
-                            manualDeductionDays: manualDeduction,
-                            auditStatus
-                        });
+                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
+                    } else if (activeLeave) {
+                        coveredByPolicyCount++;
+                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'present', anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''} معتمدة`, manualDeductionDays: 0, auditStatus: 'verified', allPunches: [] } as any);
                     } else {
-                        if (activeLeave) {
-                            coveredByPolicyCount++;
-                            employeeRecords.push({
-                                date: Timestamp.fromDate(stableDay),
-                                employeeId: emp.id!,
-                                status: 'present',
-                                anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || 'رسمية'} معتمدة`,
-                                manualDeductionDays: 0,
-                                auditStatus: 'verified',
-                                allPunches: []
-                            });
-                        } else {
-                            autoAbsencesCount++;
-                            employeeRecords.push({
-                                date: Timestamp.fromDate(stableDay),
-                                employeeId: emp.id!,
-                                status: 'absent',
-                                anomalyDescription: 'غائب (لم تظهر بصمته في الملف)',
-                                manualDeductionDays: 1,
-                                auditStatus: 'pending',
-                                allPunches: []
-                            });
-                        }
+                        autoAbsencesCount++;
+                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'absent', anomalyDescription: 'غائب (لم تظهر بصمته في الملف)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
                     }
                 }
             }
 
             if (employeeRecords.length > 0) {
-                const presentDays = employeeRecords.filter(r => r.status === 'present').length;
-                const absentDays = employeeRecords.filter(r => r.status === 'absent').length;
-                const lateDays = employeeRecords.filter(r => r.status === 'late').length;
-                const halfDays = employeeRecords.filter(r => r.status === 'half_day').length;
-                const totalDeductionDays = employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0);
-
                 const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
-                batch.set(doc(firestore, 'attendance', docId), {
-                    employeeId: emp.id,
-                    year: selectedYearNum,
-                    month: selectedMonthNum,
-                    records: employeeRecords,
-                    summary: {
-                        presentDays,
-                        absentDays,
-                        lateDays,
-                        halfDays,
-                        totalDeductionDays,
-                        totalWorkingDays: employeeRecords.length
-                    },
-                    updatedAt: serverTimestamp()
-                });
+                const summary = {
+                    presentDays: employeeRecords.filter(r => r.status === 'present').length,
+                    absentDays: employeeRecords.filter(r => r.status === 'absent').length,
+                    lateDays: employeeRecords.filter(r => r.status === 'late').length,
+                    halfDays: employeeRecords.filter(r => r.status === 'half_day').length,
+                    totalDeductionDays: employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0),
+                    totalWorkingDays: employeeRecords.length
+                };
+                batch.set(doc(firestore, 'attendance', docId), { employeeId: emp.id, year: selectedYearNum, month: selectedMonthNum, records: employeeRecords, summary, updatedAt: serverTimestamp() });
             }
         }
 
         await batch.commit();
         setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount, coveredByPolicy: coveredByPolicyCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الفترة بنجاح.` });
+        toast({ title: 'نجاح المعالجة' });
         setFile(null);
-      } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ في معالجة الملف', description: error.message });
-      } finally { setIsProcessing(false); }
+      } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ', description: error.message }); } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
   };
@@ -472,12 +351,10 @@ export function AttendanceUploader() {
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 h-14 rounded-2xl bg-muted/50 p-1.5 shadow-inner">
             <TabsTrigger value="upload" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <FileSpreadsheet className="h-4 w-4" />
-                رفع ومعالجة الملف
+                <FileSpreadsheet className="h-4 w-4" /> رفع ومعالجة الملف
             </TabsTrigger>
             <TabsTrigger value="mapping" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <Fingerprint className="h-4 w-4" />
-                مطابقة البصمة والدوام
+                <Fingerprint className="h-4 w-4" /> مطابقة البصمة والدوام
             </TabsTrigger>
         </TabsList>
 
@@ -518,10 +395,9 @@ export function AttendanceUploader() {
                                 <RadioGroupItem value="limit_to_file" id="r1" className="h-6 w-6" />
                                 <div className="flex-1">
                                     <Label htmlFor="r1" className="font-black text-lg cursor-pointer block text-primary">أيام محددة (بناءً على الملف)</Label>
-                                    <p className="text-[10px] text-muted-foreground font-bold mt-1">يتوقف النظام عند أقصى تاريخ تم رصده في الملف المرفوع.</p>
+                                    <p className="text-[10px] text-muted-foreground font-bold mt-1">يحتسب الغياب فقط للأيام الموثقة في الملف المرفوع.</p>
                                 </div>
                             </div>
-                            
                             <div className={cn(
                                 "relative flex items-center space-x-4 space-x-reverse p-6 rounded-[2rem] border-2 transition-all cursor-pointer group h-28 shadow-[0_5px_0_0_rgba(0,0,0,0.05)] active:translate-y-1 active:shadow-none",
                                 processingMode === 'full_month' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20"
@@ -529,7 +405,7 @@ export function AttendanceUploader() {
                                 <RadioGroupItem value="full_month" id="r2" className="h-6 w-6" />
                                 <div className="flex-1">
                                     <Label htmlFor="r2" className="font-black text-lg cursor-pointer block text-primary">الشهر كامل (إغلاق نهائي)</Label>
-                                    <p className="text-[10px] text-muted-foreground font-bold mt-1">يحسب النظام الغياب حتى آخر يوم في الشهر المختار.</p>
+                                    <p className="text-[10px] text-muted-foreground font-bold mt-1">يحسب الغياب حتى آخر يوم في الشهر (للتقارير النهائية).</p>
                                 </div>
                             </div>
                         </RadioGroup>
@@ -562,9 +438,8 @@ export function AttendanceUploader() {
                         </div>
                     </CardContent>
                     <CardFooter className="justify-center border-t p-10 bg-muted/10">
-                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-2xl shadow-primary/30 gap-4 min-w-[350px] transition-all hover:scale-105 active:scale-95">
-                            {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <RotateCcw className="h-8 w-8"/>} 
-                            بدء التحليل والربط المالي
+                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-2xl shadow-primary/30 gap-4 min-w-[350px] transition-all">
+                            {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <RotateCcw className="h-8 w-8"/>} بدء التحليل والربط المالي
                         </Button>
                     </CardFooter>
                 </Card>
@@ -577,19 +452,13 @@ export function AttendanceUploader() {
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="space-y-1">
                             <CardTitle className="text-2xl font-black flex items-center gap-3">
-                                <Fingerprint className="text-primary h-7 w-7" />
-                                مطابقة البصمة والدوام المخصص
+                                <Fingerprint className="text-primary h-7 w-7" /> مطابقة البصمة والدوام المخصص
                             </CardTitle>
                             <CardDescription className="text-base font-medium">تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.</CardDescription>
                         </div>
                         <div className="relative w-full md:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                            <Input 
-                                placeholder="بحث بالاسم أو الرقم..." 
-                                value={mappingSearch}
-                                onChange={(e) => setMappingSearch(e.target.value)}
-                                className="pl-10 h-12 rounded-2xl bg-white border-none shadow-inner font-bold"
-                            />
+                            <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-none shadow-inner font-bold" />
                         </div>
                     </div>
                 </CardHeader>
@@ -607,9 +476,7 @@ export function AttendanceUploader() {
                             </TableHeader>
                             <TableBody>
                                 {employeesLoading ? (
-                                    Array.from({length: 5}).map((_, i) => (
-                                        <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl"/></TableCell></TableRow>
-                                    ))
+                                    Array.from({length: 5}).map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl"/></TableCell></TableRow>)
                                 ) : filteredEmployees.length === 0 ? (
                                     <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد سجلات للموظفين.</TableCell></TableRow>
                                 ) : (
@@ -617,48 +484,13 @@ export function AttendanceUploader() {
                                         const current = editableData[emp.id!] || { employeeNumber: '', workStartTime: '', workEndTime: '' };
                                         const isChanged = emp.employeeNumber !== current.employeeNumber || (emp.workStartTime || '') !== current.workStartTime || (emp.workEndTime || '') !== current.workEndTime;
                                         const isFullTime = !current.workStartTime && !current.workEndTime;
-
                                         return (
                                             <TableRow key={emp.id} className={cn("hover:bg-primary/5 transition-colors h-20 border-b last:border-0", !isFullTime && "bg-sky-50/20")}>
-                                                <TableCell className="px-10">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-black text-gray-800">{emp.fullName}</span>
-                                                        <span className="text-[10px] text-muted-foreground font-bold">{emp.department}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input 
-                                                        value={current.employeeNumber} 
-                                                        onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, employeeNumber: e.target.value }}))}
-                                                        className="font-mono font-black h-10 rounded-xl border-2 w-32 text-center text-primary"
-                                                        placeholder="000"
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input 
-                                                        type="time"
-                                                        value={current.workStartTime} 
-                                                        onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workStartTime: e.target.value }}))}
-                                                        className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Input 
-                                                        type="time"
-                                                        value={current.workEndTime} 
-                                                        onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workEndTime: e.target.value }}))}
-                                                        className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-center px-6">
-                                                    {isChanged ? (
-                                                        <Badge className="bg-orange-600 text-white font-black text-[9px] animate-pulse rounded-lg">بانتظار الحفظ</Badge>
-                                                    ) : isFullTime ? (
-                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100 font-black text-[9px] rounded-lg">كامل (رسمي)</Badge>
-                                                    ) : (
-                                                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 font-black text-[9px] rounded-lg">جزئي (مخصص)</Badge>
-                                                    )}
-                                                </TableCell>
+                                                <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{emp.fullName}</span><span className="text-[10px] text-muted-foreground font-bold">{emp.department}</span></div></TableCell>
+                                                <TableCell><Input value={current.employeeNumber} onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, employeeNumber: e.target.value }}))} className="font-mono font-black h-10 rounded-xl border-2 w-32 text-center text-primary" placeholder="000"/></TableCell>
+                                                <TableCell><Input type="time" value={current.workStartTime} onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workStartTime: e.target.value }}))} className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"/></TableCell>
+                                                <TableCell><Input type="time" value={current.workEndTime} onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workEndTime: e.target.value }}))} className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"/></TableCell>
+                                                <TableCell className="text-center px-6">{isChanged ? <Badge className="bg-orange-600 text-white font-black text-[9px] animate-pulse rounded-lg">بانتظار الحفظ</Badge> : isFullTime ? <Badge variant="outline" className="bg-green-50 text-green-700 border-green-100 font-black text-[9px] rounded-lg">كامل (رسمي)</Badge> : <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-100 font-black text-[9px] rounded-lg">جزئي (مخصص)</Badge>}</TableCell>
                                             </TableRow>
                                         );
                                     })
@@ -668,14 +500,8 @@ export function AttendanceUploader() {
                     </div>
                 </CardContent>
                 <CardFooter className="justify-end border-t p-8 bg-muted/10">
-                    <div className="flex-1 text-xs text-muted-foreground font-bold pr-4 flex items-center gap-2">
-                        <Info className="h-4 w-4 text-primary" />
-                        اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.
-                    </div>
-                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
-                        {isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>}
-                        حفظ كافة البيانات
-                    </Button>
+                    <div className="flex-1 text-xs text-muted-foreground font-bold pr-4 flex items-center gap-2"><Info className="h-4 w-4 text-primary" /> اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.</div>
+                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">{isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>} حفظ كافة البيانات</Button>
                 </CardFooter>
             </Card>
         </TabsContent>
