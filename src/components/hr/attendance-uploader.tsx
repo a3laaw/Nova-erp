@@ -33,9 +33,9 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { useFirebase, useSubscription } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, deleteDoc, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
@@ -512,7 +512,7 @@ export function AttendanceUploader() {
                 <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
                     <CardHeader className="bg-muted/10 border-b pb-6 px-8">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-4">
                                 <CalendarRange className="h-6 w-6 text-primary" />
                                 <CardTitle className="text-xl font-black text-gray-800">إعدادات الفترة ونطاق الرقابة</CardTitle>
                             </div>
@@ -738,7 +738,7 @@ export function AttendanceUploader() {
                 <AlertDialogFooter className="mt-6 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleClearData} disabled={isClearing} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg">
-                        {isClearing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، قم بالتصفير الآن'}
+                        {isClearing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، قم بالتصفير الآن'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
