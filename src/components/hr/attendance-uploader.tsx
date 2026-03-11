@@ -54,6 +54,10 @@ const dayNameToIndex: Record<string, number> = {
   'Thursday': 4, 'Friday': 5, 'Saturday': 6
 };
 
+const leaveTypeTranslations: Record<string, string> = {
+    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
+};
+
 const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): { date: Date, timeStr: string } | null => {
     if (val === undefined || val === null || val === '') return null;
     
@@ -80,7 +84,7 @@ const parseSmartDateTime = (val: any, targetMonth: number, targetYear: number): 
             ];
             for (const fmt of formats) {
                 const p = parse(dateStr, fmt, new Date());
-                if (isValid(p) && p.getFullYear() >= 2000) {
+                if (isValid(p) && p.getFullYear() === targetYear) {
                     parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
                     break;
                 }
@@ -113,8 +117,6 @@ export function AttendanceUploader() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [clearPrevious, setClearPrevious] = useState(true);
-  
-  // ✨ خيار نظام المعالجة الجديد
   const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
   
   const [summary, setSummary] = useState<{ workingDays: number, totalPunches: number, autoAbsences: number, coveredByPolicy: number } | null>(null);
@@ -221,7 +223,7 @@ export function AttendanceUploader() {
         let totalPunchesCount = 0;
         let lastDateInFile: Date | null = null;
 
-        // ✨ محرك المسح المسبق لتحديد آخر تاريخ في الملف
+        // Pre-scan to find max date in file
         json.forEach(row => {
             const keys = Object.keys(row);
             let empNo = '';
@@ -241,7 +243,6 @@ export function AttendanceUploader() {
                     if (parsed.timeStr && parsed.timeStr !== "00:00") {
                         excelPunches.get(dateKey)!.add(parsed.timeStr);
                         totalPunchesCount++;
-                        // تحديث أحدث تاريخ تم رصده في الملف
                         if (!lastDateInFile || parsed.date > lastDateInFile) {
                             lastDateInFile = parsed.date;
                         }
@@ -250,26 +251,19 @@ export function AttendanceUploader() {
             }
         });
 
-        // ✨ تحديد سقف الرقابة الزمني بناءً على الوضع المختار
         let processingLimitDate: Date;
         if (processingMode === 'full_month') {
             processingLimitDate = monthEnd;
         } else {
-            // أيام محددة: الحد هو آخر بصمة في الملف أو اليوم الحالي أيهما أقرب (للمنطق)
-            // ولكن بناءً على طلبك سنعتمد أقصى تاريخ في الجدول كمرجع صلب
             processingLimitDate = lastDateInFile || today;
         }
 
         const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
         const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
-        const halfDaySettings = branding?.work_hours?.half_day;
-        const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
-
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
 
-        // منطق التطهير أو الدمج
         if (clearPrevious) {
             const existingQuery = query(
                 collection(firestore, 'attendance'),
@@ -313,83 +307,78 @@ export function AttendanceUploader() {
             const employeeRecords: AttendanceRecord[] = [];
             
             for (const day of workingDaysInMonth) {
-                const dayIdx = getDay(day);
-                const isSystemHalfDay = dayIdx === halfDayIndex;
-                
                 const stableDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
                 const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
                 const punches = excelPunches.get(dateKey);
 
-                const activeLeave = approvedLeaves.find(l => 
-                    l.employeeId === emp.id && 
-                    stableDay >= toFirestoreDate(l.startDate)! && 
-                    stableDay <= toFirestoreDate(l.endDate)!
-                );
+                if (!isAfter(stableDay, endOfDay(processingLimitDate))) {
+                    const activeLeave = approvedLeaves.find(l => 
+                        l.employeeId === emp.id && 
+                        stableDay >= toFirestoreDate(l.startDate)! && 
+                        stableDay <= toFirestoreDate(l.endDate)!
+                    );
 
-                const activePermission = approvedPermissions.find(p => 
-                    p.employeeId === emp.id && 
-                    isSameDay(stableDay, toFirestoreDate(p.date)!)
-                );
+                    const activePermission = approvedPermissions.find(p => 
+                        p.employeeId === emp.id && 
+                        isSameDay(stableDay, toFirestoreDate(p.date)!)
+                    );
 
-                if (punches && punches.size > 0) {
-                    const sortedTimes = Array.from(punches).sort();
-                    let status: AttendanceRecord['status'] = 'present';
-                    let anomaly = '';
-                    let manualDeduction = 0;
-                    let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
+                    if (punches && punches.size > 0) {
+                        const sortedTimes = Array.from(punches).sort();
+                        let status: AttendanceRecord['status'] = 'present';
+                        let anomaly = '';
+                        let manualDeduction = 0;
+                        let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
 
-                    const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
-                    const isCustomShift = !!emp.workStartTime && !!emp.workEndTime;
+                        const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
 
-                    if (sortedTimes[0] > startTimeLimit) {
-                        if (activePermission?.type === 'late_arrival') {
-                            status = 'present';
-                            anomaly = 'تأخير مسموح (إذن تأخير معتمد)';
-                            coveredByPolicyCount++;
-                        } else {
-                            status = 'late';
-                            anomaly = `تأخير عن الموعد (${startTimeLimit})`;
-                            auditStatus = 'pending';
-                        }
-                    }
-
-                    if (!isCustomShift && !isSystemHalfDay) {
-                        const hasMorning = sortedTimes.some(t => t <= mEnd);
-                        const hasEvening = sortedTimes.some(t => t >= eStart);
-
-                        if (hasMorning && !hasEvening) {
-                            if (activePermission?.type === 'early_departure') {
+                        if (sortedTimes[0] > startTimeLimit) {
+                            if (activePermission?.type === 'late_arrival') {
                                 status = 'present';
-                                anomaly = anomaly ? `${anomaly} + خروج مسموح (إذن خروج)` : 'خروج مسموح (إذن خروج)';
+                                anomaly = 'تأخير مسموح (إذن تأخير معتمد)';
                                 coveredByPolicyCount++;
                             } else {
+                                status = 'late';
+                                anomaly = `تأخير عن الموعد (${startTimeLimit})`;
+                                auditStatus = 'pending';
+                            }
+                        }
+
+                        if (!emp.workStartTime && !emp.workEndTime) {
+                            const hasMorning = sortedTimes.some(t => t <= mEnd);
+                            const hasEvening = sortedTimes.some(t => t >= eStart);
+
+                            if (hasMorning && !hasEvening) {
+                                if (activePermission?.type === 'early_departure') {
+                                    status = 'present';
+                                    anomaly = anomaly ? `${anomaly} + خروج مسموح` : 'خروج مسموح';
+                                    coveredByPolicyCount++;
+                                } else {
+                                    status = 'half_day';
+                                    anomaly = anomaly ? `${anomaly} + بصمة صباحية فقط` : 'بصمة صباحية فقط';
+                                    manualDeduction = 0.5;
+                                    auditStatus = 'pending';
+                                }
+                            } else if (!hasMorning && hasEvening) {
                                 status = 'half_day';
-                                anomaly = anomaly ? `${anomaly} + بصمة صباحية فقط` : 'بصمة صباحية فقط';
+                                anomaly = anomaly ? `${anomaly} + بصمة مسائية فقط` : 'بصمة مسائية فقط';
                                 manualDeduction = 0.5;
                                 auditStatus = 'pending';
                             }
-                        } else if (!hasMorning && hasEvening) {
-                            status = 'half_day';
-                            anomaly = anomaly ? `${anomaly} + بصمة مسائية فقط` : 'بصمة مسائية فقط';
-                            manualDeduction = 0.5;
-                            auditStatus = 'pending';
                         }
-                    }
 
-                    employeeRecords.push({
-                        date: Timestamp.fromDate(stableDay),
-                        employeeId: emp.id!,
-                        checkIn1: sortedTimes[0],
-                        checkOut1: sortedTimes[sortedTimes.length - 1],
-                        allPunches: sortedTimes,
-                        status,
-                        anomalyDescription: anomaly,
-                        manualDeductionDays: manualDeduction,
-                        auditStatus
-                    });
-                } else {
-                    // ✨ الرقابة الشمولية: استخدام نهاية اليوم لضمان شمول تاريخ الحد الأقصى
-                    if (!isAfter(stableDay, endOfDay(processingLimitDate))) {
+                        employeeRecords.push({
+                            date: Timestamp.fromDate(stableDay),
+                            employeeId: emp.id!,
+                            checkIn1: sortedTimes[0],
+                            checkOut1: sortedTimes[sortedTimes.length - 1],
+                            allPunches: sortedTimes,
+                            status,
+                            anomalyDescription: anomaly,
+                            manualDeductionDays: manualDeduction,
+                            auditStatus
+                        });
+                    } else {
                         if (activeLeave) {
                             coveredByPolicyCount++;
                             employeeRecords.push({
@@ -445,7 +434,7 @@ export function AttendanceUploader() {
 
         await batch.commit();
         setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount, coveredByPolicy: coveredByPolicyCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الفترة بنجاح، تم إثبات ${autoAbsencesCount} غياب حقيقي.` });
+        toast({ title: 'نجاح المعالجة', description: `تم تحليل الفترة بنجاح.` });
         setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
@@ -470,102 +459,89 @@ export function AttendanceUploader() {
         </TabsList>
 
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
-            <div className="grid lg:grid-cols-3 gap-8">
-                <Card className="lg:col-span-1 rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
-                    <CardHeader className="bg-muted/10 border-b pb-6">
-                        <CardTitle className="text-xl font-black text-gray-800">إعدادات المعالجة والرقابة</CardTitle>
+            <div className="space-y-8">
+                <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
+                    <CardHeader className="bg-muted/10 border-b pb-6 px-8">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                            <div className="flex items-center gap-3">
+                                <CalendarRange className="h-6 w-6 text-primary" />
+                                <CardTitle className="text-xl font-black text-gray-800">إعدادات نطاق الرقابة وفترة التقرير</CardTitle>
+                            </div>
+                            <div className="flex gap-4 bg-background p-2 rounded-2xl border shadow-inner">
+                                <div className="grid gap-1">
+                                    <Label className="text-[9px] font-black uppercase text-muted-foreground mr-1">السنة</Label>
+                                    <Select value={year} onValueChange={setYear}>
+                                        <SelectTrigger className="h-9 w-28 rounded-xl border-none shadow-none"><SelectValue /></SelectTrigger>
+                                        <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                                <Separator orientation="vertical" className="h-8 my-auto" />
+                                <div className="grid gap-1">
+                                    <Label className="text-[9px] font-black uppercase text-muted-foreground mr-1">الشهر</Label>
+                                    <Select value={month} onValueChange={setMonth}>
+                                        <SelectTrigger className="h-9 w-28 rounded-xl border-none shadow-none"><SelectValue /></SelectTrigger>
+                                        <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
                     </CardHeader>
-                    <CardContent className="space-y-6 pt-8">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-1.5">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label>
-                                <Select value={year} onValueChange={setYear}>
-                                    <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
-                                    <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label>
-                                <Select value={month} onValueChange={setMonth}>
-                                    <SelectTrigger className="rounded-2xl h-12 border-2"><SelectValue /></SelectTrigger>
-                                    <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        
-                        <Separator />
-
-                        <div className="space-y-4">
-                            <Label className="font-black text-sm text-primary flex items-center gap-2">
-                                <CalendarRange className="h-4 w-4" /> نطاق الرقابة (سقف الغياب)
-                            </Label>
-                            <RadioGroup value={processingMode} onValueChange={(v: any) => setProcessingMode(v)} className="grid grid-cols-1 gap-3">
-                                <div className={cn(
-                                    "flex items-center space-x-3 space-x-reverse p-4 rounded-2xl border-2 transition-all cursor-pointer",
-                                    processingMode === 'limit_to_file' ? "bg-primary/5 border-primary shadow-sm" : "bg-muted/30 border-transparent hover:bg-muted/50"
-                                )} onClick={() => setProcessingMode('limit_to_file')}>
-                                    <RadioGroupItem value="limit_to_file" id="r1" className="h-5 w-5" />
-                                    <div className="flex-1 space-y-0.5">
-                                        <Label htmlFor="r1" className="font-black text-sm cursor-pointer">أيام محددة (بناءً على الملف)</Label>
-                                        <p className="text-[10px] text-muted-foreground font-bold">النظام سيتوقف عند أقصى تاريخ تم رصده في الملف المرفوع.</p>
-                                    </div>
-                                </div>
-                                <div className={cn(
-                                    "flex items-center space-x-3 space-x-reverse p-4 rounded-2xl border-2 transition-all cursor-pointer",
-                                    processingMode === 'full_month' ? "bg-primary/5 border-primary shadow-sm" : "bg-muted/30 border-transparent hover:bg-muted/50"
-                                )} onClick={() => setProcessingMode('full_month')}>
-                                    <RadioGroupItem value="full_month" id="r2" className="h-5 w-5" />
-                                    <div className="flex-1 space-y-0.5">
-                                        <Label htmlFor="r2" className="font-black text-sm cursor-pointer">الشهر كامل (إغلاق نهائي)</Label>
-                                        <p className="text-[10px] text-muted-foreground font-bold">النظام سيحسب الغياب حتى آخر يوم في الشهر المحدد.</p>
-                                    </div>
-                                </div>
-                            </RadioGroup>
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center gap-3 p-4 bg-amber-50/50 rounded-2xl border-2 border-dashed border-amber-200">
-                            <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
-                            <div className="space-y-0.5">
-                                <Label htmlFor="purge" className="font-black text-xs text-amber-800 cursor-pointer">تطهير البيانات السابقة</Label>
-                                <p className="text-[9px] text-amber-600 font-bold leading-tight">تفعيله يمسح بصمات الشهر القديمة. إيقافه يدمج الملف الجديد مع الموجود.</p>
-                            </div>
-                        </div>
-
-                        {summary && (
-                            <div className="p-4 bg-green-50 rounded-2xl border-2 border-dashed border-green-100 space-y-3 animate-in zoom-in-95">
-                                <h4 className="font-black text-green-800 flex items-center gap-2 text-xs"><CheckCircle2 className="h-4 w-4"/> ملخص المعالجة الأخيرة:</h4>
-                                <div className="grid grid-cols-2 gap-2 text-[10px] font-bold text-center">
-                                    <div className="bg-white p-2 rounded-lg border">أيام العمل: {summary.workingDays}</div>
-                                    <div className="bg-white p-2 rounded-lg border">البصمات: {summary.totalPunches}</div>
-                                    <div className="bg-blue-600 text-white p-2 rounded-lg">إجازات: {summary.coveredByPolicy}</div>
-                                    <div className="bg-red-600 text-white p-2 rounded-lg">إثبات غياب: {summary.autoAbsences}</div>
+                    <CardContent className="p-8">
+                        <RadioGroup value={processingMode} onValueChange={(v: any) => setProcessingMode(v)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className={cn(
+                                "relative flex items-center space-x-4 space-x-reverse p-6 rounded-[2rem] border-2 transition-all cursor-pointer group h-28 shadow-[0_5px_0_0_rgba(0,0,0,0.05)] active:translate-y-1 active:shadow-none",
+                                processingMode === 'limit_to_file' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20"
+                            )} onClick={() => setProcessingMode('limit_to_file')}>
+                                <RadioGroupItem value="limit_to_file" id="r1" className="h-6 w-6" />
+                                <div className="flex-1">
+                                    <Label htmlFor="r1" className="font-black text-lg cursor-pointer block text-primary">أيام محددة (بناءً على الملف)</Label>
+                                    <p className="text-[10px] text-muted-foreground font-bold mt-1">يتوقف النظام عند أقصى تاريخ تم رصده في الملف المرفوع.</p>
                                 </div>
                             </div>
-                        )}
+                            
+                            <div className={cn(
+                                "relative flex items-center space-x-4 space-x-reverse p-6 rounded-[2rem] border-2 transition-all cursor-pointer group h-28 shadow-[0_5px_0_0_rgba(0,0,0,0.05)] active:translate-y-1 active:shadow-none",
+                                processingMode === 'full_month' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20"
+                            )} onClick={() => setProcessingMode('full_month')}>
+                                <RadioGroupItem value="full_month" id="r2" className="h-6 w-6" />
+                                <div className="flex-1">
+                                    <Label htmlFor="r2" className="font-black text-lg cursor-pointer block text-primary">الشهر كامل (إغلاق نهائي)</Label>
+                                    <p className="text-[10px] text-muted-foreground font-bold mt-1">يحسب النظام الغياب حتى آخر يوم في الشهر المختار.</p>
+                                </div>
+                            </div>
+                        </RadioGroup>
+
+                        <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-6 p-6 bg-amber-50/30 rounded-[2rem] border-2 border-dashed border-amber-200">
+                            <div className="flex items-center gap-4">
+                                <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} className="h-6 w-6 rounded-lg border-amber-400 data-[state=checked]:bg-amber-600" />
+                                <div>
+                                    <Label htmlFor="purge" className="font-black text-base text-amber-900 cursor-pointer">تطهير البيانات السابقة لهذا الشهر</Label>
+                                    <p className="text-xs text-amber-700 font-medium">تفعيل هذا الخيار سيمسح أي بصمات قديمة مسجلة لهذا الشهر ويبدأ من الصفر.</p>
+                                </div>
+                            </div>
+                            {summary && (
+                                <div className="flex gap-3 animate-in zoom-in-95">
+                                    <Badge variant="outline" className="bg-white text-red-700 border-red-100 font-black px-4 py-1 rounded-xl">إثبات غياب: {summary.autoAbsences}</Badge>
+                                    <Badge variant="outline" className="bg-white text-green-700 border-green-100 font-black px-4 py-1 rounded-xl">إجازات: {summary.coveredByPolicy}</Badge>
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
-                <Card className="lg:col-span-2 rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                    <CardHeader className="bg-muted/10 border-b pb-6">
-                        <CardTitle className="text-xl font-black text-gray-800">رفع وتحليل ملف البصمة</CardTitle>
-                        <CardDescription className="text-sm font-medium">ارفع ملف الإكسل ليقوم النظام بمطابقته مع الإجازات والاستئذانات وكشف فجوات الحضور.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-8">
-                        <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[3rem] p-16 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/20 group">
+                <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white">
+                    <CardContent className="p-12">
+                        <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[4rem] p-20 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/20 group relative overflow-hidden">
                             <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls, .csv" />
-                            <FileSpreadsheet className="h-20 w-20 mx-auto opacity-20 mb-6 group-hover:scale-110 group-hover:opacity-40 transition-all text-primary" />
-                            <p className="font-black text-2xl text-gray-700">{file ? file.name : "اضغط هنا لاختيار ملف الإكسل"}</p>
-                            <p className="text-xs text-muted-foreground mt-4 font-bold leading-relaxed max-w-sm mx-auto">
-                                سيقوم النظام بمقارنة محتوى الملف مع سجلات الإجازات والاستئذانات المعتمدة آلياً لضمان عدم الخصم من الموظفين المبرر غيابهم.
-                            </p>
+                            <FileSpreadsheet className="h-24 w-24 mx-auto opacity-20 mb-6 group-hover:scale-110 group-hover:opacity-40 transition-all text-primary" />
+                            <p className="font-black text-3xl text-gray-700">{file ? file.name : "اسحب وأفلت ملف الإكسيل هنا"}</p>
+                            <p className="text-sm text-muted-foreground mt-4 font-bold max-w-sm mx-auto">سيقوم المحاسب الذكي بمطابقة البصمات مع الإجازات والاستئذانات آلياً.</p>
                         </div>
                     </CardContent>
-                    <CardFooter className="justify-end border-t p-8 bg-muted/10">
-                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3 min-w-[280px]">
-                            {isProcessing ? <Loader2 className="animate-spin h-6 w-6"/> : <RotateCcw className="h-6 w-6"/>} 
-                            بدء المعالجة والتحليل الذكي
+                    <CardFooter className="justify-center border-t p-10 bg-muted/10">
+                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-2xl shadow-primary/30 gap-4 min-w-[350px] transition-all hover:scale-105 active:scale-95">
+                            {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <RotateCcw className="h-8 w-8"/>} 
+                            بدء التحليل والربط المالي
                         </Button>
                     </CardFooter>
                 </Card>
@@ -584,7 +560,7 @@ export function AttendanceUploader() {
                             <CardDescription className="text-base font-medium">تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.</CardDescription>
                         </div>
                         <div className="relative w-full md:w-80">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
                             <Input 
                                 placeholder="بحث بالاسم أو الرقم..." 
                                 value={mappingSearch}
@@ -673,7 +649,7 @@ export function AttendanceUploader() {
                         <Info className="h-4 w-4 text-primary" />
                         اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.
                     </div>
-                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-12 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
+                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
                         {isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>}
                         حفظ كافة البيانات
                     </Button>
