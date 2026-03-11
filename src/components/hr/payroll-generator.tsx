@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, AttendanceRecord, Account } from '@/lib/types';
-import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw } from 'lucide-react';
-import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
+import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip } from '@/lib/types';
+import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, AlertCircle, RefreshCw, CalendarDays, CheckCircle, Ban, FileDown, Check, X, ShieldAlert, FileText, Info, RotateCcw, XCircle, Banknote } from 'lucide-react';
+import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
 import { format, startOfDay } from 'date-fns';
@@ -55,7 +55,7 @@ export function PayrollGenerator() {
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
   const [attLoading, setAttLoading] = useState(false);
 
-  const fetchAttendance = useCallback(async () => {
+  const fetchAttendance = async () => {
     if (!firestore) return;
     setAttLoading(true);
     try {
@@ -65,16 +65,47 @@ export function PayrollGenerator() {
         where('month', '==', parseInt(month))
       ));
       setAttendanceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance)));
+      if (snap.empty) {
+          toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على سجلات حضور للشهر المختار.' });
+      }
     } catch (e) {
       console.error(e);
+      toast({ variant: 'destructive', title: 'خطأ في التحميل' });
     } finally {
       setAttLoading(false);
     }
+  };
+
+  // جلب البيانات عند تغيير الشهر أو السنة فقط إذا كانت هناك بيانات مسبقاً (إدارة الحالة)
+  useEffect(() => {
+    if (attendanceDocs.length > 0) {
+      fetchAttendance();
+    }
   }, [firestore, year, month]);
 
-  useEffect(() => {
-    fetchAttendance();
-  }, [fetchAttendance]);
+  const handleDeleteMonth = async () => {
+    if (!firestore) return;
+    const confirmed = window.confirm(`هل أنت متأكد من حذف جميع بيانات الحضور لشهر ${month}/${year}؟ لا يمكن التراجع عن هذا الإجراء.`);
+    if (!confirmed) return;
+    
+    setAttLoading(true);
+    try {
+      const snap = await getDocs(query(
+        collection(firestore, 'attendance'),
+        where('year', '==', parseInt(year)),
+        where('month', '==', parseInt(month))
+      ));
+      const batch = writeBatch(firestore);
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      setAttendanceDocs([]);
+      toast({ title: 'تم الحذف', description: `تم حذف بيانات شهر ${month}/${year} بنجاح.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'خطأ في الحذف', description: e.message });
+    } finally {
+      setAttLoading(false);
+    }
+  };
 
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
@@ -422,43 +453,97 @@ export function PayrollGenerator() {
   }, [month, year, toast]);
 
   const pendingAnomaliesCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
-  const processedAnomaliesCount = anomalies.filter(a => a.record.auditStatus !== 'pending').length;
   const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
   return (
     <div className="space-y-8" dir="rtl">
-        <div className="flex flex-col md:flex-row gap-4 p-6 bg-[#F8F9FE] rounded-[2.5rem] border shadow-inner no-print justify-between items-end">
-            <div className="flex gap-4">
-                <div className="grid gap-1.5">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة</Label>
-                    <Select value={year} onValueChange={setYear}>
-                        <SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger>
-                        <SelectContent dir="rtl">{[2025, 2026, 2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <div className="grid gap-1.5">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر</Label>
-                    <Select value={month} onValueChange={setMonth}>
-                        <SelectTrigger className="h-10 w-32 rounded-xl"><SelectValue/></SelectTrigger>
-                        <SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
+        {/* منطقة التحكم الرئيسية */}
+        <div className="space-y-3 mb-6" dir="rtl">
+          
+          {/* الصف الأول: اختيار الفترة */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Label className="font-black text-sm">السنة</Label>
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger className="w-24 rounded-xl h-9"><SelectValue /></SelectTrigger>
+                <SelectContent dir="rtl">{[2024,2025,2026,2027].map(y=><SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
-            <div className="flex flex-wrap gap-3">
-                <Button type="button" variant="outline" onClick={handleExportExcel} disabled={summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-green-700 border-green-200 hover:bg-green-50"><FileDown className="h-4 w-4"/> تصدير Excel</Button>
-                <Button type="button" variant="outline" onClick={handleExportSummaryPDF} disabled={isExportingSummary || summaryData.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-primary border-primary/20 hover:bg-primary/5">
-                    {isExportingSummary ? <Loader2 className="h-4 w-4 animate-spin"/> : <FileText className="h-4 w-4"/>} 
-                    تصدير PDF (ملخص)
-                </Button>
-                <Button type="button" variant="outline" onClick={handleExportPDF} disabled={isExportingPDF || anomalies.length === 0} className="rounded-xl font-bold border-2 h-10 gap-2 text-red-700 border-red-200 hover:bg-red-50">
-                    {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin"/> : <ShieldAlert className="h-4 w-4"/>} 
-                    تقرير المخالفات PDF
-                </Button>
-                <Button type="button" onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="rounded-xl font-black h-10 px-8 shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90">
-                    {isProcessing ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : <Calculator className="ml-2 h-4 w-4"/>} 
-                    {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب'}
-                </Button>
+            <div className="flex items-center gap-2">
+              <Label className="font-black text-sm">الشهر</Label>
+              <Select value={month} onValueChange={setMonth}>
+                <SelectTrigger className="w-20 rounded-xl h-9"><SelectValue /></SelectTrigger>
+                <SelectContent dir="rtl">{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
+          </div>
+
+          {/* الفريم الأول: إدارة البيانات — أحمر */}
+          <div className="p-3 rounded-2xl border-2 border-red-100 bg-red-50/50 flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-black text-red-700 ml-2">⚙️ إدارة البيانات</span>
+            <Button
+              onClick={fetchAttendance}
+              disabled={attLoading}
+              className="h-9 px-4 rounded-xl font-bold text-sm bg-primary hover:bg-primary/90 gap-2"
+            >
+              {attLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
+              تحميل بيانات الشهر
+            </Button>
+            <Button
+              onClick={handleDeleteMonth}
+              disabled={attLoading || attendanceDocs.length === 0}
+              variant="destructive"
+              className="h-9 px-4 rounded-xl font-bold text-sm gap-2"
+            >
+              <Trash2 className="h-4 w-4"/>
+              حذف بيانات الشهر
+            </Button>
+          </div>
+
+          {/* الفريم الثاني: التصدير — أخضر */}
+          <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/50 flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-black text-green-700 ml-2">📊 التصدير</span>
+            <Button
+              onClick={handleExportExcel}
+              disabled={attendanceDocs.length === 0}
+              variant="outline"
+              className="h-9 px-4 rounded-xl font-bold text-sm border-green-300 text-green-700 hover:bg-green-100 gap-2"
+            >
+              <FileDown className="h-4 w-4"/>
+              تصدير Excel
+            </Button>
+            <Button
+              onClick={handleExportSummaryPDF}
+              disabled={isExportingSummary || attendanceDocs.length === 0}
+              variant="outline"
+              className="h-9 px-4 rounded-xl font-bold text-sm border-green-300 text-green-700 hover:bg-green-100 gap-2"
+            >
+              {isExportingSummary ? <Loader2 className="h-4 w-4 animate-spin"/> : <Printer className="h-4 w-4"/>}
+              تصدير PDF ملخص
+            </Button>
+          </div>
+
+          {/* الفريم الثالث: المراجعة — بنفسجي */}
+          {attendanceDocs.length > 0 && (
+            <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/50 flex flex-wrap gap-2 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-purple-700">📋 مراجعة المخالفات</span>
+                {pendingAnomaliesCount > 0 && (
+                  <span className="bg-purple-600 text-white text-xs font-black px-3 py-1 rounded-full">
+                    {pendingAnomaliesCount} بانتظار مراجعتك
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => handleBulkAuditAction('waive')} variant="outline" className="h-9 px-4 rounded-xl font-bold text-sm border-green-300 text-green-700 hover:bg-green-100 gap-1">
+                  <CheckCircle2 className="h-4 w-4"/> تغاضي عن الكل
+                </Button>
+                <Button onClick={() => handleBulkAuditAction('apply')} variant="outline" className="h-9 px-4 rounded-xl font-bold text-sm border-red-300 text-red-700 hover:bg-red-100 gap-1">
+                  <XCircle className="h-4 w-4"/> اعتماد الخصم للكل
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div 
@@ -541,32 +626,6 @@ export function PayrollGenerator() {
                             يوجد {pendingAnomaliesCount} مخالفة
                         </Badge>
                     )}
-                    {(pendingAnomaliesCount > 0 || processedAnomaliesCount > 0) && (
-                        <div className="flex bg-muted/50 p-1 rounded-xl border shadow-inner no-print items-center">
-                            {pendingAnomaliesCount > 0 && (
-                                <>
-                                    <Button type="button" size="sm" variant="ghost" onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-green-700 hover:bg-green-100 rounded-lg gap-1">
-                                        {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3" />}
-                                        تغاضي عن الكل
-                                    </Button>
-                                    <Separator orientation="vertical" className="h-4 mx-1 my-auto" />
-                                    <Button type="button" size="sm" variant="ghost" onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-red-700 hover:bg-red-100 rounded-lg gap-1">
-                                        {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <ShieldAlert className="h-3 w-3" />}
-                                        اعتماد الخصم للكل
-                                    </Button>
-                                </>
-                            )}
-                            {processedAnomaliesCount > 0 && (
-                                <>
-                                    {pendingAnomaliesCount > 0 && <Separator orientation="vertical" className="h-4 mx-1 my-auto" />}
-                                    <Button type="button" size="sm" variant="ghost" onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="h-7 text-[10px] font-black text-gray-600 hover:bg-gray-200 rounded-lg gap-1">
-                                        {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3" />}
-                                        إعادة تعيين للتدقيق
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    )}
                 </div>
             </div>
 
@@ -612,6 +671,13 @@ export function PayrollGenerator() {
                     </Table>
                 </div>
             )}
+        </div>
+
+        <div className="no-print pt-10 border-t flex justify-center">
+            <Button onClick={handleGeneratePayroll} disabled={isProcessing || pendingAnomaliesCount > 0 || attLoading} className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90 gap-4 min-w-[350px]">
+                {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <Banknote className="h-8 w-8"/>} 
+                {pendingAnomaliesCount > 0 ? `بانتظار مراجعتك (${pendingAnomaliesCount} مخالفة)` : 'اعتماد وصرف الرواتب النهائية'}
+            </Button>
         </div>
     </div>
   );
