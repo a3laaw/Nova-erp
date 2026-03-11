@@ -35,11 +35,11 @@ import {
 } from '@/components/ui/table';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay } from 'date-fns';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isBefore } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -194,7 +194,6 @@ export function AttendanceUploader() {
     reader.onload = async (e) => {
       try {
         const data = e.target?.result;
-        // قراءة الملف كسلسلة ثنائية لضمان دقة تحليل مكتبة XLSX
         const workbook = XLSX.read(data, { type: 'binary' });
         const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         
@@ -202,6 +201,7 @@ export function AttendanceUploader() {
 
         const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
         const monthEnd = endOfMonth(monthStart);
+        const today = startOfDay(new Date());
 
         const [leavesSnap, permissionsSnap] = await Promise.all([
             getDocs(query(collection(firestore, 'leaveRequests'), where('status', 'in', ['approved', 'on-leave', 'returned']))),
@@ -215,6 +215,7 @@ export function AttendanceUploader() {
         const employeeMap = new Map(validEmployees.map(emp => [String(emp.employeeNumber), emp]));
         const excelPunches = new Map<string, Set<string>>(); 
         let totalPunchesCount = 0;
+        let lastDateInFile: Date | null = null;
 
         json.forEach(row => {
             const keys = Object.keys(row);
@@ -235,6 +236,9 @@ export function AttendanceUploader() {
                     if (parsed.timeStr && parsed.timeStr !== "00:00") {
                         excelPunches.get(dateKey)!.add(parsed.timeStr);
                         totalPunchesCount++;
+                        if (!lastDateInFile || parsed.date > lastDateInFile) {
+                            lastDateInFile = parsed.date;
+                        }
                     }
                 }
             }
@@ -245,12 +249,15 @@ export function AttendanceUploader() {
         const halfDaySettings = branding?.work_hours?.half_day;
         const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
 
+        // الرقابة الزمنية: تحديد الحد الأقصى للأيام التي سيتم اعتبار عدم وجود بصمة فيها "غياب"
+        // نختار التاريخ الأصغر بين (نهاية الشهر، اليوم، أو آخر تاريخ في الملف المرفوع)
+        const processingLimitDate = lastDateInFile && lastDateInFile < today ? lastDateInFile : today;
+
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
         const batch = writeBatch(firestore);
 
         if (clearPrevious) {
-            // وضع الاستبدال الكامل: امسح كل شيء قديم
             const existingQuery = query(
                 collection(firestore, 'attendance'),
                 where('year', '==', selectedYearNum),
@@ -259,7 +266,6 @@ export function AttendanceUploader() {
             const existingSnap = await getDocs(existingQuery);
             existingSnap.forEach(d => batch.delete(d.ref));
         } else {
-            // وضع الدمج التكميلي: اقرأ البصمات القديمة وادمجها مع الجديدة
             const existingQuery = query(
                 collection(firestore, 'attendance'),
                 where('year', '==', selectedYearNum),
@@ -269,7 +275,6 @@ export function AttendanceUploader() {
             existingSnap.forEach(existingDoc => {
                 const existingData = existingDoc.data();
                 const empId = existingData.employeeId;
-                // لكل سجل قديم فيه بصمات حقيقية، أضفها للخريطة الجديدة
                 (existingData.records || []).forEach((r: any) => {
                     if (r.allPunches && r.allPunches.length > 0) {
                         const dateObj = r.date?.toDate ? r.date.toDate() : new Date(r.date);
@@ -280,7 +285,6 @@ export function AttendanceUploader() {
                         r.allPunches.forEach((p: string) => excelPunches.get(dateKey)!.add(p));
                     }
                 });
-                // احذف القديم لأننا سنعيد بناءه بالبيانات المدموجة
                 batch.delete(existingDoc.ref);
             });
         }
@@ -371,34 +375,36 @@ export function AttendanceUploader() {
                         auditStatus
                     });
                 } else {
-                    if (activeLeave) {
-                        coveredByPolicyCount++;
-                        employeeRecords.push({
-                            date: Timestamp.fromDate(stableDay),
-                            employeeId: emp.id!,
-                            status: 'present',
-                            anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || 'رسمية'} معتمدة`,
-                            manualDeductionDays: 0,
-                            auditStatus: 'verified',
-                            allPunches: []
-                        });
-                    } else {
-                        autoAbsencesCount++;
-                        employeeRecords.push({
-                            date: Timestamp.fromDate(stableDay),
-                            employeeId: emp.id!,
-                            status: 'absent',
-                            anomalyDescription: 'غائب (لم تظهر بصمته في الملف)',
-                            manualDeductionDays: 1,
-                            auditStatus: 'pending',
-                            allPunches: []
-                        });
+                    // فقط إذا كان اليوم قد مضى أو ضمن نطاق الملف المرفوع نعتبره غياباً
+                    if (isBefore(stableDay, processingLimitDate)) {
+                        if (activeLeave) {
+                            coveredByPolicyCount++;
+                            employeeRecords.push({
+                                date: Timestamp.fromDate(stableDay),
+                                employeeId: emp.id!,
+                                status: 'present',
+                                anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || 'رسمية'} معتمدة`,
+                                manualDeductionDays: 0,
+                                auditStatus: 'verified',
+                                allPunches: []
+                            });
+                        } else {
+                            autoAbsencesCount++;
+                            employeeRecords.push({
+                                date: Timestamp.fromDate(stableDay),
+                                employeeId: emp.id!,
+                                status: 'absent',
+                                anomalyDescription: 'غائب (لم تظهر بصمته في الملف)',
+                                manualDeductionDays: 1,
+                                auditStatus: 'pending',
+                                allPunches: []
+                            });
+                        }
                     }
                 }
             }
 
             if (employeeRecords.length > 0) {
-                // حساب الملخص آلياً من السجلات لخدمة التقارير السريعة
                 const presentDays = employeeRecords.filter(r => r.status === 'present').length;
                 const absentDays = employeeRecords.filter(r => r.status === 'absent').length;
                 const lateDays = employeeRecords.filter(r => r.status === 'late').length;
@@ -426,13 +432,12 @@ export function AttendanceUploader() {
 
         await batch.commit();
         setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount, coveredByPolicy: coveredByPolicyCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب، وتغطية ${coveredByPolicyCount} حالة بسياسات الإجازات.` });
+        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب حقيقي، وتغطية ${coveredByPolicyCount} حالة إجازة.` });
         setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
       } finally { setIsProcessing(false); }
     };
-    // استخدام readAsBinaryString لضمان توافق البيانات مع مكتبة XLSX.read
     reader.readAsBinaryString(file!);
   };
 
@@ -476,11 +481,11 @@ export function AttendanceUploader() {
                         
                         <Separator />
 
-                        <div className="flex items-center gap-3 p-4 bg-red-50/50 rounded-2xl border-2 border-dashed border-red-100">
+                        <div className="flex items-center gap-3 p-4 bg-amber-50/50 rounded-2xl border-2 border-dashed border-amber-200">
                             <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} />
                             <div className="space-y-0.5">
-                                <Label htmlFor="purge" className="font-black text-xs text-red-800 cursor-pointer">تطهير البيانات السابقة</Label>
-                                <p className="text-[9px] text-red-600 font-bold leading-tight">مسح كافة البصمات القديمة المسجلة لهذا الشهر لضمان دقة الرقابة.</p>
+                                <Label htmlFor="purge" className="font-black text-xs text-amber-800 cursor-pointer">تطهير البيانات السابقة</Label>
+                                <p className="text-[9px] text-amber-600 font-bold leading-tight">إلغاء التحديد سيؤدي لدمج الملف المرفوع مع بيانات الشهر الحالية في النظام.</p>
                             </div>
                         </div>
 

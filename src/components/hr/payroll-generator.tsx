@@ -12,7 +12,7 @@ import { Loader2, Calculator, ShieldCheck, Printer, CheckCircle2, History, Alert
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '../ui/badge';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
@@ -255,7 +255,7 @@ export function PayrollGenerator() {
         if (r.auditStatus === 'waived') return;
         if (r.status === 'absent') totalAbsent++;
         else {
-            if (r.checkIn1) {
+            if (r.checkIn1 && r.checkIn1 !== "00:00") {
                 const checkInMins = timeToMinutes(r.checkIn1);
                 const diff = checkInMins - limitMins;
                 if (diff > 0) { totalLateMinutes += diff; totalLate++; }
@@ -321,14 +321,12 @@ export function PayrollGenerator() {
     }
     setIsExportingSummary(true);
 
-    // إنشاء عنصر مؤقت مرئي خارج الشاشة بطريقة صحيحة
     const element = document.getElementById('summary-printable-area');
     if (!element) {
         setIsExportingSummary(false);
         return;
     }
 
-    // نسخ العنصر ووضعه في مكان يراه html2pdf
     const clone = element.cloneNode(true) as HTMLElement;
     clone.style.position = 'absolute';
     clone.style.top = '0';
@@ -463,7 +461,6 @@ export function PayrollGenerator() {
             </div>
         </div>
 
-        {/* 🛡️ منطقة الطباعة: مخفية عن المستخدم ولكن مرئية للمحرك */}
         <div 
             id="summary-printable-area" 
             className="fixed -top-[20000px] left-0 w-[1120px] bg-white opacity-100 pointer-events-none"
