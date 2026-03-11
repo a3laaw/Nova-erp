@@ -39,7 +39,7 @@ import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimes
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isBefore } from 'date-fns';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isBefore, endOfDay, isAfter } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
@@ -249,9 +249,15 @@ export function AttendanceUploader() {
         const halfDaySettings = branding?.work_hours?.half_day;
         const halfDayIndex = halfDaySettings?.day ? dayNameToIndex[halfDaySettings.day] : -1;
 
-        // الرقابة الزمنية: تحديد الحد الأقصى للأيام التي سيتم اعتبار عدم وجود بصمة فيها "غياب"
-        // نختار التاريخ الأصغر بين (نهاية الشهر، اليوم، أو آخر تاريخ في الملف المرفوع)
-        const processingLimitDate = lastDateInFile && lastDateInFile < today ? lastDateInFile : today;
+        // ✨ محرك تحديد سقف المعالجة الزمني (Inclusive Limit Logic)
+        let processingLimitDate: Date;
+        if (isBefore(monthEnd, today)) {
+            // شهر قديم: المعالجة حتى آخر يوم في الشهر
+            processingLimitDate = endOfDay(monthEnd);
+        } else {
+            // شهر جاري: المعالجة حتى (اليوم) أو (تاريخ آخر بصمة في الملف) أيهما أبعد
+            processingLimitDate = lastDateInFile && isAfter(lastDateInFile, today) ? endOfDay(lastDateInFile) : endOfDay(today);
+        }
 
         const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
 
@@ -375,8 +381,8 @@ export function AttendanceUploader() {
                         auditStatus
                     });
                 } else {
-                    // فقط إذا كان اليوم قد مضى أو ضمن نطاق الملف المرفوع نعتبره غياباً
-                    if (isBefore(stableDay, processingLimitDate)) {
+                    // ✨ الرقابة الزمنية المحدثة: المقارنة حتى نهاية اليوم المحدد (Inclusive)
+                    if (!isAfter(stableDay, processingLimitDate)) {
                         if (activeLeave) {
                             coveredByPolicyCount++;
                             employeeRecords.push({
@@ -432,7 +438,7 @@ export function AttendanceUploader() {
 
         await batch.commit();
         setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount, coveredByPolicy: coveredByPolicyCount });
-        toast({ title: 'نجاح المعالجة', description: `تم تحليل الشهر وإثبات ${autoAbsencesCount} غياب حقيقي، وتغطية ${coveredByPolicyCount} حالة إجازة.` });
+        toast({ title: 'نجاح المعالجة', description: `تم تحليل الفترة بنجاح، تم إثبات ${autoAbsencesCount} غياب حقيقي.` });
         setFile(null);
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: error.message });
