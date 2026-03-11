@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   Card, 
   CardHeader, 
@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { cleanFirestoreData, cn } from '@/lib/utils';
@@ -45,9 +45,10 @@ import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '../ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -112,8 +113,10 @@ export function AttendanceUploader() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [clearPrevious, setClearPrevious] = useState(true);
   const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   
   const [summary, setSummary] = useState<{ workingDays: number, totalPunches: number, autoAbsences: number, coveredByPolicy: number } | null>(null);
   
@@ -138,29 +141,93 @@ export function AttendanceUploader() {
     }
   }, [employees]);
 
-  const filteredEmployees = useMemo(() => {
-    if (!mappingSearch) return employees;
-    const lower = mappingSearch.toLowerCase();
-    return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber?.includes(lower));
-  }, [employees, mappingSearch]);
+  const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
+  const [attLoading, setAttLoading] = useState(false);
 
-  const handleSaveMappingData = async () => {
+  const fetchAttendance = useCallback(async () => {
     if (!firestore) return;
-    setIsSavingData(true);
+    setAttLoading(true);
+    try {
+      const snap = await getDocs(query(
+        collection(firestore, 'attendance'),
+        where('year', '==', parseInt(year)),
+        where('month', '==', parseInt(month))
+      ));
+      setAttendanceDocs(snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance)));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setAttLoading(false);
+    }
+  }, [firestore, year, month]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
+
+  const anomalies = useMemo(() => {
+    const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
+    if (!attendanceDocs || attendanceDocs.length === 0) return [];
+
+    const selectedMonth = parseInt(month);
+    const selectedYear = parseInt(year);
+
+    attendanceDocs.forEach(attendanceDoc => {
+        const emp = employees.find(e => e.id === attendanceDoc.employeeId);
+        attendanceDoc.records?.forEach(r => {
+            const recordDate = toFirestoreDate(r.date);
+            if (!recordDate) return;
+            if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
+            if (r.status !== 'present') {
+                list.push({ 
+                    docId: attendanceDoc.id!, 
+                    record: r, 
+                    empName: emp?.fullName || 'موظف غير معروف', 
+                    employeeNumber: emp?.employeeNumber || '000'
+                });
+            }
+        });
+    });
+    return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(b.record.date)?.getTime() || 0));
+  }, [attendanceDocs, employees, month, year]);
+
+  const handleClearData = async () => {
+    if (!firestore) return;
+    setIsClearing(true);
     try {
         const batch = writeBatch(firestore);
-        let count = 0;
-        for (const id in editableData) {
-            const original = employees.find(e => e.id === id);
-            const current = editableData[id];
-            const hasChanged = original && (original.employeeNumber !== current.employeeNumber || (original.workStartTime || '') !== current.workStartTime || (original.workEndTime || '') !== current.workEndTime);
-            if (hasChanged) {
-                batch.update(doc(firestore, 'employees', id), { employeeNumber: current.employeeNumber, workStartTime: current.workStartTime || null, workEndTime: current.workEndTime || null });
-                count++;
-            }
-        }
-        if (count > 0) { await batch.commit(); toast({ title: 'تم التحديث بنجاح' }); }
-    } finally { setIsSavingData(false); }
+        const q = query(collection(firestore, 'attendance'), where('year', '==', parseInt(year)), where('month', '==', parseInt(month)));
+        const snap = await getDocs(q);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        toast({ title: 'تم تصفير البيانات', description: `تم حذف كافة سجلات شهر ${month}/${year} من النظام.` });
+        fetchAttendance();
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ في المسح' });
+    } finally {
+        setIsClearing(false);
+        setIsClearConfirmOpen(false);
+    }
+  };
+
+  const handleExportAuditExcel = () => {
+    if (anomalies.length === 0) {
+        toast({ title: 'لا توجد مخالفات لتصديرها' });
+        return;
+    }
+    const data = anomalies.map(a => ({
+        'الموظف': a.empName,
+        'رقم البصمة': a.employeeNumber,
+        'التاريخ': format(toFirestoreDate(a.record.date)!, 'yyyy-MM-dd'),
+        'الحالة': a.record.status === 'absent' ? 'غياب' : 'تأخير/نقص بصمة',
+        'المخالفة': a.record.anomalyDescription,
+        'الخصم المعتمد (أيام)': a.record.manualDeductionDays,
+        'حالة التدقيق': a.record.auditStatus === 'verified' ? 'معتمد' : a.record.auditStatus === 'waived' ? 'متغاضى عنه' : 'قيد المراجعة'
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "سجل المخالفات");
+    XLSX.writeFile(wb, `سجل_مخالفات_${month}_${year}.xlsx`);
   };
 
   const handleUpload = async () => {
@@ -189,9 +256,7 @@ export function AttendanceUploader() {
         const approvedPermissions = permissionsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PermissionRequest));
 
         const employeeMap = new Map(employees.filter(emp => !!emp.employeeNumber).map(emp => [String(emp.employeeNumber), emp]));
-        
         const excelPunches = new Map<string, Set<string>>(); 
-        let totalPunchesCount = 0;
         let lastDateInFile: Date | null = null;
         const detectedMonths = new Set<string>();
         
@@ -216,7 +281,6 @@ export function AttendanceUploader() {
                         if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
                         if (parsed.timeStr && parsed.timeStr !== "00:00") {
                             excelPunches.get(dateKey)!.add(parsed.timeStr);
-                            totalPunchesCount++;
                             if (!lastDateInFile || parsed.date > lastDateInFile) lastDateInFile = parsed.date;
                         }
                     }
@@ -237,28 +301,11 @@ export function AttendanceUploader() {
         if (clearPrevious) {
             const existingSnap = await getDocs(query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum)));
             existingSnap.forEach(d => batch.delete(d.ref));
-        } else {
-            const existingSnap = await getDocs(query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum)));
-            existingSnap.forEach(existingDoc => {
-                const existingData = existingDoc.data();
-                const empId = existingData.employeeId;
-                (existingData.records || []).forEach((r: any) => {
-                    if (r.allPunches && r.allPunches.length > 0) {
-                        const dateKey = `${empId}_${format(toFirestoreDate(r.date)!, 'yyyy-MM-dd')}`;
-                        if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
-                        r.allPunches.forEach((p: string) => excelPunches.get(dateKey)!.add(p));
-                    }
-                });
-                batch.delete(existingDoc.ref);
-            });
         }
 
         const workHours = branding?.work_hours?.general;
         const mEnd = workHours?.morning_end_time || '13:00';
         const eStart = workHours?.evening_start_time || '16:00';
-
-        let autoAbsencesCount = 0;
-        let coveredByPolicyCount = 0;
 
         for (const emp of Array.from(employeeMap.values())) {
             const employeeRecords: AttendanceRecord[] = [];
@@ -281,11 +328,10 @@ export function AttendanceUploader() {
                         const startTimeLimit = emp.workStartTime || workHours?.morning_start_time || '08:00';
                         if (sortedTimes[0] > startTimeLimit) {
                             if (activePermission?.type === 'late_arrival') {
-                                anomaly = 'تأخير مسموح (إذن تأخير معتمد)';
-                                coveredByPolicyCount++;
+                                anomaly = 'تأخير مسموح (إذن تأخير)';
                             } else {
                                 status = 'late';
-                                anomaly = `تأخير عن الموعد (${startTimeLimit})`;
+                                anomaly = `تأخير عن (${startTimeLimit})`;
                                 auditStatus = 'pending';
                             }
                         }
@@ -296,28 +342,19 @@ export function AttendanceUploader() {
                             if (hasMorning && !hasEvening) {
                                 if (activePermission?.type === 'early_departure') {
                                     anomaly = anomaly ? `${anomaly} + خروج مسموح` : 'خروج مسموح';
-                                    coveredByPolicyCount++;
                                 } else {
                                     status = 'half_day';
-                                    anomaly = anomaly ? `${anomaly} + بصمة صباحية فقط` : 'بصمة صباحية فقط';
+                                    anomaly = anomaly ? `${anomaly} + بصمة واحدة` : 'بصمة صباحية فقط';
                                     manualDeduction = 0.5;
                                     auditStatus = 'pending';
                                 }
-                            } else if (!hasMorning && hasEvening) {
-                                status = 'half_day';
-                                anomaly = anomaly ? `${anomaly} + بصمة مسائية فقط` : 'بصمة مسائية فقط';
-                                manualDeduction = 0.5;
-                                auditStatus = 'pending';
                             }
                         }
-
                         employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
                     } else if (activeLeave) {
-                        coveredByPolicyCount++;
-                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'present', anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''} معتمدة`, manualDeductionDays: 0, auditStatus: 'verified', allPunches: [] } as any);
+                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'present', anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''}`, manualDeductionDays: 0, auditStatus: 'verified', allPunches: [] } as any);
                     } else {
-                        autoAbsencesCount++;
-                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'absent', anomalyDescription: 'غائب (لم تظهر بصمته في الملف)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
+                        employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'absent', anomalyDescription: 'غائب (بدون بصمة)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
                     }
                 }
             }
@@ -328,7 +365,6 @@ export function AttendanceUploader() {
                     presentDays: employeeRecords.filter(r => r.status === 'present').length,
                     absentDays: employeeRecords.filter(r => r.status === 'absent').length,
                     lateDays: employeeRecords.filter(r => r.status === 'late').length,
-                    halfDays: employeeRecords.filter(r => r.status === 'half_day').length,
                     totalDeductionDays: employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0),
                     totalWorkingDays: employeeRecords.length
                 };
@@ -337,9 +373,9 @@ export function AttendanceUploader() {
         }
 
         await batch.commit();
-        setSummary({ workingDays: workingDaysInMonth.length, totalPunches: totalPunchesCount, autoAbsences: autoAbsencesCount, coveredByPolicy: coveredByPolicyCount });
-        toast({ title: 'نجاح المعالجة' });
+        toast({ title: 'نجاح التوليد', description: 'تم إنشاء سجلات الحضور. يمكنك الآن البدء بالتدقيق.' });
         setFile(null);
+        fetchAttendance();
       } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ', description: error.message }); } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
@@ -347,14 +383,35 @@ export function AttendanceUploader() {
 
   const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
+  const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply' | 'reset') => {
+    if (!firestore || !currentUser) return;
+    try {
+        const docRef = doc(firestore, 'attendance', docId);
+        const snap = await getDoc(docRef);
+        if (!snap.exists()) return;
+        const records = snap.data().records.map((r: any) => {
+            if (r.date.seconds === date.seconds) {
+                let manualDeduction = r.manualDeductionDays;
+                if (action === 'waive') manualDeduction = 0;
+                else if (action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                return { ...r, auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), manualDeductionDays: manualDeduction, waivedBy: action === 'reset' ? null : currentUser.fullName, waivedAt: action === 'reset' ? null : new Date() };
+            }
+            return r;
+        });
+        await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
+        setAttendanceDocs(prev => prev.map(doc => doc.id === docId ? { ...doc, records } : doc));
+        toast({ title: 'تم الحفظ' });
+    } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
+  };
+
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 h-14 rounded-2xl bg-muted/50 p-1.5 shadow-inner">
             <TabsTrigger value="upload" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <FileSpreadsheet className="h-4 w-4" /> رفع ومعالجة الملف
+                <FileSpreadsheet className="h-4 w-4" /> 1. رفع ومعالجة الملف
             </TabsTrigger>
             <TabsTrigger value="mapping" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <Fingerprint className="h-4 w-4" /> مطابقة البصمة والدوام
+                <Fingerprint className="h-4 w-4" /> 2. مطابقة البصمة والدوام
             </TabsTrigger>
         </TabsList>
 
@@ -365,7 +422,7 @@ export function AttendanceUploader() {
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="flex items-center gap-3">
                                 <CalendarRange className="h-6 w-6 text-primary" />
-                                <CardTitle className="text-xl font-black text-gray-800">إعدادات نطاق الرقابة وفترة التقرير</CardTitle>
+                                <CardTitle className="text-xl font-black text-gray-800">إعدادات الفترة ونطاق الرقابة</CardTitle>
                             </div>
                             <div className="flex gap-4 bg-background p-2 rounded-2xl border shadow-inner">
                                 <div className="grid gap-1">
@@ -418,12 +475,6 @@ export function AttendanceUploader() {
                                     <p className="text-xs text-amber-700 font-medium">تفعيل هذا الخيار سيمسح أي بصمات قديمة مسجلة لهذا الشهر ويبدأ من الصفر.</p>
                                 </div>
                             </div>
-                            {summary && (
-                                <div className="flex gap-3 animate-in zoom-in-95">
-                                    <Badge variant="outline" className="bg-white text-red-700 border-red-100 font-black px-4 py-1 rounded-xl">إثبات غياب: {summary.autoAbsences}</Badge>
-                                    <Badge variant="outline" className="bg-white text-green-700 border-green-100 font-black px-4 py-1 rounded-xl">إجازات: {summary.coveredByPolicy}</Badge>
-                                </div>
-                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -438,11 +489,87 @@ export function AttendanceUploader() {
                         </div>
                     </CardContent>
                     <CardFooter className="justify-center border-t p-10 bg-muted/10">
-                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-2xl shadow-primary/30 gap-4 min-w-[350px] transition-all">
-                            {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <RotateCcw className="h-8 w-8"/>} بدء التحليل والربط المالي
+                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-[0_8px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white hover:bg-primary/90 gap-4 min-w-[350px] transition-all">
+                            {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <RotateCcw className="h-8 w-8"/>} 
+                            بدء التحليل والإنشاء اليدوي
                         </Button>
                     </CardFooter>
                 </Card>
+
+                {/* --- مركز تدقيق الحضور والمخالفات --- */}
+                <div className="space-y-6">
+                    <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+                        <CardHeader className="bg-slate-900 text-white pb-8 px-8">
+                            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-3">
+                                        <ShieldCheck className="h-8 w-8 text-primary" />
+                                        <CardTitle className="text-2xl font-black">مركز تدقيق الحضور والمخالفات</CardTitle>
+                                    </div>
+                                    <CardDescription className="text-slate-400 font-bold">مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي.</CardDescription>
+                                </div>
+                                <div className="flex gap-3 bg-white/10 p-2 rounded-2xl border border-white/10 shadow-inner">
+                                    <Button variant="ghost" onClick={() => setIsClearConfirmOpen(true)} disabled={isClearing || attendanceDocs.length === 0} className="h-10 px-6 rounded-xl font-black text-red-400 hover:bg-red-500 hover:text-white gap-2 transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-none border border-red-500/20">
+                                        <Trash2 className="h-4 w-4" /> تصفير الداتا الحالية
+                                    </Button>
+                                    <Button variant="ghost" onClick={handleExportAuditExcel} disabled={anomalies.length === 0} className="h-10 px-6 rounded-xl font-black text-green-400 hover:bg-green-600 hover:text-white gap-2 transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-none border border-green-500/20">
+                                        <FileDown className="h-4 w-4" /> تصدير المخالفات (Excel)
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {attLoading ? (
+                                <div className="p-20 text-center space-y-4">
+                                    <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
+                                    <p className="font-black text-muted-foreground animate-pulse">جاري فحص قاعدة البيانات...</p>
+                                </div>
+                            ) : attendanceDocs.length === 0 ? (
+                                <div className="p-32 text-center border-b rounded-b-[2.5rem] bg-slate-50/50">
+                                    <Ban className="h-20 w-20 text-muted-foreground/20 mx-auto mb-6" />
+                                    <p className="text-2xl font-black text-muted-foreground">لا توجد سجلات حضور مسجلة لهذه الفترة.</p>
+                                    <p className="text-sm text-muted-foreground mt-2 font-bold">يرجى رفع ملف الإكسيل للبدء بالتحليل.</p>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader className="bg-muted/50 h-16">
+                                        <TableRow className="border-none">
+                                            <TableHead className="px-10 font-black text-[#7209B7]">الموظف</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
+                                            <TableHead className="text-center font-black text-[#7209B7]">القرار الرقابي</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {anomalies.length === 0 ? (
+                                            <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
+                                        ) : anomalies.map((item, idx) => {
+                                            const isAbsent = item.record.status === 'absent';
+                                            return (
+                                            <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
+                                                <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-lg text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                                <TableCell className="font-bold text-xs text-gray-600">{format(toFirestoreDate(item.record.date)!, 'dd/MM/yyyy', { locale: ar })}</TableCell>
+                                                <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : 'تأخير/نقص بصمة'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
+                                                <TableCell>{isAbsent ? <div className="h-8 w-8 rounded-full border-2 border-dashed border-red-200 flex items-center justify-center opacity-40"><X className="h-4 w-4 text-red-400"/></div> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-5 bg-background shadow-inner">{p}</Badge>)}</div>}</TableCell>
+                                                <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">يوم خصم</span></div></TableCell>
+                                                <TableCell className="text-center px-6">
+                                                    {item.record.auditStatus === 'pending' ? (
+                                                        <div className="flex justify-center gap-3">
+                                                            <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد الخصم</Button>
+                                                        </div>
+                                                    ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2"><History className="h-3 w-3"/>تغيير القرار</Button>}
+                                                </TableCell>
+                                            </TableRow>
+                                        )})}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </TabsContent>
 
@@ -501,10 +628,30 @@ export function AttendanceUploader() {
                 </CardContent>
                 <CardFooter className="justify-end border-t p-8 bg-muted/10">
                     <div className="flex-1 text-xs text-muted-foreground font-bold pr-4 flex items-center gap-2"><Info className="h-4 w-4 text-primary" /> اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.</div>
-                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-12 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">{isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>} حفظ كافة البيانات</Button>
+                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-14 px-12 rounded-2xl font-black text-lg gap-2 shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white">{isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>} حفظ كافة البيانات</Button>
                 </CardFooter>
             </Card>
         </TabsContent>
+
+        <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+            <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogHeader>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><ShieldAlert className="h-10 w-10"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد تصفير بيانات الفترة؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-base font-medium leading-relaxed">
+                        أنت على وشك حذف جميع سجلات الحضور المعتمدة والمدققة لشهر <strong>{month}/{year}</strong> نهائياً. 
+                        <br/><br/>
+                        <span className="text-red-600 font-black underline">تحذير:</span> لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-6 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearData} disabled={isClearing} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg">
+                        {isClearing ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، قم بالتصفير الآن'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </Tabs>
   );
 }
