@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, orderBy, doc, getDocs, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, getDocs, serverTimestamp, runTransaction, writeBatch } from 'firebase/firestore';
 import type { Payslip, Employee, Account } from '@/lib/types';
 import {
   Table,
@@ -11,7 +11,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -75,6 +74,8 @@ export function PayslipsList() {
     const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
     const [searchQuery, setSearchQuery] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [payslips, setPayslips] = useState<Payslip[]>([]);
     const [loadingPayslips, setLoadingPayslips] = useState(false);
@@ -129,6 +130,32 @@ export function PayslipsList() {
             p.employeeName.toLowerCase().includes(lower)
         );
     }, [payslips, employees, searchQuery]);
+
+    const handleDeleteMonth = async () => {
+        if (!firestore) return;
+        setShowDeleteConfirm(false);
+        setIsDeleting(true);
+        try {
+            const snap = await getDocs(query(
+                collection(firestore, 'payroll'),
+                where('year', '==', parseInt(year)),
+                where('month', '==', parseInt(month))
+            ));
+            if (snap.empty) {
+                toast({ title: 'لا توجد كشوفات', description: 'لم يتم العثور على كشوفات لهذا الشهر.' });
+                return;
+            }
+            const batch = writeBatch(firestore);
+            snap.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+            setPayslips([]);
+            toast({ title: '✅ تم الحذف', description: `تم حذف ${snap.size} كشف راتب لشهر ${month}/${year}.` });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'خطأ في الحذف', description: e.message });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const handleConfirmAndPay = async () => {
         if (!firestore || !currentUser || sortedPayslips.length === 0) return;
@@ -258,6 +285,10 @@ export function PayslipsList() {
                             {loadingPayslips ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4" />}
                             تحميل الكشوفات
                         </Button>
+                       <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" disabled={isDeleting || loading || sortedPayslips.length === 0} className="h-11 rounded-xl border-red-300 text-red-700 hover:bg-red-50 font-bold gap-2">
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                            تراجع عن الشهر
+                        </Button>
                        <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="h-11 rounded-xl border-green-600 text-green-700 hover:bg-green-50 font-bold gap-2">
                             <Download className="h-4 w-4" /> تصدير Excel
                         </Button>
@@ -331,6 +362,35 @@ export function PayslipsList() {
                     </TableFooter>
                 </Table>
             </div>
+
+        {showDeleteConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">
+                <div className="bg-white rounded-3xl p-8 shadow-2xl max-w-sm w-full mx-4 space-y-6 animate-in zoom-in-95">
+                    <div className="flex items-center gap-3">
+                        <div className="p-3 bg-red-100 rounded-2xl">
+                            <Trash2 className="h-6 w-6 text-red-600"/>
+                        </div>
+                        <div>
+                            <h3 className="font-black text-lg">تراجع عن كشوف الرواتب</h3>
+                            <p className="text-xs text-muted-foreground font-bold">هذا الإجراء سيحذف الكشوفات المولّدة</p>
+                        </div>
+                    </div>
+                    <p className="text-sm font-bold text-gray-700 bg-red-50 p-4 rounded-2xl border border-red-100">
+                        هل أنت متأكد من حذف كشوفات رواتب شهر <span className="text-red-600 font-black">{month}/{year}</span>؟<br/>
+                        <span className="text-xs text-red-500 font-bold mt-1 block">ملاحظة: لن يُحذف القيد المحاسبي تلقائياً.</span>
+                    </p>
+                    <div className="flex gap-3">
+                        <Button onClick={() => setShowDeleteConfirm(false)} variant="outline" className="flex-1 rounded-xl font-bold">
+                            إلغاء
+                        </Button>
+                        <Button onClick={handleDeleteMonth} variant="destructive" className="flex-1 rounded-xl font-bold gap-2">
+                            <Trash2 className="h-4 w-4"/>
+                            نعم، احذف
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        )}
         </div>
     );
 }
