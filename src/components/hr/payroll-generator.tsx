@@ -82,7 +82,7 @@ export function PayrollGenerator() {
     const fetchEmployees = async () => {
         setEmployeesLoading(true);
         try {
-            const q = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+            const q = query(collection(firestore, 'employees'), where('status', 'in', ['active', 'on-leave']));
             const snap = await getDocs(q);
             setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
         } finally {
@@ -112,12 +112,9 @@ export function PayrollGenerator() {
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ في التحميل' });
     } finally {
-      setLoadingRefData(false);
       setAttLoading(false);
     }
   };
-
-  const [loadingRefData, setLoadingRefData] = useState(false);
 
   const handleDeleteMonth = async () => {
     if (!firestore) return;
@@ -358,20 +355,30 @@ export function PayrollGenerator() {
         await runTransaction(firestore, async (transaction) => {
             for (const emp of employees) {
                 const att = attendanceDocs.find(a => a.employeeId === emp.id);
-                if (!att) continue;
-
+                
+                // إذا لم يوجد سجل حضور لهذا الموظف، نتحقق من وجود إجازة معتمدة
                 const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
                 const dailyRate = fullSalary / 26;
+                let netSalary = fullSalary;
+                let deductionAmount = 0;
 
-                let totalDeductionDays = 0;
-                att.records?.forEach(r => {
-                    if (r.auditStatus !== 'waived') {
-                        totalDeductionDays += (r.manualDeductionDays || 0);
-                    }
-                });
-
-                const deductionAmount = totalDeductionDays * dailyRate;
-                const netSalary = Math.max(0, fullSalary - deductionAmount);
+                if (att) {
+                    let totalDeductionDays = 0;
+                    att.records?.forEach(r => {
+                        if (r.auditStatus !== 'waived') {
+                            totalDeductionDays += (r.manualDeductionDays || 0);
+                        }
+                    });
+                    deductionAmount = totalDeductionDays * dailyRate;
+                    netSalary = Math.max(0, fullSalary - deductionAmount);
+                } else if (emp.status === 'on-leave') {
+                    // إذا كان في إجازة وليس له سجل حضور، نفترض استحقاق الراتب كاملاً (أو حسب منطق الإجازات)
+                    netSalary = fullSalary; 
+                } else {
+                    // إذا لم يوجد حضور ولا إجازة وهو نشط، يعتبر غياباً كاملاً للشهر
+                    deductionAmount = fullSalary;
+                    netSalary = 0;
+                }
 
                 const payslipId = `${year}-${month}-${emp.id}`;
                 const pRef = doc(firestore, 'payroll', payslipId);
@@ -435,7 +442,6 @@ export function PayrollGenerator() {
                 </div>
               </div>
 
-              {/* الفريم الثالث: المراجعة */}
               {attendanceDocs.length > 0 && (
                 <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3">
                     <div className="flex items-center justify-between">
@@ -445,7 +451,6 @@ export function PayrollGenerator() {
                         {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
                     </div>
 
-                    {/* فريم ١: قرارات التدقيق */}
                     <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
                         <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
                             {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
@@ -458,7 +463,6 @@ export function PayrollGenerator() {
                         </Button>
                     </div>
 
-                    {/* فريم ٢: التصدير والحذف */}
                     <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
                         <div className="relative flex-1">
                             <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
