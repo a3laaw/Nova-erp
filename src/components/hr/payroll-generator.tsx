@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -8,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip } from '@/lib/types';
+import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip, LeaveRequest, PermissionRequest } from '@/lib/types';
 import { 
     RefreshCw, 
     Trash2, 
@@ -25,7 +24,8 @@ import {
     AlertTriangle,
     ShieldCheck,
     Ban,
-    Info
+    Info,
+    AlertCircle
 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -276,14 +276,14 @@ export function PayrollGenerator() {
         
         const records = snap.data().records.map((r: any) => {
             if (r.date.seconds === date.seconds) {
-                let manualDeduction = r.manualDeductionDays;
-                if (action === 'waive') manualDeduction = 0;
-                else if (action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                let manualدeduction = r.manualDeductionDays;
+                if (action === 'waive') manualدeduction = 0;
+                else if (action === 'reset') manualدeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
                 
                 return { 
                     ...r, 
                     auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), 
-                    manualDeductionDays: manualDeduction, 
+                    manualDeductionDays: manualدeduction, 
                     waivedBy: action === 'reset' ? null : currentUser.fullName, 
                     waivedAt: action === 'reset' ? null : new Date() 
                 };
@@ -442,8 +442,8 @@ export function PayrollGenerator() {
                         {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
                     </div>
 
-                    {/* الصف الأول: قرارات التدقيق */}
-                    <div className="flex gap-2">
+                    {/* فريم ١: قرارات التدقيق */}
+                    <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
                         <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
                             {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
                         </Button>
@@ -455,8 +455,8 @@ export function PayrollGenerator() {
                         </Button>
                     </div>
 
-                    {/* الصف الثاني: التصدير والحذف */}
-                    <div className="flex gap-2">
+                    {/* فريم ٢: التصدير والحذف */}
+                    <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
                         <div className="relative flex-1">
                             <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
                                 <FileText className="h-3 w-3"/> Excel ▾
