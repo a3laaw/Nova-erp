@@ -9,9 +9,9 @@ import {
   CardDescription, 
   CardFooter 
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 import { 
   Select, 
   SelectContent, 
@@ -19,7 +19,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip, LeaveRequest, PermissionRequest } from '@/lib/types';
@@ -38,6 +38,7 @@ import {
     History,
     AlertTriangle,
     ShieldCheck,
+    ShieldAlert,
     Ban,
     Info,
     AlertCircle
@@ -111,9 +112,12 @@ export function PayrollGenerator() {
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ في التحميل' });
     } finally {
+      setLoadingRefData(false);
       setAttLoading(false);
     }
   };
+
+  const [loadingRefData, setLoadingRefData] = useState(false);
 
   const handleDeleteMonth = async () => {
     if (!firestore) return;
@@ -281,27 +285,18 @@ export function PayrollGenerator() {
         const docRef = doc(firestore, 'attendance', docId);
         const snap = await getDoc(docRef);
         if (!snap.exists()) return;
-        
         const records = snap.data().records.map((r: any) => {
             if (r.date.seconds === date.seconds) {
                 let manualDeduction = r.manualDeductionDays;
                 if (action === 'waive') manualDeduction = 0;
                 else if (action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
-                
-                return { 
-                    ...r, 
-                    auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), 
-                    manualDeductionDays: manualDeduction, 
-                    waivedBy: action === 'reset' ? null : currentUser.fullName, 
-                    waivedAt: action === 'reset' ? null : new Date() 
-                };
+                return { ...r, auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), manualDeductionDays: manualDeduction, waivedBy: action === 'reset' ? null : currentUser.fullName, waivedAt: action === 'reset' ? null : new Date() };
             }
             return r;
         });
-        
         await updateDoc(docRef, { records, updatedAt: serverTimestamp() });
         setAttendanceDocs(prev => prev.map(doc => doc.id === docId ? { ...doc, records } : doc));
-        toast({ title: 'تم تحديث القرار' });
+        toast({ title: 'تم الحفظ' });
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); }
   };
 
@@ -423,7 +418,7 @@ export function PayrollGenerator() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 rounded-3xl border-2 border-primary/10 bg-primary/5 space-y-3 shadow-sm">
                 <span className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2">
                     <RefreshCw className="h-3 w-3"/> إدارة بيانات الحضور
@@ -442,7 +437,7 @@ export function PayrollGenerator() {
 
               {/* الفريم الثالث: المراجعة */}
               {attendanceDocs.length > 0 && (
-                <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-2">
+                <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                             <ShieldCheck className="h-3 w-3"/> قرارات التدقيق الجماعي
@@ -466,7 +461,7 @@ export function PayrollGenerator() {
                     {/* فريم ٢: التصدير والحذف */}
                     <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
                         <div className="relative flex-1">
-                            <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                            <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
                                 <FileText className="h-3 w-3"/> Excel ▾
                             </Button>
                             {showExcelMenu && (
