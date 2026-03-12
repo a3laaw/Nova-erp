@@ -126,7 +126,7 @@ export function AttendanceUploader() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
-  const [isSavingData, setIsSavingData] = useState(false);
+  const [isSavingData, setIsSaving] = useState(false);
   const [mappingSearch, setMappingSearch] = useState('');
 
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
@@ -374,6 +374,9 @@ export function AttendanceUploader() {
         await batch.commit();
         toast({ title: 'نجاح التوليد', description: 'تم إنشاء سجلات الحضور والملخصات الإحصائية بنجاح.' });
         setFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         fetchAttendance();
       } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ في الملف', description: error.message }); } finally { setIsProcessing(false); }
     };
@@ -488,7 +491,7 @@ export function AttendanceUploader() {
         toast({ title: 'نجاح الإجراء الجماعي', description: action === 'reset' ? 'تمت إعادة تعيين جميع المخالفات.' : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات.` });
         fetchAttendance();
     } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تنفيذ الإجراء الجماعي.' });
+        toast({ variant: 'destructive', title: 'خطأ في الإجراء الجماعي.' });
     } finally {
         setIsBulkProcessing(false);
     }
@@ -723,7 +726,7 @@ export function AttendanceUploader() {
                 </CardContent>
                 <CardFooter className="justify-end border-t p-8 bg-muted/10">
                     <div className="flex-1 text-xs text-muted-foreground font-bold pr-4 flex items-center gap-2"><Info className="h-4 w-4 text-primary" /> اترك حقول الوقت فارغة إذا كان الموظف يتبع الدوام الرسمي الكامل للمكتب.</div>
-                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-14 px-12 rounded-2xl font-black text-lg gap-2 shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white">{isSavingData ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5"/>} حفظ كافة البيانات</Button>
+                    <Button onClick={handleSaveMappingData} disabled={isSavingData} className="h-14 px-12 rounded-2xl font-black text-lg gap-2 shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white">{isSavingData ? <Loader2 className="h-5 w-5"/> : <Save className="h-5 w-5"/>} حفظ كافة البيانات</Button>
                 </CardFooter>
             </Card>
         </TabsContent>
