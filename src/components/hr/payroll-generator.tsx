@@ -32,7 +32,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles, FileSpreadsheet, Fingerprint, Save, Search, UserCheck, Clock, BadgeInfo, X, AlertCircle, CalendarRange } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -126,6 +126,7 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isGenerated, setIsGenerated] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [attLoading, setAttLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -168,6 +169,11 @@ export function PayrollGenerator() {
         setEditableData(data);
     }
   }, [employees]);
+
+  useEffect(() => {
+    setAttendanceDocs([]);
+    setIsGenerated(false);
+  }, [year, month]);
 
   const fetchAttendance = async () => {
     if (!firestore) return;
@@ -484,6 +490,7 @@ export function PayrollGenerator() {
             }
         });
         toast({ title: 'تم توليد الرواتب' });
+        setIsGenerated(true);
         setShowGenerateConfirm(false);
     } finally { setIsProcessing(false); }
   };
@@ -707,7 +714,7 @@ export function PayrollGenerator() {
                                 <Table>
                                     <TableHeader className="bg-muted/50 h-16">
                                         <TableRow className="border-none">
-                                            <TableHead className="px-10 font-black text-[#7209B7]">رقم الملف</TableHead>
+                                            <TableHead className="px-10 font-black text-[#7209B7]">الرقم الوظيفي</TableHead>
                                             <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
                                             <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
                                             <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
@@ -761,7 +768,6 @@ export function PayrollGenerator() {
                                             <TableHead className="text-center font-black">أيام الحضور</TableHead>
                                             <TableHead className="text-center font-black">أيام الغياب</TableHead>
                                             <TableHead className="text-center font-black">عدد التأخيرات</TableHead>
-                                            <TableHead className="text-center font-black">إجمالي الخصم</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -770,7 +776,6 @@ export function PayrollGenerator() {
                                             const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
                                             const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
                                             const lateDays = doc.summary?.lateDays ?? doc.records?.filter(r => r.status === 'late').length;
-                                            const totalDeductions = doc.records?.reduce((sum, r) => sum + (r.auditStatus !== 'waived' ? (r.manualDeductionDays || 0) : 0), 0);
                                             return (
                                                 <TableRow key={doc.id} className="h-16 border-b">
                                                     <TableCell className="px-10 font-mono font-bold">{emp?.employeeNumber || '---'}</TableCell>
@@ -779,7 +784,6 @@ export function PayrollGenerator() {
                                                     <TableCell className="text-center font-mono">{presentDays}</TableCell>
                                                     <TableCell className="text-center font-mono text-red-600">{absentDays}</TableCell>
                                                     <TableCell className="text-center font-mono text-orange-600">{lateDays}</TableCell>
-                                                    <TableCell className="text-center font-mono font-black text-red-700">{totalDeductions} يوم</TableCell>
                                                 </TableRow>
                                             );
                                         })}
@@ -795,7 +799,7 @@ export function PayrollGenerator() {
         <div className="no-print pt-10 border-t flex justify-center pb-20">
             <Button 
                 onClick={() => setShowGenerateConfirm(true)} 
-                disabled={isProcessing || pendingCount > 0 || attendanceDocs.length === 0 || isMonthPaid} 
+                disabled={isProcessing || isGenerated || pendingCount > 0 || attendanceDocs.length === 0 || isMonthPaid} 
                 className={cn(
                     "h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 gap-4 min-w-[350px] active:translate-y-1 transition-all",
                     isMonthPaid ? "bg-green-600 hover:bg-green-700 cursor-not-allowed opacity-90" : "bg-primary text-white hover:bg-primary/90"
@@ -844,7 +848,7 @@ export function PayrollGenerator() {
                 <AlertDialogFooter className="mt-6 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
                     <AlertDialogAction onClick={handleDeleteMonth} disabled={attLoading} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg">
-                        {attLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، قم بالتصفير الآن'}
+                        {attLoading ? <Loader2 className="animate-spin h-4 w-4 animate-spin"/> : 'نعم، قم بالتصفير الآن'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
