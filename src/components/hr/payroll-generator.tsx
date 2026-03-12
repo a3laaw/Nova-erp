@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -24,7 +23,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, FileText, Ban, History, AlertCircle, XCircle, CalendarCheck, ShieldAlert, Banknote } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, FileText, Ban, History, AlertCircle, XCircle, CalendarCheck, ShieldAlert, Banknote, RefreshCw } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -485,6 +484,7 @@ export function PayrollGenerator() {
                         {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
                     </div>
 
+                    {/* فريم ١: قرارات التدقيق */}
                     <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
                         <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
                             {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
@@ -497,6 +497,7 @@ export function PayrollGenerator() {
                         </Button>
                     </div>
 
+                    {/* فريم ٢: التصدير والحذف */}
                     <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
                         <div className="relative flex-1">
                             <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
@@ -515,7 +516,7 @@ export function PayrollGenerator() {
                         </div>
 
                         <div className="relative flex-1">
-                            <Button onClick={() => { setShowPrintMenu(v => !v); setShowExcelMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                            <Button onClick={() => { setShowPrintMenu(v => !v); setShowExcelMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
                                 <Printer className="h-3 w-3"/> طباعة ▾
                             </Button>
                             {showPrintMenu && (
@@ -543,6 +544,7 @@ export function PayrollGenerator() {
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                        {/* Right Section: Title (RTL) */}
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
@@ -555,6 +557,7 @@ export function PayrollGenerator() {
                             </CardDescription>
                         </div>
 
+                        {/* Left Section: Context Box (RTL) */}
                         <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1" dir="rtl">
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center px-4">
