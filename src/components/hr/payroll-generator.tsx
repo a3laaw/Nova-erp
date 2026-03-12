@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Card, 
   CardHeader, 
@@ -20,18 +20,13 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from '@/components/ui/tabs';
-import { 
   Table, 
   TableBody, 
   TableCell, 
   TableHead, 
   TableHeader, 
-  TableRow 
+  TableRow,
+  TableFooter
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -48,72 +43,25 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, ListFilter, LayoutList, ChevronDown } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
-import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cleanFirestoreData, cn } from '@/lib/utils';
+import { cleanFirestoreData, cn, formatCurrency } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-
-const dayNameToIndex: Record<string, number> = {
-  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-  'Thursday': 4, 'Friday': 5, 'Saturday': 6
-};
-
-const leaveTypeTranslations: Record<string, string> = {
-    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
-};
-
-const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
-    if (val === undefined || val === null || val === '') return null;
-    
-    let parsedDate: Date | null = null;
-    let timeStr = "00:00";
-
-    if (typeof val === 'number') {
-        try {
-            const excelDate = XLSX.SSF.parse_date_code(val);
-            if (excelDate.y < 2000) return null;
-            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
-            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
-        } catch { return null; }
-    } 
-    else if (typeof val === 'string') {
-        const cleaned = val.trim();
-        const dateMatch = cleaned.match(/(\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4})/);
-        const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
-
-        if (dateMatch) {
-            const dateStr = dateMatch[0];
-            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'];
-            for (const fmt of formats) {
-                const p = parse(dateStr, fmt, new Date());
-                if (isValid(p)) {
-                    if (p.getFullYear() < 2000) break;
-                    parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
-                    break;
-                }
-            }
-        }
-
-        if (timeMatch) {
-            const tStr = timeMatch[0].toUpperCase();
-            const tp = parse(tStr, tStr.includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
-            if (isValid(tp)) timeStr = format(tp, 'HH:mm');
-        }
-    }
-
-    if (parsedDate && isValid(parsedDate)) {
-        return { date: parsedDate, timeStr };
-    }
-    return null;
-};
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -126,8 +74,6 @@ export function PayrollGenerator() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   
-  const [showExcelMenu, setShowExcelMenu] = useState(false);
-  const [showPrintMenu, setShowPrintMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -161,11 +107,8 @@ export function PayrollGenerator() {
       ));
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance));
       setAttendanceDocs(data);
-      
       if (snap.empty) {
           toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على سجلات حضور للشهر المختار.' });
-      } else {
-          toast({ title: 'تم التحميل', description: `تم جلب ${data.length} ملف حضور للمراجعة.` });
       }
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ في التحميل' });
@@ -184,36 +127,16 @@ export function PayrollGenerator() {
         where('year', '==', parseInt(year)),
         where('month', '==', parseInt(month))
       ));
-      
-      if (snap.empty) {
-        toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على سجلات لهذا الشهر.' });
-        setAttendanceDocs([]);
-        return;
-      }
-
-      const chunks = [];
-      const docs = snap.docs;
-      for (let i = 0; i < docs.length; i += 490) {
-        chunks.push(docs.slice(i, i + 490));
-      }
-
-      for (const chunk of chunks) {
-        const batch = writeBatch(firestore);
-        chunk.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-      }
-      
+      if (snap.empty) return;
+      const batch = writeBatch(firestore);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
       setAttendanceDocs([]);
-      toast({ title: '✅ تم الحذف', description: `تم تطهير ${snap.size} سجل لشهر ${month}/${year} بنجاح.` });
-    } catch (e: any) {
-      console.error('Delete error:', e);
-      toast({ variant: 'destructive', title: 'خطأ في الحذف', description: e.message });
+      toast({ title: '✅ تم الحذف', description: `تم تصفير سجلات شهر ${month}/${year}.` });
     } finally {
       setAttLoading(false);
     }
   };
-
-  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
@@ -228,7 +151,6 @@ export function PayrollGenerator() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
-            
             if (r.status !== 'present') {
                 list.push({ 
                     docId: attendanceDoc.id!, 
@@ -253,7 +175,13 @@ export function PayrollGenerator() {
                 let manualDeduction = r.manualDeductionDays;
                 if (action === 'waive') manualDeduction = 0;
                 else if (action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
-                return { ...r, auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), manualDeductionDays: manualDeduction, waivedBy: action === 'reset' ? null : currentUser.fullName, waivedAt: action === 'reset' ? null : new Date() };
+                return { 
+                    ...r, 
+                    auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), 
+                    manualDeductionDays: manualDeduction, 
+                    waivedBy: action === 'reset' ? null : currentUser.fullName, 
+                    waivedAt: action === 'reset' ? null : new Date() 
+                };
             }
             return r;
         });
@@ -265,50 +193,30 @@ export function PayrollGenerator() {
 
   const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser || anomalies.length === 0) return;
-    const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
-    if (targets.length === 0 && action !== 'reset') return;
-
     setIsBulkProcessing(true);
     try {
         const batch = writeBatch(firestore);
         const updatedDocIds = new Set(anomalies.map(a => a.docId));
-        
         for (const docId of Array.from(updatedDocIds)) {
             const docRef = doc(firestore, 'attendance', docId);
             const currentDoc = attendanceDocs.find(d => d.id === docId);
             if (!currentDoc) continue;
-
             const updatedRecords = currentDoc.records.map(r => {
-                const isTargetAnomaly = anomalies.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
-                if (isTargetAnomaly) {
+                const isTarget = anomalies.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
+                if (isTarget) {
                     let manualDeduction = r.manualDeductionDays;
                     if (action === 'waive') manualDeduction = 0;
-                    else if (action === 'apply' || action === 'reset') {
-                        manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
-                    }
-
-                    return {
-                        ...r,
-                        auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'),
-                        manualDeductionDays: manualDeduction,
-                        waivedBy: action === 'reset' ? null : currentUser.fullName,
-                        waivedAt: action === 'reset' ? null : new Date()
-                    };
+                    else if (action === 'apply' || action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                    return { ...r, auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), manualDeductionDays: manualDeduction, waivedBy: action === 'reset' ? null : currentUser.fullName, waivedAt: action === 'reset' ? null : new Date() };
                 }
                 return r;
             });
-
             batch.update(docRef, { records: updatedRecords, updatedAt: serverTimestamp() });
         }
-
         await batch.commit();
-        toast({ title: 'نجاح الإجراء الجماعي', description: action === 'reset' ? 'تمت إعادة تعيين جميع المخالفات.' : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات.` });
+        toast({ title: 'نجاح الإجراء الجماعي' });
         fetchAttendance();
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ في الإجراء الجماعي.' });
-    } finally {
-        setIsBulkProcessing(false);
-    }
+    } finally { setIsBulkProcessing(false); }
   };
 
   const handleGeneratePayroll = async () => {
@@ -322,66 +230,61 @@ export function PayrollGenerator() {
                 const dailyRate = fullSalary / 26;
                 let netSalary = fullSalary;
                 let deductionAmount = 0;
-
                 if (att) {
                     let totalDeductionDays = 0;
-                    att.records?.forEach(r => {
-                        if (r.auditStatus !== 'waived') {
-                            totalDeductionDays += (r.manualDeductionDays || 0);
-                        }
-                    });
+                    att.records?.forEach(r => { if (r.auditStatus !== 'waived') totalDeductionDays += (r.manualDeductionDays || 0); });
                     deductionAmount = totalDeductionDays * dailyRate;
                     netSalary = Math.max(0, fullSalary - deductionAmount);
-                } else if (emp.status === 'on-leave') {
-                    netSalary = fullSalary; 
-                } else {
-                    deductionAmount = fullSalary;
-                    netSalary = 0;
+                } else if (emp.status !== 'on-leave') {
+                    deductionAmount = fullSalary; netSalary = 0;
                 }
-
-                const payslipId = `${year}-${month}-${emp.id}`;
-                const pRef = doc(firestore, 'payroll', payslipId);
-                
-                transaction.set(pRef, cleanFirestoreData({
-                    employeeId: emp.id, 
-                    employeeName: emp.fullName, 
-                    year: parseInt(year), 
-                    month: parseInt(month),
-                    earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 },
-                    deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 },
-                    netSalary, 
-                    status: 'draft', 
-                    type: 'Monthly', 
-                    createdAt: serverTimestamp(), 
-                    createdBy: currentUser.id
-                }), { merge: true });
+                const pRef = doc(firestore, 'payroll', `${year}-${month}-${emp.id}`);
+                transaction.set(pRef, cleanFirestoreData({ employeeId: emp.id, employeeName: emp.fullName, year: parseInt(year), month: parseInt(month), earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 }, deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 }, netSalary, status: 'draft', type: 'Monthly', createdAt: serverTimestamp(), createdBy: currentUser.id }), { merge: true });
             }
         });
-        toast({ title: 'تم توليد الرواتب', description: 'مسودة الرواتب جاهزة الآن للمراجعة المالية.' });
-    } catch (e) { toast({ variant: 'destructive', title: 'خطأ في التوليد' }); }
-    finally { setIsProcessing(false); }
+        toast({ title: 'تم توليد الرواتب' });
+    } finally { setIsProcessing(false); }
+  };
+
+  // --- دوال التصدير المحدثة ---
+
+  const handleExportTotalsExcel = () => {
+    if (attendanceDocs.length === 0) return;
+    const data = attendanceDocs.map(doc => {
+        const emp = employees.find(e => e.id === doc.employeeId);
+        return {
+            'الرقم الوظيفي': emp?.employeeNumber || '---',
+            'اسم الموظف': emp?.fullName || 'غير معروف',
+            'القسم': emp?.department || '-',
+            'أيام الحضور': doc.summary?.presentDays || 0,
+            'أيام الغياب': doc.summary?.absentDays || 0,
+            'أيام الإجازة': doc.summary?.leaveDays || 0,
+            'عدد التأخيرات': doc.summary?.lateDays || 0
+        };
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "اجماليات الحضور");
+    XLSX.writeFile(wb, `اجماليات_الحضور_${month}_${year}.xlsx`);
   };
 
   const handleExportDetailedExcel = () => {
-    if (anomalies.length === 0) {
-        toast({ title: 'لا توجد مخالفات لتصديرها' });
-        return;
-    }
+    if (anomalies.length === 0) return;
     const data = anomalies.map(a => ({
-        'الموظف': a.empName,
-        'رقم البصمة': a.employeeNumber,
+        'الرقم الوظيفي': a.employeeNumber,
+        'اسم الموظف': a.empName,
         'التاريخ': format(toFirestoreDate(a.record.date)!, 'yyyy-MM-dd'),
-        'الحالة': a.record.status === 'absent' ? 'غياب' : 'تأخير/نقص بصمة',
-        'المخالفة': a.record.anomalyDescription,
-        'الخصم المعتمد (أيام)': a.record.manualDeductionDays,
+        'نوع المخالفة': a.record.anomalyDescription,
+        'الخصم (أيام)': a.record.manualDeductionDays,
         'حالة التدقيق': a.record.auditStatus === 'verified' ? 'معتمد' : a.record.auditStatus === 'waived' ? 'متغاضى عنه' : 'قيد المراجعة'
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "سجل المخالفات");
-    XLSX.writeFile(wb, `سجل_مخالفات_${month}_${year}.xlsx`);
-    setShowExcelMenu(false);
+    XLSX.writeFile(wb, `تفاصيل_المخالفات_${month}_${year}.xlsx`);
   };
+
+  const handlePrintAudit = () => window.print();
 
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
 
@@ -410,11 +313,7 @@ export function PayrollGenerator() {
                     <RefreshCw className="h-3 w-3"/> إدارة بيانات الحضور
                 </span>
                 <div className="flex gap-2">
-                    <Button
-                        onClick={fetchAttendance}
-                        disabled={attLoading}
-                        className="flex-1 h-10 rounded-xl font-bold text-xs bg-primary hover:bg-primary/90 gap-2 shadow-md active:translate-y-0.5 transition-all"
-                    >
+                    <Button onClick={fetchAttendance} disabled={attLoading} className="flex-1 h-10 rounded-xl font-bold text-xs bg-primary hover:bg-primary/90 gap-2 shadow-md active:translate-y-0.5 transition-all">
                         {attLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
                         تحميل البيانات
                     </Button>
@@ -463,17 +362,39 @@ export function PayrollGenerator() {
                         </div>
 
                         <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1" dir="rtl">
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center px-4">
-                                    <button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"><CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل</button>
-                                    <button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"><XCircle className="h-4 w-4" /> خصم للكل</button>
-                                    <button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"><RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> إعادة تعيين</button>
-                                </div>
-                                <Separator className="bg-white/10" />
-                                <div className="flex justify-center gap-16 px-4">
-                                    <button onClick={handleExportDetailedExcel} disabled={attendanceDocs.length === 0} className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"><FileDown className="h-4 w-4" /> تصدير Excel</button>
-                                    <button onClick={() => setShowDeleteConfirm(true)} disabled={attLoading || attendanceDocs.length === 0} className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"><Trash2 className="h-4 w-4" /> تصفير الداتا</button>
-                                </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="bg-white/10 border-white/20 text-white font-black h-11 rounded-xl gap-2 hover:bg-white/20">
+                                            <FileDown className="h-4 w-4 text-green-400" /> تصدير Excel <ChevronDown className="h-3 w-3 opacity-50"/>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
+                                        <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
+                                            <LayoutList className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={handleExportDetailedExcel} className="py-3 font-bold gap-2">
+                                            <ListFilter className="h-4 w-4 text-green-600" /> سجل المخالفات التفصيلي
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="bg-white/10 border-white/20 text-white font-black h-11 rounded-xl gap-2 hover:bg-white/20">
+                                            <Printer className="h-4 w-4 text-blue-400" /> طباعة التقارير <ChevronDown className="h-3 w-3 opacity-50"/>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
+                                        <DropdownMenuItem onClick={handlePrintAudit} className="py-3 font-bold gap-2">
+                                            <FileText className="h-4 w-4 text-primary" /> سجل التدقيق الحالي
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)} className="py-3 font-bold gap-2 text-red-600">
+                                            <Trash2 className="h-4 w-4" /> تصفير بيانات الفترة
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </div>
                         </div>
                     </div>
@@ -495,7 +416,8 @@ export function PayrollGenerator() {
                             <Table>
                                 <TableHeader className="bg-muted/50 h-16">
                                     <TableRow className="border-none">
-                                        <TableHead className="px-10 font-black text-[#7209B7]">الموظف</TableHead>
+                                        <TableHead className="px-10 font-black text-[#7209B7]">رقم الملف</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
                                         <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
                                         <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
                                         <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
@@ -505,14 +427,15 @@ export function PayrollGenerator() {
                                 </TableHeader>
                                 <TableBody>
                                     {anomalies.length === 0 ? (
-                                        <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={7} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
                                     ) : anomalies.map((item, idx) => {
                                         const isAbsent = item.record.status === 'absent';
                                         const isConflict = item.record.anomalyDescription?.includes('تعارض');
                                         const recordDate = toFirestoreDate(item.record.date);
                                         return (
                                         <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isConflict ? "bg-amber-50/50" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                            <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-lg text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                            <TableCell className="px-10 font-mono font-bold opacity-60 text-xs">{item.employeeNumber}</TableCell>
+                                            <TableCell className="font-black text-lg text-gray-800">{item.empName}</TableCell>
                                             <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col gap-1">
@@ -530,7 +453,7 @@ export function PayrollGenerator() {
                                                 {item.record.auditStatus === 'pending' ? (
                                                     <div className="flex justify-center gap-3">
                                                         <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                                        <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد الخصم</Button>
+                                                        <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد</Button>
                                                     </div>
                                                 ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2"><History className="h-3 w-3"/>تغيير القرار</Button>}
                                             </TableCell>
