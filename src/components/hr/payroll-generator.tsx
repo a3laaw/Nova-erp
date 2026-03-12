@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,7 +24,8 @@ import {
     History,
     AlertTriangle,
     ShieldCheck,
-    Ban
+    Ban,
+    Info
 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -36,6 +38,7 @@ import * as XLSX from 'xlsx';
 import { useBranding } from '@/context/branding-context';
 import { Separator } from '@/components/ui/separator';
 import { Logo } from '../layout/logo';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 
 const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
@@ -52,6 +55,10 @@ export function PayrollGenerator() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [isExportingSummary, setIsExportingSummary] = useState(false);
+  
+  const [showExcelMenu, setShowExcelMenu] = useState(false);
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
@@ -99,7 +106,7 @@ export function PayrollGenerator() {
 
   const handleDeleteMonth = async () => {
     if (!firestore) return;
-    
+    setShowDeleteConfirm(false);
     setAttLoading(true);
     try {
       const snap = await getDocs(query(
@@ -203,6 +210,27 @@ export function PayrollGenerator() {
     }).filter(Boolean);
   }, [employees, attendanceDocs]);
 
+  const handleExportDetailedExcel = () => {
+    if (anomalies.length === 0) {
+        toast({ title: 'لا توجد مخالفات لتصديرها' });
+        return;
+    }
+    const data = anomalies.map(a => ({
+        'الموظف': a.empName,
+        'رقم البصمة': a.employeeNumber,
+        'التاريخ': format(toFirestoreDate(a.record.date)!, 'yyyy-MM-dd'),
+        'الحالة': a.record.status === 'absent' ? 'غياب' : 'تأخير/نقص بصمة',
+        'المخالفة': a.record.anomalyDescription,
+        'الخصم المعتمد (أيام)': a.record.manualDeductionDays,
+        'حالة التدقيق': a.record.auditStatus === 'verified' ? 'معتمد' : a.record.auditStatus === 'waived' ? 'متغاضى عنه' : 'قيد المراجعة'
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "سجل المخالفات");
+    XLSX.writeFile(wb, `سجل_مخالفات_${month}_${year}.xlsx`);
+    setShowExcelMenu(false);
+  };
+
   const handleExportExcel = useCallback(() => {
     if (summaryData.length === 0) {
         toast({ title: 'لا توجد بيانات', description: 'يرجى تحميل البيانات أولاً.' });
@@ -231,7 +259,10 @@ export function PayrollGenerator() {
     }
     setIsExportingSummary(true);
     setTimeout(() => {
-        window.print();
+        const element = document.getElementById('summary-printable-area');
+        if (element) {
+            window.print();
+        }
         setIsExportingSummary(false);
     }, 500);
   }, [summaryData]);
@@ -269,12 +300,12 @@ export function PayrollGenerator() {
   const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser || anomalies.length === 0) return;
     const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
-    if (targets.length === 0) return;
+    if (targets.length === 0 && action !== 'reset') return;
 
     setIsBulkProcessing(true);
     try {
         const batch = writeBatch(firestore);
-        const updatedDocIds = new Set(targets.map(a => a.docId));
+        const updatedDocIds = new Set(anomalies.map(a => a.docId));
         
         for (const docId of Array.from(updatedDocIds)) {
             const docRef = doc(firestore, 'attendance', docId);
@@ -282,10 +313,13 @@ export function PayrollGenerator() {
             if (!currentDoc) continue;
 
             const updatedRecords = currentDoc.records.map(r => {
-                const isTargetAnomaly = targets.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
+                const isTargetAnomaly = anomalies.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
                 if (isTargetAnomaly) {
                     let manualDeduction = r.manualDeductionDays;
                     if (action === 'waive') manualDeduction = 0;
+                    else if (action === 'apply') {
+                        manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                    }
                     else if (action === 'reset') {
                         manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
                     }
@@ -382,9 +416,9 @@ export function PayrollGenerator() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="p-4 rounded-3xl border-2 border-red-100 bg-red-50/30 space-y-3 shadow-[0_4px_0_0_rgba(239,68,68,0.1)]">
-                <span className="text-[10px] font-black text-red-700 uppercase tracking-widest flex items-center gap-2">
-                    <RotateCcw className="h-3 w-3"/> إدارة سجلات الشهر
+              <div className="p-4 rounded-3xl border-2 border-primary/10 bg-primary/5 space-y-3 shadow-sm">
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2">
+                    <RefreshCw className="h-3 w-3"/> إدارة بيانات الحضور
                 </span>
                 <div className="flex gap-2">
                     <Button
@@ -395,58 +429,68 @@ export function PayrollGenerator() {
                         {attLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : <RefreshCw className="h-4 w-4"/>}
                         تحميل البيانات
                     </Button>
-                    <Button
-                        onClick={handleDeleteMonth}
-                        disabled={attLoading || attendanceDocs.length === 0}
-                        variant="destructive"
-                        className="flex-1 h-10 rounded-xl font-bold text-xs gap-2 shadow-md active:translate-y-0.5 transition-all"
-                    >
-                        <Trash2 className="h-4 w-4"/>
-                        حذف بيانات الشهر
-                    </Button>
                 </div>
               </div>
 
-              <div className="p-4 rounded-3xl border-2 border-green-100 bg-green-50/30 space-y-3 shadow-[0_4px_0_0_rgba(34,197,94,0.1)]">
-                <span className="text-[10px] font-black text-green-700 uppercase tracking-widest flex items-center gap-2">
-                    <FileDown className="h-3 w-3"/> أدوات استخراج التقارير
-                </span>
-                <div className="flex gap-2">
-                    <Button
-                        onClick={handleExportExcel}
-                        disabled={attendanceDocs.length === 0}
-                        variant="outline"
-                        className="flex-1 h-10 rounded-xl font-bold text-xs border-green-300 text-green-700 hover:bg-green-100 gap-2"
-                    >
-                        <FileText className="h-4 w-4"/>
-                        كشف Excel
-                    </Button>
-                    <Button
-                        onClick={handleExportSummaryPDF}
-                        disabled={attendanceDocs.length === 0}
-                        variant="outline"
-                        className="flex-1 h-10 rounded-xl font-bold text-xs border-green-300 text-green-700 hover:bg-green-100 gap-2"
-                    >
-                        <Printer className="h-4 w-4"/>
-                        طباعة PDF
-                    </Button>
-                </div>
-              </div>
-
+              {/* الفريم الثالث: المراجعة */}
               {attendanceDocs.length > 0 && (
-                <div className="p-4 rounded-3xl border-2 border-purple-100 bg-purple-50/30 space-y-3 shadow-[0_4px_0_0_rgba(168,85,247,0.1)] animate-in fade-in zoom-in-95">
-                    <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest flex items-center gap-2">
+                <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                             <ShieldCheck className="h-3 w-3"/> قرارات التدقيق الجماعي
                         </span>
-                        {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4">{pendingCount} معلق</Badge>}
+                        {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
                     </div>
+
+                    {/* الصف الأول: قرارات التدقيق */}
                     <div className="flex gap-2">
-                        <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-purple-300 text-purple-700 hover:bg-purple-100 gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي للكل
+                        <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
                         </Button>
-                        <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-100 gap-1">
+                        <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
                             {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <XCircle className="h-3 w-3"/>} خصم للكل
+                        </Button>
+                        <Button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-muted text-muted-foreground hover:bg-muted gap-1">
+                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3"/>} إعادة تعيين
+                        </Button>
+                    </div>
+
+                    {/* الصف الثاني: التصدير والحذف */}
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                                <FileText className="h-3 w-3"/> Excel ▾
+                            </Button>
+                            {showExcelMenu && (
+                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
+                                    <button onClick={handleExportDetailedExcel} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
+                                        <FileText className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
+                                    </button>
+                                    <button onClick={() => { handleExportExcel(); setShowExcelMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
+                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="relative flex-1">
+                            <Button onClick={() => { setShowPrintMenu(v => !v); setShowExcelMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                                <Printer className="h-3 w-3"/> طباعة ▾
+                            </Button>
+                            {showPrintMenu && (
+                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
+                                    <button onClick={() => { setShowPrintMenu(false); window.print(); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
+                                        <Printer className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
+                                    </button>
+                                    <button onClick={() => { handleExportSummaryPDF(); setShowPrintMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
+                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <Button onClick={() => setShowDeleteConfirm(true)} disabled={attLoading || attendanceDocs.length === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-200 text-red-600 hover:bg-red-50 gap-1">
+                            <Trash2 className="h-3 w-3"/> تصفير الداتا
                         </Button>
                     </div>
                 </div>
@@ -582,6 +626,26 @@ export function PayrollGenerator() {
                 </div>
             )}
         </div>
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogHeader>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldCheck className="h-10 w-10"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد تصفير بيانات الفترة؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-base font-medium leading-relaxed">
+                        أنت على وشك حذف جميع سجلات الحضور المعتمدة والمدققة لشهر <strong>{month}/{year}</strong> نهائياً. 
+                        <br/><br/>
+                        <span className="text-red-600 font-black underline">تحذير:</span> لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-6 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteMonth} disabled={attLoading} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg">
+                        {attLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، قم بالتصفير الآن'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }
