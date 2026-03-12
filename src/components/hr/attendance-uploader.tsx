@@ -126,6 +126,8 @@ export function AttendanceUploader() {
   const [isSavingData, setIsSavingData] = useState(false);
   const [mappingSearch, setMappingSearch] = useState('');
 
+  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+
   useEffect(() => {
     if (employees.length > 0) {
         const data: Record<string, any> = {};
@@ -209,7 +211,7 @@ export function AttendanceUploader() {
                     oldSnap.forEach(d => batch.delete(d.ref));
                 }
 
-                // ✨ الأتمتة: معالجة كافة الموظفين النشطين (وليس فقط من في الإكسل)
+                // ✨ الأتمتة الشاملة: معالجة كافة الموظفين النشطين (وليس فقط من في الإكسل)
                 for (const emp of employees) {
                     const employeeRecords: AttendanceRecord[] = [];
                     for (const day of workingDaysInMonth) {
@@ -234,8 +236,11 @@ export function AttendanceUploader() {
                                 } else {
                                     const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
                                     if (sortedTimes[0] > startTimeLimit) {
+                                        // ✨ معالجة الاستئذان المعتمد آلياً
                                         if (activePermission?.type === 'late_arrival') {
                                             anomaly = 'تأخير مسموح (إذن تأخير)';
+                                            auditStatus = 'verified';
+                                            status = 'present';
                                         } else {
                                             status = 'late';
                                             anomaly = `تأخير عن (${startTimeLimit})`;
@@ -290,7 +295,7 @@ export function AttendanceUploader() {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                 await processAttendanceLogic(json);
-                toast({ title: 'نجاح المعالجة', description: 'تم دمج البصمات مع الإجازات المعتمدة آلياً.' });
+                toast({ title: 'نجاح المعالجة', description: 'تم دمج البصمات مع الإجازات والاستئذانات آلياً.' });
                 setFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             } catch (err: any) {
@@ -301,10 +306,10 @@ export function AttendanceUploader() {
         };
         reader.readAsBinaryString(file);
     } else {
-        // إذا لم يوجد ملف، نقوم بمزامنة الإجازات فقط لكافة الموظفين
+        // مزامنة الإجازات والاستئذانات فقط
         try {
             await processAttendanceLogic([]);
-            toast({ title: 'نجاح المزامنة', description: 'تم تحديث سجلات الإجازات المعتمدة لكافة الموظفين.' });
+            toast({ title: 'نجاح المزامنة', description: 'تم تحديث سجلات الإجازات والاستئذانات المعتمدة آلياً.' });
         } catch (err: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: err.message });
         } finally {
@@ -355,8 +360,6 @@ export function AttendanceUploader() {
         setIsSavingData(false);
     }
   };
-
-  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
   const filteredEmployees = useMemo(() => {
     if (!mappingSearch) return employees;
@@ -450,7 +453,7 @@ export function AttendanceUploader() {
                                 </div>
                                 <div>
                                     <Label className="font-black text-base text-blue-900">الرقابة الآلية نشطة</Label>
-                                    <p className="text-[10px] text-blue-700 font-medium">سيقوم النظام بدمج الإجازات المعتمدة آلياً أثناء المعالجة.</p>
+                                    <p className="text-[10px] text-blue-700 font-medium">سيقوم النظام بدمج الإجازات والاستئذانات آلياً أثناء المعالجة.</p>
                                 </div>
                             </div>
                         </div>
@@ -469,7 +472,7 @@ export function AttendanceUploader() {
                         <div className="flex flex-col items-center gap-4">
                             <Button onClick={handleUpload} disabled={isProcessing} className="h-12 px-12 rounded-2xl font-black text-lg shadow-[0_4px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white hover:bg-primary/90 gap-3 min-w-[320px] transition-all">
                                 {isProcessing ? <Loader2 className="animate-spin h-5 w-5"/> : <RotateCcw className="h-5 w-5"/>} 
-                                {file ? "بدء التحليل والمعالجة" : "مزامنة الإجازات فقط (بدون ملف)"}
+                                {file ? "بدء التحليل والمعالجة" : "مزامنة الإعذار فقط (بدون ملف)"}
                             </Button>
                             {!file && (
                                 <p className="text-[10px] text-muted-foreground font-bold flex items-center gap-1">
