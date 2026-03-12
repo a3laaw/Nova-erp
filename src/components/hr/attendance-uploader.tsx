@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History, AlertCircle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -159,6 +159,7 @@ export function AttendanceUploader() {
     } catch (e) {
       console.error(e);
     } finally {
+      setLoadingPrimary(false);
       setAttLoading(false);
     }
   }, [firestore, year, month]);
@@ -180,7 +181,7 @@ export function AttendanceUploader() {
             const recordDate = toFirestoreDate(r.date);
             if (!recordDate) return;
             if ((recordDate.getMonth() + 1) !== selectedMonth || recordDate.getFullYear() !== selectedYear) return;
-            if (r.status !== 'present') {
+            if (r.status !== 'present' || r.anomalyDescription?.includes('تعارض')) {
                 list.push({ 
                     docId: attendanceDoc.id!, 
                     record: r, 
@@ -277,7 +278,6 @@ export function AttendanceUploader() {
                     const pMonth = parsed.date.getMonth() + 1;
                     const pYear = parsed.date.getFullYear();
                     
-                    // درع حماية الفترة
                     if (pYear !== selectedYearNum || pMonth !== selectedMonthNum) {
                         throw new Error(`الملف يحتوي على تواريخ لشهر ${pMonth}/${pYear}. الرجاء اختيار الفترة الصحيحة.`);
                     }
@@ -325,14 +325,20 @@ export function AttendanceUploader() {
                         let manualDeduction = 0;
                         let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
 
-                        const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
-                        if (sortedTimes[0] > startTimeLimit) {
-                            if (activePermission?.type === 'late_arrival') {
-                                anomaly = 'تأخير مسموح (إذن تأخير)';
-                            } else {
-                                status = 'late';
-                                anomaly = `تأخير عن (${startTimeLimit})`;
-                                auditStatus = 'pending';
+                        // ✨ كشف التعارض بين البصمة والإجازة
+                        if (activeLeave) {
+                            anomaly = `⚠️ تعارض: بصمة موجودة أثناء إجازة (${leaveTypeTranslations[activeLeave.leaveType]})`;
+                            auditStatus = 'pending';
+                        } else {
+                            const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
+                            if (sortedTimes[0] > startTimeLimit) {
+                                if (activePermission?.type === 'late_arrival') {
+                                    anomaly = 'تأخير مسموح (إذن تأخير)';
+                                } else {
+                                    status = 'late';
+                                    anomaly = `تأخير عن (${startTimeLimit})`;
+                                    auditStatus = 'pending';
+                                }
                             }
                         }
 
@@ -346,26 +352,12 @@ export function AttendanceUploader() {
             }
 
             if (employeeRecords.length > 0) {
-                const presentDays = employeeRecords.filter(r => r.status === 'present').length;
-                const absentDays = employeeRecords.filter(r => r.status === 'absent').length;
-                const lateDays = employeeRecords.filter(r => r.status === 'late').length;
-                const halfDays = employeeRecords.filter(r => r.status === 'half_day').length;
-                const totalDeductionDays = employeeRecords.reduce((sum, r) => sum + (r.manualDeductionDays || 0), 0);
-
                 const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
                 batch.set(doc(firestore, 'attendance', docId), {
                     employeeId: emp.id,
                     year: selectedYearNum,
                     month: selectedMonthNum,
                     records: employeeRecords,
-                    summary: {
-                        presentDays,
-                        absentDays,
-                        lateDays,
-                        halfDays,
-                        totalDeductionDays,
-                        totalWorkingDays: employeeRecords.length
-                    },
                     updatedAt: serverTimestamp()
                 });
             }
@@ -374,9 +366,7 @@ export function AttendanceUploader() {
         await batch.commit();
         toast({ title: 'نجاح التوليد', description: 'تم إنشاء سجلات الحضور والملخصات الإحصائية بنجاح.' });
         setFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) { fileInputRef.current.value = ''; }
         fetchAttendance();
       } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ في الملف', description: error.message }); } finally { setIsProcessing(false); }
     };
@@ -502,6 +492,8 @@ export function AttendanceUploader() {
     const lower = mappingSearch.toLowerCase();
     return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber.includes(lower));
   }, [employees, mappingSearch]);
+
+  const [loadingPrimary, setLoadingPrimary] = useState(false);
 
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
@@ -645,11 +637,21 @@ export function AttendanceUploader() {
                                             <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
                                         ) : anomalies.map((item, idx) => {
                                             const isAbsent = item.record.status === 'absent';
+                                            const isConflict = item.record.anomalyDescription?.includes('تعارض');
                                             return (
-                                            <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
+                                            <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isConflict ? "bg-amber-50/50" : isAbsent ? "bg-red-50/40" : "bg-white")}>
                                                 <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-lg text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
                                                 <TableCell className="font-bold text-xs text-gray-600">{format(toFirestoreDate(item.record.date)!, 'dd/MM/yyyy', { locale: ar })}</TableCell>
-                                                <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : 'تأخير/نقص بصمة'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col gap-1">
+                                                        <Badge variant={isAbsent ? 'destructive' : isConflict ? 'default' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600", isConflict && "bg-amber-600")}>
+                                                            {isAbsent ? 'غياب كامل' : isConflict ? 'تعارض رقابي حاد' : 'تأخير/نقص بصمة'}
+                                                        </Badge>
+                                                        <span className={cn("text-[10px] font-bold leading-tight", isConflict ? "text-amber-700" : "text-red-600")}>
+                                                            {item.record.anomalyDescription}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
                                                 <TableCell>{isAbsent ? <div className="h-8 w-8 rounded-full border-2 border-dashed border-red-200 flex items-center justify-center opacity-40"><X className="h-4 w-4 text-red-400"/></div> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-5 bg-background shadow-inner">{p}</Badge>)}</div>}</TableCell>
                                                 <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">يوم خصم</span></div></TableCell>
                                                 <TableCell className="text-center px-6">
