@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import { 
   PlusCircle, 
   MoreHorizontal, 
@@ -106,11 +106,11 @@ export function LeaveRequestsList() {
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [requestToApprove, setRequestToApprove] = useState<LeaveRequest | null>(null);
-  const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
-  const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
-  const [requestToStart, setRequestToStart] = useState<LeaveRequest | null>(null);
-  const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
+  const [requestToApprove, setRequestToApprove] = setState<LeaveRequest | null>(null);
+  const [requestToReject, setRequestToReject] = setState<LeaveRequest | null>(null);
+  const [requestToUndoApproval, setRequestToUndoApproval] = setState<LeaveRequest | null>(null);
+  const [requestToStart, setRequestToStart] = setState<LeaveRequest | null>(null);
+  const [requestToReturn, setRequestToReturn] = setState<LeaveRequest | null>(null);
 
   const [rejectionReason, setRejectionReason] = useState('');
   const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
@@ -158,7 +158,7 @@ export function LeaveRequestsList() {
             } else {
                 setLastLeaveInfo(null);
             }
-            setHasCheckedContext(true);
+            setHasCheckedContext(false);
         } catch (e) {
             console.error("Error fetching context:", e);
         } finally {
@@ -289,7 +289,7 @@ export function LeaveRequestsList() {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'permissionRequests', requestToReject.id!);
+        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id!);
         await updateDoc(leaveRef, {
             status: 'rejected',
             rejectionReason: rejectionReason,
@@ -436,10 +436,15 @@ export function LeaveRequestsList() {
               leaveRequests.map(req => {
                 const emp = employees.find(e => e.id === req.employeeId);
                 return (
-                <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16 cursor-pointer" onClick={() => router.push(`/dashboard/hr/leaves/${req.id}`)}>
+                <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
                   <TableCell className="px-8 font-mono font-bold opacity-60 text-xs">{emp?.employeeNumber || '---'}</TableCell>
                   <TableCell>
-                    <span className="font-black text-gray-800">{req.employeeName}</span>
+                    <Link 
+                        href={`/dashboard/hr/leaves/${req.id}`} 
+                        className="font-black text-gray-800 hover:text-primary hover:underline transition-colors"
+                    >
+                        {req.employeeName}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-bold px-3">
