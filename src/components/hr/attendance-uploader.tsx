@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -36,7 +35,7 @@ import {
 } from '@/components/ui/table';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History, AlertCircle, XCircle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
@@ -367,7 +366,7 @@ export function AttendanceUploader() {
         setFile(null);
         if (fileInputRef.current) { fileInputRef.current.value = ''; }
         fetchAttendance();
-      } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ في الملف', description: error.message }); } finally { setIsProcessing(false); }
+      } catch (error: any) { toast({ variant: 'destructive', title: 'خطأ in الملف', description: error.message }); } finally { setIsProcessing(false); }
     };
     reader.readAsBinaryString(file!);
   };
@@ -584,18 +583,18 @@ export function AttendanceUploader() {
                 </Card>
 
                 <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white">
-                    <CardContent className="p-12">
-                        <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[4rem] p-20 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/20 group relative overflow-hidden">
+                    <CardContent className="p-8">
+                        <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[3rem] p-10 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/20 group relative overflow-hidden">
                             <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls, .csv" />
-                            <FileSpreadsheet className="h-24 w-24 mx-auto opacity-20 mb-6 group-hover:scale-110 group-hover:opacity-40 transition-all text-primary" />
-                            <p className="font-black text-3xl text-gray-700">{file ? file.name : "اسحب وأفلت ملف الإكسيل هنا"}</p>
-                            <p className="text-sm text-muted-foreground mt-4 font-bold max-w-sm mx-auto">سيقوم المحاسب الذكي بمطابقة البصمات مع الإجازات والاستئذانات آلياً.</p>
+                            <FileSpreadsheet className="h-12 w-12 mx-auto opacity-20 mb-4 group-hover:scale-110 group-hover:opacity-40 transition-all text-primary" />
+                            <p className="font-black text-xl text-gray-700">{file ? file.name : "اسحب وأفلت ملف الإكسيل هنا"}</p>
+                            <p className="text-xs text-muted-foreground mt-2 font-bold max-w-xs mx-auto">سيقوم المحاسب الذكي بمطابقة البصمات مع الإجازات والاستئذانات آلياً.</p>
                         </div>
                     </CardContent>
-                    <CardFooter className="justify-center border-t p-10 bg-muted/10">
-                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-[0_8px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white hover:bg-primary/90 gap-4 min-w-[350px] transition-all">
-                            {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <RotateCcw className="h-8 w-8"/>} 
-                            بدء التحليل والإنشاء اليدوي
+                    <CardFooter className="justify-center border-t p-6 bg-muted/10">
+                        <Button onClick={handleUpload} disabled={!file || isProcessing} className="h-12 px-12 rounded-2xl font-black text-lg shadow-[0_4px_0_0_rgba(0,0,0,0.1)] active:translate-y-1 active:shadow-none bg-primary text-white hover:bg-primary/90 gap-3 min-w-[280px] transition-all">
+                            {isProcessing ? <Loader2 className="animate-spin h-5 w-5"/> : <RotateCcw className="h-5 w-5"/>} 
+                            بدء التحليل والمعالجة
                         </Button>
                     </CardFooter>
                 </Card>
