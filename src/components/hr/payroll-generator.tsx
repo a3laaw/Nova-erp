@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   Card, 
   CardHeader, 
@@ -28,33 +28,34 @@ import {
   TableRow,
   TableFooter
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { 
-  AlertDialog, 
-  AlertDialogAction, 
-  AlertDialogCancel, 
-  AlertDialogContent, 
-  AlertDialogDescription, 
-  AlertDialogFooter, 
-  AlertDialogHeader, 
-  AlertDialogTitle 
-} from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, ListFilter, LayoutList, ChevronDown } from 'lucide-react';
+import { 
+    RefreshCw, 
+    Trash2, 
+    FileDown, 
+    FileText, 
+    Printer, 
+    CheckCircle2, 
+    XCircle, 
+    Loader2, 
+    ShieldCheck, 
+    ShieldAlert, 
+    Ban, 
+    Info, 
+    RotateCcw, 
+    Banknote, 
+    CalendarDays, 
+    History, 
+    AlertTriangle,
+    LayoutList,
+    ListFilter,
+    ChevronDown,
+    CalendarCheck,
+    Sparkles
+} from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { format, isValid } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -62,6 +63,25 @@ import { cleanFirestoreData, cn, formatCurrency } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { Checkbox } from '../ui/checkbox';
+
+const dayNameToIndex: Record<string, number> = {
+  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+  'Thursday': 4, 'Friday': 5, 'Saturday': 6
+};
+
+const leaveTypeTranslations: Record<string, string> = {
+    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
+};
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -73,28 +93,12 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [employeesLoading, setEmployeesLoading] = useState(false);
-  const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
   const [attLoading, setAttLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isPrintingSummary, setIsPrintingSummary] = useState(false);
 
-  useEffect(() => {
-    if (!firestore) return;
-    const fetchEmployees = async () => {
-        setEmployeesLoading(true);
-        try {
-            const q = query(collection(firestore, 'employees'), where('status', 'in', ['active', 'on-leave']));
-            const snap = await getDocs(q);
-            setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
-        } finally {
-            setEmployeesLoading(false);
-        }
-    };
-    fetchEmployees();
-  }, [firestore]);
+  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', 'in', ['active', 'on-leave'])]);
+  const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
 
   const fetchAttendance = async () => {
     if (!firestore) return;
@@ -235,8 +239,6 @@ export function PayrollGenerator() {
                     att.records?.forEach(r => { if (r.auditStatus !== 'waived') totalDeductionDays += (r.manualDeductionDays || 0); });
                     deductionAmount = totalDeductionDays * dailyRate;
                     netSalary = Math.max(0, fullSalary - deductionAmount);
-                } else if (emp.status !== 'on-leave') {
-                    deductionAmount = fullSalary; netSalary = 0;
                 }
                 const pRef = doc(firestore, 'payroll', `${year}-${month}-${emp.id}`);
                 transaction.set(pRef, cleanFirestoreData({ employeeId: emp.id, employeeName: emp.fullName, year: parseInt(year), month: parseInt(month), earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 }, deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 }, netSalary, status: 'draft', type: 'Monthly', createdAt: serverTimestamp(), createdBy: currentUser.id }), { merge: true });
@@ -246,20 +248,22 @@ export function PayrollGenerator() {
     } finally { setIsProcessing(false); }
   };
 
-  // --- دوال التصدير المحدثة ---
-
   const handleExportTotalsExcel = () => {
     if (attendanceDocs.length === 0) return;
     const data = attendanceDocs.map(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
+        // ✨ معالجة الإجماليات في حال كانت الحقول فارغة في Firestore
+        const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
+        const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
+        const lateDays = doc.summary?.lateDays ?? doc.records?.filter(r => r.status === 'late').length;
+
         return {
             'الرقم الوظيفي': emp?.employeeNumber || '---',
             'اسم الموظف': emp?.fullName || 'غير معروف',
             'القسم': emp?.department || '-',
-            'أيام الحضور': doc.summary?.presentDays || 0,
-            'أيام الغياب': doc.summary?.absentDays || 0,
-            'أيام الإجازة': doc.summary?.leaveDays || 0,
-            'عدد التأخيرات': doc.summary?.lateDays || 0
+            'أيام الحضور': presentDays,
+            'أيام الغياب': absentDays,
+            'عدد التأخيرات': lateDays
         };
     });
     const ws = XLSX.utils.json_to_sheet(data);
@@ -284,7 +288,12 @@ export function PayrollGenerator() {
     XLSX.writeFile(wb, `تفاصيل_المخالفات_${month}_${year}.xlsx`);
   };
 
-  const handlePrintAudit = () => window.print();
+  const handlePrint = (type: 'summary' | 'detailed') => {
+    setIsPrintingSummary(type === 'summary');
+    setTimeout(() => {
+        window.print();
+    }, 100);
+  };
 
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
 
@@ -322,23 +331,58 @@ export function PayrollGenerator() {
 
               {attendanceDocs.length > 0 && (
                 <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                            <ShieldCheck className="h-3 w-3"/> قرارات التدقيق الجماعي
+                            <ShieldCheck className="h-3 w-3"/> قرارات التدقيق والخيارات الرقابية
                         </span>
-                        {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
+                        <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(true)} className="h-6 text-[9px] text-red-600 hover:bg-red-50 gap-1 font-bold">
+                            <Trash2 className="h-3 w-3"/> تصفير بيانات الشهر
+                        </Button>
                     </div>
 
-                    <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
-                        <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
-                        </Button>
-                        <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <XCircle className="h-3 w-3"/>} خصم للكل
-                        </Button>
-                        <Button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-muted text-muted-foreground hover:bg-muted gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3"/>} إعادة تعيين
-                        </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <div className="p-2 rounded-2xl border-2 border-purple-100 bg-white flex gap-2 flex-grow">
+                            <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-9 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                                <CheckCircle2 className="h-3 w-3"/> تغاضي جماعي
+                            </Button>
+                            <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-9 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
+                                <XCircle className="h-3 w-3"/> خصم جماعي
+                            </Button>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="h-9 rounded-xl font-black text-xs gap-2 border-primary/20 text-primary">
+                                        <FileDown className="h-4 w-4" /> تصدير Excel <ChevronDown className="h-3 w-3 opacity-50"/>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
+                                    <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
+                                        <LayoutList className="h-4 w-4 text-primary" /> إجمالي الشهر (للمحاسبة)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleExportDetailedExcel} className="py-3 font-bold gap-2">
+                                        <ListFilter className="h-4 w-4 text-green-600" /> سجل المخالفات التفصيلي
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="h-9 rounded-xl font-black text-xs gap-2 border-primary/20 text-primary">
+                                        <Printer className="h-4 w-4" /> طباعة التقارير <ChevronDown className="h-3 w-3 opacity-50"/>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
+                                    <DropdownMenuItem onClick={() => handlePrint('summary')} className="py-3 font-bold gap-2">
+                                        <LayoutList className="h-4 w-4 text-blue-600" /> كشف الحضور الإجمالي
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handlePrint('detailed')} className="py-3 font-bold gap-2">
+                                        <ListFilter className="h-4 w-4 text-primary" /> سجل المخالفات التفصيلي
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                     </div>
                 </div>
               )}
@@ -347,7 +391,7 @@ export function PayrollGenerator() {
 
         <div className="space-y-6">
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0 no-print">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
@@ -357,45 +401,8 @@ export function PayrollGenerator() {
                                 </div>
                             </div>
                             <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
-                                مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي.
+                                مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي قبل صرف الرواتب.
                             </CardDescription>
-                        </div>
-
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1" dir="rtl">
-                            <div className="grid grid-cols-2 gap-4">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="bg-white/10 border-white/20 text-white font-black h-11 rounded-xl gap-2 hover:bg-white/20">
-                                            <FileDown className="h-4 w-4 text-green-400" /> تصدير Excel <ChevronDown className="h-3 w-3 opacity-50"/>
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
-                                        <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
-                                            <LayoutList className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={handleExportDetailedExcel} className="py-3 font-bold gap-2">
-                                            <ListFilter className="h-4 w-4 text-green-600" /> سجل المخالفات التفصيلي
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="bg-white/10 border-white/20 text-white font-black h-11 rounded-xl gap-2 hover:bg-white/20">
-                                            <Printer className="h-4 w-4 text-blue-400" /> طباعة التقارير <ChevronDown className="h-3 w-3 opacity-50"/>
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
-                                        <DropdownMenuItem onClick={handlePrintAudit} className="py-3 font-bold gap-2">
-                                            <FileText className="h-4 w-4 text-primary" /> سجل التدقيق الحالي
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)} className="py-3 font-bold gap-2 text-red-600">
-                                            <Trash2 className="h-4 w-4" /> تصفير بيانات الفترة
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
                         </div>
                     </div>
                 </CardHeader>
@@ -405,63 +412,98 @@ export function PayrollGenerator() {
                             <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
                             <p className="font-black text-muted-foreground animate-pulse">جاري فحص قاعدة البيانات...</p>
                         </div>
-                    ) : attendanceDocs.length === 0 ? (
-                        <div className="p-32 text-center border-b rounded-b-[2.5rem] bg-slate-50/50">
-                            <Ban className="h-20 w-20 text-muted-foreground/20 mx-auto mb-6" />
-                            <p className="text-2xl font-black text-muted-foreground">لا توجد سجلات حضور مسجلة لهذه الفترة.</p>
-                            <p className="text-sm text-muted-foreground mt-2 font-bold">يرجى رفع ملف الإكسيل للبدء بالتحليل.</p>
-                        </div>
                     ) : (
-                        <div id="audit-printable-area">
-                            <Table>
-                                <TableHeader className="bg-muted/50 h-16">
-                                    <TableRow className="border-none">
-                                        <TableHead className="px-10 font-black text-[#7209B7]">رقم الملف</TableHead>
-                                        <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
-                                        <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
-                                        <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
-                                        <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
-                                        <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
-                                        <TableHead className="text-center no-print font-black text-[#7209B7]">القرار</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {anomalies.length === 0 ? (
-                                        <TableRow><TableCell colSpan={7} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
-                                    ) : anomalies.map((item, idx) => {
-                                        const isAbsent = item.record.status === 'absent';
-                                        const isConflict = item.record.anomalyDescription?.includes('تعارض');
-                                        const recordDate = toFirestoreDate(item.record.date);
-                                        return (
-                                        <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isConflict ? "bg-amber-50/50" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                            <TableCell className="px-10 font-mono font-bold opacity-60 text-xs">{item.employeeNumber}</TableCell>
-                                            <TableCell className="font-black text-lg text-gray-800">{item.empName}</TableCell>
-                                            <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <Badge variant={isAbsent ? 'destructive' : isConflict ? 'default' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600", isConflict && "bg-amber-600")}>
-                                                        {isAbsent ? 'غياب كامل' : isConflict ? 'تعارض رقابي حاد' : 'تأخير/نقص بصمة'}
-                                                    </Badge>
-                                                    <span className={cn("text-[10px] font-bold leading-tight", isConflict ? "text-amber-700" : "text-red-600")}>
-                                                        {item.record.anomalyDescription}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{isAbsent ? <div className="h-8 w-8 rounded-full border-2 border-dashed border-red-200 flex items-center justify-center opacity-40"><XCircle className="h-4 w-4 text-red-400"/></div> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-5 bg-background shadow-inner">{p}</Badge>)}</div>}</TableCell>
-                                            <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">يوم خصم</span></div></TableCell>
-                                            <TableCell className="text-center no-print px-6">
-                                                {item.record.auditStatus === 'pending' ? (
-                                                    <div className="flex justify-center gap-3">
-                                                        <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                                        <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد</Button>
-                                                    </div>
-                                                ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2"><History className="h-3 w-3"/>تغيير القرار</Button>}
-                                            </TableCell>
+                        <>
+                            {/* --- القسم التفصيلي (المخالفات) --- */}
+                            <div id="audit-printable-area" className={cn(isPrintingSummary ? "hidden" : "block")}>
+                                <div className="hidden print:block p-8 border-b-2 mb-6">
+                                    <h1 className="text-2xl font-black">سجل مخالفات الحضور والتدقيق الميداني</h1>
+                                    <p className="font-bold">شهر: {month} / {year}</p>
+                                </div>
+                                <Table>
+                                    <TableHeader className="bg-muted/50 h-16">
+                                        <TableRow className="border-none">
+                                            <TableHead className="px-10 font-black text-[#7209B7]">رقم الملف</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
+                                            <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
+                                            <TableHead className="text-center no-print font-black text-[#7209B7]">القرار</TableHead>
                                         </TableRow>
-                                    )})}
-                                </TableBody>
-                            </Table>
-                        </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {anomalies.length === 0 ? (
+                                            <TableRow><TableCell colSpan={7} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
+                                        ) : anomalies.map((item, idx) => {
+                                            const recordDate = toFirestoreDate(item.record.date);
+                                            return (
+                                            <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : item.record.status === 'absent' ? "bg-red-50/40" : "bg-white")}>
+                                                <TableCell className="px-10 font-mono font-bold opacity-60 text-xs">{item.employeeNumber}</TableCell>
+                                                <TableCell className="font-black text-lg text-gray-800">{item.empName}</TableCell>
+                                                <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={item.record.status === 'absent' ? 'destructive' : 'outline'} className="font-black text-[8px] uppercase">
+                                                        {item.record.anomalyDescription}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>{item.record.status === 'absent' ? <div className="h-8 w-8 rounded-full border-2 border-dashed border-red-200 flex items-center justify-center opacity-40"><XCircle className="h-4 w-4 text-red-400"/></div> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-5 bg-background shadow-inner">{p}</Badge>)}</div>}</TableCell>
+                                                <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">يوم خصم</span></div></TableCell>
+                                                <TableCell className="text-center no-print px-6">
+                                                    {item.record.auditStatus === 'pending' ? (
+                                                        <div className="flex justify-center gap-3">
+                                                            <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد</Button>
+                                                        </div>
+                                                    ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2"><History className="h-3 w-3"/>تغيير القرار</Button>}
+                                                </TableCell>
+                                            </TableRow>
+                                        )})}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* --- القسم الإجمالي (كشف الحضور) - يظهر فقط في الطباعة أو عند تفعيله --- */}
+                            <div id="summary-printable-area" className={cn(isPrintingSummary ? "block" : "hidden", "print:block")}>
+                                <div className="hidden print:block p-8 border-b-2 mb-6 text-center">
+                                    <h1 className="text-2xl font-black">كشف حضور وانصراف الموظفين الإجمالي</h1>
+                                    <p className="font-bold">الفترة: {month} / {year}</p>
+                                </div>
+                                <Table>
+                                    <TableHeader className="bg-muted/50 h-16">
+                                        <TableRow className="border-none">
+                                            <TableHead className="px-10 font-black">رقم الملف</TableHead>
+                                            <TableHead className="font-black">اسم الموظف</TableHead>
+                                            <TableHead className="font-black">القسم</TableHead>
+                                            <TableHead className="text-center font-black">الحضور</TableHead>
+                                            <TableHead className="text-center font-black">الغياب</TableHead>
+                                            <TableHead className="text-center font-black">الإجازات</TableHead>
+                                            <TableHead className="text-center font-black">إجمالي الخصم</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {attendanceDocs.map((doc) => {
+                                            const emp = employees.find(e => e.id === doc.employeeId);
+                                            const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
+                                            const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
+                                            const leaveDays = doc.summary?.leaveDays ?? 0;
+                                            const totalDeductions = doc.records?.reduce((sum, r) => sum + (r.auditStatus !== 'waived' ? (r.manualDeductionDays || 0) : 0), 0);
+                                            return (
+                                                <TableRow key={doc.id} className="h-16 border-b">
+                                                    <TableCell className="px-10 font-mono font-bold">{emp?.employeeNumber || '---'}</TableCell>
+                                                    <TableCell className="font-black">{emp?.fullName || 'غير معروف'}</TableCell>
+                                                    <TableCell className="text-xs">{emp?.department || '-'}</TableCell>
+                                                    <TableCell className="text-center font-mono">{presentDays}</TableCell>
+                                                    <TableCell className="text-center font-mono text-red-600">{absentDays}</TableCell>
+                                                    <TableCell className="text-center font-mono text-blue-600">{leaveDays}</TableCell>
+                                                    <TableCell className="text-center font-mono font-black text-red-700">{totalDeductions} يوم</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
