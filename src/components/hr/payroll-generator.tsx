@@ -32,40 +32,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { 
-    RefreshCw, 
-    Trash2, 
-    FileDown, 
-    FileText, 
-    Printer, 
-    CheckCircle2, 
-    XCircle, 
-    Loader2, 
-    ShieldCheck, 
-    ShieldAlert, 
-    Ban, 
-    Info, 
-    RotateCcw, 
-    Banknote, 
-    CalendarDays, 
-    History, 
-    AlertTriangle,
-    LayoutGrid,
-    ListFilter,
-    ChevronDown,
-    CalendarCheck,
-    Sparkles,
-    FileSpreadsheet,
-    Fingerprint,
-    Save,
-    Search,
-    UserCheck,
-    Clock,
-    BadgeInfo,
-    X,
-    AlertCircle,
-    CalendarRange
-} from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles, FileSpreadsheet, Fingerprint, Save, Search, UserCheck, Clock, BadgeInfo, X, AlertCircle, CalendarRange } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -157,25 +124,50 @@ export function PayrollGenerator() {
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+  const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [attLoading, setAttLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [isPrintingSummary, setIsPrintingSummary] = useState(false);
-
+  const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
+  const [clearPrevious, setClearPrevious] = useState(true);
+  
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', 'in', ['active', 'on-leave'])]);
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
+  const [isSavingData, setIsSavingData] = useState(false);
+  const [mappingSearch, setMappingSearch] = useState('');
 
   const payrollQuery = useMemo(() => [
     where('year', '==', parseInt(year)),
     where('month', '==', parseInt(month))
   ], [year, month]);
   
-  const { data: monthPayslips, loading: payrollLoading } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
+  const { data: monthPayslips } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
 
   const isMonthPaid = useMemo(() => {
     return monthPayslips.length > 0 && monthPayslips.some(p => p.status === 'paid');
   }, [monthPayslips]);
+
+  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+
+  useEffect(() => {
+    if (employees.length > 0) {
+        const data: Record<string, any> = {};
+        employees.forEach(emp => {
+            data[emp.id!] = {
+                employeeNumber: emp.employeeNumber || '',
+                workStartTime: emp.workStartTime || '',
+                workEndTime: emp.workEndTime || ''
+            };
+        });
+        setEditableData(data);
+    }
+  }, [employees]);
 
   const fetchAttendance = async () => {
     if (!firestore) return;
@@ -195,6 +187,176 @@ export function PayrollGenerator() {
       toast({ variant: 'destructive', title: 'خطأ في التحميل' });
     } finally {
       setAttLoading(false);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!firestore || !year || !month) return;
+    setIsProcessing(true);
+    const selectedYearNum = parseInt(year);
+    const selectedMonthNum = parseInt(month);
+
+    const processAttendanceLogic = (json: any[]) => {
+        return new Promise<void>(async (resolve, reject) => {
+            try {
+                const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
+                const monthEnd = endOfMonth(monthStart);
+
+                const [leavesSnap, permissionsSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'leaveRequests'), where('status', 'in', ['approved', 'on-leave', 'returned']))),
+                    getDocs(query(collection(firestore, 'permissionRequests'), where('status', '==', 'approved')))
+                ]);
+
+                const approvedLeaves = leavesSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
+                const approvedPermissions = permissionsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PermissionRequest));
+
+                const employeeMap = new Map(employees.filter(emp => !!emp.employeeNumber).map(emp => [String(emp.employeeNumber), emp]));
+                const excelPunches = new Map<string, Set<string>>(); 
+                let lastDateInFile: Date | null = null;
+                
+                if (json.length > 0) {
+                    json.forEach(row => {
+                        const keys = Object.keys(row);
+                        let empNo = '';
+                        for(let k=0; k<Math.min(keys.length, 15); k++) {
+                            const val = String(row[keys[k]] || '').trim();
+                            if (val && employeeMap.has(val)) { empNo = val; break; }
+                        }
+                        const emp = employeeMap.get(empNo);
+                        if (!emp?.id) return;
+
+                        for (const key in row) {
+                            const parsed = parseSmartDateTime(row[key]);
+                            if (parsed) {
+                                const pMonth = parsed.date.getMonth() + 1;
+                                const pYear = parsed.date.getFullYear();
+                                
+                                if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
+                                    const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
+                                    if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
+                                    if (parsed.timeStr && parsed.timeStr !== "00:00") {
+                                        excelPunches.get(dateKey)!.add(parsed.timeStr);
+                                        if (!lastDateInFile || parsed.date > lastDateInFile) lastDateInFile = parsed.date;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                let processingLimitDate = processingMode === 'full_month' ? monthEnd : (lastDateInFile || new Date());
+                const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+                const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
+                const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
+
+                const batch = writeBatch(firestore);
+
+                if (clearPrevious) {
+                    const oldQ = query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum));
+                    const oldSnap = await getDocs(oldQ);
+                    oldSnap.forEach(d => batch.delete(d.ref));
+                }
+
+                for (const emp of employees) {
+                    const employeeRecords: AttendanceRecord[] = [];
+                    for (const day of workingDaysInMonth) {
+                        const stableDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
+                        const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
+                        const punches = excelPunches.get(dateKey);
+
+                        if (!isAfter(stableDay, endOfDay(processingLimitDate))) {
+                            const activeLeave = approvedLeaves.find(l => l.employeeId === emp.id && stableDay >= toFirestoreDate(l.startDate)! && stableDay <= toFirestoreDate(l.endDate)!);
+                            const activePermission = approvedPermissions.find(p => p.employeeId === emp.id && isSameDay(stableDay, toFirestoreDate(p.date)!));
+
+                            if (punches && punches.size > 0) {
+                                const sortedTimes = Array.from(punches).sort();
+                                let status: AttendanceRecord['status'] = 'present';
+                                let anomaly = '';
+                                let manualDeduction = 0;
+                                let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
+
+                                if (activeLeave) {
+                                    anomaly = `⚠️ تعارض: بصمة موجودة أثناء إجازة (${leaveTypeTranslations[activeLeave.leaveType]})`;
+                                    auditStatus = 'pending';
+                                } else {
+                                    const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
+                                    if (sortedTimes[0] > startTimeLimit) {
+                                        if (activePermission?.type === 'late_arrival') {
+                                            anomaly = 'تأخير مسموح (إذن تأخير)';
+                                            auditStatus = 'verified';
+                                            status = 'present';
+                                        } else {
+                                            status = 'late';
+                                            anomaly = `تأخير عن (${startTimeLimit})`;
+                                            auditStatus = 'pending';
+                                        }
+                                    }
+                                }
+
+                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
+                            } else if (activeLeave) {
+                                employeeRecords.push({ 
+                                    date: Timestamp.fromDate(stableDay), 
+                                    employeeId: emp.id!, 
+                                    status: 'present', 
+                                    anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''} (مزامنة آلية)`, 
+                                    manualDeductionDays: 0, 
+                                    auditStatus: 'verified', 
+                                    allPunches: [] 
+                                } as any);
+                            } else {
+                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'absent', anomalyDescription: 'غائب (بدون بصمة)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
+                            }
+                        }
+                    }
+
+                    if (employeeRecords.length > 0) {
+                        const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
+                        batch.set(doc(firestore, 'attendance', docId), {
+                            employeeId: emp.id,
+                            year: selectedYearNum,
+                            month: selectedMonthNum,
+                            records: employeeRecords,
+                            updatedAt: serverTimestamp()
+                        });
+                    }
+                }
+
+                await batch.commit();
+                resolve();
+            } catch (err) {
+                reject(err);
+            }
+        });
+    };
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = e.target?.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                await processAttendanceLogic(json);
+                toast({ title: 'نجاح المعالجة', description: 'تم دمج البصمات مع الإجازات والاستئذانات آلياً.' });
+                setFile(null);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            } catch (err: any) {
+                toast({ variant: 'destructive', title: 'خطأ', description: err.message });
+            } finally {
+                setIsProcessing(false);
+            }
+        };
+        reader.readAsBinaryString(file);
+    } else {
+        try {
+            await processAttendanceLogic([]);
+            toast({ title: 'نجاح المزامنة', description: 'تم تحديث سجلات الإجازات والاستئذانات المعتمدة آلياً.' });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: 'خطأ', description: err.message });
+        } finally {
+            setIsProcessing(false);
+        }
     }
   };
 
@@ -322,6 +484,7 @@ export function PayrollGenerator() {
             }
         });
         toast({ title: 'تم توليد الرواتب' });
+        setShowGenerateConfirm(false);
     } finally { setIsProcessing(false); }
   };
 
@@ -369,7 +532,55 @@ export function PayrollGenerator() {
     setTimeout(() => { window.print(); }, 100);
   };
 
+  const handleSaveMappingData = async () => {
+    if (!firestore || employees.length === 0) return;
+    setIsSavingData(true);
+    try {
+        const batch = writeBatch(firestore);
+        let hasChanges = false;
+
+        for (const empId in editableData) {
+            const current = editableData[empId];
+            const original = employees.find(e => e.id === empId);
+            
+            if (original) {
+                const needsUpdate = 
+                    original.employeeNumber !== current.employeeNumber ||
+                    (original.workStartTime || '') !== current.workStartTime ||
+                    (original.workEndTime || '') !== current.workEndTime;
+
+                if (needsUpdate) {
+                    const empRef = doc(firestore, 'employees', empId);
+                    batch.update(empRef, {
+                        employeeNumber: current.employeeNumber,
+                        workStartTime: current.workStartTime || null,
+                        workEndTime: current.workEndTime || null
+                    });
+                    hasChanges = true;
+                }
+            }
+        }
+
+        if (hasChanges) {
+            await batch.commit();
+            toast({ title: 'تم حفظ البيانات', description: 'تم تحديث أرقام البصمة وساعات الدوام بنجاح.' });
+        } else {
+            toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات للحفظ.' });
+        }
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+    } finally {
+        setIsSavingData(false);
+    }
+  };
+
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
+  const filteredEmployees = useMemo(() => {
+    if (!mappingSearch) return employees;
+    const lower = mappingSearch.toLowerCase();
+    return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber.includes(lower));
+  }, [employees, mappingSearch]);
 
   return (
     <div className="space-y-8" dir="rtl">
@@ -583,7 +794,7 @@ export function PayrollGenerator() {
 
         <div className="no-print pt-10 border-t flex justify-center pb-20">
             <Button 
-                onClick={handleGeneratePayroll} 
+                onClick={() => setShowGenerateConfirm(true)} 
                 disabled={isProcessing || pendingCount > 0 || attendanceDocs.length === 0 || isMonthPaid} 
                 className={cn(
                     "h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 gap-4 min-w-[350px] active:translate-y-1 transition-all",
@@ -598,6 +809,26 @@ export function PayrollGenerator() {
                         : 'اعتماد وصرف الرواتب النهائية')}
             </Button>
         </div>
+
+        <AlertDialog open={showGenerateConfirm} onOpenChange={setShowGenerateConfirm}>
+            <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogHeader>
+                    <div className="p-3 bg-primary/10 rounded-2xl text-primary w-fit mb-4 shadow-inner"><Banknote className="h-10 w-10"/></div>
+                    <AlertDialogTitle className="text-2xl font-black">تأكيد اعتماد وصرف الرواتب؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-base font-medium leading-relaxed">
+                        أنت على وشك توليد كشوف الرواتب النهائية لـ {employees.length} موظف لشهر <strong>{month}/{year}</strong>.
+                        <br/><br/>
+                        <span className="font-black text-primary underline">الأثر المالي:</span> سيقوم النظام بإنشاء "مسودات" كشوف الرواتب بانتظار التحويل البنكي وتوليد القيود المحاسبية للمصاريف.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-6 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleGeneratePayroll} disabled={isProcessing} className="bg-primary hover:bg-primary/90 rounded-xl font-black h-12 px-12 shadow-lg shadow-primary/20">
+                        {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، اعتماد الآن'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
             <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
