@@ -431,133 +431,132 @@ export function PayrollGenerator() {
                     </Button>
                 </div>
               </div>
-
-              {/* الفريم الثالث: المراجعة */}
-              {attendanceDocs.length > 0 && (
-                <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3">
-                    <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                            <ShieldCheck className="h-3 w-3"/> قرارات التدقيق الجماعي
-                        </span>
-                        {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
-                    </div>
-
-                    {/* فريم ١: قرارات التدقيق */}
-                    <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
-                        <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
-                        </Button>
-                        <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <XCircle className="h-3 w-3"/>} خصم للكل
-                        </Button>
-                        <Button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-muted text-muted-foreground hover:bg-muted gap-1">
-                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3"/>} إعادة تعيين
-                        </Button>
-                    </div>
-
-                    {/* فريم ٢: التصدير والحذف */}
-                    <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
-                        <div className="relative flex-1">
-                            <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
-                                <FileText className="h-3 w-3"/> Excel ▾
-                            </Button>
-                            {showExcelMenu && (
-                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
-                                    <button onClick={handleExportDetailedExcel} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
-                                        <FileText className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
-                                    </button>
-                                    <button onClick={() => { handleExportExcel(); setShowExcelMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
-                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="relative flex-1">
-                            <Button onClick={() => { setShowPrintMenu(v => !v); setShowExcelMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
-                                <Printer className="h-3 w-3"/> طباعة ▾
-                            </Button>
-                            {showPrintMenu && (
-                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
-                                    <button onClick={() => { setShowPrintMenu(false); window.print(); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
-                                        <Printer className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
-                                    </button>
-                                    <button onClick={() => { handleExportSummaryPDF(); setShowPrintMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
-                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <Button onClick={() => setShowDeleteConfirm(true)} disabled={attLoading || attendanceDocs.length === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-200 text-red-600 hover:bg-red-50 gap-1">
-                            <Trash2 className="h-3 w-3"/> تصفير الداتا
-                        </Button>
-                    </div>
-                </div>
-              )}
           </div>
         </div>
 
         <div className="space-y-6">
-            <div className="flex items-center gap-3 px-4">
-                <div className="p-2 bg-primary/10 rounded-xl text-primary"><ShieldCheck className="h-6 w-6"/></div>
-                <div>
-                    <h3 className="text-xl font-black">مركز تدقيق الحضور والمخالفات</h3>
-                    <p className="text-xs text-muted-foreground font-medium">مراجعة الغيابات والتأخيرات لكل موظف قبل الاعتماد المالي النهائي.</p>
-                </div>
-            </div>
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
+                <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                        {/* Right Section: Title (RTL) */}
+                        <div className="space-y-2 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                                <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
+                                <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                    <ShieldCheck className="h-8 w-8" />
+                                </div>
+                            </div>
+                            <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                                مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي.
+                            </CardDescription>
+                        </div>
 
-            {attLoading ? (
-                <div className="p-32 text-center space-y-4">
-                    <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
-                    <p className="font-black text-muted-foreground animate-pulse">جاري فحص قاعدة البيانات...</p>
-                </div>
-            ) : attendanceDocs.length === 0 ? (
-                <div className="p-32 text-center border-4 border-dashed rounded-[4rem] bg-slate-50/50">
-                    <CalendarDays className="h-24 w-24 text-muted-foreground/20 mx-auto mb-6" />
-                    <p className="text-3xl font-black text-muted-foreground">لا توجد بيانات محملة</p>
-                    <p className="text-sm text-muted-foreground mt-2 font-bold">يرجى اختيار الفترة والضغط على "تحميل بيانات الشهر".</p>
-                </div>
-            ) : (
-                <div id="audit-printable-area" className="border-2 rounded-[2.5rem] overflow-hidden bg-white shadow-2xl">
-                    <Table>
-                        <TableHeader className="bg-muted/50 h-16">
-                            <TableRow className="border-none">
-                                <TableHead className="px-8 font-black text-slate-900">الموظف</TableHead>
-                                <TableHead className="font-black text-slate-900">التاريخ</TableHead>
-                                <TableHead className="font-black text-slate-900">المخالفة</TableHead>
-                                <TableHead className="font-black text-slate-900">سجل البصمات</TableHead>
-                                <TableHead className="font-black text-slate-900">الخصم</TableHead>
-                                <TableHead className="text-center no-print font-black text-slate-900">القرار</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {anomalies.length === 0 ? (
-                                <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
-                            ) : anomalies.map((item, idx) => {
-                                const isAbsent = item.record.status === 'absent';
-                                const recordDate = toFirestoreDate(item.record.date);
-                                return (
-                                <TableRow key={idx} className={cn("h-20 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                    <TableCell className="px-8"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
-                                    <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
-                                    <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
-                                    <TableCell>{isAbsent ? <Ban className="h-4 w-4 text-red-200" /> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-4 bg-background">{p}</Badge>)}</div>}</TableCell>
-                                    <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
-                                    <TableCell className="text-center no-print">
-                                        {item.record.auditStatus === 'pending' ? (
-                                            <div className="flex justify-center gap-2">
-                                                <Button type="button" size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                                <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
-                                            </div>
-                                        ) : <Button type="button" variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}
-                                    </TableCell>
-                                </TableRow>
-                            )})}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
+                        {/* Left Section: Stylized Control Box */}
+                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px]">
+                            <div className="space-y-6">
+                                {/* Row 1: Actions */}
+                                <div className="flex justify-between items-center px-4">
+                                    <button 
+                                        onClick={() => handleBulkAuditAction('reset')} 
+                                        disabled={isBulkProcessing}
+                                        className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"
+                                    >
+                                        <RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> 
+                                        إعادة تعيين
+                                    </button>
+                                    <button 
+                                        onClick={() => handleBulkAuditAction('apply')} 
+                                        disabled={isBulkProcessing || pendingCount === 0}
+                                        className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"
+                                    >
+                                        <XCircle className="h-4 w-4" /> خصم للكل
+                                    </button>
+                                    <button 
+                                        onClick={() => handleBulkAuditAction('waive')} 
+                                        disabled={isBulkProcessing || pendingCount === 0}
+                                        className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
+                                    >
+                                        <CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل
+                                    </button>
+                                </div>
+                                
+                                <Separator className="bg-white/10" />
+
+                                {/* Row 2: Tools */}
+                                <div className="flex justify-center gap-16 px-4">
+                                    <button 
+                                        onClick={() => setShowDeleteConfirm(true)} 
+                                        disabled={attLoading || attendanceDocs.length === 0}
+                                        className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"
+                                    >
+                                        <Trash2 className="h-4 w-4" /> تصفير الداتا
+                                    </button>
+                                    <button 
+                                        onClick={handleExportDetailedExcel} 
+                                        disabled={attendanceDocs.length === 0}
+                                        className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
+                                    >
+                                        <FileDown className="h-4 w-4" /> تصدير Excel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {attLoading ? (
+                        <div className="p-20 text-center space-y-4">
+                            <Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" />
+                            <p className="font-black text-muted-foreground animate-pulse">جاري فحص قاعدة البيانات...</p>
+                        </div>
+                    ) : attendanceDocs.length === 0 ? (
+                        <div className="p-32 text-center border-b rounded-b-[2.5rem] bg-slate-50/50">
+                            <Ban className="h-20 w-20 text-muted-foreground/20 mx-auto mb-6" />
+                            <p className="text-2xl font-black text-muted-foreground">لا توجد سجلات حضور مسجلة لهذه الفترة.</p>
+                            <p className="text-sm text-muted-foreground mt-2 font-bold">يرجى رفع ملف الإكسيل للبدء بالتحليل.</p>
+                        </div>
+                    ) : (
+                        <div id="audit-printable-area">
+                            <Table>
+                                <TableHeader className="bg-muted/50 h-16">
+                                    <TableRow className="border-none">
+                                        <TableHead className="px-10 font-black text-[#7209B7]">الموظف</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
+                                        <TableHead className="text-center no-print font-black text-[#7209B7]">القرار</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {anomalies.length === 0 ? (
+                                        <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
+                                    ) : anomalies.map((item, idx) => {
+                                        const isAbsent = item.record.status === 'absent';
+                                        const recordDate = toFirestoreDate(item.record.date);
+                                        return (
+                                        <TableRow key={idx} className={cn("h-20 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
+                                            <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                            <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
+                                            <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
+                                            <TableCell>{isAbsent ? <Ban className="h-4 w-4 text-red-200" /> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-4 bg-background">{p}</Badge>)}</div>}</TableCell>
+                                            <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
+                                            <TableCell className="text-center no-print">
+                                                {item.record.auditStatus === 'pending' ? (
+                                                    <div className="flex justify-center gap-2">
+                                                        <Button type="button" size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                                        <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
+                                                    </div>
+                                                ) : <Button type="button" variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}
+                                            </TableCell>
+                                        </TableRow>
+                                    )})}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
         </div>
 
         <div className="no-print pt-10 border-t flex justify-center pb-20">
