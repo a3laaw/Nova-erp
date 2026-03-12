@@ -19,25 +19,47 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, FileSpreadsheet, Fingerprint, Save, Search, CalendarRange, AlertCircle } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
-import { Checkbox } from '../ui/checkbox';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '../ui/skeleton';
-import { Badge } from '../ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useAuth } from '@/context/auth-context';
-import { Logo } from '../layout/logo';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -103,7 +125,6 @@ export function PayrollGenerator() {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  const [isExportingSummary, setIsExportingSummary] = useState(false);
   
   const [showExcelMenu, setShowExcelMenu] = useState(false);
   const [showPrintMenu, setShowPrintMenu] = useState(false);
@@ -192,9 +213,7 @@ export function PayrollGenerator() {
     }
   };
 
-  useEffect(() => {
-    setAttendanceDocs([]);
-  }, [year, month]);
+  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
   const anomalies = useMemo(() => {
     const list: { docId: string, record: AttendanceRecord, empName: string, employeeNumber: string }[] = [];
@@ -222,96 +241,6 @@ export function PayrollGenerator() {
     });
     return list.sort((a, b) => (toFirestoreDate(a.record.date)?.getTime() || 0) - (toFirestoreDate(b.record.date)?.getTime() || 0));
   }, [attendanceDocs, employees, month, year]);
-
-  const summaryData = useMemo(() => {
-    if (!attendanceDocs || attendanceDocs.length === 0) return [];
-    
-    return employees.map(emp => {
-      const att = attendanceDocs.find(a => a.employeeId === emp.id);
-      if (!att) return null;
-
-      let totalAbsent = 0;
-      let totalLate = 0;
-      let totalDeductionDays = 0;
-
-      att.records?.forEach(r => {
-        if (r.auditStatus === 'waived') return;
-        if (r.status === 'absent') totalAbsent++;
-        else if (r.status === 'late') totalLate++;
-        totalDeductionDays += (r.manualDeductionDays || 0);
-      });
-
-      const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-      const dailyRate = fullSalary / 26;
-      const deductionAmount = totalDeductionDays * dailyRate;
-
-      return {
-        empNo: emp.employeeNumber || '',
-        name: emp.fullName || '',
-        fullSalary,
-        absent: totalAbsent,
-        lateCount: totalLate,
-        deductionDays: totalDeductionDays,
-        dailyRate,
-        deductionAmount,
-        netSalary: fullSalary - deductionAmount
-      };
-    }).filter(Boolean);
-  }, [employees, attendanceDocs]);
-
-  const handleExportDetailedExcel = () => {
-    if (anomalies.length === 0) {
-        toast({ title: 'لا توجد مخالفات لتصديرها' });
-        return;
-    }
-    const data = anomalies.map(a => ({
-        'الموظف': a.empName,
-        'رقم البصمة': a.employeeNumber,
-        'التاريخ': format(toFirestoreDate(a.record.date)!, 'yyyy-MM-dd'),
-        'الحالة': a.record.status === 'absent' ? 'غياب' : 'تأخير/نقص بصمة',
-        'المخالفة': a.record.anomalyDescription,
-        'الخصم المعتمد (أيام)': a.record.manualDeductionDays,
-        'حالة التدقيق': a.record.auditStatus === 'verified' ? 'معتمد' : a.record.auditStatus === 'waived' ? 'متغاضى عنه' : 'قيد المراجعة'
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "سجل المخالفات");
-    XLSX.writeFile(wb, `سجل_مخالفات_${month}_${year}.xlsx`);
-    setShowExcelMenu(false);
-  };
-
-  const handleExportExcel = useCallback(() => {
-    if (summaryData.length === 0) {
-        toast({ title: 'لا توجد بيانات', description: 'يرجى تحميل البيانات أولاً.' });
-        return;
-    }
-    const excelRows = summaryData.map(s => ({
-        'رقم الموظف': s!.empNo, 
-        'اسم الموظف': s!.name, 
-        'الراتب الكامل': s!.fullSalary,
-        'أيام الغياب': s!.absent, 
-        'مرات التأخير': s!.lateCount, 
-        'إجمالي أيام الخصم': s!.deductionDays, 
-        'إجمالي الخصم (KD)': Math.round(s!.deductionAmount * 1000) / 1000,
-        'صافي الراتب المتوقع': Math.round(s!.netSalary * 1000) / 1000,
-    }));
-    const ws = XLSX.utils.json_to_sheet(excelRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Payroll Summary");
-    XLSX.writeFile(wb, `Payroll_Summary_${month}_${year}.xlsx`);
-  }, [summaryData, month, year, toast]);
-
-  const handleExportSummaryPDF = useCallback(() => {
-    if (summaryData.length === 0) {
-        toast({ title: 'لا توجد بيانات للتصدير' });
-        return;
-    }
-    setIsExportingSummary(true);
-    setTimeout(() => {
-        window.print();
-        setIsExportingSummary(false);
-    }, 500);
-  }, [summaryData]);
 
   const handleAuditAction = async (docId: string, date: any, action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser) return;
@@ -354,10 +283,7 @@ export function PayrollGenerator() {
                 if (isTargetAnomaly) {
                     let manualDeduction = r.manualDeductionDays;
                     if (action === 'waive') manualDeduction = 0;
-                    else if (action === 'apply') {
-                        manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
-                    }
-                    else if (action === 'reset') {
+                    else if (action === 'apply' || action === 'reset') {
                         manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
                     }
 
@@ -436,8 +362,28 @@ export function PayrollGenerator() {
     finally { setIsProcessing(false); }
   };
 
+  const handleExportDetailedExcel = () => {
+    if (anomalies.length === 0) {
+        toast({ title: 'لا توجد مخالفات لتصديرها' });
+        return;
+    }
+    const data = anomalies.map(a => ({
+        'الموظف': a.empName,
+        'رقم البصمة': a.employeeNumber,
+        'التاريخ': format(toFirestoreDate(a.record.date)!, 'yyyy-MM-dd'),
+        'الحالة': a.record.status === 'absent' ? 'غياب' : 'تأخير/نقص بصمة',
+        'المخالفة': a.record.anomalyDescription,
+        'الخصم المعتمد (أيام)': a.record.manualDeductionDays,
+        'حالة التدقيق': a.record.auditStatus === 'verified' ? 'معتمد' : a.record.auditStatus === 'waived' ? 'متغاضى عنه' : 'قيد المراجعة'
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "سجل المخالفات");
+    XLSX.writeFile(wb, `سجل_مخالفات_${month}_${year}.xlsx`);
+    setShowExcelMenu(false);
+  };
+
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
-  const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleString('ar', { month: 'long' });
 
   return (
     <div className="space-y-8" dir="rtl">
@@ -493,44 +439,6 @@ export function PayrollGenerator() {
                         </Button>
                         <Button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-muted text-muted-foreground hover:bg-muted gap-1">
                             {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3"/>} إعادة تعيين
-                        </Button>
-                    </div>
-
-                    <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
-                        <div className="relative flex-1">
-                            <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
-                                <FileText className="h-3 w-3"/> Excel ▾
-                            </Button>
-                            {showExcelMenu && (
-                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
-                                    <button onClick={handleExportDetailedExcel} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
-                                        <FileText className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
-                                    </button>
-                                    <button onClick={() => { handleExportExcel(); setShowExcelMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
-                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="relative flex-1">
-                            <Button onClick={() => { setShowPrintMenu(v => !v); setShowExcelMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
-                                <Printer className="h-3 w-3"/> طباعة ▾
-                            </Button>
-                            {showPrintMenu && (
-                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
-                                    <button onClick={() => { setShowPrintMenu(false); window.print(); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
-                                        <Printer className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
-                                    </button>
-                                    <button onClick={() => { handleExportSummaryPDF(); setShowPrintMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
-                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-
-                        <Button onClick={() => setShowDeleteConfirm(true)} disabled={attLoading || attendanceDocs.length === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-200 text-red-600 hover:bg-red-50 gap-1">
-                            <Trash2 className="h-3 w-3"/> تصفير الداتا
                         </Button>
                     </div>
                 </div>
