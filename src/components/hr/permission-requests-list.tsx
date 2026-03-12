@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -144,45 +143,42 @@ export function PermissionRequestsList() {
         </Button>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>اسم الموظف</TableHead>
-              <TableHead>نوع الاستئذان</TableHead>
-              <TableHead>التاريخ</TableHead>
-              <TableHead>السبب</TableHead>
-              <TableHead>الحالة</TableHead>
-              <TableHead>الإجراءات</TableHead>
+          <TableHeader className="bg-[#F8F9FE]">
+            <TableRow className="border-none">
+              <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم الملف</TableHead>
+              <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
+              <TableHead className="font-black text-[#7209B7]">نوع الاستئذان</TableHead>
+              <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
+              <TableHead className="font-black text-[#7209B7]">السبب</TableHead>
+              <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
+              <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading && Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+              <TableRow key={i}><TableCell colSpan={7} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
             ))}
             {!loading && permissionRequests.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد طلبات استئذان.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground font-bold italic">لا توجد طلبات استئذان مسجلة.</TableCell></TableRow>
             )}
             {!loading && permissionRequests.map(req => {
               const emp = employees.find(e => e.id === req.employeeId);
               return (
-              <TableRow key={req.id}>
-                <TableCell className="font-medium">
-                    <div className="flex flex-col">
-                        <span>{req.employeeName}</span>
-                        <span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {emp?.employeeNumber || '---'}</span>
-                    </div>
-                </TableCell>
+              <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
+                <TableCell className="px-8 font-mono font-bold opacity-60 text-xs">{emp?.employeeNumber || '---'}</TableCell>
+                <TableCell className="font-black text-gray-800">{req.employeeName}</TableCell>
                 <TableCell>{typeTranslations[req.type]}</TableCell>
-                <TableCell>{formatDate(req.date)}</TableCell>
-                <TableCell className="max-w-[200px] truncate">{req.reason}</TableCell>
-                <TableCell><Badge variant="outline" className={statusColors[req.status]}>{statusTranslations[req.status]}</Badge></TableCell>
-                <TableCell>
+                <TableCell className="font-bold text-xs opacity-60">{formatDate(req.date)}</TableCell>
+                <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground italic font-medium">{req.reason}</TableCell>
+                <TableCell><Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[req.status])}>{statusTranslations[req.status]}</Badge></TableCell>
+                <TableCell className="text-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent dir="rtl">
+                        <DropdownMenuContent dir="rtl" className="rounded-xl">
                             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
                              {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && req.status === 'pending' && (
                                 <>
@@ -220,13 +216,13 @@ export function PermissionRequestsList() {
       />
       
       <AlertDialog open={!!requestToDelete} onOpenChange={() => setRequestToDelete(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
                 <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
                 <AlertDialogDescription>سيتم حذف هذا الطلب بشكل دائم.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
                     {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالحذف'}
                 </AlertDialogAction>
@@ -235,7 +231,7 @@ export function PermissionRequestsList() {
       </AlertDialog>
 
       <AlertDialog open={!!requestToAction} onOpenChange={() => setRequestToAction(null)}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" className="rounded-3xl">
             <AlertDialogHeader>
                 <AlertDialogTitle>
                     {requestToAction?.action === 'approve' ? 'تأكيد الموافقة' : 'تأكيد الرفض'}
@@ -253,12 +249,13 @@ export function PermissionRequestsList() {
                         placeholder="اكتب سبب الرفض هنا..."
                         value={rejectionReason}
                         onChange={(e) => setRejectionReason(e.target.value)}
+                        className="rounded-xl border-2"
                     />
                 </div>
             )}
-            <AlertDialogFooter>
-                <AlertDialogCancel disabled={isProcessingAction}>تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmAction} disabled={isProcessingAction || (requestToAction?.action === 'reject' && !rejectionReason.trim())}>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel disabled={isProcessingAction} className="rounded-xl">تراجع</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmAction} disabled={isProcessingAction || (requestToAction?.action === 'reject' && !rejectionReason.trim())} className={cn("rounded-xl font-bold px-8", requestToAction?.action === 'approve' ? "bg-green-600" : "bg-red-600")}>
                     {isProcessingAction ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'تأكيد'}
                 </AlertDialogAction>
             </AlertDialogFooter>

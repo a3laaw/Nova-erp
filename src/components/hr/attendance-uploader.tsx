@@ -513,7 +513,8 @@ export function AttendanceUploader() {
                         <Table>
                             <TableHeader className="bg-muted/50 sticky top-0 z-10">
                                 <TableRow className="h-14">
-                                    <TableHead className="px-10 py-4 font-black text-gray-800">اسم الموظف</TableHead>
+                                    <TableHead className="px-10 font-black text-gray-800">اسم الموظف</TableHead>
+                                    <TableHead className="font-black text-gray-800">رقم الملف</TableHead>
                                     <TableHead className="font-black text-gray-800">رقم البصمة</TableHead>
                                     <TableHead className="font-black text-center text-gray-800">بداية الدوام</TableHead>
                                     <TableHead className="font-black text-center text-gray-800">نهاية الدوام</TableHead>
@@ -522,9 +523,9 @@ export function AttendanceUploader() {
                             </TableHeader>
                             <TableBody>
                                 {employeesLoading ? (
-                                    Array.from({length: 5}).map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl"/></TableCell></TableRow>)
+                                    Array.from({length: 5}).map((_, i) => <TableRow key={i}><TableCell colSpan={6} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl"/></TableCell></TableRow>)
                                 ) : filteredEmployees.length === 0 ? (
-                                    <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد سجلات للموظفين.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد سجلات للموظفين.</TableCell></TableRow>
                                 ) : (
                                     filteredEmployees.map((emp) => {
                                         const current = editableData[emp.id!] || { employeeNumber: '', workStartTime: '', workEndTime: '' };
@@ -532,7 +533,13 @@ export function AttendanceUploader() {
                                         const isFullTime = !current.workStartTime && !current.workEndTime;
                                         return (
                                             <TableRow key={emp.id} className={cn("hover:bg-primary/5 transition-colors h-20 border-b last:border-0", !isFullTime && "bg-sky-50/20")}>
-                                                <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{emp.fullName}</span><span className="text-[10px] text-muted-foreground font-bold">{emp.department}</span><span className="font-mono text-[9px] text-primary">ملف: {emp.employeeNumber}</span></div></TableCell>
+                                                <TableCell className="px-10">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-black text-base text-gray-800">{emp.fullName}</span>
+                                                        <span className="text-[10px] text-muted-foreground font-bold">{emp.department}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="font-mono font-black text-sm opacity-60">{emp.employeeNumber}</TableCell>
                                                 <TableCell><Input value={current.employeeNumber} onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, employeeNumber: e.target.value }}))} className="font-mono font-black h-10 rounded-xl border-2 w-32 text-center text-primary" placeholder="000"/></TableCell>
                                                 <TableCell><Input type="time" value={current.workStartTime} onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workStartTime: e.target.value }}))} className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"/></TableCell>
                                                 <TableCell><Input type="time" value={current.workEndTime} onChange={(e) => setEditableData(prev => ({...prev, [emp.id!]: { ...current, workEndTime: e.target.value }}))} className="font-mono h-10 rounded-xl border-2 w-32 mx-auto text-center"/></TableCell>

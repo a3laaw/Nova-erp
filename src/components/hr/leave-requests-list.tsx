@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -417,7 +416,8 @@ export function LeaveRequestsList() {
         <Table>
           <TableHeader className="bg-[#F8F9FE]">
             <TableRow className="border-none">
-              <TableHead className="px-8 py-5 font-black text-[#7209B7]">اسم الموظف</TableHead>
+              <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم الملف</TableHead>
+              <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
               <TableHead className="font-black text-[#7209B7]">نوع الإجازة</TableHead>
               <TableHead className="font-black text-[#7209B7]">الفترة</TableHead>
               <TableHead className="font-black text-[#7209B7]">الأيام (مدفوع / بدون)</TableHead>
@@ -428,20 +428,18 @@ export function LeaveRequestsList() {
           <TableBody>
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}><TableCell colSpan={6} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+                <TableRow key={i}><TableCell colSpan={7} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
               ))
             ) : leaveRequests.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد طلبات إجازة مسجلة.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد طلبات إجازة مسجلة.</TableCell></TableRow>
             ) : (
               leaveRequests.map(req => {
                 const emp = employees.find(e => e.id === req.employeeId);
                 return (
                 <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16 cursor-pointer" onClick={() => router.push(`/dashboard/hr/leaves/${req.id}`)}>
-                  <TableCell className="px-8">
-                    <div className="flex flex-col">
-                        <span className="font-black text-gray-800">{req.employeeName}</span>
-                        <span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {emp?.employeeNumber || '---'}</span>
-                    </div>
+                  <TableCell className="px-8 font-mono font-bold opacity-60 text-xs">{emp?.employeeNumber || '---'}</TableCell>
+                  <TableCell>
+                    <span className="font-black text-gray-800">{req.employeeName}</span>
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-bold px-3">
