@@ -1,10 +1,24 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardContent, 
+  CardDescription, 
+  CardFooter 
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
@@ -40,10 +54,6 @@ import { useBranding } from '@/context/branding-context';
 import { Separator } from '@/components/ui/separator';
 import { Logo } from '../layout/logo';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-
-const leaveTypeTranslations: Record<string, string> = {
-    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
-};
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
@@ -101,7 +111,6 @@ export function PayrollGenerator() {
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ في التحميل' });
     } finally {
-      setLoadingPayslips(false); // Fix: reference correct state if needed, but fetchAttendance doesn't use payslips state
       setAttLoading(false);
     }
   };
@@ -261,10 +270,7 @@ export function PayrollGenerator() {
     }
     setIsExportingSummary(true);
     setTimeout(() => {
-        const element = document.getElementById('summary-printable-area');
-        if (element) {
-            window.print();
-        }
+        window.print();
         setIsExportingSummary(false);
     }, 500);
   }, [summaryData]);
@@ -433,6 +439,70 @@ export function PayrollGenerator() {
                     </Button>
                 </div>
               </div>
+
+              {/* الفريم الثالث: المراجعة */}
+              {attendanceDocs.length > 0 && (
+                <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                            <ShieldCheck className="h-3 w-3"/> قرارات التدقيق الجماعي
+                        </span>
+                        {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
+                    </div>
+
+                    {/* فريم ١: قرارات التدقيق */}
+                    <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
+                        <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
+                        </Button>
+                        <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
+                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <XCircle className="h-3 w-3"/>} خصم للكل
+                        </Button>
+                        <Button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-muted text-muted-foreground hover:bg-muted gap-1">
+                            {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <RotateCcw className="h-3 w-3"/>} إعادة تعيين
+                        </Button>
+                    </div>
+
+                    {/* فريم ٢: التصدير والحذف */}
+                    <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
+                        <div className="relative flex-1">
+                            <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                                <FileText className="h-3 w-3"/> Excel ▾
+                            </Button>
+                            {showExcelMenu && (
+                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
+                                    <button onClick={handleExportDetailedExcel} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
+                                        <FileText className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
+                                    </button>
+                                    <button onClick={() => { handleExportExcel(); setShowExcelMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
+                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="relative flex-1">
+                            <Button onClick={() => { setShowPrintMenu(v => !v); setShowExcelMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                                <Printer className="h-3 w-3"/> طباعة ▾
+                            </Button>
+                            {showPrintMenu && (
+                                <div className="absolute top-12 right-0 z-50 bg-white border-2 border-green-100 rounded-2xl shadow-xl overflow-hidden min-w-[150px] animate-in fade-in zoom-in-95">
+                                    <button onClick={() => { setShowPrintMenu(false); window.print(); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 border-b border-green-50 flex items-center gap-2">
+                                        <Printer className="h-3 w-3 text-green-600"/> تفصيلي (مخالفات)
+                                    </button>
+                                    <button onClick={() => { handleExportSummaryPDF(); setShowPrintMenu(false); }} className="w-full text-right px-4 py-2.5 text-xs font-black text-gray-700 hover:bg-green-50 flex items-center gap-2">
+                                        <FileDown className="h-3 w-3 text-green-600"/> ملخص (رواتب)
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <Button onClick={() => setShowDeleteConfirm(true)} disabled={attLoading || attendanceDocs.length === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-red-200 text-red-600 hover:bg-red-50 gap-1">
+                            <Trash2 className="h-3 w-3"/> تصفير الداتا
+                        </Button>
+                    </div>
+                </div>
+              )}
           </div>
         </div>
 
@@ -440,7 +510,6 @@ export function PayrollGenerator() {
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
-                        {/* Right Section: Title (RTL) */}
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
@@ -453,53 +522,17 @@ export function PayrollGenerator() {
                             </CardDescription>
                         </div>
 
-                        {/* Left Section: Stylized Control Box (Mirroring the professional image) */}
                         <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1" dir="rtl">
                             <div className="space-y-6">
-                                {/* Row 1: Decisions */}
                                 <div className="flex justify-between items-center px-4">
-                                    <button 
-                                        onClick={() => handleBulkAuditAction('waive')} 
-                                        disabled={isBulkProcessing || pendingCount === 0}
-                                        className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
-                                    >
-                                        <CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل
-                                    </button>
-                                    <button 
-                                        onClick={() => handleBulkAuditAction('apply')} 
-                                        disabled={isBulkProcessing || pendingCount === 0}
-                                        className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"
-                                    >
-                                        <XCircle className="h-4 w-4" /> خصم للكل
-                                    </button>
-                                    <button 
-                                        onClick={() => handleBulkAuditAction('reset')} 
-                                        disabled={isBulkProcessing}
-                                        className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"
-                                    >
-                                        <RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> 
-                                        إعادة تعيين
-                                    </button>
+                                    <button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"><CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل</button>
+                                    <button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"><XCircle className="h-4 w-4" /> خصم للكل</button>
+                                    <button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"><RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> إعادة تعيين</button>
                                 </div>
-                                
                                 <Separator className="bg-white/10" />
-
-                                {/* Row 2: Tools */}
                                 <div className="flex justify-center gap-16 px-4">
-                                    <button 
-                                        onClick={handleExportDetailedExcel} 
-                                        disabled={attendanceDocs.length === 0}
-                                        className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
-                                    >
-                                        <FileDown className="h-4 w-4" /> تصدير Excel
-                                    </button>
-                                    <button 
-                                        onClick={() => setShowDeleteConfirm(true)} 
-                                        disabled={attLoading || attendanceDocs.length === 0}
-                                        className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"
-                                    >
-                                        <Trash2 className="h-4 w-4" /> تصفير الداتا
-                                    </button>
+                                    <button onClick={handleExportDetailedExcel} disabled={attendanceDocs.length === 0} className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"><FileDown className="h-4 w-4" /> تصدير Excel</button>
+                                    <button onClick={() => setShowDeleteConfirm(true)} disabled={attLoading || attendanceDocs.length === 0} className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"><Trash2 className="h-4 w-4" /> تصفير الداتا</button>
                                 </div>
                             </div>
                         </div>
