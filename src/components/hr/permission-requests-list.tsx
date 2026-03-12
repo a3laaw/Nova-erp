@@ -28,6 +28,7 @@ import { useAuth } from '@/context/auth-context';
 import { Textarea } from '../ui/textarea';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { useSearchParams } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 
 const statusColors: Record<PermissionRequest['status'], string> = {
@@ -179,7 +180,7 @@ export function PermissionRequestsList() {
                             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent dir="rtl" className="rounded-xl">
-                            <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                            <DropdownMenuLabel>إجراءات الطلب</DropdownMenuLabel>
                              {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && req.status === 'pending' && (
                                 <>
                                     <DropdownMenuItem onClick={() => setRequestToAction({request: req, action: 'approve'})} className="text-green-600 focus:text-green-700 focus:bg-green-50">
