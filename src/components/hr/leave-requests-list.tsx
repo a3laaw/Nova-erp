@@ -106,11 +106,11 @@ export function LeaveRequestsList() {
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [requestToApprove, setRequestToApprove] = setState<LeaveRequest | null>(null);
-  const [requestToReject, setRequestToReject] = setState<LeaveRequest | null>(null);
-  const [requestToUndoApproval, setRequestToUndoApproval] = setState<LeaveRequest | null>(null);
-  const [requestToStart, setRequestToStart] = setState<LeaveRequest | null>(null);
-  const [requestToReturn, setRequestToReturn] = setState<LeaveRequest | null>(null);
+  const [requestToApprove, setRequestToApprove] = useState<LeaveRequest | null>(null);
+  const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
+  const [requestToUndoApproval, setRequestToUndoApproval] = useState<LeaveRequest | null>(null);
+  const [requestToStart, setRequestToStart] = useState<LeaveRequest | null>(null);
+  const [requestToReturn, setRequestToReturn] = useState<LeaveRequest | null>(null);
 
   const [rejectionReason, setRejectionReason] = useState('');
   const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
@@ -289,7 +289,7 @@ export function LeaveRequestsList() {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id!);
+        const leaveRef = doc(firestore, 'permissionRequests', requestToReject.id!);
         await updateDoc(leaveRef, {
             status: 'rejected',
             rejectionReason: rejectionReason,
