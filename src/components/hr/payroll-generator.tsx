@@ -56,7 +56,7 @@ import {
     CalendarCheck,
     Sparkles
 } from 'lucide-react';
-import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
+import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday, Payslip } from '@/lib/types';
 import { format, isValid, getDay, isAfter, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cleanFirestoreData, cn, formatCurrency } from '@/lib/utils';
@@ -86,51 +86,6 @@ const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
 };
 
-const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
-    if (val === undefined || val === null || val === '') return null;
-    
-    let parsedDate: Date | null = null;
-    let timeStr = "00:00";
-
-    if (typeof val === 'number') {
-        try {
-            const excelDate = XLSX.SSF.parse_date_code(val);
-            if (excelDate.y < 2000) return null;
-            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
-            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
-        } catch { return null; }
-    } 
-    else if (typeof val === 'string') {
-        const cleaned = val.trim();
-        const dateMatch = cleaned.match(/(\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4})/);
-        const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
-
-        if (dateMatch) {
-            const dateStr = dateMatch[0];
-            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'];
-            for (const fmt of formats) {
-                const p = parse(dateStr, fmt, new Date());
-                if (isValid(p)) {
-                    if (p.getFullYear() < 2000) break;
-                    parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
-                    break;
-                }
-            }
-        }
-
-        if (timeMatch) {
-            const tStr = timeMatch[0].toUpperCase();
-            const tp = parse(tStr, tStr.includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
-            if (isValid(tp)) timeStr = format(tp, 'HH:mm');
-        }
-    }
-
-    if (parsedDate && isValid(parsedDate)) {
-        return { date: parsedDate, timeStr };
-    }
-    return null;
-};
-
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -139,7 +94,6 @@ export function PayrollGenerator() {
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
-  const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [attLoading, setAttLoading] = useState(false);
@@ -148,6 +102,18 @@ export function PayrollGenerator() {
 
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', 'in', ['active', 'on-leave'])]);
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
+
+  // ✨ الرقابة اللحظية على حالة صرف الرواتب
+  const payrollQuery = useMemo(() => [
+    where('year', '==', parseInt(year)),
+    where('month', '==', parseInt(month))
+  ], [year, month]);
+  
+  const { data: monthPayslips, loading: payrollLoading } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
+
+  const isMonthPaid = useMemo(() => {
+    return monthPayslips.length > 0 && monthPayslips.some(p => p.status === 'paid');
+  }, [monthPayslips]);
 
   const fetchAttendance = async () => {
     if (!firestore) return;
@@ -169,8 +135,6 @@ export function PayrollGenerator() {
       setAttLoading(false);
     }
   };
-
-  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
   const handleDeleteMonth = async () => {
     if (!firestore) return;
@@ -301,7 +265,6 @@ export function PayrollGenerator() {
 
   const handleExportTotalsExcel = () => {
     if (attendanceDocs.length === 0) return;
-    // ✨ تحديث الأعمدة لتتطابق مع الصورة المرفقة
     const data = attendanceDocs.map(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
         const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
@@ -341,9 +304,7 @@ export function PayrollGenerator() {
 
   const handlePrint = (type: 'summary' | 'detailed') => {
     setIsPrintingSummary(type === 'summary');
-    setTimeout(() => {
-        window.print();
-    }, 100);
+    setTimeout(() => { window.print(); }, 100);
   };
 
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
@@ -393,10 +354,10 @@ export function PayrollGenerator() {
 
                     <div className="flex flex-wrap gap-2">
                         <div className="p-2 rounded-2xl border-2 border-purple-100 bg-white flex gap-2 flex-grow">
-                            <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-9 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
+                            <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0 || isMonthPaid} variant="outline" className="flex-1 h-9 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
                                 <CheckCircle2 className="h-3 w-3"/> تغاضي جماعي
                             </Button>
-                            <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-9 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
+                            <Button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0 || isMonthPaid} variant="outline" className="flex-1 h-9 rounded-xl font-bold text-[10px] border-red-300 text-red-700 hover:bg-red-50 gap-1">
                                 <XCircle className="h-3 w-3"/> خصم جماعي
                             </Button>
                         </div>
@@ -410,7 +371,7 @@ export function PayrollGenerator() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
                                     <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
-                                        <LayoutList className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
+                                        <LayoutGrid className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={handleExportDetailedExcel} className="py-3 font-bold gap-2">
                                         <ListFilter className="h-4 w-4 text-green-600" /> تقرير المخالفات التفصيلي
@@ -426,7 +387,7 @@ export function PayrollGenerator() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
                                     <DropdownMenuItem onClick={() => handlePrint('summary')} className="py-3 font-bold gap-2">
-                                        <LayoutList className="h-4 w-4 text-blue-600" /> كشف الحضور الإجمالي
+                                        <LayoutGrid className="h-4 w-4 text-blue-600" /> كشف الحضور الإجمالي
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handlePrint('detailed')} className="py-3 font-bold gap-2">
                                         <ListFilter className="h-4 w-4 text-primary" /> سجل المخالفات التفصيلي
@@ -465,7 +426,6 @@ export function PayrollGenerator() {
                         </div>
                     ) : (
                         <>
-                            {/* --- القسم التفصيلي (المخالفات) --- */}
                             <div id="audit-printable-area" className={cn(isPrintingSummary ? "hidden" : "block")}>
                                 <div className="hidden print:block p-8 border-b-2 mb-6">
                                     <h1 className="text-2xl font-black">سجل مخالفات الحضور والتدقيق الميداني</h1>
@@ -503,10 +463,10 @@ export function PayrollGenerator() {
                                                 <TableCell className="text-center no-print px-6">
                                                     {item.record.auditStatus === 'pending' ? (
                                                         <div className="flex justify-center gap-3">
-                                                            <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد</Button>
+                                                            <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')} disabled={isMonthPaid}>تغاضي</Button>
+                                                            <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')} disabled={isMonthPaid}>اعتماد</Button>
                                                         </div>
-                                                    ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2"><History className="h-3 w-3"/>تغيير القرار</Button>}
+                                                    ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2" disabled={isMonthPaid}><History className="h-3 w-3"/>تغيير القرار</Button>}
                                                 </TableCell>
                                             </TableRow>
                                         )})}
@@ -514,7 +474,6 @@ export function PayrollGenerator() {
                                 </Table>
                             </div>
 
-                            {/* --- القسم الإجمالي (كشف الحضور) - يظهر فقط في الطباعة أو عند تفعيله --- */}
                             <div id="summary-printable-area" className={cn(isPrintingSummary ? "block" : "hidden", "print:block")}>
                                 <div className="hidden print:block p-8 border-b-2 mb-6 text-center">
                                     <h1 className="text-2xl font-black">كشف حضور وانصراف الموظفين الإجمالي</h1>
@@ -523,7 +482,6 @@ export function PayrollGenerator() {
                                 <Table>
                                     <TableHeader className="bg-muted/50 h-16">
                                         <TableRow className="border-none">
-                                            {/* ✨ مطابقة رؤوس الجدول مع الصورة */}
                                             <TableHead className="px-10 font-black">الرقم الوظيفي</TableHead>
                                             <TableHead className="font-black">اسم الموظف</TableHead>
                                             <TableHead className="font-black">القسم</TableHead>
@@ -564,11 +522,18 @@ export function PayrollGenerator() {
         <div className="no-print pt-10 border-t flex justify-center pb-20">
             <Button 
                 onClick={handleGeneratePayroll} 
-                disabled={isProcessing || pendingCount > 0 || attendanceDocs.length === 0} 
-                className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/90 gap-4 min-w-[350px] active:translate-y-1 transition-all"
+                disabled={isProcessing || pendingCount > 0 || attendanceDocs.length === 0 || isMonthPaid} 
+                className={cn(
+                    "h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 gap-4 min-w-[350px] active:translate-y-1 transition-all",
+                    isMonthPaid ? "bg-green-600 hover:bg-green-700 cursor-not-allowed opacity-90" : "bg-primary text-white hover:bg-primary/90"
+                )}
             >
-                {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <Banknote className="h-8 w-8"/>} 
-                {pendingCount > 0 ? `بانتظار مراجعتك (${pendingCount} مخالفة)` : 'اعتماد وصرف الرواتب النهائية'}
+                {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : isMonthPaid ? <CheckCircle2 className="h-8 w-8"/> : <Banknote className="h-8 w-8"/>} 
+                {isMonthPaid 
+                    ? 'تم اعتماد وصرف رواتب هذا الشهر' 
+                    : (pendingCount > 0 
+                        ? `بانتظار مراجعتك (${pendingCount} مخالفة)` 
+                        : 'اعتماد وصرف الرواتب النهائية')}
             </Button>
         </div>
 
