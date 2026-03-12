@@ -230,7 +230,7 @@ const navItems = {
 };
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile, state } = useSidebar();
+  const { setOpenMobile, state, setOpen } = useSidebar();
   const isCollapsed = state === "collapsed";
   const Icon = item.icon;
 
@@ -244,7 +244,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return (
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label}>
-          <Link href={item.href} onClick={() => setOpenMobile(false)}>
+          <Link href={item.href} onClick={() => {
+            setOpenMobile(false);
+            if (isCollapsed) setOpen(true);
+          }}>
             {Icon && (
               <Icon 
                 className="size-8 shrink-0 transition-colors" 
@@ -286,7 +289,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 const ChildIcon = child.icon;
                 return (
                   <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/5 text-primary font-bold")}>
-                    <Link href={child.href} className="flex items-center gap-3 w-full py-2.5 px-3">
+                    <Link href={child.href} onClick={() => {
+                        setOpenMobile(false);
+                        setOpen(true); // Expand sidebar on navigation
+                    }}>
                       {ChildIcon && <ChildIcon className="size-5 shrink-0" />}
                       <span className="text-sm">{child.label}</span>
                     </Link>
