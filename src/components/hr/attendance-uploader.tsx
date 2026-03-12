@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History, AlertCircle } from 'lucide-react';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History, AlertCircle, XCircle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -159,7 +159,6 @@ export function AttendanceUploader() {
     } catch (e) {
       console.error(e);
     } finally {
-      setLoadingPrimary(false);
       setAttLoading(false);
     }
   }, [firestore, year, month]);
@@ -325,7 +324,6 @@ export function AttendanceUploader() {
                         let manualDeduction = 0;
                         let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
 
-                        // ✨ كشف التعارض بين البصمة والإجازة
                         if (activeLeave) {
                             anomaly = `⚠️ تعارض: بصمة موجودة أثناء إجازة (${leaveTypeTranslations[activeLeave.leaveType]})`;
                             auditStatus = 'pending';
@@ -442,12 +440,12 @@ export function AttendanceUploader() {
   const handleBulkAuditAction = async (action: 'waive' | 'apply' | 'reset') => {
     if (!firestore || !currentUser || anomalies.length === 0) return;
     const targets = action === 'reset' ? anomalies : anomalies.filter(a => a.record.auditStatus === 'pending');
-    if (targets.length === 0) return;
+    if (targets.length === 0 && action !== 'reset') return;
 
     setIsBulkProcessing(true);
     try {
         const batch = writeBatch(firestore);
-        const updatedDocIds = new Set(targets.map(a => a.docId));
+        const updatedDocIds = new Set(anomalies.map(a => a.docId));
         
         for (const docId of Array.from(updatedDocIds)) {
             const docRef = doc(firestore, 'attendance', docId);
@@ -455,10 +453,13 @@ export function AttendanceUploader() {
             if (!currentDoc) continue;
 
             const updatedRecords = currentDoc.records.map(r => {
-                const isTargetAnomaly = targets.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
+                const isTargetAnomaly = anomalies.some(pa => pa.docId === docId && pa.record.date.seconds === r.date.seconds);
                 if (isTargetAnomaly) {
                     let manualDeduction = r.manualDeductionDays;
                     if (action === 'waive') manualDeduction = 0;
+                    else if (action === 'apply') {
+                        manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                    }
                     else if (action === 'reset') {
                         manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
                     }
@@ -493,7 +494,7 @@ export function AttendanceUploader() {
     return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber.includes(lower));
   }, [employees, mappingSearch]);
 
-  const [loadingPrimary, setLoadingPrimary] = useState(false);
+  const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
 
   return (
     <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
@@ -598,12 +599,23 @@ export function AttendanceUploader() {
                                     </div>
                                     <CardDescription className="text-slate-400 font-bold">مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي.</CardDescription>
                                 </div>
-                                <div className="flex gap-3 bg-white/10 p-2 rounded-2xl border border-white/10 shadow-inner">
-                                    <Button variant="ghost" onClick={() => setIsClearConfirmOpen(true)} disabled={isClearing || attendanceDocs.length === 0} className="h-10 px-6 rounded-xl font-black text-red-400 hover:bg-red-500 hover:text-white gap-2 transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-none border border-red-500/20">
-                                        <Trash2 className="h-4 w-4" /> تصفير الداتا الحالية
+                                <div className="flex flex-wrap gap-2 bg-white/10 p-2 rounded-2xl border border-white/10 shadow-inner">
+                                    <div className="flex gap-1 border-l border-white/10 pl-2 ml-1">
+                                        <Button variant="ghost" size="sm" onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-green-400 hover:bg-green-600 hover:text-white gap-1 text-[10px]">
+                                            <CheckCircle2 className="h-3.5 w-3.5" /> تغاضي عن الكل
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-red-400 hover:bg-red-600 hover:text-white gap-1 text-[10px]">
+                                            <XCircle className="h-3.5 w-3.5" /> خصم للكل
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing || anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-slate-400 hover:bg-slate-600 hover:text-white gap-1 text-[10px]">
+                                            <RotateCcw className="h-3.5 w-3.5" /> إعادة تعيين
+                                        </Button>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={handleExportAuditExcel} disabled={anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-green-400 hover:bg-green-600 hover:text-white gap-1 text-[10px]">
+                                        <FileDown className="h-3.5 w-3.5" /> تصدير Excel
                                     </Button>
-                                    <Button variant="ghost" onClick={handleExportAuditExcel} disabled={anomalies.length === 0} className="h-10 px-6 rounded-xl font-black text-green-400 hover:bg-green-600 hover:text-white gap-2 transition-all shadow-[0_4px_0_0_rgba(0,0,0,0.2)] active:translate-y-1 active:shadow-none border border-green-500/20">
-                                        <FileDown className="h-4 w-4" /> تصدير المخالفات (Excel)
+                                    <Button variant="ghost" size="sm" onClick={() => setIsClearConfirmOpen(true)} disabled={isClearing || attendanceDocs.length === 0} className="h-9 px-4 rounded-xl font-black text-red-400 hover:bg-red-500 hover:text-white gap-1 text-[10px]">
+                                        <Trash2 className="h-3.5 w-3.5" /> تصفير الداتا
                                     </Button>
                                 </div>
                             </div>
