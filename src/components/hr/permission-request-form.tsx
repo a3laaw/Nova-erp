@@ -9,13 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, PermissionRequest } from '@/lib/types';
-import { Loader2, Save, Upload } from 'lucide-react';
+import type { Employee, PermissionRequest, LeaveRequest } from '@/lib/types';
+import { Loader2, Save, Upload, ShieldAlert } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { InlineSearchList } from '../ui/inline-search-list';
-import { startOfMonth, endOfMonth, isSameDay } from 'date-fns';
+import { startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -77,11 +77,32 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       const selectedEmployee = activeEmployees.find(e => e.id === selectedEmployeeId);
       if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار أو أنه غير نشط.');
       
+      const checkDateStart = startOfDay(date);
+      const checkDateEnd = endOfDay(date);
+
+      // --- الدرع الرقابي: التحقق من وجود إجازة معتمدة في نفس التاريخ ---
+      const leavesQuery = query(
+          collection(firestore, 'leaveRequests'),
+          where('employeeId', '==', selectedEmployeeId)
+      );
+      const leavesSnapshot = await getDocs(leavesQuery);
+      const hasOverlappingLeave = leavesSnapshot.docs.some(docSnap => {
+          const l = docSnap.data() as LeaveRequest;
+          const leaveStart = toFirestoreDate(l.startDate);
+          const leaveEnd = toFirestoreDate(l.endDate);
+          return ['approved', 'on-leave', 'returned'].includes(l.status) &&
+                 leaveStart && leaveEnd &&
+                 checkDateStart >= startOfDay(leaveStart) && checkDateStart <= endOfDay(leaveEnd);
+      });
+
+      if (hasOverlappingLeave) {
+          throw new Error('⚠️ منع رقابي: لا يمكن تقديم طلب استئذان لموظف في إجازة معتمدة في هذا التاريخ.');
+      }
+
       if (!isEditing) {
         const startOfMonthDate = startOfMonth(date);
         const endOfMonthDate = endOfMonth(date);
         
-        // FIX: Simplified query to only filter by employeeId to avoid composite index requirement
         const permissionsQuery = query(
             collection(firestore, 'permissionRequests'),
             where('employeeId', '==', selectedEmployeeId)
@@ -89,7 +110,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         const permissionsSnapshot = await getDocs(permissionsQuery);
         const allUserPermissions = permissionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 
-        // Memory-based filtering for month count
         const approvedCountInMonth = allUserPermissions.filter(p => {
             const pDate = toFirestoreDate(p.date);
             return p.status === 'approved' && pDate && pDate >= startOfMonthDate && pDate <= endOfMonthDate;
@@ -99,7 +119,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             throw new Error('لقد استنفذ الموظف الحد الأقصى للاستئذانات الموافق عليها (3) لهذا الشهر.');
         }
         
-        // Memory-based filtering for same day check
         const sameDayRequest = allUserPermissions.some(p => {
             const pDate = toFirestoreDate(p.date);
             return pDate && isSameDay(pDate, date);
@@ -135,9 +154,9 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       onSaveSuccess();
       onClose();
 
-    } catch (error) {
+    } catch (error: any) {
       const message = error instanceof Error ? error.message : "فشل حفظ الطلب.";
-      toast({ variant: 'destructive', title: 'خطأ', description: message });
+      toast({ variant: 'destructive', title: 'خطأ في العملية', description: message });
     } finally {
       setIsSaving(false);
     }
@@ -145,32 +164,45 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent dir="rtl">
+      <DialogContent 
+        className="sm:max-w-md rounded-[2rem] shadow-2xl border-none" 
+        dir="rtl"
+        onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
+                e.preventDefault();
+            }
+        }}
+      >
         <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>{isEditing ? 'تعديل طلب استئذان' : 'طلب استئذان جديد'}</DialogTitle>
-            <DialogDescription>
-              سيتم إرسال الطلب للموافقة عليه من قبل مدير النظام أو قسم الموارد البشرية.
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-xl font-black flex items-center gap-2">
+                <ShieldAlert className="text-primary h-5 w-5" />
+                {isEditing ? 'تعديل طلب استئذان' : 'طلب استئذان جديد'}
+            </DialogTitle>
+            <DialogDescription className="text-xs font-bold">
+              سيخضع الطلب لرقابة التداخل مع الإجازات ومسيرة الرواتب.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-6 py-6">
             {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
               <div className="grid gap-2">
-                <Label htmlFor="employee">الموظف</Label>
+                <Label htmlFor="employee" className="font-bold mr-1">الموظف المعني *</Label>
                 <InlineSearchList
                     value={selectedEmployeeId}
                     onSelect={setSelectedEmployeeId}
                     options={employeeOptions}
-                    placeholder="اختر موظفًا..."
-                    disabled={loadingRefs}
+                    placeholder={loadingRefs ? 'جاري التحميل...' : 'اختر موظفاً...'}
+                    disabled={loadingRefs || isSaving}
+                    className="h-11 rounded-xl"
                 />
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="permissionType">نوع الاستئذان</Label>
-                <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)}>
-                    <SelectTrigger id="permissionType"><SelectValue/></SelectTrigger>
+                <Label htmlFor="permissionType" className="font-bold mr-1">نوع الاستئذان *</Label>
+                <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)} disabled={isSaving}>
+                    <SelectTrigger id="permissionType" className="h-11 rounded-xl border-2"><SelectValue/></SelectTrigger>
                     <SelectContent dir="rtl">
                         <SelectItem value="late_arrival">تأخير صباحي</SelectItem>
                         <SelectItem value="early_departure">خروج مبكر</SelectItem>
@@ -178,25 +210,27 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date">تاريخ الاستئذان</Label>
-                <DateInput value={date} onChange={setDate} />
+                <Label htmlFor="date" className="font-bold mr-1">تاريخ الاستئذان *</Label>
+                <DateInput value={date} onChange={setDate} className="h-11 rounded-xl" disabled={isSaving} />
               </div>
             </div>
              <div className="grid gap-2">
-              <Label htmlFor="reason">السبب / ملاحظات</Label>
-              <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+              <Label htmlFor="reason" className="font-bold mr-1">السبب / مبرر الطلب *</Label>
+              <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} required rows={3} className="rounded-2xl border-2" placeholder="اشرح سبب الاستئذان..." disabled={isSaving} />
             </div>
-            <Alert>
-                <Info className="h-4 w-4" />
-                <AlertTitle>ملاحظة</AlertTitle>
-                <AlertDescription>
-                    الحد الأقصى المسموح به لطلبات الاستئذان الموافق عليها هو 3 طلبات شهريًا.
+            
+            <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertTitle className="text-xs font-black text-primary uppercase">قواعد الرقابة</AlertTitle>
+                <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1">
+                    • الحد الأقصى: 3 استئذانات شهرياً. <br/>
+                    • يُمنع الاستئذان في أيام الإجازات المعتمدة.
                 </AlertDescription>
             </Alert>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-            <Button type="submit" disabled={isSaving}>
+          <DialogFooter className="gap-2 border-t pt-6">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold">إلغاء</Button>
+            <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-10 shadow-lg shadow-primary/20">
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
               {isEditing ? 'حفظ التعديلات' : 'إرسال الطلب'}
             </Button>
