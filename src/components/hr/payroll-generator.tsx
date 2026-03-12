@@ -139,6 +139,7 @@ export function PayrollGenerator() {
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+  const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [attLoading, setAttLoading] = useState(false);
@@ -300,6 +301,7 @@ export function PayrollGenerator() {
 
   const handleExportTotalsExcel = () => {
     if (attendanceDocs.length === 0) return;
+    // ✨ تحديث الأعمدة لتتطابق مع الصورة المرفقة
     const data = attendanceDocs.map(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
         const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
@@ -408,10 +410,10 @@ export function PayrollGenerator() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
                                     <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
-                                        <LayoutList className="h-4 w-4 text-primary" /> إجمالي الشهر (للمحاسبة)
+                                        <LayoutList className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={handleExportDetailedExcel} className="py-3 font-bold gap-2">
-                                        <ListFilter className="h-4 w-4 text-green-600" /> سجل المخالفات التفصيلي
+                                        <ListFilter className="h-4 w-4 text-green-600" /> تقرير المخالفات التفصيلي
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -521,12 +523,13 @@ export function PayrollGenerator() {
                                 <Table>
                                     <TableHeader className="bg-muted/50 h-16">
                                         <TableRow className="border-none">
-                                            <TableHead className="px-10 font-black">رقم الملف</TableHead>
+                                            {/* ✨ مطابقة رؤوس الجدول مع الصورة */}
+                                            <TableHead className="px-10 font-black">الرقم الوظيفي</TableHead>
                                             <TableHead className="font-black">اسم الموظف</TableHead>
                                             <TableHead className="font-black">القسم</TableHead>
-                                            <TableHead className="text-center font-black">الحضور</TableHead>
-                                            <TableHead className="text-center font-black">الغياب</TableHead>
-                                            <TableHead className="text-center font-black">الإجازات</TableHead>
+                                            <TableHead className="text-center font-black">أيام الحضور</TableHead>
+                                            <TableHead className="text-center font-black">أيام الغياب</TableHead>
+                                            <TableHead className="text-center font-black">عدد التأخيرات</TableHead>
                                             <TableHead className="text-center font-black">إجمالي الخصم</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -535,7 +538,7 @@ export function PayrollGenerator() {
                                             const emp = employees.find(e => e.id === doc.employeeId);
                                             const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
                                             const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
-                                            const leaveDays = doc.summary?.leaveDays ?? 0;
+                                            const lateDays = doc.summary?.lateDays ?? doc.records?.filter(r => r.status === 'late').length;
                                             const totalDeductions = doc.records?.reduce((sum, r) => sum + (r.auditStatus !== 'waived' ? (r.manualDeductionDays || 0) : 0), 0);
                                             return (
                                                 <TableRow key={doc.id} className="h-16 border-b">
@@ -544,7 +547,7 @@ export function PayrollGenerator() {
                                                     <TableCell className="text-xs">{emp?.department || '-'}</TableCell>
                                                     <TableCell className="text-center font-mono">{presentDays}</TableCell>
                                                     <TableCell className="text-center font-mono text-red-600">{absentDays}</TableCell>
-                                                    <TableCell className="text-center font-mono text-blue-600">{leaveDays}</TableCell>
+                                                    <TableCell className="text-center font-mono text-orange-600">{lateDays}</TableCell>
                                                     <TableCell className="text-center font-mono font-black text-red-700">{totalDeductions} يوم</TableCell>
                                                 </TableRow>
                                             );
