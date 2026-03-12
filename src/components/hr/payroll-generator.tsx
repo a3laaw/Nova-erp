@@ -23,7 +23,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, FileText, Ban, History, AlertCircle, XCircle, CalendarCheck, ShieldAlert, Banknote, RefreshCw } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, FileSpreadsheet, Fingerprint, Save, Search, CalendarRange, AlertCircle } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -484,7 +484,6 @@ export function PayrollGenerator() {
                         {pendingCount > 0 && <Badge className="bg-purple-600 text-[8px] h-4 px-2">{pendingCount} معلق</Badge>}
                     </div>
 
-                    {/* فريم ١: قرارات التدقيق */}
                     <div className="p-3 rounded-2xl border-2 border-purple-100 bg-purple-50/30 flex gap-2">
                         <Button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} variant="outline" className="flex-1 h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-50 gap-1">
                             {isBulkProcessing ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle2 className="h-3 w-3"/>} تغاضي عن الكل
@@ -497,7 +496,6 @@ export function PayrollGenerator() {
                         </Button>
                     </div>
 
-                    {/* فريم ٢: التصدير والحذف */}
                     <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/30 flex gap-2">
                         <div className="relative flex-1">
                             <Button onClick={() => { setShowExcelMenu(v => !v); setShowPrintMenu(false); }} disabled={attendanceDocs.length === 0} variant="outline" className="w-full h-10 rounded-xl font-bold text-[10px] border-green-300 text-green-700 hover:bg-green-100 gap-1">
@@ -544,7 +542,6 @@ export function PayrollGenerator() {
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
-                        {/* Right Section: Title (RTL) */}
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
@@ -557,7 +554,6 @@ export function PayrollGenerator() {
                             </CardDescription>
                         </div>
 
-                        {/* Left Section: Context Box (RTL) */}
                         <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1" dir="rtl">
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center px-4">
@@ -649,62 +645,6 @@ export function PayrollGenerator() {
                 {isProcessing ? <Loader2 className="animate-spin h-8 w-8"/> : <Banknote className="h-8 w-8"/>} 
                 {pendingCount > 0 ? `بانتظار مراجعتك (${pendingCount} مخالفة)` : 'اعتماد وصرف الرواتب النهائية'}
             </Button>
-        </div>
-
-        <div id="summary-printable-area" className="fixed -top-[20000px] left-0 w-[1120px] bg-white opacity-100 pointer-events-none" style={{ visibility: 'visible', zIndex: -1000 }} dir="rtl">
-            {summaryData.length > 0 && (
-                <div className="p-10">
-                    <div className="flex justify-between items-start mb-10 border-b-4 border-primary pb-6">
-                        <div className="flex items-center gap-4">
-                            <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                            <div>
-                                <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                                <p className="text-sm font-bold text-muted-foreground">ملخص مستحقات الموظفين الشهرية</p>
-                            </div>
-                        </div>
-                        <div className="text-left">
-                            <h2 className="text-xl font-black text-primary">شهر {monthName} {year}</h2>
-                            <p className="text-[10px] text-muted-foreground font-mono">تاريخ الاستخراج: {format(new Date(), 'PPpp', { locale: ar })}</p>
-                        </div>
-                    </div>
-                    <div className="border-2 rounded-3xl overflow-hidden mb-10 bg-white">
-                        <Table>
-                            <TableHeader className="bg-gray-50 border-b">
-                                <TableRow>
-                                    <TableHead className="px-6 font-black text-gray-900">الموظف</TableHead>
-                                    <TableHead className="font-black text-center text-gray-900">الراتب الكامل</TableHead>
-                                    <TableHead className="font-black text-center text-gray-900">الغياب</TableHead>
-                                    <TableHead className="font-black text-center text-gray-900">خصم (أيام)</TableHead>
-                                    <TableHead className="text-left font-black text-gray-900">إجمالي الخصم</TableHead>
-                                    <TableHead className="text-left font-black bg-blue-50 text-blue-700">صافي المستحق</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {summaryData.map((s, idx) => (
-                                    <TableRow key={idx} className="h-14 border-b">
-                                        <TableCell className="px-6 font-bold text-gray-800">{s?.name}</TableCell>
-                                        <TableCell className="text-center font-mono font-bold">{formatCurrency(s?.fullSalary || 0)}</TableCell>
-                                        <TableCell className="text-center font-mono">{s?.absent} يوم</TableCell>
-                                        <TableCell className="text-center font-mono font-bold text-red-600">{s?.deductionDays} يوم</TableCell>
-                                        <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(s?.deductionAmount || 0)})</TableCell>
-                                        <TableCell className="text-left font-mono font-black text-blue-700 bg-blue-50/30">{formatCurrency(s?.netSalary || 0)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFooter className="bg-gray-100 font-black h-16">
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-right px-10 text-lg">إجمالي الرواتب الصافية للصرف:</TableCell>
-                                    <TableCell className="text-left font-mono text-xl text-primary">{formatCurrency(summaryData.reduce((sum, s) => sum + (s?.netSalary || 0), 0))}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </div>
-                    <div className="grid grid-cols-2 gap-20 text-center mt-20">
-                        <div className="space-y-16"><p className="font-black border-b-2 border-gray-800 pb-2">المحاسب المالي</p><div className="pt-2 border-t border-dashed">التوقيع والتاريخ</div></div>
-                        <div className="space-y-16"><p className="font-black border-b-2 border-gray-800 pb-2">المدير العام (الاعتماد)</p><div className="pt-2 border-t border-dashed">الختم والموافقة</div></div>
-                    </div>
-                </div>
-            )}
         </div>
 
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
