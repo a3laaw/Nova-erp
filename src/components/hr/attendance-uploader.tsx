@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -126,7 +127,7 @@ export function AttendanceUploader() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
-  const [isSavingData, setIsSaving] = useState(false);
+  const [isSavingData, setIsSavingData] = useState(false);
   const [mappingSearch, setMappingSearch] = useState('');
 
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
@@ -509,28 +510,39 @@ export function AttendanceUploader() {
 
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="space-y-8">
-                <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
-                    <CardHeader className="bg-muted/10 border-b pb-6 px-8">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="flex items-center gap-4">
-                                <CalendarRange className="h-6 w-6 text-primary" />
-                                <CardTitle className="text-xl font-black text-gray-800">إعدادات الفترة ونطاق الرقابة</CardTitle>
-                            </div>
-                            <div className="flex gap-4 bg-background p-2 rounded-2xl border shadow-inner">
-                                <div className="grid gap-1">
-                                    <Label className="text-[9px] font-black uppercase text-muted-foreground mr-1">السنة</Label>
-                                    <Select value={year} onValueChange={setYear}>
-                                        <SelectTrigger className="h-9 w-28 rounded-xl border-none shadow-none"><SelectValue /></SelectTrigger>
-                                        <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                                    </Select>
+                {/* Professional Dark Header for Upload Section */}
+                <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
+                    <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                        <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                            <div className="space-y-2 text-right order-1 lg:order-2">
+                                <div className="flex items-center justify-end gap-3">
+                                    <CardTitle className="text-3xl font-black text-white tracking-tight">إعدادات الفترة ونطاق الرقابة</CardTitle>
+                                    <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                        <CalendarRange className="h-8 w-8" />
+                                    </div>
                                 </div>
-                                <Separator orientation="vertical" className="h-8 my-auto" />
-                                <div className="grid gap-1">
-                                    <Label className="text-[9px] font-black uppercase text-muted-foreground mr-1">الشهر</Label>
-                                    <Select value={month} onValueChange={setMonth}>
-                                        <SelectTrigger className="h-9 w-28 rounded-xl border-none shadow-none"><SelectValue /></SelectTrigger>
-                                        <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
-                                    </Select>
+                                <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                                    حدد الشهر والسنة المستهدفة لاحتساب الرواتب ومطابقة البصمات.
+                                </CardDescription>
+                            </div>
+
+                            {/* Selection Controls */}
+                            <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                                <div className="flex gap-6 justify-center">
+                                    <div className="grid gap-1">
+                                        <Label className="text-[10px] font-black uppercase text-slate-400 mr-1">السنة الرقابية</Label>
+                                        <Select value={year} onValueChange={setYear}>
+                                            <SelectTrigger className="h-11 w-32 rounded-xl border-white/10 bg-white/5 text-white font-black"><SelectValue /></SelectTrigger>
+                                            <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <Label className="text-[10px] font-black uppercase text-slate-400 mr-1">الشهر المستهدف</Label>
+                                        <Select value={month} onValueChange={setMonth}>
+                                            <SelectTrigger className="h-11 w-32 rounded-xl border-white/10 bg-white/5 text-white font-black"><SelectValue /></SelectTrigger>
+                                            <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -590,33 +602,34 @@ export function AttendanceUploader() {
 
                 <div className="space-y-6">
                     <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                        <CardHeader className="bg-slate-900 text-white pb-8 px-8">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-3">
-                                        <ShieldCheck className="h-8 w-8 text-primary" />
-                                        <CardTitle className="text-2xl font-black">مركز تدقيق الحضور والمخالفات</CardTitle>
+                        <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                            <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                                <div className="space-y-2 text-right order-1 lg:order-2">
+                                    <div className="flex items-center justify-end gap-3">
+                                        <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
+                                        <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                            <ShieldCheck className="h-8 w-8" />
+                                        </div>
                                     </div>
-                                    <CardDescription className="text-slate-400 font-bold">مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي.</CardDescription>
+                                    <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                                        مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي.
+                                    </CardDescription>
                                 </div>
-                                <div className="flex flex-wrap gap-2 bg-white/10 p-2 rounded-2xl border border-white/10 shadow-inner">
-                                    <div className="flex gap-1 border-l border-white/10 pl-2 ml-1">
-                                        <Button variant="ghost" size="sm" onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-green-400 hover:bg-green-600 hover:text-white gap-1 text-[10px]">
-                                            <CheckCircle2 className="h-3.5 w-3.5" /> تغاضي عن الكل
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-red-400 hover:bg-red-600 hover:text-white gap-1 text-[10px]">
-                                            <XCircle className="h-3.5 w-3.5" /> خصم للكل
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing || anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-slate-400 hover:bg-slate-600 hover:text-white gap-1 text-[10px]">
-                                            <RotateCcw className="h-3.5 w-3.5" /> إعادة تعيين
-                                        </Button>
+
+                                {/* Control Box */}
+                                <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center px-4">
+                                            <button onClick={() => handleBulkAuditAction('waive')} disabled={isBulkProcessing || pendingCount === 0} className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"><CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل</button>
+                                            <button onClick={() => handleBulkAuditAction('apply')} disabled={isBulkProcessing || pendingCount === 0} className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"><XCircle className="h-4 w-4" /> خصم للكل</button>
+                                            <button onClick={() => handleBulkAuditAction('reset')} disabled={isBulkProcessing} className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"><RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> إعادة تعيين</button>
+                                        </div>
+                                        <Separator className="bg-white/10" />
+                                        <div className="flex justify-center gap-16 px-4">
+                                            <button onClick={handleExportAuditExcel} disabled={anomalies.length === 0} className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"><FileDown className="h-4 w-4" /> تصدير Excel</button>
+                                            <button onClick={() => setIsClearConfirmOpen(true)} disabled={isClearing || attendanceDocs.length === 0} className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"><Trash2 className="h-4 w-4" /> تصفير الداتا</button>
+                                        </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={handleExportAuditExcel} disabled={anomalies.length === 0} className="h-9 px-4 rounded-xl font-black text-green-400 hover:bg-green-600 hover:text-white gap-1 text-[10px]">
-                                        <FileDown className="h-3.5 w-3.5" /> تصدير Excel
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => setIsClearConfirmOpen(true)} disabled={isClearing || attendanceDocs.length === 0} className="h-9 px-4 rounded-xl font-black text-red-400 hover:bg-red-500 hover:text-white gap-1 text-[10px]">
-                                        <Trash2 className="h-3.5 w-3.5" /> تصفير الداتا
-                                    </Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -641,7 +654,7 @@ export function AttendanceUploader() {
                                             <TableHead className="font-black text-[#7209B7]">المخالفة</TableHead>
                                             <TableHead className="font-black text-[#7209B7]">سجل البصمات</TableHead>
                                             <TableHead className="font-black text-[#7209B7]">الخصم</TableHead>
-                                            <TableHead className="text-center font-black text-[#7209B7]">القرار الرقابي</TableHead>
+                                            <TableHead className="text-center font-black text-[#7209B7]">القرار</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -687,17 +700,24 @@ export function AttendanceUploader() {
 
         <TabsContent value="mapping" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-primary/5 pb-8 border-b">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                        <div className="space-y-1">
-                            <CardTitle className="text-2xl font-black flex items-center gap-3">
-                                <Fingerprint className="text-primary h-7 w-7" /> مطابقة البصمة والدوام المخصص
-                            </CardTitle>
-                            <CardDescription className="text-base font-medium">تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.</CardDescription>
+                <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                        <div className="space-y-2 text-right order-1 lg:order-2">
+                            <div className="flex items-center justify-end gap-3">
+                                <CardTitle className="text-3xl font-black text-white tracking-tight">مطابقة البصمة والدوام المخصص</CardTitle>
+                                <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                    <Fingerprint className="h-8 w-8" />
+                                </div>
+                            </div>
+                            <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                                تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.
+                            </CardDescription>
                         </div>
-                        <div className="relative w-full md:w-80">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                            <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-none shadow-inner font-bold" />
+                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                            <div className="relative w-full">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white/10 border-white/10 text-white placeholder:text-slate-400 font-bold" />
+                            </div>
                         </div>
                     </div>
                 </CardHeader>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -100,6 +101,7 @@ export function PayrollGenerator() {
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ في التحميل' });
     } finally {
+      setLoadingPayslips(false); // Fix: reference correct state if needed, but fetchAttendance doesn't use payslips state
       setAttLoading(false);
     }
   };
@@ -276,14 +278,14 @@ export function PayrollGenerator() {
         
         const records = snap.data().records.map((r: any) => {
             if (r.date.seconds === date.seconds) {
-                let manualدeduction = r.manualDeductionDays;
-                if (action === 'waive') manualدeduction = 0;
-                else if (action === 'reset') manualدeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
+                let manualDeduction = r.manualDeductionDays;
+                if (action === 'waive') manualDeduction = 0;
+                else if (action === 'reset') manualDeduction = r.status === 'absent' ? 1 : (r.status === 'half_day' ? 0.5 : 0);
                 
                 return { 
                     ...r, 
                     auditStatus: action === 'reset' ? 'pending' : (action === 'waive' ? 'waived' : 'verified'), 
-                    manualDeductionDays: manualدeduction, 
+                    manualDeductionDays: manualDeduction, 
                     waivedBy: action === 'reset' ? null : currentUser.fullName, 
                     waivedAt: action === 'reset' ? null : new Date() 
                 };
@@ -342,7 +344,7 @@ export function PayrollGenerator() {
         toast({ title: 'نجاح الإجراء الجماعي', description: action === 'reset' ? 'تمت إعادة تعيين جميع المخالفات.' : `تم ${action === 'waive' ? 'التغاضي عن' : 'اعتماد'} المخالفات.` });
         fetchAttendance();
     } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ' });
+        toast({ variant: 'destructive', title: 'خطأ في الإجراء الجماعي.' });
     } finally {
         setIsBulkProcessing(false);
     }
@@ -439,7 +441,7 @@ export function PayrollGenerator() {
                 <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         {/* Right Section: Title (RTL) */}
-                        <div className="space-y-2 text-right">
+                        <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
                                 <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
@@ -451,18 +453,17 @@ export function PayrollGenerator() {
                             </CardDescription>
                         </div>
 
-                        {/* Left Section: Stylized Control Box */}
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px]">
+                        {/* Left Section: Stylized Control Box (Mirroring the professional image) */}
+                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1" dir="rtl">
                             <div className="space-y-6">
-                                {/* Row 1: Actions */}
+                                {/* Row 1: Decisions */}
                                 <div className="flex justify-between items-center px-4">
                                     <button 
-                                        onClick={() => handleBulkAuditAction('reset')} 
-                                        disabled={isBulkProcessing}
-                                        className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"
+                                        onClick={() => handleBulkAuditAction('waive')} 
+                                        disabled={isBulkProcessing || pendingCount === 0}
+                                        className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
                                     >
-                                        <RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> 
-                                        إعادة تعيين
+                                        <CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل
                                     </button>
                                     <button 
                                         onClick={() => handleBulkAuditAction('apply')} 
@@ -472,11 +473,12 @@ export function PayrollGenerator() {
                                         <XCircle className="h-4 w-4" /> خصم للكل
                                     </button>
                                     <button 
-                                        onClick={() => handleBulkAuditAction('waive')} 
-                                        disabled={isBulkProcessing || pendingCount === 0}
-                                        className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
+                                        onClick={() => handleBulkAuditAction('reset')} 
+                                        disabled={isBulkProcessing}
+                                        className="flex items-center gap-2 text-slate-300 hover:text-white transition-all text-xs font-black group"
                                     >
-                                        <CheckCircle2 className="h-4 w-4" /> تغاضي عن الكل
+                                        <RotateCcw className={cn("h-4 w-4 transition-transform group-hover:rotate-180", isBulkProcessing && "animate-spin")} /> 
+                                        إعادة تعيين
                                     </button>
                                 </div>
                                 
@@ -485,18 +487,18 @@ export function PayrollGenerator() {
                                 {/* Row 2: Tools */}
                                 <div className="flex justify-center gap-16 px-4">
                                     <button 
-                                        onClick={() => setShowDeleteConfirm(true)} 
-                                        disabled={attLoading || attendanceDocs.length === 0}
-                                        className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"
-                                    >
-                                        <Trash2 className="h-4 w-4" /> تصفير الداتا
-                                    </button>
-                                    <button 
                                         onClick={handleExportDetailedExcel} 
                                         disabled={attendanceDocs.length === 0}
                                         className="flex items-center gap-2 text-green-400 hover:text-green-300 transition-all text-xs font-black disabled:opacity-20"
                                     >
                                         <FileDown className="h-4 w-4" /> تصدير Excel
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowDeleteConfirm(true)} 
+                                        disabled={attLoading || attendanceDocs.length === 0}
+                                        className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-all text-xs font-black disabled:opacity-20"
+                                    >
+                                        <Trash2 className="h-4 w-4" /> تصفير الداتا
                                     </button>
                                 </div>
                             </div>
@@ -533,21 +535,31 @@ export function PayrollGenerator() {
                                         <TableRow><TableCell colSpan={6} className="h-48 text-center text-green-700 font-black italic">سجل الحضور نظيف تماماً لهذا الشهر!</TableCell></TableRow>
                                     ) : anomalies.map((item, idx) => {
                                         const isAbsent = item.record.status === 'absent';
+                                        const isConflict = item.record.anomalyDescription?.includes('تعارض');
                                         const recordDate = toFirestoreDate(item.record.date);
                                         return (
-                                        <TableRow key={idx} className={cn("h-20 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isAbsent ? "bg-red-50/40" : "bg-white")}>
-                                            <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-base text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
+                                        <TableRow key={idx} className={cn("h-24 transition-colors", item.record.auditStatus === 'waived' ? "bg-green-50/30 opacity-60" : isConflict ? "bg-amber-50/50" : isAbsent ? "bg-red-50/40" : "bg-white")}>
+                                            <TableCell className="px-10"><div className="flex flex-col"><span className="font-black text-lg text-gray-800">{item.empName}</span><span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {item.employeeNumber}</span></div></TableCell>
                                             <TableCell className="font-bold text-xs text-gray-600">{recordDate ? format(recordDate, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell>
-                                            <TableCell><div className="flex flex-col gap-1"><Badge variant={isAbsent ? 'destructive' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600")}>{isAbsent ? 'غياب كامل' : item.record.status === 'half_day' ? 'نصف يوم' : 'تأخير'}</Badge><span className="text-[10px] font-bold text-red-600 leading-tight">{item.record.anomalyDescription}</span></div></TableCell>
-                                            <TableCell>{isAbsent ? <Ban className="h-4 w-4 text-red-200" /> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-4 bg-background">{p}</Badge>)}</div>}</TableCell>
-                                            <TableCell><span className="font-black text-lg text-primary font-mono">{item.record.manualDeductionDays || 0} يوم</span></TableCell>
-                                            <TableCell className="text-center no-print">
+                                            <TableCell>
+                                                <div className="flex flex-col gap-1">
+                                                    <Badge variant={isAbsent ? 'destructive' : isConflict ? 'default' : 'outline'} className={cn("w-fit text-[8px] font-black uppercase", isAbsent && "bg-red-600", isConflict && "bg-amber-600")}>
+                                                        {isAbsent ? 'غياب كامل' : isConflict ? 'تعارض رقابي حاد' : 'تأخير/نقص بصمة'}
+                                                    </Badge>
+                                                    <span className={cn("text-[10px] font-bold leading-tight", isConflict ? "text-amber-700" : "text-red-600")}>
+                                                        {item.record.anomalyDescription}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{isAbsent ? <div className="h-8 w-8 rounded-full border-2 border-dashed border-red-200 flex items-center justify-center opacity-40"><XCircle className="h-4 w-4 text-red-400"/></div> : <div className="flex flex-wrap gap-1">{(item.record.allPunches || []).map((p, i) => <Badge key={i} variant="outline" className="font-mono text-[9px] h-5 bg-background shadow-inner">{p}</Badge>)}</div>}</TableCell>
+                                            <TableCell><div className="flex flex-col"><span className="font-black text-2xl text-primary font-mono">{item.record.manualDeductionDays || 0}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">يوم خصم</span></div></TableCell>
+                                            <TableCell className="text-center no-print px-6">
                                                 {item.record.auditStatus === 'pending' ? (
-                                                    <div className="flex justify-center gap-2">
-                                                        <Button type="button" size="sm" variant="outline" className="bg-green-50 text-green-700 border-green-200 h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
-                                                        <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-8 rounded-lg font-black" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>خصم</Button>
+                                                    <div className="flex justify-center gap-3">
+                                                        <Button type="button" size="sm" variant="ghost" className="bg-green-50 text-green-700 border-2 border-green-200 h-10 px-6 rounded-2xl font-black shadow-sm hover:bg-green-600 hover:text-white" onClick={() => handleAuditAction(item.docId, item.record.date, 'waive')}>تغاضي</Button>
+                                                        <Button type="button" size="sm" className="bg-red-600 hover:bg-red-700 text-white h-10 px-6 rounded-2xl font-black shadow-lg shadow-red-100" onClick={() => handleAuditAction(item.docId, item.record.date, 'apply')}>اعتماد الخصم</Button>
                                                     </div>
-                                                ) : <Button type="button" variant="ghost" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-8 rounded-lg gap-2 font-black"><History className="h-3 w-3"/>تغيير القرار</Button>}
+                                                ) : <Button type="button" variant="outline" size="sm" onClick={() => handleAuditAction(item.docId, item.record.date, 'reset')} className="text-muted-foreground h-9 rounded-xl gap-2 font-bold bg-muted/30 border-dashed border-2"><History className="h-3 w-3"/>تغيير القرار</Button>}
                                             </TableCell>
                                         </TableRow>
                                     )})}
@@ -629,7 +641,7 @@ export function PayrollGenerator() {
         <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
             <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
                 <AlertDialogHeader>
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldCheck className="h-10 w-10"/></div>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldAlert className="h-10 w-10"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد تصفير بيانات الفترة؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-base font-medium leading-relaxed">
                         أنت على وشك حذف جميع سجلات الحضور المعتمدة والمدققة لشهر <strong>{month}/{year}</strong> نهائياً. 
