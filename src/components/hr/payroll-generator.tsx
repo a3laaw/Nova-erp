@@ -57,12 +57,13 @@ import {
     Sparkles
 } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
-import { format, isValid } from 'date-fns';
+import { format, isValid, getDay, isAfter, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cleanFirestoreData, cn, formatCurrency } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +74,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { Checkbox } from '../ui/checkbox';
+import { Skeleton } from '../ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -81,6 +84,51 @@ const dayNameToIndex: Record<string, number> = {
 
 const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
+};
+
+const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
+    if (val === undefined || val === null || val === '') return null;
+    
+    let parsedDate: Date | null = null;
+    let timeStr = "00:00";
+
+    if (typeof val === 'number') {
+        try {
+            const excelDate = XLSX.SSF.parse_date_code(val);
+            if (excelDate.y < 2000) return null;
+            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
+            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
+        } catch { return null; }
+    } 
+    else if (typeof val === 'string') {
+        const cleaned = val.trim();
+        const dateMatch = cleaned.match(/(\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4})/);
+        const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
+
+        if (dateMatch) {
+            const dateStr = dateMatch[0];
+            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'];
+            for (const fmt of formats) {
+                const p = parse(dateStr, fmt, new Date());
+                if (isValid(p)) {
+                    if (p.getFullYear() < 2000) break;
+                    parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
+                    break;
+                }
+            }
+        }
+
+        if (timeMatch) {
+            const tStr = timeMatch[0].toUpperCase();
+            const tp = parse(tStr, tStr.includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
+            if (isValid(tp)) timeStr = format(tp, 'HH:mm');
+        }
+    }
+
+    if (parsedDate && isValid(parsedDate)) {
+        return { date: parsedDate, timeStr };
+    }
+    return null;
 };
 
 export function PayrollGenerator() {
@@ -97,7 +145,7 @@ export function PayrollGenerator() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isPrintingSummary, setIsPrintingSummary] = useState(false);
 
-  const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', 'in', ['active', 'on-leave'])]);
+  const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', 'in', ['active', 'on-leave'])]);
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
 
   const fetchAttendance = async () => {
@@ -120,6 +168,8 @@ export function PayrollGenerator() {
       setAttLoading(false);
     }
   };
+
+  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
   const handleDeleteMonth = async () => {
     if (!firestore) return;
@@ -252,7 +302,6 @@ export function PayrollGenerator() {
     if (attendanceDocs.length === 0) return;
     const data = attendanceDocs.map(doc => {
         const emp = employees.find(e => e.id === doc.employeeId);
-        // ✨ معالجة الإجماليات في حال كانت الحقول فارغة في Firestore
         const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
         const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
         const lateDays = doc.summary?.lateDays ?? doc.records?.filter(r => r.status === 'late').length;
