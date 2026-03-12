@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -289,7 +290,7 @@ export function LeaveRequestsList() {
     if (!requestToReject || !rejectionReason.trim() || !firestore || !currentUser) return;
     setIsProcessingAction(true);
     try {
-        const leaveRef = doc(firestore, 'leaveRequests', requestToReject.id!);
+        const leaveRef = doc(firestore, 'permissionRequests', requestToReject.id!);
         await updateDoc(leaveRef, {
             status: 'rejected',
             rejectionReason: rejectionReason,
@@ -347,14 +348,14 @@ export function LeaveRequestsList() {
   };
   
   const handleStartLeave = async () => {
-    if (!requestToStart || !firestore || !actualDate) {
+    if (!requestToStart || !firestore || !actualDate || !requestToStart.id) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير كافية لتسجيل المغادرة.' });
         return;
     }
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
-        const requestRef = doc(firestore, 'leaveRequests', requestToStart.id!);
+        const requestRef = doc(firestore, 'leaveRequests', requestToStart.id);
         const employeeRef = doc(firestore, 'employees', requestToStart.employeeId);
 
         batch.update(requestRef, { 
@@ -374,14 +375,14 @@ export function LeaveRequestsList() {
   };
 
   const handleReturnToWork = async () => {
-    if (!requestToReturn || !firestore || !actualDate) {
+    if (!requestToReturn || !firestore || !actualDate || !requestToReturn.id) {
         toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير كافية لتسجيل العودة.' });
         return;
     }
     setIsProcessingAction(true);
     try {
         const batch = writeBatch(firestore);
-        const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id!);
+        const requestRef = doc(firestore, 'leaveRequests', requestToReturn.id);
         const employeeRef = doc(firestore, 'employees', requestToReturn.employeeId);
 
         batch.update(requestRef, { 
@@ -432,9 +433,16 @@ export function LeaveRequestsList() {
             ) : leaveRequests.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد طلبات إجازة مسجلة.</TableCell></TableRow>
             ) : (
-              leaveRequests.map(req => (
+              leaveRequests.map(req => {
+                const emp = employees.find(e => e.id === req.employeeId);
+                return (
                 <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16 cursor-pointer" onClick={() => router.push(`/dashboard/hr/leaves/${req.id}`)}>
-                  <TableCell className="px-8 font-black text-gray-800">{req.employeeName}</TableCell>
+                  <TableCell className="px-8">
+                    <div className="flex flex-col">
+                        <span className="font-black text-gray-800">{req.employeeName}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {emp?.employeeNumber || '---'}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-bold px-3">
                         {leaveTypeTranslations[req.leaveType]}
@@ -506,7 +514,7 @@ export function LeaveRequestsList() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
+              )})
             )}
           </TableBody>
         </Table>

@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { 
   Card, 
   CardHeader, 
@@ -22,45 +23,82 @@ import {
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, runTransaction } from 'firebase/firestore';
-import type { Employee, MonthlyAttendance, AttendanceRecord, Account, Payslip, LeaveRequest, PermissionRequest } from '@/lib/types';
-import { 
-    RefreshCw, 
-    Trash2, 
-    FileDown, 
-    FileText,
-    Printer, 
-    CheckCircle2, 
-    XCircle, 
-    Loader2, 
-    RotateCcw, 
-    Banknote, 
-    CalendarDays,
-    History,
-    AlertTriangle,
-    ShieldCheck,
-    ShieldAlert,
-    Ban,
-    Info,
-    AlertCircle
-} from 'lucide-react';
-import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Badge } from '../ui/badge';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
-import { toFirestoreDate } from '@/services/date-converter';
-import { useAuth } from '@/context/auth-context';
 import * as XLSX from 'xlsx';
+import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, FileText, Ban, History, AlertCircle, XCircle, CalendarCheck, ShieldAlert, Banknote } from 'lucide-react';
+import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
+import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
+import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Logo } from '../layout/logo';
+import { Skeleton } from '../ui/skeleton';
+import { Badge } from '../ui/badge';
+import { toFirestoreDate } from '@/services/date-converter';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useAuth } from '@/context/auth-context';
+import { Logo } from '../layout/logo';
+
+const dayNameToIndex: Record<string, number> = {
+  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
+  'Thursday': 4, 'Friday': 5, 'Saturday': 6
+};
+
+const leaveTypeTranslations: Record<string, string> = {
+    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
+};
+
+const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
+    if (val === undefined || val === null || val === '') return null;
+    
+    let parsedDate: Date | null = null;
+    let timeStr = "00:00";
+
+    if (typeof val === 'number') {
+        try {
+            const excelDate = XLSX.SSF.parse_date_code(val);
+            if (excelDate.y < 2000) return null;
+            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
+            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
+        } catch { return null; }
+    } 
+    else if (typeof val === 'string') {
+        const cleaned = val.trim();
+        const dateMatch = cleaned.match(/(\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4})/);
+        const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
+
+        if (dateMatch) {
+            const dateStr = dateMatch[0];
+            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'];
+            for (const fmt of formats) {
+                const p = parse(dateStr, fmt, new Date());
+                if (isValid(p)) {
+                    if (p.getFullYear() < 2000) break;
+                    parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
+                    break;
+                }
+            }
+        }
+
+        if (timeMatch) {
+            const tStr = timeMatch[0].toUpperCase();
+            const tp = parse(tStr, tStr.includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
+            if (isValid(tp)) timeStr = format(tp, 'HH:mm');
+        }
+    }
+
+    if (parsedDate && isValid(parsedDate)) {
+        return { date: parsedDate, timeStr };
+    }
+    return null;
+};
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
-  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const { branding } = useBranding();
+  const { user: currentUser } = useAuth();
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
@@ -355,8 +393,6 @@ export function PayrollGenerator() {
         await runTransaction(firestore, async (transaction) => {
             for (const emp of employees) {
                 const att = attendanceDocs.find(a => a.employeeId === emp.id);
-                
-                // إذا لم يوجد سجل حضور لهذا الموظف، نتحقق من وجود إجازة معتمدة
                 const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
                 const dailyRate = fullSalary / 26;
                 let netSalary = fullSalary;
@@ -372,10 +408,8 @@ export function PayrollGenerator() {
                     deductionAmount = totalDeductionDays * dailyRate;
                     netSalary = Math.max(0, fullSalary - deductionAmount);
                 } else if (emp.status === 'on-leave') {
-                    // إذا كان في إجازة وليس له سجل حضور، نفترض استحقاق الراتب كاملاً (أو حسب منطق الإجازات)
                     netSalary = fullSalary; 
                 } else {
-                    // إذا لم يوجد حضور ولا إجازة وهو نشط، يعتبر غياباً كاملاً للشهر
                     deductionAmount = fullSalary;
                     netSalary = 0;
                 }

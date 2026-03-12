@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -120,6 +121,7 @@ export function PayslipsList() {
                 return {
                     ...p,
                     employeeName: employee ? employee.fullName : p.employeeName,
+                    employeeNumber: employee?.employeeNumber || '---'
                 };
             })
             .sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'ar'));
@@ -128,7 +130,8 @@ export function PayslipsList() {
 
         const lower = searchQuery.toLowerCase();
         return filteredAndSorted.filter(p => 
-            p.employeeName.toLowerCase().includes(lower)
+            p.employeeName.toLowerCase().includes(lower) || 
+            p.employeeNumber.includes(lower)
         );
     }, [payslips, employees, searchQuery]);
 
@@ -229,6 +232,7 @@ export function PayslipsList() {
         }
 
         const data = sortedPayslips.map(p => ({
+            'رقم الملف': p.employeeNumber,
             'اسم الموظف': p.employeeName,
             'نوع الكشف': payslipTypeTranslations[p.type || 'Monthly'],
             'إجمالي الاستحقاقات': p.earnings.basicSalary + p.earnings.housingAllowance + p.earnings.transportAllowance + p.earnings.commission,
@@ -271,10 +275,10 @@ export function PayslipsList() {
                   </Select>
                 </div>
                 <div className="grid gap-1.5 col-span-2">
-                  <Label className="font-black text-xs text-muted-foreground">بحث في الأسماء</Label>
+                  <Label className="font-black text-xs text-muted-foreground">بحث في الأسماء والرقم الوظيفي</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="ابحث عن موظف..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl bg-white border-2"/>
+                    <Input placeholder="ابحث عن موظف أو رقم ملف..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl bg-white border-2"/>
                   </div>
                 </div>
               </div>
@@ -318,7 +322,8 @@ export function PayslipsList() {
                 <Table>
                     <TableHeader className="bg-muted/50 h-14">
                         <TableRow className="border-none">
-                            <TableHead className="px-8 font-black text-[#7209B7]">اسم الموظف</TableHead>
+                            <TableHead className="px-8 font-black text-[#7209B7]">رقم الملف</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
                             <TableHead className="font-black text-[#7209B7]">نوع الكشف</TableHead>
                             <TableHead className="text-left font-black text-[#7209B7]">الراتب الكامل</TableHead>
                             <TableHead className="text-left font-black text-[#7209B7]">الاستقطاعات</TableHead>
@@ -330,11 +335,11 @@ export function PayslipsList() {
                     <TableBody>
                         {loading ? (
                             Array.from({length: 5}).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={7} className="px-8"><Skeleton className="h-10 w-full rounded-xl"/></TableCell></TableRow>
+                                <TableRow key={i}><TableCell colSpan={8} className="px-8"><Skeleton className="h-10 w-full rounded-xl"/></TableCell></TableRow>
                             ))
                         ) : sortedPayslips.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-bold italic">
+                                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-bold italic">
                                     {loadingPayslips ? 'جاري التحميل...' : 'اضغط على "تحميل الكشوفات" لعرض البيانات.'}
                                 </TableCell>
                             </TableRow>
@@ -344,7 +349,8 @@ export function PayslipsList() {
                                 const totalDeductions = (payslip.deductions.absenceDeduction || 0) + (payslip.deductions.otherDeductions || 0);
                                 return (
                                 <TableRow key={payslip.id} className="hover:bg-muted/30 transition-colors h-16">
-                                    <TableCell className="px-8 font-black text-gray-800">{payslip.employeeName}</TableCell>
+                                    <TableCell className="px-8 font-mono font-black text-primary text-sm">{payslip.employeeNumber}</TableCell>
+                                    <TableCell className="font-black text-gray-800">{payslip.employeeName}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={cn("px-3 font-bold text-[10px]", payslipTypeColors[payslip.type || 'Monthly'])}>
                                             {payslipTypeTranslations[payslip.type || 'Monthly']}
@@ -369,7 +375,7 @@ export function PayslipsList() {
                     </TableBody>
                     <TableFooter className="bg-primary/5 h-20">
                         <TableRow className="border-t-4 border-primary/20">
-                            <TableCell colSpan={4} className="text-right px-12 font-black text-xl">إجمالي صافي الرواتب للصرف:</TableCell>
+                            <TableCell colSpan={5} className="text-right px-12 font-black text-xl">إجمالي صافي الرواتب للصرف:</TableCell>
                             <TableCell className="text-left font-mono text-2xl font-black text-primary px-4">{formatCurrency(totals.netSalary)}</TableCell>
                             <TableCell colSpan={2}></TableCell>
                         </TableRow>

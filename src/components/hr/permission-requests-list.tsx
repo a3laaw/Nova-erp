@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -162,9 +163,16 @@ export function PermissionRequestsList() {
             {!loading && permissionRequests.length === 0 && (
               <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد طلبات استئذان.</TableCell></TableRow>
             )}
-            {!loading && permissionRequests.map(req => (
+            {!loading && permissionRequests.map(req => {
+              const emp = employees.find(e => e.id === req.employeeId);
+              return (
               <TableRow key={req.id}>
-                <TableCell className="font-medium">{req.employeeName}</TableCell>
+                <TableCell className="font-medium">
+                    <div className="flex flex-col">
+                        <span>{req.employeeName}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground font-bold">الملف: {emp?.employeeNumber || '---'}</span>
+                    </div>
+                </TableCell>
                 <TableCell>{typeTranslations[req.type]}</TableCell>
                 <TableCell>{formatDate(req.date)}</TableCell>
                 <TableCell className="max-w-[200px] truncate">{req.reason}</TableCell>
@@ -197,7 +205,7 @@ export function PermissionRequestsList() {
                     </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
       </div>
@@ -219,7 +227,7 @@ export function PermissionRequestsList() {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-bold">
                     {isDeleting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : 'نعم، قم بالحذف'}
                 </AlertDialogAction>
             </AlertDialogFooter>
