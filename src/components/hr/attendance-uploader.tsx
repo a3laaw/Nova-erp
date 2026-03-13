@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, CalendarRange, Trash2 as Trash, FileDown as Download, Printer as Print, Search, Fingerprint, Sparkles } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, CalendarRange, Trash2 as Trash, FileDown as Download, Printer as Print, Search, Fingerprint, Sparkles, FileSpreadsheet } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -497,7 +497,7 @@ export function AttendanceUploader() {
                         <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
                             <div className="relative w-full">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white/10 border-white/10 text-white placeholder:text-slate-400 font-bold" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white/10 border-white/10 text-white placeholder:text-rose-200 font-bold" />
                             </div>
                         </div>
                     </div>
