@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search, Banknote, Trash2, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, Eye, CheckCircle, Loader2, Info, Printer, Download, Search, Banknote, Trash2, RefreshCw, FileDown, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -309,7 +309,7 @@ export function PayslipsList() {
                 {/* زر الصرف */}
                 <div className="p-3 rounded-2xl border-2 border-primary/20 bg-primary/5 flex items-center">
                   <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0} className="w-full h-9 rounded-xl bg-primary text-white font-black text-xs shadow-md shadow-primary/20 gap-2">
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Banknote className="h-4 w-4" />}
+                    {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : <Banknote className="h-4 w-4" />}
                     صرف الرواتب النهائية
                   </Button>
                 </div>
@@ -318,23 +318,23 @@ export function PayslipsList() {
             </div>
 
             <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0">
+                <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b no-print">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
-                                <CardTitle className="text-3xl font-black text-white tracking-tight">كشوف الرواتب المعتمدة</CardTitle>
-                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
+                                <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">كشوف الرواتب المعتمدة</CardTitle>
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
                                     <Banknote className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
+                            <CardDescription className="text-muted-foreground font-bold text-base leading-relaxed">
                                 مراجعة وتأكيد دفع الرواتب وإصدار السجلات المالية النهائية.
                             </CardDescription>
                         </div>
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                        <div className="bg-muted/30 border p-6 rounded-[2.5rem] shadow-inner min-w-[420px] order-2 lg:order-1">
                             <div className="relative w-full">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                                <Input placeholder="بحث بالاسم أو الرقم..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white/10 border-white/10 text-white placeholder:text-rose-200 font-bold" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-primary/10 text-gray-800 placeholder:text-muted-foreground font-bold shadow-sm" />
                             </div>
                         </div>
                     </div>

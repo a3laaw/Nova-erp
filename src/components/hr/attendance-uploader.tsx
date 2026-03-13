@@ -375,33 +375,33 @@ export function AttendanceUploader() {
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="space-y-8">
                 <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                    <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0">
+                    <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b">
                         <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                             <div className="space-y-2 text-right order-1 lg:order-2">
                                 <div className="flex items-center justify-end gap-3">
-                                    <CardTitle className="text-3xl font-black text-white tracking-tight">إعدادات الفترة ونطاق الرقابة</CardTitle>
-                                    <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
+                                    <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">إعدادات الفترة ونطاق الرقابة</CardTitle>
+                                    <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
                                         <CalendarRange className="h-8 w-8" />
                                     </div>
                                 </div>
-                                <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
+                                <CardDescription className="text-muted-foreground font-bold text-base leading-relaxed">
                                     حدد الشهر والسنة المستهدفة لاحتساب الرواتب ومطابقة البصمات.
                                 </CardDescription>
                             </div>
 
-                            <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                            <div className="bg-muted/30 border p-6 rounded-[2.5rem] shadow-inner min-w-[420px] order-2 lg:order-1">
                                 <div className="flex gap-6 justify-center">
                                     <div className="grid gap-1">
-                                        <Label className="text-[10px] font-black uppercase text-rose-200 mr-1">السنة الرقابية</Label>
+                                        <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة الرقابية</Label>
                                         <Select value={year} onValueChange={setYear}>
-                                            <SelectTrigger className="h-11 w-32 rounded-xl border-white/10 bg-white/5 text-white font-black"><SelectValue /></SelectTrigger>
+                                            <SelectTrigger className="h-11 w-32 rounded-xl border-primary/10 bg-white font-black"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
                                     <div className="grid gap-1">
-                                        <Label className="text-[10px] font-black uppercase text-rose-200 mr-1">الشهر المستهدف</Label>
+                                        <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر المستهدف</Label>
                                         <Select value={month} onValueChange={setMonth}>
-                                            <SelectTrigger className="h-11 w-32 rounded-xl border-white/10 bg-white/5 text-white font-black"><SelectValue /></SelectTrigger>
+                                            <SelectTrigger className="h-11 w-32 rounded-xl border-primary/10 bg-white font-black"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
@@ -481,23 +481,23 @@ export function AttendanceUploader() {
 
         <TabsContent value="mapping" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0">
+                <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
-                                <CardTitle className="text-3xl font-black text-white tracking-tight">مطابقة البصمة والدوام المخصص</CardTitle>
-                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
+                                <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">مطابقة البصمة والدوام المخصص</CardTitle>
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
                                     <Fingerprint className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
+                            <CardDescription className="text-muted-foreground font-bold text-base leading-relaxed">
                                 تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.
                             </CardDescription>
                         </div>
-                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                        <div className="bg-muted/30 border p-6 rounded-[2.5rem] shadow-inner min-w-[420px] order-2 lg:order-1">
                             <div className="relative w-full">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white/10 border-white/10 text-white placeholder:text-rose-200 font-bold" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-primary/10 text-gray-800 placeholder:text-muted-foreground font-bold shadow-sm" />
                             </div>
                         </div>
                     </div>

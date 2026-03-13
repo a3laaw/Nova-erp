@@ -38,7 +38,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup, deleteDoc, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles, FileSpreadsheet, Save } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -700,16 +700,16 @@ export function PayrollGenerator() {
 
         <div className="space-y-6">
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0 no-print">
+                <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b no-print">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
-                                <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
-                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
+                                <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
                                     <ShieldCheck className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
+                            <CardDescription className="text-muted-foreground font-bold text-base leading-relaxed">
                                 مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي قبل صرف الرواتب.
                             </CardDescription>
                         </div>
