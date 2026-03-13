@@ -20,6 +20,12 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import { 
   Table, 
   TableBody, 
   TableCell, 
@@ -30,7 +36,7 @@ import {
 } from '@/components/ui/table';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup, deleteDoc, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles } from 'lucide-react';
 import {
@@ -52,7 +58,7 @@ import {
     AlertDialogTitle 
 } from '../ui/alert-dialog';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday, Payslip } from '@/lib/types';
-import { format, isValid, getDay, isAfter, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { parse, format, isValid, getDay, isAfter, endOfDay, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cleanFirestoreData, cn, formatCurrency } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
@@ -148,7 +154,7 @@ export function PayrollGenerator() {
     where('month', '==', parseInt(month))
   ], [year, month]);
   
-  const { data: monthPayslips } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
+  const { data: monthPayslips, loading: payrollLoading } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
 
   const isMonthPaid = useMemo(() => {
     return monthPayslips.length > 0 && monthPayslips.some(p => p.status === 'paid');
@@ -799,7 +805,7 @@ export function PayrollGenerator() {
         <div className="no-print pt-10 border-t flex justify-center pb-20">
             <Button 
                 onClick={() => setShowGenerateConfirm(true)} 
-                disabled={isProcessing || isGenerated || pendingCount > 0 || attendanceDocs.length === 0 || isMonthPaid} 
+                disabled={isProcessing || payrollLoading || pendingCount > 0 || attendanceDocs.length === 0 || isMonthPaid} 
                 className={cn(
                     "h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-xl shadow-primary/20 gap-4 min-w-[350px] active:translate-y-1 transition-all",
                     isMonthPaid ? "bg-green-600 hover:bg-green-700 cursor-not-allowed opacity-90" : "bg-primary text-white hover:bg-primary/90"
