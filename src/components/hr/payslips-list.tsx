@@ -41,6 +41,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Input } from '../ui/input';
 import { useAuth } from '@/context/auth-context';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const statusColors: Record<Payslip['status'], string> = {
   draft: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -75,7 +76,7 @@ export function PayslipsList() {
     const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
     const [searchQuery, setSearchQuery] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showDeleteConfirm, setshowDeleteConfirm] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const [payslips, setPayslips] = useState<Payslip[]>([]);
@@ -102,7 +103,6 @@ export function PayslipsList() {
         }
     };
 
-    // عند تغيير الشهر أو السنة: نصفّر البيانات فقط
     useEffect(() => {
         setPayslips([]);
     }, [year, month]);
@@ -136,7 +136,7 @@ export function PayslipsList() {
 
     const handleDeleteMonth = async () => {
         if (!firestore) return;
-        setShowDeleteConfirm(false);
+        setshowDeleteConfirm(false);
         setIsDeleting(true);
         try {
             const snap = await getDocs(query(
@@ -300,7 +300,7 @@ export function PayslipsList() {
                   <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="flex-1 h-9 rounded-xl font-bold text-xs border-green-300 text-green-700 hover:bg-green-100 gap-1">
                     <Download className="h-3 w-3" /> Excel
                   </Button>
-                  <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" disabled={isDeleting || loading || sortedPayslips.length === 0} className="flex-1 h-9 rounded-xl font-bold text-xs border-red-200 text-red-600 hover:bg-red-50 gap-1">
+                  <Button onClick={() => setshowDeleteConfirm(true)} variant="outline" disabled={isDeleting || loading || sortedPayslips.length === 0} className="flex-1 h-9 rounded-xl font-bold text-xs border-red-200 text-red-600 hover:bg-red-50 gap-1">
                     {isDeleting ? <Loader2 className="h-3 w-3 animate-spin"/> : <Trash2 className="h-3 w-3" />}
                     تراجع
                   </Button>
@@ -422,7 +422,7 @@ export function PayslipsList() {
                         <span className="text-xs text-red-500 font-bold mt-1 block">ملاحظة: لن يُحذف القيد المحاسبي تلقائياً.</span>
                     </p>
                     <div className="flex gap-3">
-                        <Button onClick={() => setShowDeleteConfirm(false)} variant="outline" className="flex-1 rounded-xl font-bold">
+                        <Button onClick={() => setshowDeleteConfirm(false)} variant="outline" className="flex-1 rounded-xl font-bold">
                             إلغاء
                         </Button>
                         <Button onClick={handleDeleteMonth} variant="destructive" className="flex-1 rounded-xl font-bold gap-2">
