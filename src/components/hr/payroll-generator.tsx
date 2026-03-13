@@ -138,6 +138,7 @@ export function PayrollGenerator() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [isPrintingSummary, setIsPrintingSummary] = useState(false);
+  const [monthIsPaid, setMonthIsPaid] = useState(false);
   const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
   const [clearPrevious, setClearPrevious] = useState(true);
   
@@ -156,9 +157,7 @@ export function PayrollGenerator() {
   
   const { data: monthPayslips, loading: payrollLoading } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
 
-  const isMonthPaid = useMemo(() => {
-    return monthPayslips.length > 0 && monthPayslips.some(p => p.status === 'paid');
-  }, [monthPayslips]);
+  const isMonthPaid = monthIsPaid || (monthPayslips.length > 0 && monthPayslips.some(p => p.status === 'paid'));
 
   const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
 
@@ -178,6 +177,7 @@ export function PayrollGenerator() {
 
   useEffect(() => {
     setAttendanceDocs([]);
+    setMonthIsPaid(false);
     setIsGenerated(false);
   }, [year, month]);
 
@@ -192,6 +192,17 @@ export function PayrollGenerator() {
       ));
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance));
       setAttendanceDocs(data);
+
+      // تحقق من حالة الرواتب لهذا الشهر
+      const payrollSnap = await getDocs(query(
+        collection(firestore, 'payroll'),
+        where('year', '==', parseInt(year)),
+        where('month', '==', parseInt(month)),
+        where('status', '==', 'paid'),
+        limit(1)
+      ));
+      setMonthIsPaid(!payrollSnap.empty);
+
       if (snap.empty) {
           toast({ title: 'لا توجد بيانات', description: 'لم يتم العثور على سجلات حضور للشهر المختار.' });
       }
@@ -655,7 +666,7 @@ export function PayrollGenerator() {
                                         <FileDown className="h-4 w-4" /> تصدير Excel <ChevronDown className="h-3 w-3 opacity-50"/>
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
+                                <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
                                     <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
                                         <LayoutGrid className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
                                     </DropdownMenuItem>
@@ -671,7 +682,7 @@ export function PayrollGenerator() {
                                         <Printer className="h-4 w-4" /> طباعة التقارير <ChevronDown className="h-3 w-3 opacity-50"/>
                                     </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
+                                <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
                                     <DropdownMenuItem onClick={() => handlePrint('summary')} className="py-3 font-bold gap-2">
                                         <LayoutGrid className="h-4 w-4 text-blue-600" /> كشف الحضور الإجمالي
                                     </DropdownMenuItem>
