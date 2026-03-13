@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -317,71 +316,94 @@ export function PayslipsList() {
 
               </div>
             </div>
-            
-            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
-                <Table>
-                    <TableHeader className="bg-muted/50 h-14">
-                        <TableRow className="border-none">
-                            <TableHead className="px-8 font-black text-[#7209B7]">رقم الملف</TableHead>
-                            <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
-                            <TableHead className="font-black text-[#7209B7]">نوع الكشف</TableHead>
-                            <TableHead className="text-left font-black text-[#7209B7]">الراتب الكامل</TableHead>
-                            <TableHead className="text-left font-black text-[#7209B7]">الاستقطاعات</TableHead>
-                            <TableHead className="text-left font-black text-[#7209B7]">صافي المستحق</TableHead>
-                            <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
-                            <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {loading ? (
-                            Array.from({length: 5}).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={8} className="px-8"><Skeleton className="h-10 w-full rounded-xl"/></TableCell></TableRow>
-                            ))
-                        ) : sortedPayslips.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-bold italic">
-                                    {loadingPayslips ? 'جاري التحميل...' : 'اضغط على "تحميل الكشوفات" لعرض البيانات.'}
-                                </TableCell>
+
+            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+                <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0">
+                    <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                        <div className="space-y-2 text-right order-1 lg:order-2">
+                            <div className="flex items-center justify-end gap-3">
+                                <CardTitle className="text-3xl font-black text-white tracking-tight">كشوف الرواتب المعتمدة</CardTitle>
+                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
+                                    <Banknote className="h-8 w-8" />
+                                </div>
+                            </div>
+                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
+                                مراجعة وتأكيد دفع الرواتب وإصدار السجلات المالية النهائية.
+                            </CardDescription>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
+                            <div className="relative w-full">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white/10 border-white/10 text-white placeholder:text-rose-200 font-bold" />
+                            </div>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-muted/50 h-14">
+                            <TableRow className="border-none">
+                                <TableHead className="px-8 font-black text-[#7209B7]">رقم الملف</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">نوع الكشف</TableHead>
+                                <TableHead className="text-left font-black text-[#7209B7]">الراتب الكامل</TableHead>
+                                <TableHead className="text-left font-black text-[#7209B7]">الاستقطاعات</TableHead>
+                                <TableHead className="text-left font-black text-[#7209B7]">صافي المستحق</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">الحالة</TableHead>
+                                <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
                             </TableRow>
-                        ) : (
-                            sortedPayslips.map(payslip => {
-                                const totalEarnings = (payslip.earnings.basicSalary || 0) + (payslip.earnings.housingAllowance || 0) + (payslip.earnings.transportAllowance || 0);
-                                const totalDeductions = (payslip.deductions.absenceDeduction || 0) + (payslip.deductions.otherDeductions || 0);
-                                return (
-                                <TableRow key={payslip.id} className="hover:bg-muted/30 transition-colors h-16">
-                                    <TableCell className="px-8 font-mono font-black text-primary text-sm">{payslip.employeeNumber}</TableCell>
-                                    <TableCell className="font-black text-gray-800">{payslip.employeeName}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className={cn("px-3 font-bold text-[10px]", payslipTypeColors[payslip.type || 'Monthly'])}>
-                                            {payslipTypeTranslations[payslip.type || 'Monthly']}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-left font-mono font-bold text-gray-600">{formatCurrency(totalEarnings)}</TableCell>
-                                    <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(totalDeductions)})</TableCell>
-                                    <TableCell className="text-left font-mono font-black text-primary text-lg">{formatCurrency(payslip.netSalary)}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[payslip.status])}>
-                                            {statusTranslations[payslip.status]}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border" asChild>
-                                            <Link href={`/dashboard/hr/payroll/${payslip.id}`}><Eye className="h-4 w-4" /></Link>
-                                        </Button>
+                        </TableHeader>
+                        <TableBody>
+                            {loading ? (
+                                Array.from({length: 5}).map((_, i) => (
+                                    <TableRow key={i}><TableCell colSpan={8} className="px-8"><Skeleton className="h-10 w-full rounded-xl"/></TableCell></TableRow>
+                                ))
+                            ) : sortedPayslips.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={8} className="h-48 text-center text-muted-foreground font-bold italic">
+                                        {loadingPayslips ? 'جاري التحميل...' : 'اضغط على "تحميل الكشوفات" لعرض البيانات.'}
                                     </TableCell>
                                 </TableRow>
-                            )})
-                        )}
-                    </TableBody>
-                    <TableFooter className="bg-primary/5 h-20">
-                        <TableRow className="border-t-4 border-primary/20">
-                            <TableCell colSpan={5} className="text-right px-12 font-black text-xl">إجمالي صافي الرواتب للصرف:</TableCell>
-                            <TableCell className="text-left font-mono text-2xl font-black text-primary px-4">{formatCurrency(totals.netSalary)}</TableCell>
-                            <TableCell colSpan={2}></TableCell>
-                        </TableRow>
-                    </TableFooter>
-                </Table>
-            </div>
+                            ) : (
+                                sortedPayslips.map(payslip => {
+                                    const totalEarnings = (payslip.earnings.basicSalary || 0) + (payslip.earnings.housingAllowance || 0) + (payslip.earnings.transportAllowance || 0);
+                                    const totalDeductions = (payslip.deductions.absenceDeduction || 0) + (payslip.deductions.otherDeductions || 0);
+                                    return (
+                                    <TableRow key={payslip.id} className="hover:bg-muted/30 transition-colors h-16">
+                                        <TableCell className="px-8 font-mono font-black text-primary text-sm">{payslip.employeeNumber}</TableCell>
+                                        <TableCell className="font-black text-gray-800">{payslip.employeeName}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={cn("px-3 font-bold text-[10px]", payslipTypeColors[payslip.type || 'Monthly'])}>
+                                                {payslipTypeTranslations[payslip.type || 'Monthly']}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-left font-mono font-bold text-gray-600">{formatCurrency(totalEarnings)}</TableCell>
+                                        <TableCell className="text-left font-mono font-bold text-red-600">({formatCurrency(totalDeductions)})</TableCell>
+                                        <TableCell className="text-left font-mono font-black text-primary text-lg">{formatCurrency(payslip.netSalary)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[payslip.status])}>
+                                                {statusTranslations[payslip.status]}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border" asChild>
+                                                <Link href={`/dashboard/hr/payroll/${payslip.id}`}><Eye className="h-4 w-4" /></Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                )})
+                            )}
+                        </TableBody>
+                        <TableFooter className="bg-primary/5 h-20">
+                            <TableRow className="border-t-4 border-primary/20">
+                                <TableCell colSpan={5} className="text-right px-12 font-black text-xl">إجمالي صافي الرواتب للصرف:</TableCell>
+                                <TableCell className="text-left font-mono text-2xl font-black text-primary px-4">{formatCurrency(totals.netSalary)}</TableCell>
+                                <TableCell colSpan={2}></TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </CardContent>
+            </Card>
 
         {showDeleteConfirm && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" dir="rtl">

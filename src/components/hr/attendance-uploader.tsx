@@ -381,16 +381,16 @@ export function AttendanceUploader() {
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="space-y-8">
                 <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                    <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                    <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0">
                         <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                             <div className="space-y-2 text-right order-1 lg:order-2">
                                 <div className="flex items-center justify-end gap-3">
                                     <CardTitle className="text-3xl font-black text-white tracking-tight">إعدادات الفترة ونطاق الرقابة</CardTitle>
-                                    <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                    <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
                                         <CalendarRange className="h-8 w-8" />
                                     </div>
                                 </div>
-                                <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                                <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
                                     حدد الشهر والسنة المستهدفة لاحتساب الرواتب ومطابقة البصمات.
                                 </CardDescription>
                             </div>
@@ -398,14 +398,14 @@ export function AttendanceUploader() {
                             <div className="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] shadow-2xl backdrop-blur-sm min-w-[420px] order-2 lg:order-1">
                                 <div className="flex gap-6 justify-center">
                                     <div className="grid gap-1">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 mr-1">السنة الرقابية</Label>
+                                        <Label className="text-[10px] font-black uppercase text-rose-200 mr-1">السنة الرقابية</Label>
                                         <Select value={year} onValueChange={setYear}>
                                             <SelectTrigger className="h-11 w-32 rounded-xl border-white/10 bg-white/5 text-white font-black"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
                                     <div className="grid gap-1">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 mr-1">الشهر المستهدف</Label>
+                                        <Label className="text-[10px] font-black uppercase text-rose-200 mr-1">الشهر المستهدف</Label>
                                         <Select value={month} onValueChange={setMonth}>
                                             <SelectTrigger className="h-11 w-32 rounded-xl border-white/10 bg-white/5 text-white font-black"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
@@ -487,16 +487,16 @@ export function AttendanceUploader() {
 
         <TabsContent value="mapping" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0">
+                <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-white tracking-tight">مطابقة البصمة والدوام المخصص</CardTitle>
-                                <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
                                     <Fingerprint className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
                                 تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.
                             </CardDescription>
                         </div>

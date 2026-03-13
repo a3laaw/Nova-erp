@@ -700,16 +700,16 @@ export function PayrollGenerator() {
 
         <div className="space-y-6">
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#0f172a] text-white py-10 px-10 border-b-0 no-print">
+                <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0 no-print">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-white tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
-                                <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner">
+                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
                                     <ShieldCheck className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-slate-400 font-bold text-base leading-relaxed">
+                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
                                 مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي قبل صرف الرواتب.
                             </CardDescription>
                         </div>
