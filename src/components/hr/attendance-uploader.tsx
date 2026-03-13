@@ -37,7 +37,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup, deleteDoc } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { Loader2, FileSpreadsheet, RotateCcw, CheckCircle2, Fingerprint, Save, Search, UserCheck, Clock, ShieldCheck, BadgeInfo, X, Info, AlertTriangle, CalendarRange, Trash2, FileDown, ShieldAlert, FileText, Ban, History, AlertCircle, XCircle, CalendarCheck, Sparkles } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, CalendarRange, Trash2 as Trash, FileDown as Download, Printer as Print, Search, Fingerprint, Sparkles } from 'lucide-react';
 import type { Employee, MonthlyAttendance, AttendanceRecord, LeaveRequest, PermissionRequest, Holiday } from '@/lib/types';
 import { parse, format, isValid, startOfDay, eachDayOfInterval, startOfMonth, endOfMonth, getDay, isAfter, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -148,7 +148,6 @@ export function AttendanceUploader() {
     const selectedYearNum = parseInt(year);
     const selectedMonthNum = parseInt(month);
 
-    // دالة المعالجة الأساسية
     const processAttendanceLogic = (json: any[]) => {
         return new Promise<void>(async (resolve, reject) => {
             try {
@@ -167,7 +166,6 @@ export function AttendanceUploader() {
                 const excelPunches = new Map<string, Set<string>>(); 
                 let lastDateInFile: Date | null = null;
                 
-                // معالجة بيانات الإكسيل إذا وُجدت
                 if (json.length > 0) {
                     json.forEach(row => {
                         const keys = Object.keys(row);
@@ -211,7 +209,6 @@ export function AttendanceUploader() {
                     oldSnap.forEach(d => batch.delete(d.ref));
                 }
 
-                // ✨ الأتمتة الشاملة: معالجة كافة الموظفين النشطين (وليس فقط من في الإكسل)
                 for (const emp of employees) {
                     const employeeRecords: AttendanceRecord[] = [];
                     for (const day of workingDaysInMonth) {
@@ -236,7 +233,6 @@ export function AttendanceUploader() {
                                 } else {
                                     const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
                                     if (sortedTimes[0] > startTimeLimit) {
-                                        // ✨ معالجة الاستئذان المعتمد آلياً
                                         if (activePermission?.type === 'late_arrival') {
                                             anomaly = 'تأخير مسموح (إذن تأخير)';
                                             auditStatus = 'verified';
@@ -251,7 +247,6 @@ export function AttendanceUploader() {
 
                                 employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
                             } else if (activeLeave) {
-                                // ✨ مزامنة آلية: الموظف في إجازة ولا توجد بصمة
                                 employeeRecords.push({ 
                                     date: Timestamp.fromDate(stableDay), 
                                     employeeId: emp.id!, 
@@ -306,7 +301,6 @@ export function AttendanceUploader() {
         };
         reader.readAsBinaryString(file);
     } else {
-        // مزامنة الإجازات والاستئذانات فقط
         try {
             await processAttendanceLogic([]);
             toast({ title: 'نجاح المزامنة', description: 'تم تحديث سجلات الإجازات والاستئذانات المعتمدة آلياً.' });
@@ -381,7 +375,7 @@ export function AttendanceUploader() {
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="space-y-8">
                 <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                    <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0">
+                    <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0">
                         <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                             <div className="space-y-2 text-right order-1 lg:order-2">
                                 <div className="flex items-center justify-end gap-3">
@@ -487,7 +481,7 @@ export function AttendanceUploader() {
 
         <TabsContent value="mapping" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0">
+                <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">

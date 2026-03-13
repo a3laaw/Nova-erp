@@ -32,7 +32,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toFirestoreDate } from '@/services/date-converter';
 import * as XLSX from 'xlsx';
 import { useBranding } from '@/context/branding-context';
@@ -318,7 +318,7 @@ export function PayslipsList() {
             </div>
 
             <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-[#4a0e2e] text-white py-10 px-10 border-b-0">
+                <CardHeader className="bg-[#9B1B8E] text-white py-10 px-10 border-b-0">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
