@@ -282,7 +282,26 @@ export interface MonthlyAttendance extends BaseEntity {
     summary: { presentDays: number; absentDays: number; lateDays: number; leaveDays: number; totalDays: number; }; 
 }
 
-export interface Payslip extends BaseEntity { employeeId: string; employeeName: string; year: number; month: number; type: 'Monthly' | 'Leave'; earnings: { basicSalary: number; housingAllowance: number; transportAllowance: number; commission: number; }; deductions: { absenceDeduction: number; otherDeductions: number; }; netSalary: number; status: 'draft' | 'processed' | 'paid'; notes?: string; attendanceId?: string; leaveRequestId?: string; paidAt?: any; salaryPaymentType?: string; }
+export interface Payslip extends BaseEntity { 
+    employeeId: string; 
+    employeeName: string; 
+    year: number; 
+    month: number; 
+    type: 'Monthly' | 'Leave'; 
+    earnings: { basicSalary: number; housingAllowance: number; transportAllowance: number; commission: number; }; 
+    deductions: { 
+        absenceDeduction: number; 
+        lateDeduction: number; // حقل جديد لفصل استقطاعات التأخير
+        otherDeductions: number; 
+    }; 
+    netSalary: number; 
+    status: 'draft' | 'processed' | 'paid'; 
+    notes?: string; 
+    attendanceId?: string; 
+    leaveRequestId?: string; 
+    paidAt?: any; 
+    salaryPaymentType?: string; 
+}
 export interface LeaveRequest extends BaseEntity { employeeId: string; employeeName: string; leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid'; startDate: any; endDate: any; days: number; workingDays: number; unpaidDays?: number; status: 'pending' | 'approved' | 'rejected' | 'on-leave' | 'returned'; approvedBy?: string; approvedAt?: any; rejectionReason?: string; notes?: string; passportReceived?: boolean; isSalaryPaid?: boolean; actualStartDate?: any; actualReturnDate?: any; }
 export interface Notification extends BaseEntity { userId: string; title: string; body: string; link?: string; isRead: boolean; }
 export interface RecurringObligation extends BaseEntity { title: string; type: 'rent' | 'installment' | 'vendor_debt' | 'daily_labor'; amount: number; frequency: 'weekly' | 'monthly'; dueDate: any; lastGeneratedDate?: any; debitAccountId: string; debitAccountName?: string; creditAccountId: string; creditAccountName?: string; status: 'active' | 'paused'; }

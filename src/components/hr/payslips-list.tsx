@@ -235,7 +235,9 @@ export function PayslipsList() {
             'اسم الموظف': p.employeeName,
             'نوع الكشف': payslipTypeTranslations[p.type || 'Monthly'],
             'إجمالي الاستحقاقات': p.earnings.basicSalary + p.earnings.housingAllowance + p.earnings.transportAllowance + p.earnings.commission,
-            'إجمالي الاستقطاعات': p.deductions.absenceDeduction + p.deductions.otherDeductions,
+            'استقطاع غياب': p.deductions.absenceDeduction || 0,
+            'استقطاع تأخير': p.deductions.lateDeduction || 0,
+            'استقطاعات أخرى': p.deductions.otherDeductions || 0,
             'صافي الراتب المستحق': p.netSalary,
             'الحالة': statusTranslations[p.status],
         }));
@@ -367,7 +369,7 @@ export function PayslipsList() {
                             ) : (
                                 sortedPayslips.map(payslip => {
                                     const totalEarnings = (payslip.earnings.basicSalary || 0) + (payslip.earnings.housingAllowance || 0) + (payslip.earnings.transportAllowance || 0);
-                                    const totalDeductions = (payslip.deductions.absenceDeduction || 0) + (payslip.deductions.otherDeductions || 0);
+                                    const totalDeductions = (payslip.deductions.absenceDeduction || 0) + (payslip.deductions.lateDeduction || 0) + (payslip.deductions.otherDeductions || 0);
                                     return (
                                     <TableRow key={payslip.id} className="hover:bg-muted/30 transition-colors h-16">
                                         <TableCell className="px-8 font-mono font-black text-primary text-sm">{payslip.employeeNumber}</TableCell>

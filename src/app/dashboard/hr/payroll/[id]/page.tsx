@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDocument, useFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { Payslip, Employee, Company } from '@/lib/types';
+import type { Payslip, Employee } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowRight } from 'lucide-react';
@@ -11,6 +11,7 @@ import { formatCurrency, numberToArabicWords } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Logo } from '@/components/layout/logo';
+import { Badge } from '@/components/ui/badge';
 
 const InfoRow = ({ label, value }: { label: string, value: string | number | undefined }) => (
     <div className="flex justify-between items-center py-2">
@@ -73,6 +74,9 @@ export default function PayslipPage() {
                          <div className="text-right">
                              <h2 className="text-2xl font-bold">كشف راتب</h2>
                              <p className="text-muted-foreground">راتب شهر {payslip.month} / {payslip.year}</p>
+                             <Badge variant="outline" className="mt-2 bg-primary/5 text-primary border-primary/20">
+                                {payslip.type === 'Leave' ? 'راتب إجازة' : 'راتب شهري'}
+                             </Badge>
                          </div>
                          <div className="flex items-center gap-4">
                             <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
@@ -92,7 +96,9 @@ export default function PayslipPage() {
                         
                         <div className="grid md:grid-cols-2 gap-8">
                             <div className="space-y-2 p-4 border rounded-lg">
-                                <h3 className="font-semibold border-b pb-2 mb-2">الاستحقاقات</h3>
+                                <h3 className="font-bold border-b pb-2 mb-2 text-primary flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4" /> الاستحقاقات
+                                </h3>
                                 <AmountRow label="الراتب الأساسي" value={payslip.earnings.basicSalary} />
                                 {payslip.earnings.housingAllowance > 0 && <AmountRow label="بدل السكن" value={payslip.earnings.housingAllowance} />}
                                 {payslip.earnings.transportAllowance > 0 && <AmountRow label="بدل المواصلات" value={payslip.earnings.transportAllowance} />}
@@ -102,10 +108,19 @@ export default function PayslipPage() {
                                     <span className="font-mono">{formatCurrency(totalEarnings)}</span>
                                 </div>
                             </div>
-                            <div className="space-y-2 p-4 border rounded-lg">
-                                <h3 className="font-semibold border-b pb-2 mb-2">الاستقطاعات</h3>
-                                {payslip.deductions.absenceDeduction > 0 && <AmountRow label="خصم غياب" value={payslip.deductions.absenceDeduction} isDeduction />}
-                                {payslip.deductions.otherDeductions > 0 && <AmountRow label="خصومات أخرى" value={payslip.deductions.otherDeductions} isDeduction />}
+                            <div className="space-y-2 p-4 border rounded-lg bg-red-50/10">
+                                <h3 className="font-bold border-b pb-2 mb-2 text-red-700 flex items-center gap-2">
+                                    <Ban className="h-4 w-4" /> الاستقطاعات
+                                </h3>
+                                {payslip.deductions.absenceDeduction > 0 && (
+                                    <AmountRow label="خصم غياب (أيام انقطاع)" value={payslip.deductions.absenceDeduction} isDeduction />
+                                )}
+                                {payslip.deductions.lateDeduction > 0 && (
+                                    <AmountRow label="خصم تأخير (دقائق مخالفة)" value={payslip.deductions.lateDeduction} isDeduction />
+                                )}
+                                {payslip.deductions.otherDeductions > 0 && (
+                                    <AmountRow label="خصومات أخرى" value={payslip.deductions.otherDeductions} isDeduction />
+                                )}
                                 <div className="border-t pt-2 mt-2 flex justify-between items-center font-bold">
                                     <span>إجمالي الاستقطاعات</span>
                                     <span className="font-mono">{formatCurrency(totalDeductions)}</span>
@@ -113,27 +128,29 @@ export default function PayslipPage() {
                             </div>
                         </div>
 
-                        <div className="bg-primary/10 text-primary-foreground p-4 rounded-lg text-center">
-                            <p className="font-bold text-lg text-primary">صافي الراتب المستحق</p>
-                            <p className="font-extrabold text-3xl text-primary font-mono">{formatCurrency(payslip.netSalary)}</p>
-                            <p className="text-sm text-primary/80 mt-1">{numberToArabicWords(payslip.netSalary)}</p>
+                        <div className="bg-primary/10 text-primary-foreground p-6 rounded-3xl text-center border-2 border-primary/20 shadow-inner">
+                            <p className="font-black text-lg text-primary uppercase tracking-widest mb-1">صافي الراتب المستحق للصرف</p>
+                            <p className="font-extrabold text-4xl text-primary font-mono tabular-nums">{formatCurrency(payslip.netSalary)}</p>
+                            <p className="text-sm text-primary/80 mt-3 font-bold italic">{numberToArabicWords(payslip.netSalary)}</p>
                         </div>
                     </main>
-                     <footer className="pt-16 text-center text-xs text-gray-500">
-                        <p>هذا كشف راتب تم إنشاؤه بواسطة النظام ولا يتطلب توقيعًا يدويًا.</p>
+                     <footer className="pt-16 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                        <p>هذا كشف راتب تم إنشاؤه آلياً بواسطة نظام Nova ERP ولا يتطلب توقيعاً يدوياً للاعتماد المحاسبي.</p>
                      </footer>
                 </div>
                  <div className="p-6 bg-muted/50 rounded-b-lg flex justify-between items-center no-print">
-                    <Button variant="outline" onClick={() => router.back()}>
+                    <Button variant="outline" onClick={() => router.back()} className="rounded-xl font-bold">
                         <ArrowRight className="ml-2 h-4 w-4" />
                         العودة
                     </Button>
-                    <Button onClick={handlePrint}>
+                    <Button onClick={handlePrint} className="rounded-xl font-black px-10 shadow-lg shadow-primary/20">
                         <Printer className="ml-2 h-4 w-4" />
-                        طباعة
+                        طباعة الكشف
                     </Button>
                 </div>
             </div>
         </div>
     );
 }
+
+import { CheckCircle2, Ban } from 'lucide-react';

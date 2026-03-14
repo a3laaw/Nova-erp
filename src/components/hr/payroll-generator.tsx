@@ -38,7 +38,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, writeBatch, doc, getDoc, serverTimestamp, updateDoc, Timestamp, orderBy, limit, collectionGroup, deleteDoc, runTransaction } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
-import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles, FileSpreadsheet, Save } from 'lucide-react';
+import { RefreshCw, Trash2, FileDown, FileText, Printer, CheckCircle2, XCircle, Loader2, ShieldCheck, ShieldAlert, Ban, Info, RotateCcw, Banknote, CalendarDays, History, AlertTriangle, LayoutGrid, ListFilter, ChevronDown, CalendarCheck, Sparkles, FileSpreadsheet, Save, Badge } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +64,6 @@ import { cleanFirestoreData, cn, formatCurrency } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '../ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -130,7 +129,6 @@ export function PayrollGenerator() {
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
-  const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
@@ -139,16 +137,9 @@ export function PayrollGenerator() {
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [isPrintingSummary, setIsPrintingSummary] = useState(false);
   const [monthIsPaid, setMonthIsPaid] = useState(false);
-  const [processingMode, setProcessingMode] = useState<'limit_to_file' | 'full_month'>('limit_to_file');
-  const [clearPrevious, setClearPrevious] = useState(true);
   
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', 'in', ['active', 'on-leave'])]);
   const [attendanceDocs, setAttendanceDocs] = useState<MonthlyAttendance[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [editableData, setEditableData] = useState<Record<string, { employeeNumber: string, workStartTime: string, workEndTime: string }>>({});
-  const [isSavingData, setIsSavingData] = useState(false);
-  const [mappingSearch, setMappingSearch] = useState('');
 
   const payrollQuery = useMemo(() => [
     where('year', '==', parseInt(year)),
@@ -158,22 +149,6 @@ export function PayrollGenerator() {
   const { data: monthPayslips, loading: payrollLoading } = useSubscription<Payslip>(firestore, 'payroll', payrollQuery);
 
   const isMonthPaid = monthIsPaid || (monthPayslips.length > 0 && monthPayslips.some(p => p.status === 'paid'));
-
-  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
-
-  useEffect(() => {
-    if (employees.length > 0) {
-        const data: Record<string, any> = {};
-        employees.forEach(emp => {
-            data[emp.id!] = {
-                employeeNumber: emp.employeeNumber || '',
-                workStartTime: emp.workStartTime || '',
-                workEndTime: emp.workEndTime || ''
-            };
-        });
-        setEditableData(data);
-    }
-  }, [employees]);
 
   useEffect(() => {
     setAttendanceDocs([]);
@@ -193,7 +168,6 @@ export function PayrollGenerator() {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as MonthlyAttendance));
       setAttendanceDocs(data);
 
-      // تحقق من حالة الرواتب لهذا الشهر
       const payrollSnap = await getDocs(query(
         collection(firestore, 'payroll'),
         where('year', '==', parseInt(year)),
@@ -213,195 +187,62 @@ export function PayrollGenerator() {
     }
   };
 
-  const handleUpload = async () => {
-    if (!firestore || !year || !month) return;
+  const handleGeneratePayroll = async () => {
+    if (!firestore || !currentUser) return;
+    
+    // 🛡️ التصفية: استبعاد عمال اليومية من مسير الرواتب الشهري
+    const filteredEmployees = employees.filter(emp => emp.jobTitle !== 'عامل يومية');
+    
     setIsProcessing(true);
-    const selectedYearNum = parseInt(year);
-    const selectedMonthNum = parseInt(month);
-
-    const processAttendanceLogic = (json: any[]) => {
-        return new Promise<void>(async (resolve, reject) => {
-            try {
-                const monthStart = startOfMonth(new Date(selectedYearNum, selectedMonthNum - 1));
-                const monthEnd = endOfMonth(monthStart);
-
-                const [leavesSnap, permissionsSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'leaveRequests'), where('status', 'in', ['approved', 'on-leave', 'returned']))),
-                    getDocs(query(collection(firestore, 'permissionRequests'), where('status', '==', 'approved')))
-                ]);
-
-                const approvedLeaves = leavesSnap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
-                const approvedPermissions = permissionsSnap.docs.map(d => ({ id: d.id, ...d.data() } as PermissionRequest));
-
-                const employeeMap = new Map(employees.filter(emp => !!emp.employeeNumber).map(emp => [String(emp.employeeNumber), emp]));
-                const excelPunches = new Map<string, Set<string>>(); 
-                let lastDateInFile: Date | null = null;
+    try {
+        await runTransaction(firestore, async (transaction) => {
+            for (const emp of filteredEmployees) {
+                const att = attendanceDocs.find(a => a.employeeId === emp.id);
+                const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
+                const dailyRate = fullSalary / 26;
                 
-                if (json.length > 0) {
-                    json.forEach(row => {
-                        const keys = Object.keys(row);
-                        let empNo = '';
-                        for(let k=0; k<Math.min(keys.length, 15); k++) {
-                            const val = String(row[keys[k]] || '').trim();
-                            if (val && employeeMap.has(val)) { empNo = val; break; }
-                        }
-                        const emp = employeeMap.get(empNo);
-                        if (!emp?.id) return;
-
-                        for (const key in row) {
-                            const parsed = parseSmartDateTime(row[key]);
-                            if (parsed) {
-                                const pMonth = parsed.date.getMonth() + 1;
-                                const pYear = parsed.date.getFullYear();
-                                
-                                if (pYear === selectedYearNum && pMonth === selectedMonthNum) {
-                                    const dateKey = `${emp.id}_${format(parsed.date, 'yyyy-MM-dd')}`;
-                                    if (!excelPunches.has(dateKey)) excelPunches.set(dateKey, new Set());
-                                    if (parsed.timeStr && parsed.timeStr !== "00:00") {
-                                        excelPunches.get(dateKey)!.add(parsed.timeStr);
-                                        if (!lastDateInFile || parsed.date > lastDateInFile) lastDateInFile = parsed.date;
-                                    }
-                                }
+                let absenceDeduction = 0;
+                let lateDeduction = 0;
+                
+                if (att) {
+                    att.records?.forEach(r => {
+                        if (r.auditStatus !== 'waived') {
+                            if (r.status === 'absent') {
+                                absenceDeduction += (r.manualDeductionDays || 1) * dailyRate;
+                            } else if (r.status === 'late') {
+                                lateDeduction += (r.manualDeductionDays || 0) * dailyRate;
                             }
                         }
                     });
                 }
 
-                let processingLimitDate = processingMode === 'full_month' ? monthEnd : (lastDateInFile || new Date());
-                const allDaysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-                const holidayIndexes = new Set((branding?.work_hours?.holidays || []).map(h => dayNameToIndex[h]));
-                const workingDaysInMonth = allDaysInMonth.filter(day => !holidayIndexes.has(getDay(day)));
-
-                const batch = writeBatch(firestore);
-
-                if (clearPrevious) {
-                    const oldQ = query(collection(firestore, 'attendance'), where('year', '==', selectedYearNum), where('month', '==', selectedMonthNum));
-                    const oldSnap = await getDocs(oldQ);
-                    oldSnap.forEach(d => batch.delete(d.ref));
-                }
-
-                for (const emp of employees) {
-                    const employeeRecords: AttendanceRecord[] = [];
-                    for (const day of workingDaysInMonth) {
-                        const stableDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12, 0, 0);
-                        const dateKey = `${emp.id}_${format(stableDay, 'yyyy-MM-dd')}`;
-                        const punches = excelPunches.get(dateKey);
-
-                        if (!isAfter(stableDay, endOfDay(processingLimitDate))) {
-                            const activeLeave = approvedLeaves.find(l => l.employeeId === emp.id && stableDay >= toFirestoreDate(l.startDate)! && stableDay <= toFirestoreDate(l.endDate)!);
-                            const activePermission = approvedPermissions.find(p => p.employeeId === emp.id && isSameDay(stableDay, toFirestoreDate(p.date)!));
-
-                            if (punches && punches.size > 0) {
-                                const sortedTimes = Array.from(punches).sort();
-                                let status: AttendanceRecord['status'] = 'present';
-                                let anomaly = '';
-                                let manualDeduction = 0;
-                                let auditStatus: AttendanceRecord['auditStatus'] = 'verified';
-
-                                if (activeLeave) {
-                                    anomaly = `⚠️ تعارض: بصمة موجودة أثناء إجازة (${leaveTypeTranslations[activeLeave.leaveType]})`;
-                                    auditStatus = 'pending';
-                                } else {
-                                    const startTimeLimit = emp.workStartTime || branding?.work_hours?.general?.morning_start_time || '08:00';
-                                    if (sortedTimes[0] > startTimeLimit) {
-                                        if (activePermission?.type === 'late_arrival') {
-                                            anomaly = 'تأخير مسموح (إذن تأخير)';
-                                            auditStatus = 'verified';
-                                            status = 'present';
-                                        } else {
-                                            status = 'late';
-                                            anomaly = `تأخير عن (${startTimeLimit})`;
-                                            auditStatus = 'pending';
-                                        }
-                                    }
-                                }
-
-                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
-                            } else if (activeLeave) {
-                                employeeRecords.push({ 
-                                    date: Timestamp.fromDate(stableDay), 
-                                    employeeId: emp.id!, 
-                                    status: 'present', 
-                                    anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''} (مزامنة آلية)`, 
-                                    manualDeductionDays: 0, 
-                                    auditStatus: 'verified', 
-                                    allPunches: [] 
-                                } as any);
-                            } else {
-                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'absent', anomalyDescription: 'غائب (بدون بصمة)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
-                            }
-                        }
-                    }
-
-                    if (employeeRecords.length > 0) {
-                        const docId = `${selectedYearNum}-${selectedMonthNum}-${emp.id}`;
-                        batch.set(doc(firestore, 'attendance', docId), {
-                            employeeId: emp.id,
-                            year: selectedYearNum,
-                            month: selectedMonthNum,
-                            records: employeeRecords,
-                            updatedAt: serverTimestamp()
-                        });
-                    }
-                }
-
-                await batch.commit();
-                resolve();
-            } catch (err) {
-                reject(err);
+                const netSalary = Math.max(0, fullSalary - (absenceDeduction + lateDeduction));
+                const pRef = doc(firestore, 'payroll', `${year}-${month}-${emp.id}`);
+                
+                transaction.set(pRef, cleanFirestoreData({
+                    employeeId: emp.id,
+                    employeeName: emp.fullName,
+                    year: parseInt(year),
+                    month: parseInt(month),
+                    // ✨ تحديد النوع: راتب إجازة إذا كان الموظف في إجازة
+                    type: emp.status === 'on-leave' ? 'Leave' : 'Monthly',
+                    earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 },
+                    deductions: { 
+                        absenceDeduction, 
+                        lateDeduction, 
+                        otherDeductions: 0 
+                    },
+                    netSalary,
+                    status: 'draft',
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUser.id
+                }), { merge: true });
             }
         });
-    };
-
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                await processAttendanceLogic(json);
-                toast({ title: 'نجاح المعالجة', description: 'تم دمج البصمات مع الإجازات والاستئذانات آلياً.' });
-                setFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-            } catch (err: any) {
-                toast({ variant: 'destructive', title: 'خطأ', description: err.message });
-            } finally {
-                setIsProcessing(false);
-            }
-        };
-        reader.readAsBinaryString(file);
-    } else {
-        try {
-            await processAttendanceLogic([]);
-            toast({ title: 'نجاح المزامنة', description: 'تم تحديث سجلات الإجازات والاستئذانات المعتمدة آلياً.' });
-        } catch (err: any) {
-            toast({ variant: 'destructive', title: 'خطأ', description: err.message });
-        } finally {
-            setIsProcessing(false);
-        }
-    }
-  };
-
-  const handleDeleteMonth = async () => {
-    if (!firestore) return;
-    setShowDeleteConfirm(false);
-    setAttLoading(true);
-    try {
-      const snap = await getDocs(query(
-        collection(firestore, 'attendance'),
-        where('year', '==', parseInt(year)),
-        where('month', '==', parseInt(month))
-      ));
-      if (snap.empty) return;
-      const batch = writeBatch(firestore);
-      snap.docs.forEach(d => batch.delete(d.ref));
-      await batch.commit();
-      setAttendanceDocs([]);
-      toast({ title: '✅ تم الحذف', description: `تم تصفير سجلات شهر ${month}/${year}.` });
-    } finally {
-      setAttLoading(false);
-    }
+        toast({ title: 'تم توليد الرواتب' });
+        setIsGenerated(true);
+        setShowGenerateConfirm(false);
+    } finally { setIsProcessing(false); }
   };
 
   const anomalies = useMemo(() => {
@@ -485,126 +326,12 @@ export function PayrollGenerator() {
     } finally { setIsBulkProcessing(false); }
   };
 
-  const handleGeneratePayroll = async () => {
-    if (!firestore || !currentUser) return;
-    setIsProcessing(true);
-    try {
-        await runTransaction(firestore, async (transaction) => {
-            for (const emp of employees) {
-                const att = attendanceDocs.find(a => a.employeeId === emp.id);
-                const fullSalary = (emp.basicSalary || 0) + (emp.housingAllowance || 0) + (emp.transportAllowance || 0);
-                const dailyRate = fullSalary / 26;
-                let netSalary = fullSalary;
-                let deductionAmount = 0;
-                if (att) {
-                    let totalDeductionDays = 0;
-                    att.records?.forEach(r => { if (r.auditStatus !== 'waived') totalDeductionDays += (r.manualDeductionDays || 0); });
-                    deductionAmount = totalDeductionDays * dailyRate;
-                    netSalary = Math.max(0, fullSalary - deductionAmount);
-                }
-                const pRef = doc(firestore, 'payroll', `${year}-${month}-${emp.id}`);
-                transaction.set(pRef, cleanFirestoreData({ employeeId: emp.id, employeeName: emp.fullName, year: parseInt(year), month: parseInt(month), earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 }, deductions: { absenceDeduction: deductionAmount, otherDeductions: 0 }, netSalary, status: 'draft', type: 'Monthly', createdAt: serverTimestamp(), createdBy: currentUser.id }), { merge: true });
-            }
-        });
-        toast({ title: 'تم توليد الرواتب' });
-        setIsGenerated(true);
-        setShowGenerateConfirm(false);
-    } finally { setIsProcessing(false); }
-  };
-
-  const handleExportTotalsExcel = () => {
-    if (attendanceDocs.length === 0) return;
-    const data = attendanceDocs.map(doc => {
-        const emp = employees.find(e => e.id === doc.employeeId);
-        const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
-        const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
-        const lateDays = doc.summary?.lateDays ?? doc.records?.filter(r => r.status === 'late').length;
-
-        return {
-            'الرقم الوظيفي': emp?.employeeNumber || '---',
-            'اسم الموظف': emp?.fullName || 'غير معروف',
-            'القسم': emp?.department || '-',
-            'أيام الحضور': presentDays,
-            'أيام الغياب': absentDays,
-            'عدد التأخيرات': lateDays
-        };
-    });
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "اجماليات الحضور");
-    XLSX.writeFile(wb, `اجماليات_الحضور_${month}_${year}.xlsx`);
-  };
-
-  const handleExportDetailedExcel = () => {
-    if (anomalies.length === 0) return;
-    const data = anomalies.map(a => ({
-        'الرقم الوظيفي': a.employeeNumber,
-        'اسم الموظف': a.empName,
-        'التاريخ': format(toFirestoreDate(a.record.date)!, 'yyyy-MM-dd'),
-        'نوع المخالفة': a.record.anomalyDescription,
-        'الخصم (أيام)': a.record.manualDeductionDays,
-        'حالة التدقيق': a.record.auditStatus === 'verified' ? 'معتمد' : a.record.auditStatus === 'waived' ? 'متغاضى عنه' : 'قيد المراجعة'
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "سجل المخالفات");
-    XLSX.writeFile(wb, `تفاصيل_المخالفات_${month}_${year}.xlsx`);
-  };
-
   const handlePrint = (type: 'summary' | 'detailed') => {
     setIsPrintingSummary(type === 'summary');
     setTimeout(() => { window.print(); }, 100);
   };
 
-  const handleSaveMappingData = async () => {
-    if (!firestore || employees.length === 0) return;
-    setIsSavingData(true);
-    try {
-        const batch = writeBatch(firestore);
-        let hasChanges = false;
-
-        for (const empId in editableData) {
-            const current = editableData[empId];
-            const original = employees.find(e => e.id === empId);
-            
-            if (original) {
-                const needsUpdate = 
-                    original.employeeNumber !== current.employeeNumber ||
-                    (original.workStartTime || '') !== current.workStartTime ||
-                    (original.workEndTime || '') !== current.workEndTime;
-
-                if (needsUpdate) {
-                    const empRef = doc(firestore, 'employees', empId);
-                    batch.update(empRef, {
-                        employeeNumber: current.employeeNumber,
-                        workStartTime: current.workStartTime || null,
-                        workEndTime: current.workEndTime || null
-                    });
-                    hasChanges = true;
-                }
-            }
-        }
-
-        if (hasChanges) {
-            await batch.commit();
-            toast({ title: 'تم حفظ البيانات', description: 'تم تحديث أرقام البصمة وساعات الدوام بنجاح.' });
-        } else {
-            toast({ title: 'لا توجد تغييرات', description: 'لم يتم تعديل أي بيانات للحفظ.' });
-        }
-    } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
-    } finally {
-        setIsSavingData(false);
-    }
-  };
-
   const pendingCount = anomalies.filter(a => a.record.auditStatus === 'pending').length;
-  const filteredEmployees = useMemo(() => {
-    if (!mappingSearch) return employees;
-    const lower = mappingSearch.toLowerCase();
-    return employees.filter(e => e.fullName.toLowerCase().includes(lower) || e.employeeNumber.includes(lower));
-  }, [employees, mappingSearch]);
 
   return (
     <div className="space-y-8" dir="rtl">
@@ -663,22 +390,6 @@ export function PayrollGenerator() {
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" className="h-9 rounded-xl font-black text-xs gap-2 border-primary/20 text-primary">
-                                        <FileDown className="h-4 w-4" /> تصدير Excel <ChevronDown className="h-3 w-3 opacity-50"/>
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-xl shadow-2xl border-none">
-                                    <DropdownMenuItem onClick={handleExportTotalsExcel} className="py-3 font-bold gap-2">
-                                        <LayoutGrid className="h-4 w-4 text-primary" /> اجمالي الشهر (للمحاسبة)
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleExportDetailedExcel} className="py-3 font-bold gap-2">
-                                        <ListFilter className="h-4 w-4 text-green-600" /> تقرير المخالفات التفصيلي
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="h-9 rounded-xl font-black text-xs gap-2 border-primary/20 text-primary">
                                         <Printer className="h-4 w-4" /> طباعة التقارير <ChevronDown className="h-3 w-3 opacity-50"/>
                                     </Button>
                                 </DropdownMenuTrigger>
@@ -699,17 +410,17 @@ export function PayrollGenerator() {
         </div>
 
         <div className="space-y-6">
-            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
+            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
                 <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b no-print">
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
-                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
+                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
                                     <ShieldCheck className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-muted-foreground font-bold text-base leading-relaxed">
+                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
                                 مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي قبل صرف الرواتب.
                             </CardDescription>
                         </div>
@@ -776,31 +487,34 @@ export function PayrollGenerator() {
                                     <h1 className="text-2xl font-black">كشف حضور وانصراف الموظفين الإجمالي</h1>
                                     <p className="font-bold">الفترة: {month} / {year}</p>
                                 </div>
-                                <Table>
+                                <Table className="border-collapse">
                                     <TableHeader className="bg-muted/50 h-16">
                                         <TableRow className="border-none">
-                                            <TableHead className="px-10 font-black">الرقم الوظيفي</TableHead>
-                                            <TableHead className="font-black">اسم الموظف</TableHead>
-                                            <TableHead className="font-black">القسم</TableHead>
-                                            <TableHead className="text-center font-black">أيام الحضور</TableHead>
-                                            <TableHead className="text-center font-black">أيام الغياب</TableHead>
-                                            <TableHead className="text-center font-black">عدد التأخيرات</TableHead>
+                                            <TableHead className="px-10 font-black border">الرقم الوظيفي</TableHead>
+                                            <TableHead className="font-black border">اسم الموظف</TableHead>
+                                            <TableHead className="font-black border">القسم</TableHead>
+                                            <TableHead className="text-center font-black border">أيام الحضور</TableHead>
+                                            <TableHead className="text-center font-black border">أيام الغياب</TableHead>
+                                            <TableHead className="text-center font-black border">عدد التأخيرات</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {attendanceDocs.map((doc) => {
                                             const emp = employees.find(e => e.id === doc.employeeId);
-                                            const presentDays = doc.summary?.presentDays ?? doc.records?.filter(r => r.status === 'present').length;
-                                            const absentDays = doc.summary?.absentDays ?? doc.records?.filter(r => r.status === 'absent').length;
-                                            const lateDays = doc.summary?.lateDays ?? doc.records?.filter(r => r.status === 'late').length;
+                                            // 🛡️ تصفية عمال اليومية من التقرير الإجمالي أيضاً
+                                            if (emp?.jobTitle === 'عامل يومية') return null;
+
+                                            const presentDays = doc.records?.filter(r => r.status === 'present').length || 0;
+                                            const absentDays = doc.records?.filter(r => r.status === 'absent').length || 0;
+                                            const lateDays = doc.records?.filter(r => r.status === 'late').length || 0;
                                             return (
-                                                <TableRow key={doc.id} className="h-16 border-b">
-                                                    <TableCell className="px-10 font-mono font-bold">{emp?.employeeNumber || '---'}</TableCell>
-                                                    <TableCell className="font-black">{emp?.fullName || 'غير معروف'}</TableCell>
-                                                    <TableCell className="text-xs">{emp?.department || '-'}</TableCell>
-                                                    <TableCell className="text-center font-mono">{presentDays}</TableCell>
-                                                    <TableCell className="text-center font-mono text-red-600">{absentDays}</TableCell>
-                                                    <TableCell className="text-center font-mono text-orange-600">{lateDays}</TableCell>
+                                                <TableRow key={doc.id} className="h-16 border">
+                                                    <TableCell className="px-10 font-mono font-bold border">{emp?.employeeNumber || '---'}</TableCell>
+                                                    <TableCell className="font-black border">{emp?.fullName || 'غير معروف'}</TableCell>
+                                                    <TableCell className="text-xs border">{emp?.department || '-'}</TableCell>
+                                                    <TableCell className="text-center font-mono border">{presentDays}</TableCell>
+                                                    <TableCell className="text-center font-mono text-red-600 border">{absentDays}</TableCell>
+                                                    <TableCell className="text-center font-mono text-orange-600 border">{lateDays}</TableCell>
                                                 </TableRow>
                                             );
                                         })}
