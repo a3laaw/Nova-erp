@@ -55,20 +55,20 @@ export default function DashboardLayout({
     router.push('/');
   };
   
-  // High contrast background for Glass Theme
-  const glassBackground = "radial-gradient(circle at top right, #1e1b4b, #0f172a), linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)";
+  // Vibrant Glowing Gradient Background for Glass Theme
+  const vibrantGlassBackground = "linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%)";
   
   const isGlass = theme === 'glass';
   const hasBackground = !!branding?.system_background_url || isGlass;
   const backgroundStyle = {
-    backgroundImage: isGlass ? glassBackground : (branding?.system_background_url ? `url(${branding.system_background_url})` : 'none'),
+    backgroundImage: isGlass ? vibrantGlassBackground : (branding?.system_background_url ? `url(${branding.system_background_url})` : 'none'),
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
   };
 
   return (
-    <div className={cn("relative min-h-screen", isGlass && "dark")} style={backgroundStyle}>
+    <div className={cn("relative min-h-screen", isGlass && "theme-glass")} style={backgroundStyle}>
       <SidebarProvider>
           <Sidebar
             side={language === 'ar' ? 'right' : 'left'}
@@ -81,12 +81,12 @@ export default function DashboardLayout({
           </Sidebar>
           <SidebarInset className={cn(
             "flex flex-col h-screen min-w-0 w-full transition-all duration-500", 
-            isGlass ? "bg-black/10" : (hasBackground ? "bg-background/80 backdrop-blur-sm" : "bg-background")
+            isGlass ? "bg-white/5" : (hasBackground ? "bg-background/80 backdrop-blur-sm" : "bg-background")
           )}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
             <main className={cn(
                 "flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 min-w-0",
-                isGlass && "scrollbar-thin scrollbar-thumb-white/10"
+                isGlass && "scrollbar-thin scrollbar-thumb-white/20"
             )}>
               {children}
             </main>
