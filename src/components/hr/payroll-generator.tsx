@@ -67,60 +67,6 @@ import { useAuth } from '@/context/auth-context';
 import { Checkbox } from '../ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
-const dayNameToIndex: Record<string, number> = {
-  'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
-  'Thursday': 4, 'Friday': 5, 'Saturday': 6
-};
-
-const leaveTypeTranslations: Record<string, string> = {
-    'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
-};
-
-const parseSmartDateTime = (val: any): { date: Date, timeStr: string } | null => {
-    if (val === undefined || val === null || val === '') return null;
-    
-    let parsedDate: Date | null = null;
-    let timeStr = "00:00";
-
-    if (typeof val === 'number') {
-        try {
-            const excelDate = XLSX.SSF.parse_date_code(val);
-            if (excelDate.y < 2000) return null;
-            parsedDate = new Date(excelDate.y, excelDate.m - 1, excelDate.d, 12, 0, 0);
-            timeStr = `${String(excelDate.h).padStart(2, '0')}:${String(excelDate.m).padStart(2, '0')}`;
-        } catch { return null; }
-    } 
-    else if (typeof val === 'string') {
-        const cleaned = val.trim();
-        const dateMatch = cleaned.match(/(\d{1,4}[-/\.]\d{1,2}[-/\.]\d{1,4})/);
-        const timeMatch = cleaned.match(/(\d{1,2}:\d{2}(:\d{2})?(\s?[AaPp][Mm])?)/);
-
-        if (dateMatch) {
-            const dateStr = dateMatch[0];
-            const formats = ['dd-MM-yyyy', 'd-M-yyyy', 'yyyy-MM-dd', 'dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'dd-MM-yy', 'MM-dd-yyyy', 'MM/dd/yyyy'];
-            for (const fmt of formats) {
-                const p = parse(dateStr, fmt, new Date());
-                if (isValid(p)) {
-                    if (p.getFullYear() < 2000) break;
-                    parsedDate = new Date(p.getFullYear(), p.getMonth(), p.getDate(), 12, 0, 0);
-                    break;
-                }
-            }
-        }
-
-        if (timeMatch) {
-            const tStr = timeMatch[0].toUpperCase();
-            const tp = parse(tStr, tStr.includes('M') ? 'hh:mm a' : 'HH:mm', new Date());
-            if (isValid(tp)) timeStr = format(tp, 'HH:mm');
-        }
-    }
-
-    if (parsedDate && isValid(parsedDate)) {
-        return { date: parsedDate, timeStr };
-    }
-    return null;
-};
-
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -243,6 +189,31 @@ export function PayrollGenerator() {
         setIsGenerated(true);
         setShowGenerateConfirm(false);
     } finally { setIsProcessing(false); }
+  };
+
+  const handleDeleteMonth = async () => {
+    if (!firestore) return;
+    setAttLoading(true);
+    try {
+        const q = query(
+            collection(firestore, 'attendance'),
+            where('year', '==', parseInt(year)),
+            where('month', '==', parseInt(month))
+        );
+        const snap = await getDocs(q);
+        
+        const batch = writeBatch(firestore);
+        snap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+
+        setAttendanceDocs([]);
+        toast({ title: 'تم التصفير بنجاح', description: `تم حذف سجلات الحضور لشهر ${month}/${year}.` });
+        setShowDeleteConfirm(false);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف', description: e.message });
+    } finally {
+        setAttLoading(false);
+    }
   };
 
   const anomalies = useMemo(() => {
@@ -416,11 +387,11 @@ export function PayrollGenerator() {
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
-                                <div className="bg-white/10 rounded-2xl text-rose-200 shadow-inner">
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
                                     <ShieldCheck className="h-8 w-8" />
                                 </div>
                             </div>
-                            <CardDescription className="text-rose-200 font-bold text-base leading-relaxed">
+                            <CardDescription className="text-muted-foreground font-bold text-base leading-relaxed">
                                 مراجعة المخالفات المكتشفة واتخاذ قرارات التغاضي أو الخصم المالي قبل صرف الرواتب.
                             </CardDescription>
                         </div>
