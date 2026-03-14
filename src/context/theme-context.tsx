@@ -36,10 +36,8 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     setTheme(nextTheme);
   };
 
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
+  // يجب دائماً إرجاع الـ Provider لضمان عدم تعطل الخطاف useAppTheme في المكونات التابعة
+  // حتى لو لم يكتمل الـ hydration بعد
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
