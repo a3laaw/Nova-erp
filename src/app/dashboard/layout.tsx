@@ -55,35 +55,39 @@ export default function DashboardLayout({
     router.push('/');
   };
   
-  // Glass Theme dynamic background enhancement
-  const glassBackground = "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)";
+  // High contrast background for Glass Theme
+  const glassBackground = "radial-gradient(circle at top right, #1e1b4b, #0f172a), linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)";
   
-  const hasBackground = !!branding?.system_background_url || theme === 'glass';
+  const isGlass = theme === 'glass';
+  const hasBackground = !!branding?.system_background_url || isGlass;
   const backgroundStyle = {
-    backgroundImage: theme === 'glass' ? glassBackground : (branding?.system_background_url ? `url(${branding.system_background_url})` : 'none'),
+    backgroundImage: isGlass ? glassBackground : (branding?.system_background_url ? `url(${branding.system_background_url})` : 'none'),
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
   };
 
   return (
-    <div className={cn("relative min-h-screen", theme === 'glass' && "dark")} style={backgroundStyle}>
+    <div className={cn("relative min-h-screen", isGlass && "dark")} style={backgroundStyle}>
       <SidebarProvider>
           <Sidebar
             side={language === 'ar' ? 'right' : 'left'}
             className={cn(
                 "no-print transition-all duration-500",
-                theme === 'glass' ? "sidebar-glass" : "border-l border-sidebar-border bg-white shadow-sm"
+                isGlass ? "sidebar-glass" : "border-l border-sidebar-border bg-white shadow-sm"
             )}
           >
             <MainNav currentUser={user} onLogout={handleLogout} />
           </Sidebar>
           <SidebarInset className={cn(
             "flex flex-col h-screen min-w-0 w-full transition-all duration-500", 
-            theme === 'glass' ? "bg-black/20" : (hasBackground ? "bg-background/80 backdrop-blur-sm" : "bg-background")
+            isGlass ? "bg-black/10" : (hasBackground ? "bg-background/80 backdrop-blur-sm" : "bg-background")
           )}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
-            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 min-w-0">
+            <main className={cn(
+                "flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 min-w-0",
+                isGlass && "scrollbar-thin scrollbar-thumb-white/10"
+            )}>
               {children}
             </main>
             <OfflineIndicator />

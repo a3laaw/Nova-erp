@@ -31,23 +31,23 @@
   }
 
   [data-theme='glass'] {
-    /* Modern Glass Theme - Inspired by Image */
-    --background: 230 40% 10%; /* Darker base for glass transparency */
-    --foreground: 0 0% 100%;
-    --card: 0 0% 100% / 0.08; /* Semi-transparent */
+    /* Sovereign Glass Theme - Pure Contrast & High Readability */
+    --background: 230 40% 5%; /* Very deep dark for maximum pop */
+    --foreground: 0 0% 100%; /* Pure White */
+    --card: 0 0% 100% / 0.05; 
     --card-foreground: 0 0% 100%;
-    --popover: 230 40% 15% / 0.95;
+    --popover: 230 40% 10% / 0.98;
     --popover-foreground: 0 0% 100%;
-    --primary: 190 90% 60%; /* Sky Blue from image */
-    --primary-foreground: 230 40% 10%;
-    --secondary: 280 80% 60% / 0.2; /* Purple Neon */
+    --primary: 190 90% 60%; /* Neon Sky Blue */
+    --primary-foreground: 230 40% 5%;
+    --secondary: 280 80% 60% / 0.15;
     --secondary-foreground: 0 0% 100%;
-    --muted: 230 40% 20% / 0.5;
-    --muted-foreground: 230 20% 70%;
-    --accent: 320 100% 65% / 0.2; /* Neon Pink */
+    --muted: 230 40% 15% / 0.4;
+    --muted-foreground: 215 20% 85%; /* Light Blueish Gray for subtext */
+    --accent: 320 100% 65% / 0.2;
     --accent-foreground: 0 0% 100%;
-    --border: 0 0% 100% / 0.1;
-    --input: 0 0% 100% / 0.05;
+    --border: 0 0% 100% / 0.15;
+    --input: 0 0% 100% / 0.08;
     --ring: 190 90% 60%;
   }
 }
@@ -59,37 +59,72 @@
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
   }
+
+  [data-theme='glass'] body {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
 }
 
 @layer components {
-  /* Glassmorphism Specific Classes */
+  /* Ultra-Glass Aesthetics */
   [data-theme='glass'] .card,
   [data-theme='glass'] .glass-effect {
-    @apply backdrop-blur-xl border-[0.5px] border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)];
-    background: rgba(255, 255, 255, 0.05);
+    @apply backdrop-blur-[25px] border-[0.5px] border-white/20 shadow-[0_15px_35px_rgba(0,0,0,0.4)];
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%);
   }
 
   [data-theme='glass'] .active-glow {
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.3), 0 0 40px rgba(6, 182, 212, 0.2);
+    box-shadow: 0 0 30px rgba(34, 211, 238, 0.3), inset 0 0 15px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.4) !important;
   }
 
   [data-theme='glass'] .neon-text {
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    @apply font-bold;
+    color: #FFFFFF;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 0 20px rgba(34, 211, 238, 0.2);
   }
-  
+
   [data-theme='glass'] .sidebar-glass {
-    @apply bg-white/5 backdrop-blur-2xl border-l border-white/10;
+    @apply bg-black/40 backdrop-blur-[30px] border-l border-white/10;
+    background: linear-gradient(to bottom, rgba(15, 23, 42, 0.8), rgba(30, 27, 75, 0.8));
+  }
+
+  [data-theme='glass'] .glass-input {
+    @apply bg-white/5 border-white/20 text-white placeholder:text-white/40 focus:bg-white/10 focus:border-primary/50 transition-all;
+  }
+
+  [data-theme='glass'] .glass-button-primary {
+    @apply bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 border-none shadow-lg shadow-cyan-500/20 text-white font-black;
   }
 }
 
 @layer utilities {
     .glass-surface { @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm; }
-    .hover-lift { @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md; }
+    .hover-lift { @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl; }
     
     /* Neon Gradients */
     .bg-neon-sky { @apply bg-gradient-to-br from-cyan-400 to-blue-600; }
     .bg-neon-purple { @apply bg-gradient-to-br from-purple-500 to-indigo-700; }
     .bg-neon-pink { @apply bg-gradient-to-br from-pink-500 to-rose-600; }
+}
+
+/* Global Readability for Glass Mode */
+[data-theme='glass'] input, 
+[data-theme='glass'] textarea, 
+[data-theme='glass'] select {
+  @apply text-white font-medium bg-white/5 border-white/20;
+}
+
+[data-theme='glass'] .font-mono {
+  @apply text-white font-black;
+}
+
+[data-theme='glass'] table th {
+  @apply text-cyan-400 font-black uppercase tracking-wider bg-white/5;
+}
+
+[data-theme='glass'] table td {
+  @apply text-white font-bold border-white/5;
 }
 
 /* Fix for clicks */
