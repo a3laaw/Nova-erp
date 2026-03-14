@@ -64,7 +64,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     title="تبديل الثيم"
                     className={cn(
                         "rounded-full px-4 gap-2 transition-all duration-500",
-                        theme === 'glass' ? "bg-neon-sky text-white border-none active-glow" : "border-primary text-primary"
+                        theme === 'glass' ? "bg-slate-900 text-white border-none shadow-lg shadow-black/20" : "border-primary text-primary"
                     )}
                 >
                     {theme === 'glass' ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Palette className="h-4 w-4" />}
@@ -73,14 +73,14 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     </span>
                 </Button>
                 
-                <Button variant="outline" size="icon" asChild>
+                <Button variant="outline" size="icon" asChild className="theme-glass:border-slate-950/20 theme-glass:text-slate-950">
                   <Link href="/dashboard/appointments">
                     <Calendar className="h-4 w-4" />
                     <span className="sr-only">Appointments</span>
                   </Link>
                 </Button>
                 <Notifications />
-                <Button variant="outline" size="icon" onClick={toggleLanguage} aria-label="Toggle language">
+                <Button variant="outline" size="icon" onClick={toggleLanguage} aria-label="Toggle language" className="theme-glass:border-slate-950/20 theme-glass:text-slate-950">
                     <Languages className="h-4 w-4" />
                 </Button>
                  <DropdownMenu>
