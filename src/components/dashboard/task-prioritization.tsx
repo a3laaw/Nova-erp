@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,14 +10,16 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
-import { ClipboardList, Clock } from 'lucide-react';
+import { ClipboardList, Clock, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isPast, differenceInDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import Link from 'next/link';
+import { useAppTheme } from '@/context/theme-context';
 
 export function TaskPrioritization() {
   const { transactions, projects, loading } = useAnalyticalData();
+  const { theme } = useAppTheme();
   const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
 
   useEffect(() => {
@@ -49,21 +50,28 @@ export function TaskPrioritization() {
 
     const sortedTasks = tasks.sort((a, b) => b.delayDays - a.delayDays).slice(0, 5);
     
-    // Safety check to prevent infinite loop
     setUrgentTasks(prev => {
         if (JSON.stringify(prev) === JSON.stringify(sortedTasks)) return prev;
         return sortedTasks;
     });
   }, [transactions, projects, loading]); 
 
+  const isGlass = theme === 'glass';
+
   return (
-    <Card className="h-full flex flex-col rounded-3xl border-none shadow-sm overflow-hidden">
-      <CardHeader className="bg-orange-500/5 border-b pb-4">
+    <Card className={cn(
+        "h-full flex flex-col rounded-3xl border-none shadow-sm overflow-hidden",
+        isGlass && "glass-effect active-glow"
+    )}>
+      <CardHeader className={cn(
+          "border-b pb-4",
+          isGlass ? "bg-white/5" : "bg-orange-500/5"
+      )}>
         <CardTitle className="text-lg font-black flex items-center gap-2">
-          <ClipboardList className="h-5 w-5 text-orange-600" />
+          {isGlass ? <Sparkles className="h-5 w-5 text-primary animate-pulse" /> : <ClipboardList className="h-5 w-5 text-orange-600" />}
           تنبيهات الأولويات (WBS)
         </CardTitle>
-        <CardDescription>المهام الميدانية التي تجاوزت جدولها الزمني المخطط.</CardDescription>
+        <CardDescription className={isGlass ? "text-white/60" : ""}>المهام الميدانية التي تجاوزت جدولها الزمني المخطط.</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow pt-6">
         {loading ? (
@@ -82,16 +90,22 @@ export function TaskPrioritization() {
               <Link 
                 href={`/dashboard/clients/${task.clientId}/transactions/${task.transactionId}`}
                 key={task.id} 
-                className="flex items-center justify-between p-3 border-2 border-transparent bg-muted/20 hover:bg-white hover:border-orange-200 hover:shadow-md transition-all rounded-2xl group"
+                className={cn(
+                    "flex items-center justify-between p-3 border-2 border-transparent transition-all rounded-2xl group",
+                    isGlass ? "bg-white/5 hover:bg-white/10 hover:border-primary/30" : "bg-muted/20 hover:bg-white hover:border-orange-200 hover:shadow-md"
+                )}
               >
                 <div className="space-y-1">
-                  <p className="font-black text-sm group-hover:text-orange-700 transition-colors">{task.projectName}</p>
-                  <p className="text-[10px] text-muted-foreground font-bold flex items-center gap-1">
+                  <p className={cn("font-black text-sm transition-colors", isGlass ? "text-white" : "group-hover:text-orange-700")}>{task.projectName}</p>
+                  <p className={cn("text-[10px] font-bold flex items-center gap-1", isGlass ? "text-white/50" : "text-muted-foreground")}>
                     <Clock className="h-3 w-3" /> متأخر في مرحلة: {task.stageName}
                   </p>
                 </div>
                 <div className="text-left">
-                    <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-black text-[10px]">
+                    <Badge variant="destructive" className={cn(
+                        "border-none font-black text-[10px]",
+                        isGlass ? "bg-neon-pink text-white" : "bg-red-100 text-red-700"
+                    )}>
                         +{task.delayDays} يوم
                     </Badge>
                 </div>

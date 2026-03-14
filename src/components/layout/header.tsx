@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Languages, Calendar, LogOut, Palette } from 'lucide-react';
+import { Languages, Calendar, LogOut, Palette, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -59,13 +59,20 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
             <div className="ml-auto flex items-center gap-2">
                 <Button 
                     variant="outline" 
-                    size="icon" 
+                    size="sm" 
                     onClick={toggleTheme} 
                     title="تبديل الثيم"
-                    className={cn(theme === 'purple-salmon' && "border-primary text-primary")}
+                    className={cn(
+                        "rounded-full px-4 gap-2 transition-all duration-500",
+                        theme === 'glass' ? "bg-neon-sky text-white border-none active-glow" : "border-primary text-primary"
+                    )}
                 >
-                    <Palette className="h-4 w-4" />
+                    {theme === 'glass' ? <Sparkles className="h-4 w-4 animate-pulse" /> : <Palette className="h-4 w-4" />}
+                    <span className="hidden sm:inline font-black text-[10px] uppercase tracking-widest">
+                        {theme === 'glass' ? 'Glass Mode' : 'Default UI'}
+                    </span>
                 </Button>
+                
                 <Button variant="outline" size="icon" asChild>
                   <Link href="/dashboard/appointments">
                     <Calendar className="h-4 w-4" />

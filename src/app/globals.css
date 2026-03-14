@@ -7,99 +7,96 @@
 
 @layer base {
   :root {
-    /* Nova ERP Purple Suite - Minimalist SaaS Theme */
-    --background: 0 0% 98%; /* Soft Greyish White */
-    --foreground: 244 47% 15%; /* Deep Slate */
-    
+    /* Nova ERP Purple Suite - Default Theme */
+    --background: 0 0% 98%;
+    --foreground: 244 47% 15%;
     --card: 0 0% 100%;
     --card-foreground: 244 47% 15%;
-    
     --popover: 0 0% 100%;
     --popover-foreground: 244 47% 15%;
-    
-    --primary: 262 83% 58%; /* Vibrant Purple #7C3AED */
+    --primary: 262 83% 58%;
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 262 83% 96%; /* Very Faint Lavender */
+    --secondary: 262 83% 96%;
     --secondary-foreground: 262 70% 30%;
-    
-    --muted: 240 5% 96%; /* Very Soft Grey */
+    --muted: 240 5% 96%;
     --muted-foreground: 240 5% 45%;
-    
     --accent: 262 83% 94%;
     --accent-foreground: 262 70% 30%;
-    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    
     --border: 240 6% 90%;
     --input: 240 6% 90%;
     --ring: 262 83% 58%;
-    
     --radius: 1rem;
+  }
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 244 10% 30%;
-    --sidebar-primary: 262 83% 58%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 83% 97%;
-    --sidebar-accent-foreground: 262 83% 58%;
-    --sidebar-border: 240 6% 95%;
-    --sidebar-ring: 262 83% 58%;
+  [data-theme='glass'] {
+    /* Modern Glass Theme - Inspired by Image */
+    --background: 230 40% 10%; /* Darker base for glass transparency */
+    --foreground: 0 0% 100%;
+    --card: 0 0% 100% / 0.08; /* Semi-transparent */
+    --card-foreground: 0 0% 100%;
+    --popover: 230 40% 15% / 0.95;
+    --popover-foreground: 0 0% 100%;
+    --primary: 190 90% 60%; /* Sky Blue from image */
+    --primary-foreground: 230 40% 10%;
+    --secondary: 280 80% 60% / 0.2; /* Purple Neon */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 230 40% 20% / 0.5;
+    --muted-foreground: 230 20% 70%;
+    --accent: 320 100% 65% / 0.2; /* Neon Pink */
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 0.1;
+    --input: 0 0% 100% / 0.05;
+    --ring: 190 90% 60%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-500;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* Glassmorphism Specific Classes */
+  [data-theme='glass'] .card,
+  [data-theme='glass'] .glass-effect {
+    @apply backdrop-blur-xl border-[0.5px] border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)];
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  [data-theme='glass'] .active-glow {
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.3), 0 0 40px rgba(6, 182, 212, 0.2);
+  }
+
+  [data-theme='glass'] .neon-text {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+  
+  [data-theme='glass'] .sidebar-glass {
+    @apply bg-white/5 backdrop-blur-2xl border-l border-white/10;
   }
 }
 
 @layer utilities {
     .glass-surface { @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm; }
     .hover-lift { @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md; }
-    [data-sidebar="sidebar"] { @apply border-l border-sidebar-border bg-white shadow-sm !important; }
-    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    @media print { .no-print { display: none !important; } main { margin: 0 !important; padding: 0 !important; width: 100% !important; } }
+    
+    /* Neon Gradients */
+    .bg-neon-sky { @apply bg-gradient-to-br from-cyan-400 to-blue-600; }
+    .bg-neon-purple { @apply bg-gradient-to-br from-purple-500 to-indigo-700; }
+    .bg-neon-pink { @apply bg-gradient-to-br from-pink-500 to-rose-600; }
 }
 
-/* 🛡️ Global Click Fix 🛡️ */
-/* This ensures all buttons and interactive elements remain clickable despite library behaviors */
-
-[data-radix-portal],
-[data-radix-popper-content-wrapper],
-.react-select__menu-portal {
-  pointer-events: auto !important;
-  z-index: 999999 !important;
-}
-
-[role="listbox"],
-[role="menu"],
-[role="dialog"],
-[role="combobox"],
-[data-state="open"] {
-  pointer-events: auto !important;
-}
-
-[role="option"],
-[role="menuitem"],
-[cmdk-item],
-.react-select__option {
-  cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-/* Force body clicks if library locks them */
-body[style*="pointer-events: none"] {
-  pointer-events: auto !important;
-}
+/* Fix for clicks */
+[data-radix-portal], [data-radix-popper-content-wrapper] { pointer-events: auto !important; z-index: 999999 !important; }
+[role="option"], [role="menuitem"], [cmdk-item] { cursor: pointer !important; pointer-events: auto !important; }
 
 @media print {
-  nav, header, aside, .no-print { display: none !important; }
-  .printable-area { display: block !important; }
-  body { font-size: 12px; }
+  .no-print { display: none !important; }
   @page { margin: 1cm; size: A4 landscape; }
 }

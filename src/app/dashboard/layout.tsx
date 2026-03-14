@@ -13,6 +13,7 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { useBranding } from '@/context/branding-context';
 import { cn } from '@/lib/utils';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
+import { useAppTheme } from '@/context/theme-context';
 
 export default function DashboardLayout({
   children,
@@ -23,6 +24,7 @@ export default function DashboardLayout({
   const router = useRouter();
   const { language } = useLanguage();
   const { branding } = useBranding();
+  const { theme } = useAppTheme();
 
   if (loading) {
     return (
@@ -53,27 +55,33 @@ export default function DashboardLayout({
     router.push('/');
   };
   
-  const hasBackground = !!branding?.system_background_url;
-  const backgroundStyle = hasBackground ? {
-    backgroundImage: `url(${branding.system_background_url})`,
+  // Glass Theme dynamic background enhancement
+  const glassBackground = "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)";
+  
+  const hasBackground = !!branding?.system_background_url || theme === 'glass';
+  const backgroundStyle = {
+    backgroundImage: theme === 'glass' ? glassBackground : (branding?.system_background_url ? `url(${branding.system_background_url})` : 'none'),
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundAttachment: 'fixed',
-  } : {};
+  };
 
   return (
-    <div className="relative min-h-screen" style={backgroundStyle}>
+    <div className={cn("relative min-h-screen", theme === 'glass' && "dark")} style={backgroundStyle}>
       <SidebarProvider>
           <Sidebar
             side={language === 'ar' ? 'right' : 'left'}
             className={cn(
-                "no-print",
-                hasBackground && "border-r-white/10 bg-card/80 backdrop-blur-sm"
+                "no-print transition-all duration-500",
+                theme === 'glass' ? "sidebar-glass" : "border-l border-sidebar-border bg-white shadow-sm"
             )}
           >
             <MainNav currentUser={user} onLogout={handleLogout} />
           </Sidebar>
-          <SidebarInset className={cn("flex flex-col h-screen min-w-0 w-full", hasBackground && "bg-background/80 backdrop-blur-sm")}>
+          <SidebarInset className={cn(
+            "flex flex-col h-screen min-w-0 w-full transition-all duration-500", 
+            theme === 'glass' ? "bg-black/20" : (hasBackground ? "bg-background/80 backdrop-blur-sm" : "bg-background")
+          )}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
             <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 min-w-0">
               {children}
