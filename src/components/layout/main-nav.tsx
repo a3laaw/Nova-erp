@@ -248,7 +248,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
           asChild 
           tooltip={item.label}
           className={cn(
-            "my-1",
+            "my-1 flex-row-reverse",
             isGlass && "glass-nav-button", 
             isGlass && isActive && "glass-nav-button-active"
           )}
@@ -268,8 +268,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               />
             )}
             <span className={cn(
-              "font-medium transition-colors text-sm flex-1 text-right",
-              isActive && "font-black",
+              "font-bold transition-colors text-sm flex-1 text-center",
               isGlass && "text-[#1e1b4b]"
             )}>
               {item.label}
@@ -335,7 +334,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               isActive={isActive} 
               tooltip={item.label} 
               className={cn(
-                "my-1",
+                "my-1 flex-row-reverse",
                 isGlass && "glass-nav-button", 
                 isGlass && isActive && "glass-nav-button-active"
               )}
@@ -350,29 +349,32 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                 />
               )}
               <span className={cn(
-                "font-medium transition-colors text-sm flex-1 text-right",
-                isActive && "font-black",
+                "font-bold transition-colors text-sm flex-1 text-center",
                 isGlass && "text-[#1e1b4b]"
               )}>
                 {item.label}
               </span>
               <ChevronDown className={cn(
-                "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden",
+                "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50",
                 isGlass ? "text-[#1e1b4b]" : "text-primary"
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className={cn("mt-1 mb-2", isGlass && "glass-sub-menu")}>
+            <SidebarMenuSub className={cn("mt-1 mb-2 pr-4 border-r-2 border-primary/10")}>
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
                   <SidebarMenuSubItem key={child.href}>
-                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass ? "glass-sub-button" : "my-0.5 rounded-xl")}>
+                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
+                        "rounded-xl my-0.5 flex-row-reverse transition-all",
+                        isGlass && "glass-nav-button hover:translate-x-[-4px]",
+                        isGlass && isChildActive && "glass-nav-button-active"
+                    )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
-                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "text-[#1e1b4b]" : "")} />}
-                        <span className={cn("font-bold text-xs flex-1 text-right", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
+                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "sidebar-icon-deep" : "")} />}
+                        <span className={cn("font-bold text-xs flex-1 text-center", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>

@@ -73,7 +73,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-14 px-4 text-right align-middle font-black text-[11px] uppercase tracking-wider text-[#7209B7] theme-glass:text-slate-950 theme-glass:font-black [&:has([role=checkbox])]:pr-0 table-head",
+      "h-14 px-4 text-right align-middle font-black text-[11px] uppercase tracking-wider text-[#7209B7] theme-glass:text-[#1e1b4b] theme-glass:font-black [&:has([role=checkbox])]:pr-0 table-head",
       className
     )}
     {...props}
@@ -87,7 +87,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle font-bold text-gray-700 theme-glass:text-slate-900 theme-glass:font-bold [&:has([role=checkbox])]:pr-0 table-cell", className)}
+    className={cn("p-4 align-middle font-bold text-gray-700 theme-glass:text-[#1e1b4b] theme-glass:font-bold [&:has([role=checkbox])]:pr-0 table-cell", className)}
     {...props}
   />
 ))
@@ -99,7 +99,7 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn("mt-4 text-sm text-muted-foreground table-caption theme-glass:text-slate-800", className)}
+    className={cn("mt-4 text-sm text-muted-foreground table-caption theme-glass:text-[#1e1b4b]/80", className)}
     {...props}
   />
 ))
