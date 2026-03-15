@@ -89,6 +89,7 @@ import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { useAppTheme } from '@/context/theme-context';
 
 const navItems = {
   ar: [
@@ -229,7 +230,7 @@ const navItems = {
   ]
 };
 
-function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
+function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole: string, currentPath: string, isGlass: boolean }) {
   const { setOpenMobile, state } = useSidebar();
   const Icon = item.icon;
 
@@ -243,10 +244,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return (
       <SidebarMenuItem>
         <SidebarMenuButton isActive={isActive} asChild tooltip={item.label}>
-          <Link href={item.href} onClick={() => setOpenMobile(false)}>
+          <Link 
+            href={item.href} 
+            onClick={() => setOpenMobile(false)}
+            className={cn(isGlass && isActive && "sidebar-item-active")}
+          >
             {Icon && (
               <Icon 
-                className="size-8 shrink-0 transition-colors" 
+                className={cn("size-8 shrink-0 transition-colors", isGlass && isActive && "text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]")} 
                 strokeWidth={isActive ? 2.5 : 2} 
               />
             )}
@@ -277,7 +282,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 )}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-2xl shadow-2xl border-primary/10 bg-card/95 backdrop-blur-md p-2">
+            <DropdownMenuContent side="left" align="start" dir="rtl" className={cn("w-64 rounded-2xl shadow-2xl p-2", isGlass ? "backdrop-blur-xl bg-slate-900/90 border-white/10" : "bg-card/95 border-primary/10")}>
               <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any) => {
@@ -302,10 +307,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <Collapsible defaultOpen={isActive} className="group/collapsible">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton isActive={isActive} tooltip={item.label}>
+            <SidebarMenuButton isActive={isActive} tooltip={item.label} className={cn(isGlass && isActive && "sidebar-item-active")}>
               {Icon && (
                 <Icon 
-                  className="size-8 shrink-0 transition-colors" 
+                  className={cn("size-8 shrink-0 transition-colors", isGlass && isActive && "text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]")} 
                   strokeWidth={isActive ? 2.5 : 2} 
                 />
               )}
@@ -350,6 +355,8 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
   const pathname = usePathname();
   const { language } = useLanguage();
   const { branding } = useBranding();
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
   
   const currentNavItems = navItems[language] || navItems.ar;
 
@@ -359,7 +366,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         <div className="flex items-center gap-3">
             <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-sm border border-slate-100 bg-white" />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
-              <span className="text-xl font-black tracking-tight text-foreground leading-tight">{branding?.company_name || 'Nova ERP'}</span>
+              <span className={cn("text-xl font-black tracking-tight leading-tight", isGlass ? "text-white" : "text-foreground")}>{branding?.company_name || 'Nova ERP'}</span>
               <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-70">Purple Suite</span>
             </div>
         </div>
@@ -372,19 +379,23 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
                 item={item} 
                 userRole={currentUser.role} 
                 currentPath={pathname}
+                isGlass={isGlass}
             />
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-6 border-t border-slate-50">
+      <SidebarFooter className="p-6 border-t border-slate-50/10">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 bg-slate-50 border border-slate-100 group hover:bg-muted transition-all">
+            <div className={cn(
+                "flex h-auto w-full items-center justify-start rounded-2xl p-2 transition-all",
+                isGlass ? "bg-white/5 border border-white/10 hover:bg-white/10" : "bg-slate-50 border border-slate-100 hover:bg-muted"
+            )}>
                 <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-white text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className="text-sm font-black text-foreground truncate">{currentUser.fullName}</p>
+                    <p className={cn("text-sm font-black truncate", isGlass ? "text-white" : "text-foreground")}>{currentUser.fullName}</p>
                     <p className="text-[9px] text-muted-foreground truncate font-bold uppercase tracking-wider">{currentUser.role}</p>
                 </div>
             </div>
