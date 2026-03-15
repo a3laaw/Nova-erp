@@ -248,7 +248,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
           asChild 
           tooltip={item.label}
           className={cn(
-            "my-1 flex-row-reverse",
+            "my-1",
             isGlass && "glass-nav-button", 
             isGlass && isActive && "glass-nav-button-active"
           )}
@@ -334,7 +334,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               isActive={isActive} 
               tooltip={item.label} 
               className={cn(
-                "my-1 flex-row-reverse",
+                "my-1",
                 isGlass && "glass-nav-button", 
                 isGlass && isActive && "glass-nav-button-active"
               )}
@@ -368,7 +368,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl my-0.5 flex-row-reverse transition-all",
+                        "rounded-xl my-0.5 transition-all",
                         isGlass && "glass-nav-button hover:translate-x-[-4px]",
                         isGlass && isChildActive && "glass-nav-button-active"
                     )}>
