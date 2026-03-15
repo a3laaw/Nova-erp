@@ -159,7 +159,6 @@ export default function NewCashReceiptPage() {
     }
   }, [accounts, paymentMethod]);
 
-  // منطق التعرف على العميل بناءً على الحساب المختار من الشجرة
   const handleAccountChange = (accountId: string) => {
     setSelectedAccountId(accountId);
     setSelectedProjectId('');
@@ -168,17 +167,11 @@ export default function NewCashReceiptPage() {
 
     const account = accounts.find(a => a.id === accountId);
     if (account) {
-        // البحث عن العميل الذي يطابق اسمه اسم الحساب في الشجرة
         const client = clients.find(c => c.nameAr === account.name);
         if (client) {
             setSelectedClientId(client.id!);
         } else {
             setSelectedClientId('');
-            toast({ 
-                variant: 'default', 
-                title: 'تنبيه الربط', 
-                description: 'تم اختيار حساب عميل مالي ولكن لا يوجد ملف عميل مرتبط بهذا الاسم لجلب العقود.' 
-            });
         }
     } else {
         setSelectedClientId('');
@@ -211,60 +204,6 @@ export default function NewCashReceiptPage() {
     fetchClientProjects();
   }, [firestore, selectedClientId]);
   
-  useEffect(() => {
-    const generateDescription = async () => {
-        if (!selectedProjectId || !amount || parseFloat(amount) <= 0 || !firestore) {
-            setDescription('');
-            return;
-        }
-
-        const project = clientProjects.find(p => p.id === selectedProjectId);
-        if (!project || !project.contract?.clauses) {
-            setDescription('');
-            return;
-        }
-
-        let totalAlreadyPaid = 0;
-        try {
-            totalAlreadyPaid = await getTotalPaidForProject(selectedProjectId, firestore);
-        } catch (e) {
-            console.error("Could not fetch previous payments:", e);
-        }
-
-        let remainingAmountFromCurrentPayment = parseFloat(amount);
-        const descriptionParts: string[] = [];
-        let allocatedPaid = 0;
-
-        for (const clause of [...project.contract.clauses]) {
-            if (remainingAmountFromCurrentPayment <= 0) break;
-            
-            const clauseAmount = clause.amount;
-            const paidOnThisClausePreviously = Math.max(0, Math.min(clauseAmount, totalAlreadyPaid - allocatedPaid));
-            const remainingOnClause = clauseAmount - paidOnThisClausePreviously;
-
-            if (remainingOnClause > 0) {
-                const paymentForThisClause = Math.min(remainingAmountFromCurrentPayment, remainingOnClause);
-                
-                if (paymentForThisClause >= remainingOnClause) {
-                    descriptionParts.push(`سداد كامل للدفعة "${clause.name}" بقيمة ${formatCurrency(remainingOnClause)}`);
-                } else {
-                    descriptionParts.push(`سداد جزئي من الدفعة "${clause.name}" بقيمة ${formatCurrency(paymentForThisClause)}`);
-                }
-                remainingAmountFromCurrentPayment -= paymentForThisClause;
-            }
-            allocatedPaid += clauseAmount;
-        }
-
-        if (remainingAmountFromCurrentPayment > 0) {
-            descriptionParts.push(`مبلغ إضافي قدره ${formatCurrency(remainingAmountFromCurrentPayment)} كدفعة مقدمة على الحساب.`);
-        }
-        
-        setDescription(descriptionParts.join('\n'));
-    };
-
-    generateDescription();
-  }, [amount, selectedProjectId, clientProjects, firestore]);
-
   const handleSave = async () => {
     if (!firestore || !currentUser) return;
     if (savingRef.current) return;
@@ -372,8 +311,7 @@ export default function NewCashReceiptPage() {
         router.push(`/dashboard/accounting/cash-receipts/${newReceiptId}`);
 
     } catch (error: any) {
-        console.error("Error saving cash receipt:", error);
-        toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'فشل حفظ السند.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل حفظ السند.' });
         setIsSaving(false);
         savingRef.current = false;
     }
@@ -420,22 +358,22 @@ export default function NewCashReceiptPage() {
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="space-y-8 p-10">
+        <CardContent className="space-y-8 p-10 bg-white">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
                 <div className="md:col-span-2 grid gap-2">
-                <Label className="font-black pr-1">استلمنا من (حساب العميل في الشجرة) <span className="text-destructive">*</span></Label>
+                <Label className="font-black text-[#1e1b4b] pr-1">استلمنا من (حساب العميل في الشجرة) *</Label>
                 <InlineSearchList 
                     value={selectedAccountId}
                     onSelect={handleAccountChange}
                     options={clientAccountOptions}
                     placeholder={refDataLoading ? 'جاري التحميل...' : 'اختر الحساب المالي للعميل...'}
                     disabled={refDataLoading || isSaving}
-                    className="h-12 rounded-2xl border-primary/20"
+                    className="h-12 rounded-2xl border-2 soft-shadow-input"
                 />
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-black pr-1">التاريخ *</Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12 rounded-2xl" />
+                    <Label className="font-black text-[#1e1b4b] pr-1">التاريخ *</Label>
+                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12 rounded-2xl border-2 soft-shadow-input" />
                 </div>
             </div>
             
@@ -449,14 +387,14 @@ export default function NewCashReceiptPage() {
                     options={projectOptions}
                     placeholder={!selectedClientId ? 'اختر حساب العميل المربوط بملف أولاً' : projectsLoading ? 'جاري جلب المشاريع...' : 'اختر المشروع (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
-                    className="h-12 bg-white border-primary/20 rounded-2xl"
+                    className="h-12 bg-white border-primary/20 rounded-2xl soft-shadow-input"
                 />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="grid gap-2">
-                    <Label className="font-black pr-1">المبلغ المحصل <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-primary rounded-2xl shadow-inner border-2' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Label className="font-black text-[#1e1b4b] pr-1">المبلغ المحصل *</Label>
+                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-primary rounded-2xl shadow-inner border-2 soft-shadow-input' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label className="text-xs font-black text-muted-foreground uppercase pr-1">مبلغ وقدره (كتابة)</Label>
@@ -466,24 +404,24 @@ export default function NewCashReceiptPage() {
                 </div>
             </div>
             <div className="grid gap-2">
-                <Label htmlFor="description" className="font-black pr-1">البيان / وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-3xl border-2 p-4 text-base font-medium" />
+                <Label htmlFor="description" className="font-black text-[#1e1b4b] pr-1">البيان / وذلك عن</Label>
+                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-3xl border-2 p-4 text-base font-medium soft-shadow-input" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t">
                 <div className="grid gap-2">
-                    <Label className="font-black pr-1">طريقة الدفع <span className="text-destructive">*</span></Label>
+                    <Label className="font-black text-[#1e1b4b] pr-1">طريقة الدفع *</Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger className="h-12 rounded-2xl border-2"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-2xl border-2 soft-shadow-input"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
                         <SelectContent dir="rtl">{paymentMethodOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                  <div className="grid gap-2">
-                    <Label className="font-black pr-1">حساب الإيداع <span className="text-destructive">*</span></Label>
-                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-12 rounded-2xl border-2" />
+                    <Label className="font-black text-[#1e1b4b] pr-1">حساب الإيداع *</Label>
+                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-12 rounded-2xl border-2 soft-shadow-input" />
                 </div>
                 <div className="grid gap-2">
-                <Label className="font-black pr-1">رقم الشيك / المرجع</Label>
-                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono shadow-inner" />
+                <Label className="font-black text-[#1e1b4b] pr-1">رقم الشيك / المرجع</Label>
+                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono shadow-inner soft-shadow-input" />
                 </div>
             </div>
         </CardContent>
