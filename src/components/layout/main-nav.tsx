@@ -363,16 +363,16 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className={cn("mt-1 mb-2", isGlass && "glass-sub-menu border-r-2 border-white/30 mr-4 pr-2")}>
+            <SidebarMenuSub className={cn("mt-1 mb-2", isGlass && "glass-sub-menu")}>
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
                   <SidebarMenuSubItem key={child.href}>
-                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass ? "glass-sub-button my-0.5 rounded-xl" : "my-0.5 rounded-xl")}>
+                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass ? "glass-sub-button" : "my-0.5 rounded-xl")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
-                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "text-[#1e1b4b]" : "")} />}
-                        <span className={cn("font-bold text-xs", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
+                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0 order-2", isGlass ? "text-[#1e1b4b]" : "")} />}
+                        <span className={cn("font-bold text-xs order-1 flex-1 text-right", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
