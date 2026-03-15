@@ -80,33 +80,50 @@
     background: transparent; /* Pure transparent to show background colors */
   }
 
-  /* REFINED GLASS SIDEBAR ITEMS */
+  /* REFINED CRYSTAL GLASS SIDEBAR ITEMS */
   [data-theme='glass'] .glass-sidebar-item {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
     backdrop-filter: blur(25px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.45) !important;
-    box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15), inset 0 0 2px rgba(255, 255, 255, 0.5) !important;
+    /* Crystal Thin Pearlescent Border */
+    border: 0.5px solid rgba(255, 255, 255, 0.6) !important;
+    /* Refraction effect with multiple shadows */
+    box-shadow: 
+      0 4px 15px rgba(0, 0, 0, 0.05), 
+      inset 0 0 10px rgba(255, 255, 255, 0.1), 
+      inset 0 0 2px rgba(255, 255, 255, 0.5) !important;
     color: #020617 !important; /* Deep Navy */
     margin-bottom: 0.6rem !important;
     border-radius: 1.25rem !important;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    /* Soft sheen for text */
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+  }
+
+  [data-theme='glass'] .glass-sidebar-item svg {
+    /* Soft sheen for icons to look part of the glass */
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.4));
+    transition: all 0.3s ease;
   }
 
   [data-theme='glass'] .glass-sidebar-item:hover {
     background: rgba(255, 255, 255, 0.25) !important;
-    border-color: rgba(255, 255, 255, 0.7) !important;
+    border-color: rgba(255, 255, 255, 0.8) !important;
     transform: translateY(-1px) scale(1.01);
-    box-shadow: 0 8px 25px rgba(255, 255, 255, 0.2) !important;
+    box-shadow: 
+      0 8px 25px rgba(255, 255, 255, 0.2),
+      inset 0 0 15px rgba(255, 255, 255, 0.2) !important;
   }
 
   [data-theme='glass'] .glass-sidebar-item-active,
   [data-theme='glass'] .glass-sidebar-item[data-active='true'] {
     background: rgba(255, 255, 255, 0.5) !important;
-    border: 1.5px solid rgba(255, 255, 255, 1) !important;
-    box-shadow: 0 0 25px rgba(255, 255, 255, 0.4), inset 0 0 8px rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 1) !important;
+    box-shadow: 
+      0 0 25px rgba(255, 255, 255, 0.4), 
+      inset 0 0 12px rgba(255, 255, 255, 0.8) !important;
     color: #000000 !important;
     transform: scale(1.03);
-    border-right-width: 1.5px !important; /* Override default thick border */
+    border-right-width: 1px !important;
   }
 
   [data-theme='glass'] .header-icon-glass {
