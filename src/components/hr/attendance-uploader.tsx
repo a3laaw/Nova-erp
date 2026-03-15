@@ -51,6 +51,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useAuth } from '@/context/auth-context';
+import { useAppTheme } from '@/context/theme-context';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -111,6 +112,8 @@ export function AttendanceUploader() {
   const { toast } = useToast();
   const { branding } = useBranding();
   const { user: currentUser } = useAuth();
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
@@ -362,25 +365,38 @@ export function AttendanceUploader() {
   }, [employees, mappingSearch]);
 
   return (
-    <Tabs defaultValue="upload" dir="rtl" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 h-14 rounded-2xl bg-muted/50 p-1.5 shadow-inner">
-            <TabsTrigger value="upload" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <FileSpreadsheet className="h-4 w-4" /> 1. رفع ومعالجة الملف
+    <Tabs defaultValue="upload" dir="rtl" className="space-y-10">
+        <TabsList className={cn(
+            "w-full h-auto bg-transparent p-0 gap-6",
+            isGlass ? "tabs-list-cards" : "grid grid-cols-1 md:grid-cols-2"
+        )}>
+            <TabsTrigger value="upload" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                <div className="tab-icon-box"><FileSpreadsheet className="h-6 w-6" /></div>
+                <h3 className="text-lg font-black">رفع ومعالجة الملف</h3>
+                <p className="text-[10px] font-bold text-muted-foreground">استيراد سجلات البصمة ومطابقتها آلياً.</p>
             </TabsTrigger>
-            <TabsTrigger value="mapping" className="rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <Fingerprint className="h-4 w-4" /> 2. مطابقة البصمة والدوام
+            <TabsTrigger value="mapping" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                <div className="tab-icon-box"><Fingerprint className="h-6 w-6" /></div>
+                <h3 className="text-lg font-black">مطابقة البصمة والدوام</h3>
+                <p className="text-[10px] font-bold text-muted-foreground">تخصيص أرقام البصمة وساعات العمل.</p>
             </TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="space-y-8">
-                <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                    <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b">
+                <Card className={cn(
+                    "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
+                    isGlass ? "glass-effect" : "bg-white"
+                )}>
+                    <CardHeader className={cn(
+                        "py-10 px-10 border-b",
+                        isGlass ? "bg-white/5" : "bg-gradient-to-l from-white to-purple-50"
+                    )}>
                         <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
-                            <div className="space-y-2 text-right order-1 lg:order-2">
+                            <div className="space-y-2 text-right">
                                 <div className="flex items-center justify-end gap-3">
                                     <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">إعدادات الفترة ونطاق الرقابة</CardTitle>
-                                    <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
+                                    <div className="bg-primary/10 rounded-2xl text-primary shadow-inner p-2">
                                         <CalendarRange className="h-8 w-8" />
                                     </div>
                                 </div>
@@ -389,19 +405,22 @@ export function AttendanceUploader() {
                                 </CardDescription>
                             </div>
 
-                            <div className="bg-muted/30 border p-6 rounded-[2.5rem] shadow-inner min-w-[420px] order-2 lg:order-1">
+                            <div className={cn(
+                                "border p-6 rounded-[2.5rem] shadow-inner min-w-[420px]",
+                                isGlass ? "bg-white/10" : "bg-muted/30"
+                            )}>
                                 <div className="flex gap-6 justify-center">
                                     <div className="grid gap-1">
                                         <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">السنة الرقابية</Label>
                                         <Select value={year} onValueChange={setYear}>
-                                            <SelectTrigger className="h-11 w-32 rounded-xl border-primary/10 bg-white font-black"><SelectValue /></SelectTrigger>
+                                            <SelectTrigger className="h-11 w-32 rounded-xl border-primary/10 bg-background font-black"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">{[2025, 2026, 2027].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
                                     <div className="grid gap-1">
                                         <Label className="text-[10px] font-black uppercase text-muted-foreground mr-1">الشهر المستهدف</Label>
                                         <Select value={month} onValueChange={setMonth}>
-                                            <SelectTrigger className="h-11 w-32 rounded-xl border-primary/10 bg-white font-black"><SelectValue /></SelectTrigger>
+                                            <SelectTrigger className="h-11 w-32 rounded-xl border-primary/10 bg-background font-black"><SelectValue /></SelectTrigger>
                                             <SelectContent dir="rtl">{Array.from({length:12}, (_,i)=>i+1).map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
@@ -413,7 +432,8 @@ export function AttendanceUploader() {
                         <RadioGroup value={processingMode} onValueChange={(v: any) => setProcessingMode(v)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className={cn(
                                 "relative flex items-center space-x-4 space-x-reverse p-6 rounded-[2rem] border-2 transition-all cursor-pointer group h-28 shadow-[0_5px_0_0_rgba(0,0,0,0.05)] active:translate-y-1 active:shadow-none",
-                                processingMode === 'limit_to_file' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20"
+                                processingMode === 'limit_to_file' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20",
+                                isGlass && "glass-effect border-white/20"
                             )} onClick={() => setProcessingMode('limit_to_file')}>
                                 <RadioGroupItem value="limit_to_file" id="r1" className="h-6 w-6" />
                                 <div className="flex-1">
@@ -423,7 +443,8 @@ export function AttendanceUploader() {
                             </div>
                             <div className={cn(
                                 "relative flex items-center space-x-4 space-x-reverse p-6 rounded-[2rem] border-2 transition-all cursor-pointer group h-28 shadow-[0_5px_0_0_rgba(0,0,0,0.05)] active:translate-y-1 active:shadow-none",
-                                processingMode === 'full_month' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20"
+                                processingMode === 'full_month' ? "bg-primary/5 border-primary" : "bg-card border-slate-100 hover:border-primary/20",
+                                isGlass && "glass-effect border-white/20"
                             )} onClick={() => setProcessingMode('full_month')}>
                                 <RadioGroupItem value="full_month" id="r2" className="h-6 w-6" />
                                 <div className="flex-1">
@@ -434,14 +455,20 @@ export function AttendanceUploader() {
                         </RadioGroup>
 
                         <div className="mt-8 grid md:grid-cols-2 gap-6">
-                            <div className="flex items-center gap-4 p-6 bg-amber-50/30 rounded-[2rem] border-2 border-dashed border-amber-200">
+                            <div className={cn(
+                                "flex items-center gap-4 p-6 rounded-[2rem] border-2 border-dashed",
+                                isGlass ? "bg-white/5 border-white/20" : "bg-amber-50/30 border-amber-200"
+                            )}>
                                 <Checkbox id="purge" checked={clearPrevious} onCheckedChange={(c) => setClearPrevious(!!c)} className="h-6 w-6 rounded-lg border-amber-400 data-[state=checked]:bg-amber-600" />
                                 <div>
                                     <Label htmlFor="purge" className="font-black text-base text-amber-900 cursor-pointer">تطهير البيانات السابقة</Label>
                                     <p className="text-[10px] text-amber-700 font-medium">مسح أي بصمات قديمة مسجلة لهذا الشهر والبدء من الصفر.</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4 p-6 bg-blue-50/30 rounded-[2rem] border-2 border-dashed border-blue-200">
+                            <div className={cn(
+                                "flex items-center gap-4 p-6 rounded-[2rem] border-2 border-dashed",
+                                isGlass ? "bg-white/5 border-white/20" : "bg-blue-50/30 border-blue-200"
+                            )}>
                                 <div className="p-3 bg-blue-100 rounded-2xl text-blue-600">
                                     <ShieldCheck className="h-6 w-6" />
                                 </div>
@@ -454,7 +481,10 @@ export function AttendanceUploader() {
                     </CardContent>
                 </Card>
 
-                <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white">
+                <Card className={cn(
+                    "rounded-[3rem] border-none shadow-2xl overflow-hidden",
+                    isGlass ? "glass-effect" : "bg-white"
+                )}>
                     <CardContent className="p-8 text-center space-y-6">
                         <div onClick={() => fileInputRef.current?.click()} className="border-4 border-dashed rounded-[3rem] p-6 text-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/20 group relative overflow-hidden max-w-lg mx-auto">
                             <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} accept=".xlsx, .xls, .csv" />
@@ -480,13 +510,19 @@ export function AttendanceUploader() {
         </TabsContent>
 
         <TabsContent value="mapping" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
-            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b">
+            <Card className={cn(
+                "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
+                isGlass ? "glass-effect" : "bg-white"
+            )}>
+                <CardHeader className={cn(
+                    "py-10 px-10 border-b",
+                    isGlass ? "bg-white/5" : "bg-gradient-to-l from-white to-purple-50"
+                )}>
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
-                        <div className="space-y-2 text-right order-1 lg:order-2">
+                        <div className="space-y-2 text-right">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">مطابقة البصمة والدوام المخصص</CardTitle>
-                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner p-2">
                                     <Fingerprint className="h-8 w-8" />
                                 </div>
                             </div>
@@ -494,10 +530,13 @@ export function AttendanceUploader() {
                                 تحديد أرقام البصمة وساعات الدوام لكل موظف لضمان دقة الرقابة المالية.
                             </CardDescription>
                         </div>
-                        <div className="bg-muted/30 border p-6 rounded-[2.5rem] shadow-inner min-w-[420px] order-2 lg:order-1">
+                        <div className={cn(
+                            "border p-6 rounded-[2.5rem] shadow-inner min-w-[420px]",
+                            isGlass ? "bg-white/10" : "bg-muted/30"
+                        )}>
                             <div className="relative w-full">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-primary/10 text-gray-800 placeholder:text-muted-foreground font-bold shadow-sm" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={mappingSearch} onChange={(e) => setMappingSearch(e.target.value)} className="pl-10 h-12 rounded-2xl bg-background border-primary/10 text-gray-800 placeholder:text-muted-foreground font-bold shadow-sm" />
                             </div>
                         </div>
                     </div>

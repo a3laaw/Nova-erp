@@ -66,12 +66,15 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Checkbox } from '../ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { useAppTheme } from '@/context/theme-context';
 
 export function PayrollGenerator() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
   const { branding } = useBranding();
   const { user: currentUser } = useAuth();
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
@@ -135,8 +138,6 @@ export function PayrollGenerator() {
 
   const handleGeneratePayroll = async () => {
     if (!firestore || !currentUser) return;
-    
-    // 🛡️ التصفية: استبعاد عمال اليومية من مسير الرواتب الشهري
     const filteredEmployees = employees.filter(emp => emp.jobTitle !== 'عامل يومية');
     
     setIsProcessing(true);
@@ -170,7 +171,6 @@ export function PayrollGenerator() {
                     employeeName: emp.fullName,
                     year: parseInt(year),
                     month: parseInt(month),
-                    // ✨ تحديد النوع: راتب إجازة إذا كان الموظف في إجازة
                     type: emp.status === 'on-leave' ? 'Leave' : 'Monthly',
                     earnings: { basicSalary: emp.basicSalary, housingAllowance: emp.housingAllowance, transportAllowance: emp.transportAllowance, commission: 0 },
                     deductions: { 
@@ -324,7 +324,10 @@ export function PayrollGenerator() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-4 rounded-3xl border-2 border-primary/10 bg-primary/5 space-y-3 shadow-sm">
+              <div className={cn(
+                  "p-4 rounded-3xl border-2 border-primary/10 space-y-3 shadow-sm",
+                  isGlass ? "glass-effect" : "bg-primary/5"
+              )}>
                 <span className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-2">
                     <RefreshCw className="h-3 w-3"/> إدارة بيانات الحضور
                 </span>
@@ -337,7 +340,10 @@ export function PayrollGenerator() {
               </div>
 
               {attendanceDocs.length > 0 && (
-                <div className="p-4 rounded-3xl border-2 border-muted bg-muted/30 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3">
+                <div className={cn(
+                    "p-4 rounded-3xl border-2 space-y-3 shadow-sm animate-in fade-in zoom-in-95 md:col-span-3",
+                    isGlass ? "glass-effect" : "bg-muted/30 border-muted"
+                )}>
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                             <ShieldCheck className="h-3 w-3"/> قرارات التدقيق والخيارات الرقابية
@@ -381,13 +387,19 @@ export function PayrollGenerator() {
         </div>
 
         <div className="space-y-6">
-            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b no-print">
+            <Card className={cn(
+                "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
+                isGlass ? "glass-effect" : "bg-white"
+            )}>
+                <CardHeader className={cn(
+                    "py-10 px-10 border-b no-print",
+                    isGlass ? "bg-white/5" : "bg-gradient-to-l from-white to-purple-50"
+                )}>
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                         <div className="space-y-2 text-right order-1 lg:order-2">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">مركز تدقيق الحضور والمخالفات</CardTitle>
-                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner p-2">
                                     <ShieldCheck className="h-8 w-8" />
                                 </div>
                             </div>
@@ -472,7 +484,6 @@ export function PayrollGenerator() {
                                     <TableBody>
                                         {attendanceDocs.map((doc) => {
                                             const emp = employees.find(e => e.id === doc.employeeId);
-                                            // 🛡️ تصفية عمال اليومية من التقرير الإجمالي أيضاً
                                             if (emp?.jobTitle === 'عامل يومية') return null;
 
                                             const presentDays = doc.records?.filter(r => r.status === 'present').length || 0;

@@ -42,6 +42,7 @@ import { ar } from 'date-fns/locale';
 import { Input } from '../ui/input';
 import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAppTheme } from '@/context/theme-context';
 
 const statusColors: Record<Payslip['status'], string> = {
   draft: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -71,6 +72,8 @@ export function PayslipsList() {
     const router = useRouter();
     const { toast } = useToast();
     const { branding } = useBranding();
+    const { theme } = useAppTheme();
+    const isGlass = theme === 'glass';
 
     const [year, setYear] = useState(new Date().getFullYear().toString());
     const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
@@ -264,14 +267,14 @@ export function PayslipsList() {
                 <div className="grid gap-1.5">
                   <Label className="font-black text-xs text-muted-foreground">سنة الكشف</Label>
                   <Select value={year} onValueChange={setYear}>
-                    <SelectTrigger className="h-10 rounded-xl bg-white border-2"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-xl bg-background border-2"><SelectValue /></SelectTrigger>
                     <SelectContent dir="rtl">{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="font-black text-xs text-muted-foreground">شهر الكشف</Label>
                   <Select value={month} onValueChange={setMonth}>
-                    <SelectTrigger className="h-10 rounded-xl bg-white border-2"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-xl bg-background border-2"><SelectValue /></SelectTrigger>
                     <SelectContent dir="rtl">{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
@@ -279,7 +282,7 @@ export function PayslipsList() {
                   <Label className="font-black text-xs text-muted-foreground">بحث في الأسماء والرقم الوظيفي</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="ابحث عن موظف أو رقم ملف..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl bg-white border-2"/>
+                    <Input placeholder="ابحث عن موظف أو رقم ملف..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl bg-background border-2"/>
                   </div>
                 </div>
               </div>
@@ -288,7 +291,10 @@ export function PayslipsList() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
 
                 {/* فريم التحميل */}
-                <div className="p-3 rounded-2xl border-2 border-slate-200 bg-slate-50/50 flex items-center gap-2">
+                <div className={cn(
+                    "p-3 rounded-2xl border-2 flex items-center gap-2",
+                    isGlass ? "glass-effect border-white/20" : "border-slate-200 bg-slate-50/50"
+                )}>
                   <span className="text-[10px] font-black text-slate-500 shrink-0">📂 البيانات</span>
                   <Button onClick={fetchPayslips} disabled={loadingPayslips} className="flex-1 h-9 rounded-xl font-bold text-xs gap-2 bg-primary hover:bg-primary/90">
                     {loadingPayslips ? <Loader2 className="h-3 w-3 animate-spin"/> : <RefreshCw className="h-3 w-3" />}
@@ -297,7 +303,10 @@ export function PayslipsList() {
                 </div>
 
                 {/* فريم التصدير والتراجع */}
-                <div className="p-3 rounded-2xl border-2 border-green-100 bg-green-50/50 flex items-center gap-2">
+                <div className={cn(
+                    "p-3 rounded-2xl border-2 flex items-center gap-2",
+                    isGlass ? "glass-effect border-white/20" : "border-green-100 bg-green-50/50"
+                )}>
                   <span className="text-[10px] font-black text-green-600 shrink-0">📊 أدوات</span>
                   <Button onClick={handleExcelExport} variant="outline" disabled={loading || sortedPayslips.length === 0} className="flex-1 h-9 rounded-xl font-bold text-xs border-green-300 text-green-700 hover:bg-green-100 gap-1">
                     <Download className="h-3 w-3" /> Excel
@@ -309,7 +318,10 @@ export function PayslipsList() {
                 </div>
 
                 {/* زر الصرف */}
-                <div className="p-3 rounded-2xl border-2 border-primary/20 bg-primary/5 flex items-center">
+                <div className={cn(
+                    "p-3 rounded-2xl border-2 flex items-center",
+                    isGlass ? "glass-effect border-white/20" : "border-primary/20 bg-primary/5"
+                )}>
                   <Button onClick={handleConfirmAndPay} disabled={isProcessing || loading || sortedPayslips.length === 0} className="w-full h-9 rounded-xl bg-primary text-white font-black text-xs shadow-md shadow-primary/20 gap-2">
                     {isProcessing ? <Loader2 className="animate-spin h-4 w-4"/> : <Banknote className="h-4 w-4" />}
                     صرف الرواتب النهائية
@@ -319,13 +331,19 @@ export function PayslipsList() {
               </div>
             </div>
 
-            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-gradient-to-l from-white to-purple-50 py-10 px-10 border-b no-print">
+            <Card className={cn(
+                "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
+                isGlass ? "glass-effect" : "bg-white"
+            )}>
+                <CardHeader className={cn(
+                    "py-10 px-10 border-b no-print",
+                    isGlass ? "bg-white/5" : "bg-gradient-to-l from-white to-purple-50"
+                )}>
                     <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
-                        <div className="space-y-2 text-right order-1 lg:order-2">
+                        <div className="space-y-2 text-right">
                             <div className="flex items-center justify-end gap-3">
                                 <CardTitle className="text-3xl font-black text-gray-800 tracking-tight">كشوف الرواتب المعتمدة</CardTitle>
-                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner">
+                                <div className="bg-primary/10 rounded-2xl text-primary shadow-inner p-2">
                                     <Banknote className="h-8 w-8" />
                                 </div>
                             </div>
@@ -333,10 +351,13 @@ export function PayslipsList() {
                                 مراجعة وتأكيد دفع الرواتب وإصدار السجلات المالية النهائية.
                             </CardDescription>
                         </div>
-                        <div className="bg-muted/30 border p-6 rounded-[2.5rem] shadow-inner min-w-[420px] order-2 lg:order-1">
+                        <div className={cn(
+                            "border p-6 rounded-[2.5rem] shadow-inner min-w-[420px]",
+                            isGlass ? "bg-white/10" : "bg-muted/30"
+                        )}>
                             <div className="relative w-full">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
-                                <Input placeholder="بحث بالاسم أو الرقم..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-primary/10 text-gray-800 placeholder:text-muted-foreground font-bold shadow-sm" />
+                                <Input placeholder="بحث بالاسم أو الرقم..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-background border-primary/10 text-gray-800 placeholder:text-muted-foreground font-bold shadow-sm" />
                             </div>
                         </div>
                     </div>
