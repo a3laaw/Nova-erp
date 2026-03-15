@@ -8,13 +8,15 @@ import { Textarea } from '../ui/textarea';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { collection, addDoc, doc, updateDoc, serverTimestamp, query, getDocs, orderBy } from 'firebase/firestore';
-import { Loader2, Save, HardHat, Building2, Phone, Mail, MapPin, Landmark, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, HardHat, Building2, Phone, Mail, MapPin, Landmark, ShieldCheck, Ban } from 'lucide-react';
 import type { Subcontractor, SubcontractorType, SubcontractorSpecialization } from '@/lib/types';
 import { cleanFirestoreData } from '@/lib/utils';
 import { Switch } from '../ui/switch';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { useAppTheme } from '@/context/theme-context';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '../ui/scroll-area';
+import { Separator } from '../ui/separator';
 
 interface SubcontractorFormProps {
     isOpen: boolean;
@@ -256,7 +258,7 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                                     <Switch id="isActive" checked={formData.isActive} onCheckedChange={(c) => setFormData(p => ({...p, isActive: c}))} />
                                 </div>
                                 
-                                <div className={cn("p-4 rounded-2xl border transition-all", formData.blacklisted ? "bg-red-50 border-red-200" : "bg-white")}>
+                                <div className={cn("p-4 rounded-2xl border transition-all", formData.blacklisted ? "bg-red-50 border-red-300" : "bg-white")}>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <Ban className={cn("h-5 w-5", formData.blacklisted ? "text-red-600" : "text-muted-foreground")} />
@@ -276,7 +278,7 @@ export function SubcontractorForm({ isOpen, onClose, subcontractor }: Subcontrac
                     </ScrollArea>
 
                     <DialogFooter className="p-8 bg-muted/10 border-t flex-shrink-0">
-                        <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-12 px-8 font-bold rounded-xl">إلغاء</Button>
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 font-bold rounded-xl">إلغاء</Button>
                         <Button type="submit" disabled={isSaving} className="h-12 px-16 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/30">
                             {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />}
                             حفظ البيانات
