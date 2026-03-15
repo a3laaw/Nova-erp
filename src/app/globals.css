@@ -8,7 +8,7 @@
 @layer base {
   :root {
     /* Nova ERP Purple Suite - Default Theme */
-    --background: 0 0% 98%;
+    --background: 0 0% 100%;
     --foreground: 244 47% 15%;
     --card: 0 0% 100%;
     --card-foreground: 244 47% 15%;
@@ -31,10 +31,10 @@
   }
 
   [data-theme='glass'] {
-    /* Vibrant Luminous Purple Glass Theme - Pro Version */
+    /* Crystal Purple Glass Theme - Pro Version */
     --background: 270 100% 99%; 
     --foreground: 262 70% 15%;
-    --card: 270 100% 100% / 0.12; 
+    --card: 270 100% 100% / 0.15; 
     --card-foreground: 262 70% 10%;
     --popover: 270 50% 10% / 0.95;
     --popover-foreground: 0 0% 100%;
@@ -68,40 +68,40 @@
 }
 
 @layer components {
-  /* Global Glass Overrides for Vibrant Mode */
+  /* Global Glass Overrides for Crystal Mode */
   [data-theme='glass'] .glass-effect {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
-    backdrop-filter: blur(25px) !important;
-    -webkit-backdrop-filter: blur(25px) !important;
+    backdrop-filter: blur(30px) !important;
+    -webkit-backdrop-filter: blur(30px) !important;
     border: 1px solid rgba(255, 255, 255, 0.5) !important;
-    box-shadow: 0 8px 32px 0 rgba(114, 9, 183, 0.1) !important;
+    box-shadow: 0 8px 32px 0 rgba(168, 85, 247, 0.1) !important;
   }
 
   [data-theme='glass'] .sidebar-glass {
     background: rgba(243, 232, 255, 0.15) !important;
-    backdrop-filter: blur(30px) !important;
+    backdrop-filter: blur(25px) !important;
     border-left: 1.5px solid rgba(255, 255, 255, 0.4) !important;
-    box-shadow: inset 0 0 20px rgba(114, 9, 183, 0.05) !important;
+    box-shadow: inset 0 0 20px rgba(168, 85, 247, 0.05) !important;
   }
 
-  /* Glassy Navigation Buttons */
+  /* Glassy Button with Neon Gradient and Inner Glow */
   [data-theme='glass'] .glass-nav-button {
-    background: linear-gradient(90deg, rgba(114, 9, 183, 0.15) 0%, rgba(255, 255, 255, 0) 100%) !important;
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.15) 0%, rgba(255, 255, 255, 0) 100%) !important;
     border: 0.5px solid rgba(255, 255, 255, 0.5) !important;
     box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.2) !important;
     @apply transition-all duration-300;
   }
 
   [data-theme='glass'] .glass-nav-button:hover {
-    background: linear-gradient(90deg, rgba(114, 9, 183, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
-    box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.4), 0 4px 15px rgba(114, 9, 183, 0.1) !important;
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
+    box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.4), 0 4px 15px rgba(168, 85, 247, 0.1) !important;
     @apply -translate-x-1;
   }
 
   [data-theme='glass'] .glass-nav-button-active {
-    background: linear-gradient(90deg, rgba(114, 9, 183, 0.8) 0%, rgba(114, 9, 183, 0.4) 100%) !important;
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.8) 0%, rgba(168, 85, 247, 0.4) 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.8) !important;
-    box-shadow: 0 0 20px rgba(114, 9, 183, 0.3) !important;
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3) !important;
     @apply text-white font-bold;
   }
 
@@ -111,7 +111,7 @@
   }
 
   [data-theme='glass'] .neon-icon {
-    @apply text-[#7209B7] drop-shadow-[0_0_5px_rgba(114,9,183,0.5)];
+    @apply text-[#a855f7] drop-shadow-[0_0_5px_rgba(168,85,247,0.5)];
   }
 }
 

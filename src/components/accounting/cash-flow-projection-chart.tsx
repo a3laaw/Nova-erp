@@ -15,11 +15,11 @@ const CustomTooltip = ({ active, payload, label, isGlass }: any) => {
     return (
       <div className={cn(
           "border shadow-md p-3 rounded-lg",
-          isGlass ? "bg-black/80 backdrop-blur-md border-white/20 text-white" : "bg-background"
+          isGlass ? "bg-white/80 backdrop-blur-md border-white/20 text-[#a855f7]" : "bg-background"
       )}>
         <p className="font-bold">{label}</p>
-        <p className={isGlass ? "text-cyan-400" : "text-green-600"}>{`الإيرادات المتوقعة: ${formatCurrency(payload[0].value)}`}</p>
-        <p className={isGlass ? "text-pink-400" : "text-red-600"}>{`المصروفات المتوقعة: ${formatCurrency(payload[1].value)}`}</p>
+        <p className={isGlass ? "text-[#a855f7]" : "text-green-600"}>{`الإيرادات المتوقعة: ${formatCurrency(payload[0].value)}`}</p>
+        <p className={isGlass ? "text-pink-600" : "text-red-600"}>{`المصروفات المتوقعة: ${formatCurrency(payload[1].value)}`}</p>
         <hr className="my-1 opacity-20" />
         <p className="font-semibold">{`صافي التدفق: ${formatCurrency(payload[0].value - payload[1].value)}`}</p>
       </div>
@@ -82,7 +82,7 @@ export function CashFlowProjectionChart() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Label htmlFor="months-select" className={isGlass ? "text-white/70" : ""}>عرض توقعات لـ:</Label>
+        <Label htmlFor="months-select" className={isGlass ? "text-[#a855f7]/70" : ""}>عرض توقعات لـ:</Label>
         <Select value={months} onValueChange={setMonths}>
             <SelectTrigger id="months-select" className="w-[180px]">
                 <SelectValue />
@@ -98,12 +98,12 @@ export function CashFlowProjectionChart() {
       <div style={{ width: '100%', height: 400 }} className={cn(isGlass && "bg-white/5 p-4 rounded-3xl border border-white/10")}>
         <ResponsiveContainer>
           <BarChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={isGlass ? "rgba(255,255,255,0.1)" : "#ccc"} vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: isGlass ? "rgba(255,255,255,0.6)" : "#666" }} />
-            <YAxis tick={{ fill: isGlass ? "rgba(255,255,255,0.6)" : "#666" }} tickFormatter={(value) => formatCurrency(value)} />
+            <CartesianGrid strokeDasharray="3 3" stroke={isGlass ? "rgba(168,85,247,0.1)" : "#ccc"} vertical={false} />
+            <XAxis dataKey="name" tick={{ fill: isGlass ? "rgba(168,85,247,0.6)" : "#666" }} />
+            <YAxis tick={{ fill: isGlass ? "rgba(168,85,247,0.6)" : "#666" }} tickFormatter={(value) => formatCurrency(value)} />
             <Tooltip content={<CustomTooltip isGlass={isGlass} />} />
             <Legend />
-            <Bar dataKey="الإيرادات المتوقعة" fill={isGlass ? "#22d3ee" : "#22c55e"} radius={[10, 10, 0, 0]} />
+            <Bar dataKey="الإيرادات المتوقعة" fill={isGlass ? "#a855f7" : "#22c55e"} radius={[10, 10, 0, 0]} />
             <Bar dataKey="المصروفات المتوقعة" fill={isGlass ? "#f472b6" : "#ef4444"} radius={[10, 10, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -128,7 +128,7 @@ export function CashFlowProjectionChart() {
         {data?.assumptions && (
             <div className={cn(
                 "text-[10px] p-4 border rounded-2xl",
-                isGlass ? "bg-white/5 border-white/10 text-white/50" : "bg-muted/50 text-muted-foreground"
+                isGlass ? "bg-white/5 border-white/10 text-[#a855f7]/50" : "bg-muted/50 text-muted-foreground"
             )}>
                 <h4 className="font-black mb-1 uppercase tracking-widest opacity-80">الافتراضات المستخدمة في الحساب (Engine v2.0):</h4>
                 <p>• المصروفات الثابتة تشمل إجمالي رواتب {data.assumptions.employeeCount} موظفاً (بقيمة {formatCurrency(data.assumptions.totalSalaries)} شهرياً) + إيجار تقديري {formatCurrency(data.assumptions.fixedRent)}.</p>
