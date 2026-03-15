@@ -353,12 +353,12 @@ export default function NewCashReceiptPage() {
         <CardHeader className={cn("pb-8 rounded-t-[2.5rem] border-b", isGlass ? "bg-white/10" : "bg-primary/5")}>
             <div className="flex justify-between items-start">
                 <div>
-                    <CardTitle className="text-3xl font-black">سـنـد قـبـض / Cash Receipt</CardTitle>
-                    <CardDescription className="font-bold">{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
+                    <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
+                    <CardDescription className="font-bold text-[#1e1b4b]/60">{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="space-y-8 p-10 bg-white">
+        <CardContent className="space-y-8 p-10 bg-white/95">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
                 <div className="md:col-span-2 grid gap-2">
                 <Label className="font-black text-[#1e1b4b] pr-1">استلمنا من (حساب العميل في الشجرة) *</Label>
@@ -394,11 +394,11 @@ export default function NewCashReceiptPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">المبلغ المحصل *</Label>
-                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-primary rounded-2xl shadow-inner border-2 soft-shadow-input' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-[#1e1b4b] rounded-2xl shadow-inner border-2 soft-shadow-input' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
                 <Label className="text-xs font-black text-muted-foreground uppercase pr-1">مبلغ وقدره (كتابة)</Label>
-                <div className='p-4 text-sm font-black text-muted-foreground border-2 border-dashed rounded-2xl min-h-[56px] bg-muted/20 flex items-center justify-center italic text-center'>
+                <div className='p-4 text-sm font-black text-[#1e1b4b]/70 border-2 border-dashed rounded-2xl min-h-[56px] bg-muted/20 flex items-center justify-center italic text-center'>
                     {amountInWords || '(سيتم ملؤه تلقائياً)'}
                 </div>
                 </div>
@@ -411,7 +411,7 @@ export default function NewCashReceiptPage() {
                 <div className="grid gap-2">
                     <Label className="font-black text-[#1e1b4b] pr-1">طريقة الدفع *</Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger className="h-12 rounded-2xl border-2 soft-shadow-input"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-2xl border-2 soft-shadow-input text-[#1e1b4b]"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
                         <SelectContent dir="rtl">{paymentMethodOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
@@ -421,12 +421,12 @@ export default function NewCashReceiptPage() {
                 </div>
                 <div className="grid gap-2">
                 <Label className="font-black text-[#1e1b4b] pr-1">رقم الشيك / المرجع</Label>
-                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono shadow-inner soft-shadow-input" />
+                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono shadow-inner soft-shadow-input text-[#1e1b4b]" />
                 </div>
             </div>
         </CardContent>
       <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
-        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg">إلغاء</Button>
+        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg text-[#1e1b4b]/60">إلغاء</Button>
         <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px]">
             {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} اعتماد وإصدار السند
         </Button>

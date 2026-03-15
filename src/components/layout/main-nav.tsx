@@ -260,7 +260,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               <Icon 
                 className={cn(
                   "size-8 shrink-0 transition-colors", 
-                  isGlass ? "sidebar-icon-white" : ""
+                  isGlass ? "sidebar-icon-deep" : ""
                 )} 
                 strokeWidth={isActive ? 3 : 2} 
               />
@@ -268,7 +268,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
             <span className={cn(
               "font-medium transition-colors text-base",
               isActive && "font-black",
-              isGlass && "text-[#1e1b4b]" /* Always deep indigo-violet in glass mode */
+              isGlass && "text-[#1e1b4b]" /* Deep Purple-Indigo */
             )}>
               {item.label}
             </span>
@@ -296,7 +296,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                   <Icon 
                     className={cn(
                         "size-8 shrink-0 transition-colors", 
-                        isGlass ? "sidebar-icon-white" : ""
+                        isGlass ? "sidebar-icon-deep" : ""
                     )} 
                     strokeWidth={isActive ? 3 : 2} 
                   />
@@ -304,16 +304,16 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent side="left" align="start" dir="rtl" className={cn("w-64 rounded-2xl shadow-2xl p-2", isGlass ? "backdrop-blur-xl bg-white/90 border-white/20" : "bg-card/95 border-primary/10")}>
-              <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
+              <DropdownMenuLabel className="font-black text-[#1e1b4b] px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
-                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/10 text-primary font-bold")}>
+                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/10 text-[#1e1b4b] font-bold")}>
                     <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                      {ChildIcon && <ChildIcon className="size-5 shrink-0" />}
-                      <span className="text-sm">{child.label}</span>
+                      {ChildIcon && <ChildIcon className="size-5 shrink-0 text-[#1e1b4b]" />}
+                      <span className="text-sm text-[#1e1b4b]">{child.label}</span>
                     </Link>
                   </DropdownMenuItem>
                 );
@@ -340,7 +340,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                 <Icon 
                   className={cn(
                     "size-8 shrink-0 transition-colors", 
-                    isGlass ? "sidebar-icon-white" : ""
+                    isGlass ? "sidebar-icon-deep" : ""
                   )} 
                   strokeWidth={isActive ? 3 : 2} 
                 />
@@ -367,7 +367,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass ? "glass-sub-button my-0.5 rounded-xl" : "my-0.5 rounded-xl")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "text-primary" : "")} />}
+                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "text-[#1e1b4b]" : "")} />}
                         <span className={cn("font-bold text-sm", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
