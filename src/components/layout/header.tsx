@@ -64,8 +64,8 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     onClick={toggleTheme} 
                     title="تبديل الثيم"
                     className={cn(
-                        "rounded-full px-4 gap-2 transition-all duration-500",
-                        isGlass ? "bg-white/40 text-slate-950 border-white/50 shadow-lg shadow-black/5" : "border-primary text-primary"
+                        "rounded-full px-4 gap-2 transition-all duration-500 shadow-sm",
+                        isGlass ? "bg-white/50 text-slate-950 border-white/60 hover:bg-white/70" : "border-primary text-primary"
                     )}
                 >
                     {isGlass ? <Sparkles className="h-4 w-4 animate-pulse text-indigo-600" /> : <Palette className="h-4 w-4" />}

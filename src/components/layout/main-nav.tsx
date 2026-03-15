@@ -253,7 +253,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               <Icon 
                 className={cn(
                   "size-8 shrink-0 transition-colors", 
-                  isGlass ? "text-white" : ""
+                  isGlass ? "text-slate-900" : ""
                 )} 
                 strokeWidth={isActive ? 2.5 : 2} 
               />
@@ -261,7 +261,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
             <span className={cn(
               "font-medium transition-colors text-base",
               isActive && "font-bold",
-              isGlass && "text-white"
+              isGlass ? "text-slate-900" : ""
             )}>
               {item.label}
             </span>
@@ -280,13 +280,13 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               <SidebarMenuButton isActive={isActive} tooltip={item.label}>
                 {Icon && (
                   <Icon 
-                    className={cn("size-8 shrink-0 transition-colors", isGlass && "text-white")} 
+                    className={cn("size-8 shrink-0 transition-colors", isGlass ? "text-slate-900" : "")} 
                     strokeWidth={isActive ? 2.5 : 2} 
                   />
                 )}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="start" dir="rtl" className={cn("w-64 rounded-2xl shadow-2xl p-2", isGlass ? "backdrop-blur-xl bg-slate-900/90 border-white/20" : "bg-card/95 border-primary/10")}>
+            <DropdownMenuContent side="left" align="start" dir="rtl" className={cn("w-64 rounded-2xl shadow-2xl p-2", isGlass ? "backdrop-blur-xl bg-white/90 border-white/20" : "bg-card/95 border-primary/10")}>
               <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any) => {
@@ -316,7 +316,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                 <Icon 
                   className={cn(
                     "size-8 shrink-0 transition-colors", 
-                    isGlass ? "text-white" : ""
+                    isGlass ? "text-slate-900" : ""
                   )} 
                   strokeWidth={isActive ? 2.5 : 2} 
                 />
@@ -324,13 +324,13 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               <span className={cn(
                 "font-medium transition-colors text-base",
                 isActive && "font-bold",
-                isGlass && "text-white"
+                isGlass ? "text-slate-900" : ""
               )}>
                 {item.label}
               </span>
               <ChevronDown className={cn(
                 "ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden",
-                isGlass && "text-white"
+                isGlass && "text-slate-900"
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -341,7 +341,7 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                 const ChildIcon = child.icon;
                 return (
                   <SidebarMenuSubItem key={child.href}>
-                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass && "text-white/80 hover:bg-white/10 hover:text-white")}>
+                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass && "text-slate-800 hover:bg-white/40 hover:text-slate-950")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
                         <span>{child.label}</span>
@@ -373,10 +373,10 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-6 mb-2">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className={cn("shadow-sm border", isGlass ? "bg-white/20 border-white/20" : "border-slate-100 bg-white")} />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className={cn("shadow-sm border", isGlass ? "bg-white/40 border-white/40" : "border-slate-100 bg-white")} />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
-              <span className={cn("text-xl font-black tracking-tight leading-tight", isGlass ? "text-white" : "text-foreground")}>{branding?.company_name || 'Nova ERP'}</span>
-              <span className={cn("text-[9px] font-black uppercase tracking-[0.2em] opacity-70", isGlass ? "text-primary-foreground/80" : "text-primary")}>Purple Suite</span>
+              <span className={cn("text-xl font-black tracking-tight leading-tight", isGlass ? "text-slate-900" : "text-foreground")}>{branding?.company_name || 'Nova ERP'}</span>
+              <span className={cn("text-[9px] font-black uppercase tracking-[0.2em] opacity-70", isGlass ? "text-indigo-700" : "text-primary")}>Purple Suite</span>
             </div>
         </div>
       </SidebarHeader>
@@ -393,19 +393,19 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-6 border-t border-white/10">
+      <SidebarFooter className="p-6 border-t border-black/5">
         <div className="p-1">
             <div className={cn(
                 "flex h-auto w-full items-center justify-start rounded-2xl p-2 transition-all",
-                isGlass ? "bg-white/10 border border-white/20 hover:bg-white/20" : "bg-slate-50 border border-slate-100 hover:bg-muted"
+                isGlass ? "bg-white/30 border border-white/40 hover:bg-white/50" : "bg-slate-50 border border-slate-100 hover:bg-muted"
             )}>
                 <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-white text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className={cn("text-sm font-black truncate", isGlass ? "text-white" : "text-foreground")}>{currentUser.fullName}</p>
-                    <p className={cn("text-[9px] truncate font-bold uppercase tracking-wider", isGlass ? "text-white/60" : "text-muted-foreground")}>{currentUser.role}</p>
+                    <p className={cn("text-sm font-black truncate", isGlass ? "text-slate-900" : "text-foreground")}>{currentUser.fullName}</p>
+                    <p className={cn("text-[9px] truncate font-bold uppercase tracking-wider", isGlass ? "text-slate-700" : "text-muted-foreground")}>{currentUser.role}</p>
                 </div>
             </div>
         </div>
