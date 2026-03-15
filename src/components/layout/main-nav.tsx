@@ -261,14 +261,14 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
             {Icon && (
               <Icon 
                 className={cn(
-                  "size-6 shrink-0 transition-colors order-2", 
+                  "size-6 shrink-0 transition-colors", 
                   isGlass ? "sidebar-icon-deep" : ""
                 )} 
                 strokeWidth={isActive ? 3 : 2} 
               />
             )}
             <span className={cn(
-              "font-medium transition-colors text-sm order-1 flex-1 text-right",
+              "font-medium transition-colors text-sm flex-1 text-right",
               isActive && "font-black",
               isGlass && "text-[#1e1b4b]"
             )}>
@@ -343,21 +343,21 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               {Icon && (
                 <Icon 
                   className={cn(
-                    "size-6 shrink-0 transition-colors order-2", 
+                    "size-6 shrink-0 transition-colors", 
                     isGlass ? "sidebar-icon-deep" : ""
                   )} 
                   strokeWidth={isActive ? 3 : 2} 
                 />
               )}
               <span className={cn(
-                "font-medium transition-colors text-sm order-1 flex-1 text-right",
+                "font-medium transition-colors text-sm flex-1 text-right",
                 isActive && "font-black",
                 isGlass && "text-[#1e1b4b]"
               )}>
                 {item.label}
               </span>
               <ChevronDown className={cn(
-                "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden order-0 mr-auto",
+                "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden",
                 isGlass ? "text-[#1e1b4b]" : "text-primary"
               )} />
             </SidebarMenuButton>
@@ -371,8 +371,8 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass ? "glass-sub-button" : "my-0.5 rounded-xl")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
-                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0 order-2", isGlass ? "text-[#1e1b4b]" : "")} />}
-                        <span className={cn("font-bold text-xs order-1 flex-1 text-right", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
+                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "text-[#1e1b4b]" : "")} />}
+                        <span className={cn("font-bold text-xs flex-1 text-right", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
