@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -34,7 +33,7 @@ import {
   TabsContent,
 } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 export default function UnifiedContractsPage() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,7 +44,7 @@ export default function UnifiedContractsPage() {
   const [activeTab, setActiveTab] = useState('signed-contracts');
 
   return (
-    <div className="min-h-full -m-8 p-8 bg-[#F8F9FE]" dir="rtl">
+    <div className="min-h-full -m-8 p-8" dir="rtl">
       <div className="max-w-7xl mx-auto space-y-10">
         
         {/* --- البطاقات التفاعلية (تبويبات) --- */}
@@ -120,7 +119,7 @@ export default function UnifiedContractsPage() {
         </div>
 
         {/* --- منطقة الفلاتر والجدول --- */}
-        <Card className="rounded-[3rem] border-none shadow-sm overflow-hidden bg-white">
+        <Card className="rounded-[3rem] border-none shadow-sm overflow-hidden">
           <CardHeader className="bg-muted/10 border-b pb-8 px-8">
               <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
                   <div className="flex items-center gap-4">
@@ -136,7 +135,7 @@ export default function UnifiedContractsPage() {
                   </div>
 
                   {/* واجهة الفلاتر السداسية */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-white/80 p-4 rounded-3xl border shadow-inner w-full lg:w-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-3xl border shadow-inner w-full lg:w-auto">
                       <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40 group-focus-within:opacity-100 transition-opacity"/>
                         <Input 
@@ -207,15 +206,4 @@ export default function UnifiedContractsPage() {
       </div>
     </div>
   )
-}
-
-function Badge({ children, className, variant }: any) {
-    return (
-        <span className={cn(
-            "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
-            className
-        )}>
-            {children}
-        </span>
-    )
 }

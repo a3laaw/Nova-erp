@@ -33,8 +33,8 @@
   [data-theme='glass'] {
     /* Vibrant Luminous Glass Theme - Optimized for Global Contrast */
     --background: 230 100% 98%; 
-    --foreground: 222 47% 11%; /* Charcoal Navy */
-    --card: 0 0% 100% / 0.25; 
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100% / 0.15; 
     --card-foreground: 222 47% 11%;
     --popover: 222 47% 11% / 0.95;
     --popover-foreground: 0 0% 100%;
@@ -46,7 +46,7 @@
     --muted-foreground: 222 20% 30%;
     --accent: 262 83% 58% / 0.2;
     --accent-foreground: 222 47% 11%;
-    --border: 0 0% 100% / 0.6; /* Pearl White Border */
+    --border: 0 0% 100% / 0.4;
     --input: 0 0% 100% / 0.2;
     --ring: 262 83% 58%;
 
@@ -68,50 +68,73 @@
 }
 
 @layer components {
-  /* Unified Glass Aesthetics for ALL internal elements */
+  /* Global Glass Overrides for White Backgrounds */
+  [data-theme='glass'] .bg-white,
+  [data-theme='glass'] .bg-background,
+  [data-theme='glass'] .bg-card,
+  [data-theme='glass'] .bg-muted,
+  [data-theme='glass'] .bg-slate-50,
+  [data-theme='glass'] .bg-sky-50,
+  [data-theme='glass'] .bg-emerald-50,
+  [data-theme='glass'] .bg-purple-50,
+  [data-theme='glass'] .bg-indigo-50,
+  [data-theme='glass'] .bg-red-50,
+  [data-theme='glass'] .bg-orange-50,
+  [data-theme='glass'] .bg-gradient-to-l,
+  [data-theme='glass'] .bg-gradient-to-r,
+  [data-theme='glass'] .bg-muted\/30,
+  [data-theme='glass'] .bg-muted\/50 {
+    background: rgba(255, 255, 255, 0.12) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.1) !important;
+  }
+
   [data-theme='glass'] .card,
-  [data-theme='glass'] .glass-effect,
-  [data-theme='glass'] .table-header,
-  [data-theme='glass'] .table-row,
-  [data-theme='glass'] .sidebar-glass {
-    @apply backdrop-blur-[25px] border-[0.5px] border-white/60 shadow-[0_10px_40px_rgba(0,0,0,0.05)];
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
+  [data-theme='glass'] .glass-effect {
+    @apply backdrop-blur-[25px] border-[0.5px] border-white/40 shadow-[0_10px_40px_rgba(0,0,0,0.05)];
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%) !important;
     box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1), 0 10px 40px rgba(0, 0, 0, 0.05) !important;
   }
 
+  /* Deep Contrast Typography for Glass Mode */
+  [data-theme='glass'] .text-foreground,
+  [data-theme='glass'] .text-gray-800,
+  [data-theme='glass'] .text-gray-700,
+  [data-theme='glass'] .card-title,
+  [data-theme='glass'] h1,
+  [data-theme='glass'] h2,
+  [data-theme='glass'] h3,
+  [data-theme='glass'] .font-black {
+    @apply text-slate-950;
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
+  }
+
+  /* Sidebar Specific Glass Styling */
+  [data-theme='glass'] .sidebar-glass {
+    background: rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(35px) !important;
+    border-left: 0.5px solid rgba(255, 255, 255, 0.3) !important;
+  }
+
   [data-theme='glass'] .glass-sidebar-item {
-    background: rgba(255, 255, 255, 0.15) !important;
-    backdrop-filter: blur(25px) !important;
-    border: 0.5px solid rgba(255, 255, 255, 0.6) !important;
-    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1) !important;
-    color: #020617 !important;
-    text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.3) !important;
     @apply transition-all duration-300;
   }
 
-  [data-theme='glass'] .glass-sidebar-item svg {
-    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
-  }
-
   [data-theme='glass'] .glass-sidebar-item:hover {
-    background: rgba(255, 255, 255, 0.3) !important;
-    transform: translateY(-1px) scale(1.01);
+    background: rgba(255, 255, 255, 0.25) !important;
+    border-color: rgba(255, 255, 255, 0.6) !important;
   }
 
   [data-theme='glass'] .glass-sidebar-item-active,
   [data-theme='glass'] .glass-sidebar-item[data-active='true'] {
     background: rgba(255, 255, 255, 0.6) !important;
     border: 1px solid rgba(255, 255, 255, 1) !important;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.4), inset 0 0 12px rgba(255, 255, 255, 0.8) !important;
-  }
-
-  /* Soft Sheen for Typography in Glass Mode */
-  [data-theme='glass'] h1, 
-  [data-theme='glass'] h2, 
-  [data-theme='glass'] h3, 
-  [data-theme='glass'] .font-black {
-    @apply text-slate-950;
-    text-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3) !important;
   }
 
   [data-theme='glass'] .glass-input {
