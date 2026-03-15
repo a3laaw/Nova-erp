@@ -247,7 +247,10 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
           isActive={isActive} 
           asChild 
           tooltip={item.label}
-          className={cn(isGlass && "glass-sidebar-item", isGlass && isActive && "glass-sidebar-item-active")}
+          className={cn(
+            isGlass && "glass-nav-button", 
+            isGlass && isActive && "glass-nav-button-active"
+          )}
         >
           <Link 
             href={item.href} 
@@ -257,15 +260,16 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               <Icon 
                 className={cn(
                   "size-8 shrink-0 transition-colors", 
-                  isGlass ? "text-slate-950" : ""
+                  isGlass ? "neon-icon" : "",
+                  isGlass && isActive ? "text-white" : ""
                 )} 
-                strokeWidth={isActive ? 2.5 : 2} 
+                strokeWidth={isActive ? 3 : 2} 
               />
             )}
             <span className={cn(
               "font-medium transition-colors text-base",
-              isActive && "font-bold",
-              isGlass ? "text-slate-950" : ""
+              isActive && "font-black",
+              isGlass && !isActive ? "text-primary/80" : ""
             )}>
               {item.label}
             </span>
@@ -284,12 +288,19 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               <SidebarMenuButton 
                 isActive={isActive} 
                 tooltip={item.label}
-                className={cn(isGlass && "glass-sidebar-item", isGlass && isActive && "glass-sidebar-item-active")}
+                className={cn(
+                    isGlass && "glass-nav-button", 
+                    isGlass && isActive && "glass-nav-button-active"
+                )}
               >
                 {Icon && (
                   <Icon 
-                    className={cn("size-8 shrink-0 transition-colors", isGlass ? "text-slate-950" : "")} 
-                    strokeWidth={isActive ? 2.5 : 2} 
+                    className={cn(
+                        "size-8 shrink-0 transition-colors", 
+                        isGlass ? "neon-icon" : "",
+                        isGlass && isActive ? "text-white" : ""
+                    )} 
+                    strokeWidth={isActive ? 3 : 2} 
                   />
                 )}
               </SidebarMenuButton>
@@ -322,38 +333,42 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
             <SidebarMenuButton 
               isActive={isActive} 
               tooltip={item.label} 
-              className={cn(isGlass && "glass-sidebar-item", isGlass && isActive && "glass-sidebar-item-active")}
+              className={cn(
+                isGlass && "glass-nav-button", 
+                isGlass && isActive && "glass-nav-button-active"
+              )}
             >
               {Icon && (
                 <Icon 
                   className={cn(
                     "size-8 shrink-0 transition-colors", 
-                    isGlass ? "text-slate-950" : ""
+                    isGlass ? "neon-icon" : "",
+                    isGlass && isActive ? "text-white" : ""
                   )} 
-                  strokeWidth={isActive ? 2.5 : 2} 
+                  strokeWidth={isActive ? 3 : 2} 
                 />
               )}
               <span className={cn(
                 "font-medium transition-colors text-base",
-                isActive && "font-bold",
-                isGlass ? "text-slate-950" : ""
+                isActive && "font-black",
+                isGlass && !isActive ? "text-primary/80" : ""
               )}>
                 {item.label}
               </span>
               <ChevronDown className={cn(
                 "ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50 group-data-[state=collapsed]:hidden",
-                isGlass && "text-slate-950"
+                isGlass && isActive ? "text-white" : "text-primary"
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className={cn(isGlass && "mr-4 border-r-2 border-white/20")}>
+            <SidebarMenuSub className={cn(isGlass && "glass-sub-menu")}>
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
                   <SidebarMenuSubItem key={child.href}>
-                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass && "text-slate-800 hover:bg-white/40 hover:text-slate-950 rounded-xl my-0.5")}>
+                    <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(isGlass && "text-primary/70 hover:bg-primary/5 hover:text-primary rounded-xl my-0.5")}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
                         <span className="font-bold">{child.label}</span>
@@ -387,7 +402,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         <div className="flex items-center gap-3">
             <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className={cn("shadow-sm border", isGlass ? "bg-white/40 border-white/40" : "border-slate-100 bg-white")} />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
-              <span className={cn("text-xl font-black tracking-tight leading-tight", isGlass ? "text-slate-950" : "text-foreground")}>{branding?.company_name || 'Nova ERP'}</span>
+              <span className={cn("text-xl font-black tracking-tight leading-tight", isGlass ? "text-primary" : "text-foreground")}>{branding?.company_name || 'Nova ERP'}</span>
               <span className={cn("text-[9px] font-black uppercase tracking-[0.2em] opacity-70", isGlass ? "text-indigo-700" : "text-primary")}>Purple Suite</span>
             </div>
         </div>
@@ -416,8 +431,8 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
                     <AvatarFallback className="bg-white text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className={cn("text-sm font-black truncate", isGlass ? "text-slate-950" : "text-foreground")}>{currentUser.fullName}</p>
-                    <p className={cn("text-[9px] truncate font-bold uppercase tracking-wider", isGlass ? "text-slate-700" : "text-muted-foreground")}>{currentUser.role}</p>
+                    <p className={cn("text-sm font-black truncate", isGlass ? "text-primary" : "text-foreground")}>{currentUser.fullName}</p>
+                    <p className={cn("text-[9px] truncate font-bold uppercase tracking-wider", isGlass ? "text-indigo-700" : "text-muted-foreground")}>{currentUser.role}</p>
                 </div>
             </div>
         </div>

@@ -36,6 +36,7 @@ import { useBranding } from '@/context/branding-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useAppTheme } from '@/context/theme-context';
 
 const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
     let total = 0;
@@ -55,6 +56,8 @@ export default function NewCashReceiptPage() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { branding } = useBranding();
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
   const { toast } = useToast();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -408,37 +411,37 @@ export default function NewCashReceiptPage() {
   }, [accounts, paymentMethod]);
 
   return (
-    <Card className="max-w-4xl mx-auto rounded-3xl border-none shadow-xl overflow-hidden" dir="rtl">
-        <CardHeader className="bg-primary/5 pb-8 rounded-t-3xl border-b">
+    <Card className={cn("max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden", isGlass && "glass-effect")} dir="rtl">
+        <CardHeader className={cn("pb-8 rounded-t-[2.5rem] border-b", isGlass ? "bg-white/10" : "bg-primary/5")}>
             <div className="flex justify-between items-start">
                 <div>
-                    <CardTitle className="text-2xl font-black">سـنـد قـبـض / Cash Receipt</CardTitle>
-                    <CardDescription>{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
+                    <CardTitle className="text-3xl font-black">سـنـد قـبـض / Cash Receipt</CardTitle>
+                    <CardDescription className="font-bold">{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="space-y-8 p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+        <CardContent className="space-y-8 p-10">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-end">
                 <div className="md:col-span-2 grid gap-2">
-                <Label className="font-bold">استلمنا من (حساب العميل في الشجرة) <span className="text-destructive">*</span></Label>
+                <Label className="font-black pr-1">استلمنا من (حساب العميل في الشجرة) <span className="text-destructive">*</span></Label>
                 <InlineSearchList 
                     value={selectedAccountId}
                     onSelect={handleAccountChange}
                     options={clientAccountOptions}
                     placeholder={refDataLoading ? 'جاري التحميل...' : 'اختر الحساب المالي للعميل...'}
                     disabled={refDataLoading || isSaving}
-                    className="h-12 rounded-xl border-primary/20"
+                    className="h-12 rounded-2xl border-primary/20"
                 />
                 </div>
                 <div className="grid gap-2">
-                    <Label className="font-bold">التاريخ *</Label>
-                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12" />
+                    <Label className="font-black pr-1">التاريخ *</Label>
+                    <DateInput value={date} onChange={setDate} disabled={isSaving} className="h-12 rounded-2xl" />
                 </div>
             </div>
             
-            <div className="grid gap-2 p-4 bg-muted/30 rounded-2xl border border-dashed">
-                <Label className="font-bold flex items-center gap-2 text-primary">
-                    <Target className="h-4 w-4"/> ربط بعقد/مشروع (مركز ربحية)
+            <div className="grid gap-2 p-6 bg-primary/5 rounded-3xl border-2 border-dashed border-primary/20">
+                <Label className="font-black flex items-center gap-2 text-primary">
+                    <Target className="h-5 w-5"/> ربط بعقد/مشروع (مركز ربحية)
                 </Label>
                 <InlineSearchList 
                     value={selectedProjectId}
@@ -446,48 +449,48 @@ export default function NewCashReceiptPage() {
                     options={projectOptions}
                     placeholder={!selectedClientId ? 'اختر حساب العميل المربوط بملف أولاً' : projectsLoading ? 'جاري جلب المشاريع...' : 'اختر المشروع (اختياري)...'}
                     disabled={!selectedClientId || projectsLoading || isSaving}
-                    className="h-11 bg-white border-primary/20"
+                    className="h-12 bg-white border-primary/20 rounded-2xl"
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="grid gap-2">
-                    <Label className="font-bold">المبلغ المحصل <span className="text-destructive">*</span></Label>
-                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-12 text-xl font-black text-primary' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
+                    <Label className="font-black pr-1">المبلغ المحصل <span className="text-destructive">*</span></Label>
+                    <Input id="amount" type="number" step="0.001" placeholder="0.000" className='text-left dir-ltr h-14 text-3xl font-black text-primary rounded-2xl shadow-inner border-2' value={amount} onChange={e => setAmount(e.target.value)} disabled={isSaving}/>
                 </div>
                 <div className="md:col-span-2 grid gap-2">
-                <Label className="text-xs font-bold text-muted-foreground uppercase">مبلغ وقدره (كتابة)</Label>
-                <div className='p-3 text-sm font-bold text-muted-foreground border-2 border-dashed rounded-xl min-h-[48px] bg-muted/50 flex items-center justify-center italic text-center'>
+                <Label className="text-xs font-black text-muted-foreground uppercase pr-1">مبلغ وقدره (كتابة)</Label>
+                <div className='p-4 text-sm font-black text-muted-foreground border-2 border-dashed rounded-2xl min-h-[56px] bg-muted/20 flex items-center justify-center italic text-center'>
                     {amountInWords || '(سيتم ملؤه تلقائياً)'}
                 </div>
                 </div>
             </div>
             <div className="grid gap-2">
-                <Label htmlFor="description" className="font-bold">البيان / وذلك عن</Label>
-                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-xl" />
+                <Label htmlFor="description" className="font-black pr-1">البيان / وذلك عن</Label>
+                <Textarea id="description" placeholder="وصف عملية الدفع..." value={description} onChange={e => setDescription(e.target.value)} disabled={isSaving} rows={3} className="rounded-3xl border-2 p-4 text-base font-medium" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t">
                 <div className="grid gap-2">
-                    <Label className="font-bold">طريقة الدفع <span className="text-destructive">*</span></Label>
+                    <Label className="font-black pr-1">طريقة الدفع <span className="text-destructive">*</span></Label>
                     <Select dir='rtl' value={paymentMethod} onValueChange={setPaymentMethod} disabled={isSaving}>
-                        <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
+                        <SelectTrigger className="h-12 rounded-2xl border-2"><SelectValue placeholder="اختر الطريقة..." /></SelectTrigger>
                         <SelectContent dir="rtl">{paymentMethodOptions.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}</SelectContent>
                     </Select>
                 </div>
                  <div className="grid gap-2">
-                    <Label className="font-bold">حساب الإيداع <span className="text-destructive">*</span></Label>
-                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-11" />
+                    <Label className="font-black pr-1">حساب الإيداع <span className="text-destructive">*</span></Label>
+                    <InlineSearchList value={debitAccountId} onSelect={setDebitAccountId} options={debitAccountOptions} placeholder={!paymentMethod ? 'اختر الطريقة أولاً' : 'اختر الحساب...'} disabled={isSaving || !paymentMethod} className="h-12 rounded-2xl border-2" />
                 </div>
                 <div className="grid gap-2">
-                <Label className="font-bold">رقم الشيك / المرجع</Label>
-                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-11 rounded-xl" />
+                <Label className="font-black pr-1">رقم الشيك / المرجع</Label>
+                <Input value={reference} onChange={e => setReference(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 font-mono shadow-inner" />
                 </div>
             </div>
         </CardContent>
-      <CardFooter className="flex justify-end gap-3 p-8 border-t bg-muted/10 rounded-b-3xl">
-        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
-        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
-            {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} اعتماد السند
+      <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
+        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg">إلغاء</Button>
+        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px]">
+            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} اعتماد وإصدار السند
         </Button>
       </CardFooter>
     </Card>
