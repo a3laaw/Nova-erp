@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -34,11 +33,14 @@ import { Badge } from '@/components/ui/badge';
 import type { RecurringObligation } from '@/lib/types';
 import { addDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useAppTheme } from '@/context/theme-context';
 
 export default function DashboardPage() {
   const { firestore } = useFirebase();
   const { journalEntries, projects, clients, accounts, loading } = useAnalyticalData();
   const { data: obligations } = useSubscription<RecurringObligation>(firestore, 'recurring_obligations');
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
 
   // ✨ رادار السيولة: التحقق من القدرة على تغطية الالتزامات القادمة
   const liquidityAlert = useMemo(() => {
@@ -86,7 +88,10 @@ export default function DashboardPage() {
   return (
     <div className="space-y-10" dir="rtl">
         {/* الترويسة الرئيسية للنظام */}
-        <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+        <Card className={cn(
+            "rounded-[2.5rem] overflow-hidden border-none",
+            isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-sky-50 shadow-sm"
+        )}>
             <CardHeader className="pb-8 px-8">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
                     <div className="space-y-1 text-center lg:text-right">
@@ -94,13 +99,13 @@ export default function DashboardPage() {
                             <LayoutGrid className="text-primary h-8 w-8" />
                             لوحة التحكم المركزية
                         </CardTitle>
-                        <CardDescription className="text-base font-medium">
+                        <CardDescription className={cn("text-base font-medium", isGlass && "text-slate-800")}>
                             مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
                         </CardDescription>
                     </div>
                     
                     <div className="flex flex-wrap items-center justify-center gap-3">
-                        <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2">
+                        <Button asChild variant="outline" className={cn("h-11 px-6 rounded-xl font-bold gap-2", isGlass && "bg-white/40")}>
                             <Link href="/dashboard/notifications">
                                 <BellRing className="h-5 w-5" />
                                 سجل التنبيهات
@@ -160,7 +165,10 @@ export default function DashboardPage() {
 
         <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
             <div className="grid gap-6 md:grid-cols-2 xl:col-span-3">
-                <Card className="border-none shadow-sm bg-white rounded-3xl hover-lift">
+                <Card className={cn(
+                    "border-none shadow-sm rounded-3xl hover-lift transition-all",
+                    isGlass ? "glass-effect" : "bg-white"
+                )}>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
                             إجمالي التدفقات الداخلة
@@ -177,7 +185,10 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-white rounded-3xl hover-lift">
+                <Card className={cn(
+                    "border-none shadow-sm rounded-3xl hover-lift transition-all",
+                    isGlass ? "glass-effect" : "bg-white"
+                )}>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
                             المواقع النشطة
@@ -194,7 +205,10 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-white rounded-3xl hover-lift">
+                <Card className={cn(
+                    "border-none shadow-sm rounded-3xl hover-lift transition-all",
+                    isGlass ? "glass-effect" : "bg-white"
+                )}>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">قاعدة بيانات العملاء</CardTitle>
                         <Users className="h-5 w-5 text-muted-foreground opacity-50" />
@@ -209,15 +223,18 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="border-none shadow-sm bg-primary text-primary-foreground rounded-3xl">
+                <Card className={cn(
+                    "border-none shadow-sm rounded-3xl",
+                    isGlass ? "glass-effect border-primary/20" : "bg-primary text-primary-foreground"
+                )}>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold opacity-80 text-white">كشف يوميات المواقع</CardTitle>
+                        <CardTitle className={cn("text-sm font-bold opacity-80", !isGlass && "text-white")}>كشف يوميات المواقع</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-sm font-bold leading-relaxed mb-4 text-white/90">
+                        <div className={cn("text-sm font-bold leading-relaxed mb-4", !isGlass && "text-white/90")}>
                             تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.
                         </div>
-                        <Button asChild variant="secondary" className="w-full font-black rounded-xl h-10">
+                        <Button asChild variant={isGlass ? "default" : "secondary"} className="w-full font-black rounded-xl h-10">
                             <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
                         </Button>
                     </CardContent>
