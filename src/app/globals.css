@@ -31,13 +31,14 @@
   }
 
   [data-theme='glass'] {
-    /* Advanced Glass Theme - Lighter Ethereal Crystal */
+    /* Advanced Glass Theme - Light Ethereal Crystal */
     --background: 270 100% 99%; 
     --foreground: 262 70% 15%;
     --card: 270 100% 100% / 0.1; 
     --card-foreground: 262 70% 5%;
-    --popover: 270 50% 10% / 0.95;
-    --popover-foreground: 0 0% 100%;
+    /* Popover should be bright crystal for maximum text readability */
+    --popover: 0 0% 100% / 0.9;
+    --popover-foreground: 262 70% 15%;
     --primary: 272 90% 50%;
     --primary-foreground: 0 0% 100%;
     --secondary: 272 90% 50% / 0.1;
@@ -74,82 +75,99 @@
     backdrop-filter: blur(25px) !important;
     -webkit-backdrop-filter: blur(25px) !important;
     border: 0.5px solid rgba(255, 255, 255, 0.5) !important;
-    box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.15), 0 8px 32px 0 rgba(0, 0, 0, 0.05) !important;
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1), 0 8px 32px 0 rgba(0, 0, 0, 0.05) !important;
   }
 
-  /* Sidebar Lighter Vertical Gradient - Matching Lighter Image */
+  /* Internal Screens Background Correction - NO MORE WHITE BACKGROUNDS */
+  [data-theme='glass'] .bg-white,
+  [data-theme='glass'] .bg-background,
+  [data-theme='glass'] .bg-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.15) 100%) !important;
+    backdrop-filter: blur(25px) !important;
+    -webkit-backdrop-filter: blur(25px) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.5) !important;
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1), 0 4px 20px rgba(0, 0, 0, 0.02) !important;
+  }
+
+  [data-theme='glass'] .bg-muted,
+  [data-theme='glass'] .bg-muted\/30,
+  [data-theme='glass'] .bg-\[\#F8F9FE\] {
+    background: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(5px) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.2) !important;
+  }
+
+  [data-theme='glass'] .bg-sky-50 {
+    background: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  /* Sidebar Lighter Vertical Gradient */
   [data-theme='glass'] .sidebar-glass {
     background: linear-gradient(to bottom, 
-                rgba(255, 255, 255, 0.45) 0%, 
-                rgba(232, 200, 255, 0.35) 50%, 
-                rgba(216, 180, 254, 0.5) 100%) !important;
+                rgba(255, 255, 255, 0.5) 0%, 
+                rgba(255, 255, 255, 0.3) 50%, 
+                rgba(255, 255, 255, 0.4) 100%) !important;
     backdrop-filter: blur(35px) !important;
     border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
     box-shadow: inset -5px 0 30px rgba(255, 255, 255, 0.1) !important;
   }
 
-  /* Main Navigation Buttons - Lighter White Gradient */
+  /* Navigation Buttons */
   [data-theme='glass'] .glass-nav-button {
     background: linear-gradient(to left, 
                 rgba(255, 255, 255, 0.6) 0%, 
-                rgba(255, 255, 255, 0.2) 50%, 
-                rgba(216, 180, 254, 0.3) 100%) !important;
+                rgba(255, 255, 255, 0.2) 100%) !important;
     backdrop-filter: blur(12px) !important;
     border: 0.5px solid rgba(255, 255, 255, 0.6) !important;
-    border-radius: 18px !important;
-    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.2), 
+    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.1), 
                 0 4px 15px rgba(0, 0, 0, 0.03) !important;
     color: #1e1b4b !important;
     @apply transition-all duration-300;
   }
 
   [data-theme='glass'] .glass-nav-button:hover {
-    background: linear-gradient(to left, 
-                rgba(255, 255, 255, 0.8) 0%, 
-                rgba(255, 255, 255, 0.4) 100%) !important;
+    background: rgba(255, 255, 255, 0.8) !important;
     transform: translateX(-6px) !important;
-    box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.3), 0 8px 25px rgba(126, 34, 206, 0.1) !important;
   }
 
   [data-theme='glass'] .glass-nav-button-active {
-    background: rgba(255, 255, 255, 0.7) !important;
+    background: rgba(255, 255, 255, 0.75) !important;
     border: 1px solid rgba(255, 255, 255, 0.9) !important;
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.4) !important;
     @apply font-black;
   }
 
-  /* Sub-menu Connector Line */
-  [data-theme='glass'] .glass-sub-menu {
-    border-right: 1.5px solid rgba(255, 255, 255, 0.3) !important;
-    margin-right: 1.5rem !important;
-    padding-right: 0.75rem !important;
-    background: transparent !important;
-  }
-
-  /* Glassy Sub-item Pills - Lighter Version */
-  [data-theme='glass'] .glass-sub-button {
-    background: linear-gradient(to left, 
-                rgba(255, 255, 255, 0.4) 0%, 
-                rgba(255, 255, 255, 0.15) 100%) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 0.5px solid rgba(255, 255, 255, 0.4) !important;
-    border-radius: 14px !important;
-    box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.15) !important;
-    color: #1e1b4b !important;
-    margin-bottom: 0.5rem !important;
-    @apply font-bold transition-all duration-300;
-  }
-
-  [data-theme='glass'] .glass-sub-button:hover {
-    background: rgba(255, 255, 255, 0.6) !important;
-    transform: translateX(-4px) !important;
-    border-color: rgba(255, 255, 255, 0.7) !important;
-  }
-
   /* Deep Saturated Icons & Text with Soft Sheen */
-  [data-theme='glass'] .sidebar-icon-deep {
+  [data-theme='glass'] .sidebar-icon-deep,
+  [data-theme='glass'] .text-foreground,
+  [data-theme='glass'] .text-gray-800,
+  [data-theme='glass'] .text-slate-900 {
     color: #1e1b4b !important;
-    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.5));
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  /* Dropdown & Popover Corrections for Glass Mode */
+  [data-theme='glass'] [data-radix-popover-content-wrapper],
+  [data-theme='glass'] [role="listbox"],
+  [data-theme='glass'] [data-radix-select-content],
+  [data-theme='glass'] .bg-popover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(25px) !important;
+    border: 1px solid white !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  [data-theme='glass'] [role="option"],
+  [data-theme='glass'] [role="menuitem"],
+  [data-theme='glass'] [cmdk-item] {
+    color: #1e1b4b !important;
+    font-weight: 700 !important;
+  }
+
+  [data-theme='glass'] [role="option"]:hover,
+  [data-theme='glass'] [cmdk-item][aria-selected="true"] {
+    background: rgba(126, 34, 206, 0.1) !important;
+    color: #7e22ce !important;
   }
 }
 
