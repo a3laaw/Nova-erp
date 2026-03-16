@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { Package, History, BarChart3, TrendingDown, TrendingUp, DollarSign, ShieldCheck, AlertTriangle, SearchCode } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppTheme } from '@/context/theme-context';
 
 const reportList = [
     { title: 'أرصدة الأصناف', description: 'عرض الكميات الحالية لكل صنف في المخازن.', href: '/dashboard/warehouse/reports/balances', icon: Package, color: 'bg-blue-100 text-blue-600' },
@@ -16,9 +17,15 @@ const reportList = [
 ];
 
 export default function InventoryReportsPage() {
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
+
   return (
     <div className="space-y-6" dir="rtl">
-        <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-purple-50 dark:from-card dark:to-card">
+        <Card className={cn(
+            "rounded-[2.5rem] border-none shadow-sm overflow-hidden",
+            isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-purple-50 shadow-sm"
+        )}>
             <CardHeader className="pb-8 px-8 border-b">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-purple-600/10 rounded-2xl text-purple-600 shadow-inner">
@@ -32,13 +39,19 @@ export default function InventoryReportsPage() {
             </CardHeader>
         </Card>
 
-        <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+        <Card className={cn(
+            "border-none shadow-sm rounded-3xl overflow-hidden",
+            isGlass ? "glass-effect" : "bg-white"
+        )}>
             <CardContent className="pt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {reportList.map((report) => {
                     const Icon = report.icon;
                     return (
                         <Link href={report.href} key={report.href} className="group block">
-                            <Card className="h-full transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-2 border-transparent hover:border-primary/10 bg-slate-50/50">
+                            <Card className={cn(
+                                "h-full transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-2 border-transparent hover:border-primary/10",
+                                isGlass ? "bg-white/10 hover:bg-white/20" : "bg-slate-50/50"
+                            )}>
                                 <CardHeader>
                                     <div className="flex items-center gap-4">
                                         <div className={cn("flex-shrink-0 p-3 rounded-xl shadow-sm", report.color)}>

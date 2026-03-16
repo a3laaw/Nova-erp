@@ -16,6 +16,8 @@ import {
 import dynamic from 'next/dynamic';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, Home } from 'lucide-react';
+import { useAppTheme } from '@/context/theme-context';
+import { cn } from '@/lib/utils';
 
 const ArchitecturalAppointmentsView = dynamic(
     () => import('@/components/appointments/architectural-appointments-view'),
@@ -34,9 +36,15 @@ const RoomBookingCalendar = dynamic(
 );
 
 export default function AppointmentsPage() {
+    const { theme } = useAppTheme();
+    const isGlass = theme === 'glass';
+
     return (
         <div className="space-y-6" dir="rtl">
-            <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+            <Card className={cn(
+                "border-none shadow-sm rounded-[2.5rem] overflow-hidden",
+                isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-sky-50 shadow-sm"
+            )}>
                 <CardHeader className="pb-8 px-8 border-b">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
@@ -52,28 +60,37 @@ export default function AppointmentsPage() {
                 </CardHeader>
             </Card>
 
-            <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
-                <CardContent className="pt-8">
-                    <Tabs defaultValue="architectural" dir="rtl">
-                        <TabsList className="grid w-full grid-cols-2 h-auto p-1.5 bg-muted/50 rounded-2xl mb-8">
-                            <TabsTrigger value="architectural" className="py-3.5 rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg">
-                                <CalendarDays className="h-4 w-4" />
-                                مواعيد القسم المعماري
-                            </TabsTrigger>
-                            <TabsTrigger value="rooms" className="py-3.5 rounded-xl font-black gap-2 data-[state=active]:bg-white data-[state=active]:shadow-lg">
-                                <Home className="h-4 w-4" />
-                                حجوزات قاعات الاجتماعات
-                            </TabsTrigger>
-                        </TabsList>
+            <Tabs defaultValue="architectural" dir="rtl">
+                <div className={cn(isGlass ? "tabs-frame-secondary" : "mb-8 bg-white rounded-3xl shadow-sm p-4")}>
+                    <TabsList className={cn(
+                        "grid w-full grid-cols-2 h-auto p-0 gap-4 bg-transparent",
+                        isGlass ? "" : ""
+                    )}>
+                        <TabsTrigger value="architectural" className={cn("py-3.5 rounded-xl font-black gap-2 h-14", isGlass && "tabs-trigger-card justify-center items-center")}>
+                            <CalendarDays className="h-4 w-4" />
+                            مواعيد القسم المعماري
+                        </TabsTrigger>
+                        <TabsTrigger value="rooms" className={cn("py-3.5 rounded-xl font-black gap-2 h-14", isGlass && "tabs-trigger-card justify-center items-center")}>
+                            <Home className="h-4 w-4" />
+                            حجوزات قاعات الاجتماعات
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
+
+                <Card className={cn(
+                    "border-none shadow-sm rounded-3xl overflow-hidden",
+                    isGlass ? "glass-effect" : "bg-white shadow-sm"
+                )}>
+                    <CardContent className="pt-8">
                         <TabsContent value="architectural" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
                             <ArchitecturalAppointmentsView />
                         </TabsContent>
                         <TabsContent value="rooms" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
                             <RoomBookingCalendar />
                         </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </Tabs>
         </div>
     )
 }

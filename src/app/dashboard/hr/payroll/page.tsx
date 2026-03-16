@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AttendanceUploader } from '@/components/hr/attendance-uploader';
 import { PayrollGenerator } from '@/components/hr/payroll-generator';
-import { Users2, Sheet, FileSpreadsheet, Banknote, ShieldCheck, Sparkles, History } from 'lucide-react';
+import { Users2, Sheet, FileSpreadsheet, Banknote, ShieldCheck } from 'lucide-react';
 import { PayslipsList } from '@/components/hr/payslips-list';
 import { useAppTheme } from '@/context/theme-context';
 import { cn } from '@/lib/utils';
@@ -32,10 +32,10 @@ export default function PayrollPage() {
             </Card>
 
             <Tabs defaultValue="attendance" dir="rtl" className="space-y-0">
-                <div className={cn(isGlass ? "tabs-frame-primary" : "mb-8")}>
+                <div className={cn(isGlass ? "tabs-frame-secondary" : "mb-8")}>
                     <TabsList className={cn(
                         "w-full h-auto bg-transparent p-0 gap-6",
-                        isGlass ? "tabs-list-cards" : "grid grid-cols-1 md:grid-cols-3"
+                        isGlass ? "tabs-list-cards lg:grid-cols-3" : "grid grid-cols-1 md:grid-cols-3"
                     )}>
                         <TabsTrigger value="attendance" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
                             <div className="tab-icon-box"><Users2 className="h-6 w-6" /></div>

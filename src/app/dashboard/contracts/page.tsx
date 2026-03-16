@@ -65,50 +65,51 @@ export default function UnifiedContractsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* --- Card-Style Tab Triggers (Image 1 Style) --- */}
-            <TabsList className={cn(
-                "w-full h-auto bg-transparent p-0 gap-6",
-                isGlass ? "tabs-list-cards" : "grid grid-cols-1 md:grid-cols-2"
-            )}>
-                <TabsTrigger 
-                    value="signed-contracts" 
-                    className={cn(
-                        "transition-all duration-500 text-right",
-                        isGlass ? "tabs-trigger-card" : "flex flex-col items-start p-6 rounded-2xl border bg-white shadow-sm h-full"
-                    )}
-                >
-                    <div className="tab-icon-box">
-                        <Construction className="h-6 w-6" />
-                    </div>
-                    <Badge variant="outline" className="mb-2 bg-primary/10 text-primary border-primary/20 text-[10px] font-black">المسار القانوني</Badge>
-                    <h3 className="text-xl font-black mb-1">العقود الموقعة</h3>
-                    <p className="text-xs font-bold text-muted-foreground mb-4">التعاقد المباشر وإثبات المديونيات المالية واللوجستية.</p>
-                    <Button asChild className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto">
-                        <Link href="/dashboard/contracts/new">توقيع عقد مباشر فوري +</Link>
-                    </Button>
-                </TabsTrigger>
+            <div className={cn(isGlass ? "tabs-frame-primary" : "mb-10")}>
+                <TabsList className={cn(
+                    "w-full h-auto bg-transparent p-0 gap-6",
+                    isGlass ? "tabs-list-cards lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
+                )}>
+                    <TabsTrigger 
+                        value="signed-contracts" 
+                        className={cn(
+                            "transition-all duration-500 text-right",
+                            isGlass ? "tabs-trigger-card" : "flex flex-col items-start p-6 rounded-2xl border bg-white shadow-sm h-full"
+                        )}
+                    >
+                        <div className="tab-icon-box">
+                            <Construction className="h-6 w-6" />
+                        </div>
+                        <Badge variant="outline" className="mb-2 bg-primary/10 text-primary border-primary/20 text-[10px] font-black">المسار القانوني</Badge>
+                        <h3 className="text-xl font-black mb-1">العقود الموقعة</h3>
+                        <p className="text-xs font-bold text-muted-foreground mb-4">التعاقد المباشر وإثبات المديونيات المالية واللوجستية.</p>
+                        <Button asChild className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto">
+                            <Link href="/dashboard/contracts/new">توقيع عقد مباشر فوري +</Link>
+                        </Button>
+                    </TabsTrigger>
 
-                <TabsTrigger 
-                    value="quotations" 
-                    className={cn(
-                        "transition-all duration-500 text-right",
-                        isGlass ? "tabs-trigger-card" : "flex flex-col items-start p-6 rounded-2xl border bg-white shadow-sm h-full"
-                    )}
-                >
-                    <div className="tab-icon-box">
-                        <FileText className="h-6 w-6" />
-                    </div>
-                    <Badge variant="outline" className="mb-2 bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-black">المسار المالي</Badge>
-                    <h3 className="text-xl font-black mb-1">عروض الأسعار</h3>
-                    <p className="text-xs font-bold text-muted-foreground mb-4">إدارة المسودات والمقترحات المالية للمشاريع الجديدة.</p>
-                    <Button asChild variant="outline" className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto border-primary/30 text-primary bg-primary/5">
-                        <Link href="/dashboard/accounting/quotations/new">إنشاء عرض سعر جديد +</Link>
-                    </Button>
-                </TabsTrigger>
-            </TabsList>
+                    <TabsTrigger 
+                        value="quotations" 
+                        className={cn(
+                            "transition-all duration-500 text-right",
+                            isGlass ? "tabs-trigger-card" : "flex flex-col items-start p-6 rounded-2xl border bg-white shadow-sm h-full"
+                        )}
+                    >
+                        <div className="tab-icon-box">
+                            <FileText className="h-6 w-6" />
+                        </div>
+                        <Badge variant="outline" className="mb-2 bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-black">المسار المالي</Badge>
+                        <h3 className="text-xl font-black mb-1">عروض الأسعار</h3>
+                        <p className="text-xs font-bold text-muted-foreground mb-4">إدارة المسودات والمقترحات المالية للمشاريع الجديدة.</p>
+                        <Button asChild variant="outline" className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto border-primary/30 text-primary bg-primary/5">
+                            <Link href="/dashboard/accounting/quotations/new">إنشاء عرض سعر جديد +</Link>
+                        </Button>
+                    </TabsTrigger>
+                </TabsList>
+            </div>
 
             {/* --- Filter Section & Table Content --- */}
-            <div className="mt-10 space-y-6">
+            <div className="mt-6 space-y-6">
                 <Card className={cn(
                     "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
                     isGlass ? "glass-effect" : "bg-white"
