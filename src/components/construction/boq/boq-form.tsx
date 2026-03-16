@@ -18,7 +18,6 @@ import {
   ListTree,
   Calculator,
   Info,
-  CalendarDays,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -46,7 +45,6 @@ import type {
   UseFormWatch,
   FieldErrors,
 } from 'react-hook-form';
-import { DateInput } from '@/components/ui/date-input';
 
 const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -69,8 +67,6 @@ export const itemSchema = z.object({
   level: z.number(),
   isHeader: z.boolean(),
   itemId: z.string().optional(),
-  startDate: z.date().optional().nullable(),
-  endDate: z.date().optional().nullable(),
 });
 
 export const boqFormSchema = z.object({
@@ -191,20 +187,6 @@ const BoqItemRowRenderer = React.memo(
             </div>
           </TableCell>
           <TableCell className="px-1">
-            <div className="space-y-1">
-                <Controller
-                    control={control}
-                    name={`items.${node._index}.startDate`}
-                    render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-8 text-[10px]" placeholder="البدء"/>}
-                />
-                <Controller
-                    control={control}
-                    name={`items.${node._index}.endDate`}
-                    render={({ field }) => <DateInput value={field.value} onChange={field.onChange} className="h-8 text-[10px]" placeholder="الانتهاء"/>}
-                />
-            </div>
-          </TableCell>
-          <TableCell className="px-1">
             <Input {...register(`items.${node._index}.unit`)} className="h-10 text-center bg-background text-sm font-semibold" disabled={isHeader} placeholder="الوحدة" />
           </TableCell>
           <TableCell className="px-1">
@@ -312,13 +294,13 @@ export function BoqForm({
   }, [watchedItems]);
 
   const handleAddRootSection = React.useCallback(() => {
-    append({ uid: generateStableId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '', notes: '', startDate: null, endDate: null });
+    append({ uid: generateStableId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '' });
   }, [append]);
 
   const handleAddItem = React.useCallback((parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
     const parentItem = watchedItems?.find((f: any) => f.uid === parentId);
     const parentLevel = parentItem ? parentItem.level : -1;
-    insert(insertAtIndex, { uid: generateStableId(), description: '', unit: isHeader ? '' : 'مقطوعية', quantity: 1, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1, isHeader: isHeader, itemId: '', notes: '', startDate: null, endDate: null });
+    insert(insertAtIndex, { uid: generateStableId(), description: '', unit: isHeader ? '' : 'مقطوعية', quantity: 1, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1, isHeader: isHeader, itemId: '' });
   }, [watchedItems, insert]);
 
   const handleDelete = React.useCallback((index: number) => {
@@ -340,7 +322,7 @@ export function BoqForm({
           <div className="flex justify-between items-center max-w-full px-4 mx-auto">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-primary/10 rounded-xl text-primary shadow-inner"><ListTree className="h-7 w-7" /></div>
-              <div><CardTitle className="text-2xl font-extrabold tracking-tight">مُحرر جداول الكميات</CardTitle><CardDescription className="flex items-center gap-2"><span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />إدارة الحصر والتسعير والجدولة</CardDescription></div>
+              <div><CardTitle className="text-2xl font-extrabold tracking-tight">مُحرر جداول الكميات</CardTitle><CardDescription className="flex items-center gap-2"><span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />إدارة الحصر والتسعير والبنود</CardDescription></div>
             </div>
             <div className="flex items-center gap-8 bg-muted/30 px-6 py-3 rounded-2xl border">
               <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">إجمالي المشروع</Label><div className="text-3xl font-black text-primary font-mono tabular-nums">{formatCurrency(grandTotal)}</div></div>
@@ -358,15 +340,14 @@ export function BoqForm({
               <div className="grid gap-2"><Label className="font-bold text-sm text-foreground/70">الحالة التعاقدية</Label><Controller name="status" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
             </div>
 
-            <div className="border rounded-3xl overflow-hidden shadow-xl bg-card">
+            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
               <div className="overflow-x-auto">
                 <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                  <colgroup><col className="w-12" /><col className="min-w-[300px]" /><col className="w-32" /><col className="w-24" /><col className="w-24" /><col className="w-32" /><col className="w-40" /><col className="w-20" /></colgroup>
+                  <colgroup><col className="w-12" /><col className="min-w-[400px]" /><col className="w-24" /><col className="w-24" /><col className="w-32" /><col className="w-40" /><col className="w-20" /></colgroup>
                   <TableHeader className="bg-muted/80 backdrop-blur-sm">
                     <TableRow className="hover:bg-transparent border-b-2 h-14">
                       <TableHead className="text-center font-bold text-xs uppercase px-1">م</TableHead>
                       <TableHead className="font-bold px-2">بيان الأعمال</TableHead>
-                      <TableHead className="text-center font-bold px-1"><CalendarDays className="h-4 w-4 mx-auto"/></TableHead>
                       <TableHead className="text-center font-bold px-1">الوحدة</TableHead>
                       <TableHead className="text-center font-bold px-1">الكمية</TableHead>
                       <TableHead className="text-center font-bold px-1">سعر الوحدة</TableHead>
@@ -376,7 +357,7 @@ export function BoqForm({
                   </TableHeader>
                   <TableBody>
                     {boqTree.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="h-64 text-center"><div className="flex flex-col items-center justify-center gap-4 text-muted-foreground"><Info className="h-12 w-12 opacity-20" /><p>الجدول فارغ حالياً.</p></div></TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="h-64 text-center"><div className="flex flex-col items-center justify-center gap-4 text-muted-foreground"><Info className="h-12 w-12 opacity-20" /><p>الجدول فارغ حالياً.</p></div></TableCell></TableRow>
                     ) : (
                       boqTree.map((node, index) => (
                         <BoqItemRowRenderer key={node.uid} node={node} level={0} wbs={`${index + 1}`} parentReferenceId={null} control={control} register={register} setValue={setValue} onDelete={handleDelete} onAdd={handleAddItem} watchedItems={watchedItems || []} masterItemsMap={masterItemsMap} masterItemsLoading={masterItemsLoading} errors={errors} />
@@ -397,12 +378,12 @@ export function BoqForm({
 
           <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] no-print">
             <div className="max-w-7xl mx-auto flex justify-between items-center p-6 px-10">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border"><Calculator className="h-4 w-4" />تم حساب {fields.length} بنود بدقة</div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border"><Calculator className="h-4 w-4" />تم حصر وتثمين {fields.length} بنود بدقة</div>
               <div className="flex gap-4">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-extrabold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[200px]">
                   {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin" /> : <Save className="ml-3 h-5 w-5" />}
-                  {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول والجدول الزمني'}
+                  {isSaving ? 'جاري الحفظ...' : 'حفظ جدول الكميات'}
                 </Button>
               </div>
             </div>
