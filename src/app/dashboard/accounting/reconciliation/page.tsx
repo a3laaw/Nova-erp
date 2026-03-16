@@ -31,23 +31,25 @@ export default function ReconciliationPage() {
                 </CardHeader>
             </Card>
 
-            <Tabs defaultValue="standard" dir="rtl" className="space-y-10">
-                <TabsList className={cn(
-                    "w-full h-auto bg-transparent p-0 gap-6",
-                    isGlass ? "tabs-list-cards lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
-                )}>
-                    <TabsTrigger value="standard" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                        <div className="tab-icon-box"><Landmark className="h-6 w-6" /></div>
-                        <h3 className="text-lg font-black">التسوية القياسية</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground">مطابقة حركة مقابل حركة لكشوف الحسابات التقليدية.</p>
-                    </TabsTrigger>
-                    
-                    <TabsTrigger value="intermediary" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                        <div className="tab-icon-box"><Share2 className="h-6 w-6" /></div>
-                        <h3 className="text-lg font-black">شركات الوساطة</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground">معالجة الدفعات المجمعة من بوابات الدفع (K-Net, Link).</p>
-                    </TabsTrigger>
-                </TabsList>
+            <Tabs defaultValue="standard" dir="rtl" className="space-y-0">
+                <div className={cn(isGlass ? "tabs-frame-primary" : "mb-10")}>
+                    <TabsList className={cn(
+                        "w-full h-auto bg-transparent p-0 gap-6",
+                        isGlass ? "tabs-list-cards lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
+                    )}>
+                        <TabsTrigger value="standard" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                            <div className="tab-icon-box"><Landmark className="h-6 w-6" /></div>
+                            <h3 className="text-lg font-black">التسوية القياسية</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">مطابقة حركة مقابل حركة لكشوف الحسابات التقليدية.</p>
+                        </TabsTrigger>
+                        
+                        <TabsTrigger value="intermediary" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                            <div className="tab-icon-box"><Share2 className="h-6 w-6" /></div>
+                            <h3 className="text-lg font-black">شركات الوساطة</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">معالجة الدفعات المجمعة من بوابات الدفع (K-Net, Link).</p>
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
 
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <TabsContent value="standard" className="m-0"><StandardReconciliationView /></TabsContent>

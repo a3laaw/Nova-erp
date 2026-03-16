@@ -31,29 +31,31 @@ export default function PayrollPage() {
                 </CardHeader>
             </Card>
 
-            <Tabs defaultValue="attendance" dir="rtl" className="space-y-10">
-                <TabsList className={cn(
-                    "w-full h-auto bg-transparent p-0 gap-6",
-                    isGlass ? "tabs-list-cards" : "grid grid-cols-1 md:grid-cols-3"
-                )}>
-                    <TabsTrigger value="attendance" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                        <div className="tab-icon-box"><Users2 className="h-6 w-6" /></div>
-                        <h3 className="text-lg font-black">رفع الحضور</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground">استيراد سجلات البصمة ومطابقتها مع التراخيص.</p>
-                    </TabsTrigger>
-                    
-                    <TabsTrigger value="payroll" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                        <div className="tab-icon-box"><ShieldCheck className="h-6 w-6" /></div>
-                        <h3 className="text-lg font-black">معالجة الرواتب</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground">احتساب البدلات والخصومات وإغلاق الفترة مالياً.</p>
-                    </TabsTrigger>
+            <Tabs defaultValue="attendance" dir="rtl" className="space-y-0">
+                <div className={cn(isGlass ? "tabs-frame-primary" : "mb-8")}>
+                    <TabsList className={cn(
+                        "w-full h-auto bg-transparent p-0 gap-6",
+                        isGlass ? "tabs-list-cards" : "grid grid-cols-1 md:grid-cols-3"
+                    )}>
+                        <TabsTrigger value="attendance" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                            <div className="tab-icon-box"><Users2 className="h-6 w-6" /></div>
+                            <h3 className="text-lg font-black">رفع الحضور</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">استيراد سجلات البصمة ومطابقتها مع التراخيص.</p>
+                        </TabsTrigger>
+                        
+                        <TabsTrigger value="payroll" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                            <div className="tab-icon-box"><ShieldCheck className="h-6 w-6" /></div>
+                            <h3 className="text-lg font-black">معالجة الرواتب</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">احتساب البدلات والخصومات وإغلاق الفترة مالياً.</p>
+                        </TabsTrigger>
 
-                    <TabsTrigger value="payslips" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                        <div className="tab-icon-box"><FileSpreadsheet className="h-6 w-6" /></div>
-                        <h3 className="text-lg font-black">كشوفات الصرف</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground">عرض وتصدير قسائم الرواتب النهائية المعتمدة.</p>
-                    </TabsTrigger>
-                </TabsList>
+                        <TabsTrigger value="payslips" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                            <div className="tab-icon-box"><FileSpreadsheet className="h-6 w-6" /></div>
+                            <h3 className="text-lg font-black">كشوفات الصرف</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground">عرض وتصدير قسائم الرواتب النهائية المعتمدة.</p>
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
 
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <TabsContent value="attendance" className="m-0"><AttendanceUploader /></TabsContent>

@@ -45,7 +45,7 @@ import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '../ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -365,22 +365,24 @@ export function AttendanceUploader() {
   }, [employees, mappingSearch]);
 
   return (
-    <Tabs defaultValue="upload" dir="rtl" className="space-y-10">
-        <TabsList className={cn(
-            "w-full h-auto bg-transparent p-0 gap-6",
-            isGlass ? "tabs-list-cards" : "grid grid-cols-1 md:grid-cols-2"
-        )}>
-            <TabsTrigger value="upload" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                <div className="tab-icon-box"><FileSpreadsheet className="h-6 w-6" /></div>
-                <h3 className="text-lg font-black">رفع ومعالجة الملف</h3>
-                <p className="text-[10px] font-bold text-muted-foreground">استيراد سجلات البصمة ومطابقتها آلياً.</p>
-            </TabsTrigger>
-            <TabsTrigger value="mapping" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
-                <div className="tab-icon-box"><Fingerprint className="h-6 w-6" /></div>
-                <h3 className="text-lg font-black">مطابقة البصمة والدوام</h3>
-                <p className="text-[10px] font-bold text-muted-foreground">تخصيص أرقام البصمة وساعات العمل.</p>
-            </TabsTrigger>
-        </TabsList>
+    <Tabs defaultValue="upload" dir="rtl" className="space-y-0">
+        <div className={cn(isGlass ? "tabs-frame-secondary" : "mb-8")}>
+            <TabsList className={cn(
+                "w-full h-auto bg-transparent p-0 gap-6",
+                isGlass ? "tabs-list-cards lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
+            )}>
+                <TabsTrigger value="upload" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                    <div className="tab-icon-box"><FileSpreadsheet className="h-6 w-6" /></div>
+                    <h3 className="text-lg font-black">رفع ومعالجة الملف</h3>
+                    <p className="text-[10px] font-bold text-muted-foreground">استيراد سجلات البصمة ومطابقتها آلياً.</p>
+                </TabsTrigger>
+                <TabsTrigger value="mapping" className={cn("text-right", isGlass ? "tabs-trigger-card" : "")}>
+                    <div className="tab-icon-box"><Fingerprint className="h-6 w-6" /></div>
+                    <h3 className="text-lg font-black">مطابقة البصمة والدوام</h3>
+                    <p className="text-[10px] font-bold text-muted-foreground">تخصيص أرقام البصمة وساعات العمل.</p>
+                </TabsTrigger>
+            </TabsList>
+        </div>
 
         <TabsContent value="upload" className="mt-0 animate-in fade-in zoom-in-95 duration-300">
             <div className="space-y-8">
