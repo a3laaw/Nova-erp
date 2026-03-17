@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark, FileText, Wallet } from 'lucide-react';
+import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark, FileText } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -47,7 +47,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
     const { data: jobs, loading: jobsLoading } = useSubscription<Job>(firestore, 'jobs', [], true);
-    const { data: accounts, loading: accountsLoading } = useSubscription<Account>(firestore, 'chartOfAccounts', [orderBy('code')]);
 
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
@@ -70,7 +69,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         targetDescription: 0,
         pieceRate: 0,
         dailyRate: 0,
-        custodyAccountId: null,
     });
 
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
@@ -96,7 +94,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
-                custodyAccountId: initialData.custodyAccountId || null,
             });
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
             setShowTransportAllowance(Number(initialData.transportAllowance) > 0);
@@ -156,12 +153,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         if (!selectedDept) return [];
         return jobs.filter(j => (j as any).parentId === selectedDept.id).map(j => ({ value: j.name, label: j.name }));
     }, [departments, jobs, formData.department]);
-
-    // ✨ تحديد حسابات العهد فقط من شجرة الحسابات لربط الموظف
-    const custodyAccountOptions = useMemo(() => 
-        accounts.filter(a => a.parentCode === '110102' && a.isPayable)
-            .map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
-    , [accounts]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -329,24 +320,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-emerald-50/20 border-emerald-100">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800">
-                        <Banknote className="h-5 w-5" /> الرواتب والربط المالي
+                        <Banknote className="h-5 w-5" /> الرواتب والمعلومات المالية
                     </h3>
                     
                     <div className="grid gap-6">
-                        <div className="grid gap-2 p-4 bg-white rounded-2xl border-2 border-dashed border-emerald-200">
-                            <Label className="font-black text-emerald-900 flex items-center gap-2">
-                                <Wallet className="h-4 w-4" /> ربط حساب العهدة في الشجرة *
-                            </Label>
-                            <InlineSearchList 
-                                value={formData.custodyAccountId || ''} 
-                                onSelect={v => handleSelectChange('custodyAccountId', v)} 
-                                options={custodyAccountOptions}
-                                placeholder={accountsLoading ? "جاري تحميل الشجرة..." : "اختر حساب العهدة المخصص..."}
-                                disabled={accountsLoading || isSaving}
-                            />
-                            <p className="text-[9px] text-emerald-700 font-bold pr-1">هذا الربط جوهري لتمكين الموظف من رفع تسويات العهدة آلياً.</p>
-                        </div>
-
                         {formData.contractType === 'day_laborer' ? (
                             <div className="grid gap-2 max-w-xs animate-in zoom-in-95">
                                 <Label className="font-black text-emerald-900">أجرة اليومية (د.ك) *</Label>
@@ -371,6 +348,42 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                                         <Label htmlFor="t-allow" className="text-xs font-bold">بدل مواصلات</Label>
                                     </div>
                                     <Input id="transportAllowance" type="number" step="0.001" value={formData.transportAllowance} onChange={handleInputChange} disabled={!showTransportAllowance} className="h-11 bg-white" />
+                                </div>
+                            </div>
+                        )}
+
+                        <Separator className="my-2" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="font-bold text-emerald-900">طريقة استلام الراتب</Label>
+                                <Select value={formData.salaryPaymentType} onValueChange={v => handleSelectChange('salaryPaymentType', v)}>
+                                    <SelectTrigger className="h-11 bg-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                        <SelectItem value="cash">كاش (نقداً)</SelectItem>
+                                        <SelectItem value="cheque">شيك</SelectItem>
+                                        <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            
+                            {formData.salaryPaymentType === 'transfer' && (
+                                <div className="grid gap-2 animate-in slide-in-from-top-2">
+                                    <Label htmlFor="bankName" className="font-bold text-emerald-900">اسم البنك</Label>
+                                    <Input id="bankName" value={formData.bankName} onChange={handleInputChange} className="h-11 bg-white" />
+                                </div>
+                            )}
+                        </div>
+
+                        {formData.salaryPaymentType === 'transfer' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-2">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="accountNumber" className="font-bold text-emerald-900">رقم الحساب</Label>
+                                    <Input id="accountNumber" value={formData.accountNumber} onChange={handleInputChange} dir="ltr" className="h-11 bg-white" />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="iban" className="font-bold text-emerald-900">رقم الـ IBAN</Label>
+                                    <Input id="iban" value={formData.iban} onChange={handleInputChange} dir="ltr" className="h-11 bg-white" />
                                 </div>
                             </div>
                         )}

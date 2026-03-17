@@ -240,7 +240,6 @@ export interface Employee extends BaseEntity {
     targetDescription?: number;
     pieceRate?: number;
     dailyRate?: number;
-    custodyAccountId?: string | null; // الحساب المالي المرتبط بالعهدة في شجرة الحسابات
 }
 
 export interface CustodyReconciliation extends BaseEntity {
@@ -269,7 +268,17 @@ export interface Warehouse extends BaseEntity { name: string; location?: string;
 export interface ItemCategory extends BaseEntity { name: string; parentCategoryId: string | null; order?: number; }
 export interface Item extends BaseEntity { name: string; sku: string; categoryId: string; unitOfMeasure: string; costPrice?: number; sellingPrice?: number; inventoryTracked?: boolean; isSubsidyEligible?: boolean; warrantyYears?: number; }
 export interface Vendor extends BaseEntity { name: string; phone: string; contactPerson?: string; }
-export interface Account extends BaseEntity { code: string; name: string; type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; level: number; parentCode: string | null; isPayable: boolean; statement: 'Balance Sheet' | 'Income Statement'; balanceType: 'Debit' | 'Credit'; }
+export interface Account extends BaseEntity { 
+    code: string; 
+    name: string; 
+    type: 'asset' | 'liability' | 'equity' | 'income' | 'expense'; 
+    level: number; 
+    parentCode: string | null; 
+    isPayable: boolean; 
+    statement: 'Balance Sheet' | 'Income Statement'; 
+    balanceType: 'Debit' | 'Credit'; 
+    employeeId?: string | null; // الحقل الجديد لربط الحساب بالموظف
+}
 export interface Department extends BaseEntity { name: string; order?: number; activityTypes?: string[]; }
 export interface Governorate extends BaseEntity { name: string; order?: number; }
 export interface Area extends BaseEntity { name: string; order?: number; }

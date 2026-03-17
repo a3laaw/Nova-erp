@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc, orderBy } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc, orderBy, limit } from 'firebase/firestore';
 import type { CustodyReconciliation, Account, JournalEntry, ConstructionProject, Client, Employee } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
@@ -77,7 +77,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
         const updatedItems = [...localItems];
         updatedItems[index] = { ...updatedItems[index], [field]: value };
         
-        // إذا تغير المشروع، نقوم بتحديث الاسم المعروض في المصفوفة المحلية للتدقيق البصري
         if (field === 'projectId') {
             const proj = projects.find(p => p.id === value);
             updatedItems[index].projectName = proj?.projectName || null;
@@ -109,18 +108,20 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
                 
-                // ✨ الدرع الرقابي: جلب ملف الموظف للتأكد من حساب العهدة المربوط به
-                const empSnap = await transaction.get(doc(firestore, 'employees', rec.employeeId));
-                if (!empSnap.exists()) throw new Error("لم يتم العثور على ملف الموظف.");
-                const employee = empSnap.data() as Employee;
+                // ✨ الدرع الرقابي المحدث: البحث في شجرة الحسابات عن الحساب المربوط بهذا الموظف
+                const custodyAccQuery = query(
+                    collection(firestore, 'chartOfAccounts'), 
+                    where('employeeId', '==', rec.employeeId),
+                    limit(1)
+                );
+                const custodyAccSnap = await getDocs(custodyAccQuery);
 
-                if (!employee.custodyAccountId) {
-                    throw new Error(`⚠️ تنبيه رقابي: الموظف ${rec.employeeName} غير مربوط بحساب عهدة في شجرة الحسابات. يرجى تعديل ملفه أولاً.`);
+                if (custodyAccSnap.empty) {
+                    throw new Error(`⚠️ تنبيه رقابي: لم يتم العثور على حساب عهدة مربوط بالموظف ${rec.employeeName} في شجرة الحسابات. يرجى تعديل الحساب في الشجرة وربطه بالموظف أولاً.`);
                 }
 
-                const custodyAccSnap = await transaction.get(doc(firestore, 'chartOfAccounts', employee.custodyAccountId));
-                if (!custodyAccSnap.exists()) throw new Error("حساب العهدة المربوط بالموظف غير موجود في شجرة الحسابات.");
-                const custodyAcc = { id: custodyAccSnap.id, ...custodyAccSnap.data() } as Account;
+                const custodyAccDoc = custodyAccSnap.docs[0];
+                const custodyAcc = { id: custodyAccDoc.id, ...custodyAccDoc.data() } as Account;
 
                 const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
                 const jeCounterDoc = await transaction.get(jeCounterRef);
@@ -133,7 +134,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 const finalItemsToSave = localItems.map((item, idx) => {
                     const selectedAcc = accounts.find(a => a.id === mappings[idx])!;
                     
-                    // إعداد سطر القيد
                     jeLines.push({
                         accountId: selectedAcc.id,
                         accountName: selectedAcc.name,
@@ -144,7 +144,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                         transactionId: item.projectId || null
                     });
 
-                    // إرجاع البيانات المحدثة للحفظ في مستند التسوية
                     return {
                         ...item,
                         category: mappings[idx],
@@ -152,7 +151,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     };
                 });
 
-                // سطر الدائن (تصفير العهدة من حساب الموظف المربوط رسمياً)
                 jeLines.push({
                     accountId: custodyAcc.id!,
                     accountName: custodyAcc.name,
@@ -182,7 +180,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 transaction.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
             });
 
-            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية عهدة الموظف بالمبالغ المعدلة.' });
+            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية عهدة الموظف بناءً على الربط في شجرة الحسابات.' });
             router.push('/dashboard/hr/custody-reconciliation');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: error.message });
@@ -320,7 +318,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                         ) : (
                                             <InlineSearchList 
                                                 value={mappings[idx] || ''}
-                                                onSelect={(v) => setMappings(prev => ({ ...prev, [idx]: v }))}
+                                                onSelect={v => setMappings(prev => ({ ...prev, [idx]: v }))}
                                                 options={expenseAccounts}
                                                 placeholder="اختر حساب المصروف..."
                                                 className="bg-white border-primary/30 rounded-xl h-10 shadow-sm"

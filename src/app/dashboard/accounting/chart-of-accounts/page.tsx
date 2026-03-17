@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
@@ -57,9 +57,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { Account, JournalEntry } from '@/lib/types';
+import type { Account, JournalEntry, Employee } from '@/lib/types';
 import { formatCurrency, cn } from '@/lib/utils';
 import { defaultChartOfAccounts } from '@/lib/default-coa';
+import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
 const accountTypeTranslations: Record<Account['type'], string> = {
@@ -100,13 +101,16 @@ const getBalanceType = (code: string): Account['balanceType'] => {
 
 
 function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null, accounts: Account[] }) {
+    const { firestore } = useFirebase();
     const isEditing = !!account;
     const [formData, setFormData] = useState<Partial<Account>>({});
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [loadingEmployees, setLoadingEmployees] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             if (isEditing && account) {
-                setFormData({ code: account.code, name: account.name, type: account.type, isPayable: account.isPayable });
+                setFormData({ code: account.code, name: account.name, type: account.type, isPayable: account.isPayable, employeeId: account.employeeId || null });
             } else {
                 let nextCode = '';
                 let newType: Account['type'] = parentAccount ? parentAccount.type : 'asset';
@@ -128,10 +132,20 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                     nextCode = String(lastCodeNum + 1);
                 }
                 
-                setFormData({ type: newType, code: nextCode, name: '', isPayable: true });
+                setFormData({ type: newType, code: nextCode, name: '', isPayable: true, employeeId: null });
             }
         }
     }, [account, parentAccount, isEditing, isOpen, accounts]);
+
+    // جلب الموظفين عند فتح النموذج لتمكين الربط
+    useEffect(() => {
+        if (isOpen && firestore) {
+            setLoadingEmployees(true);
+            getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))).then(snap => {
+                setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
+            }).finally(() => setLoadingEmployees(false));
+        }
+    }, [isOpen, firestore]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -142,6 +156,8 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         const balanceType = getBalanceType(code);
         onSave({ ...formData, level, type, statement, balanceType, parentCode: parentAccount?.code || null });
     };
+
+    const showEmployeeLink = parentAccount?.code === '110102' || account?.parentCode === '110102';
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -161,6 +177,23 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
                             <Label htmlFor="name">اسم الحساب</Label>
                             <Input id="name" value={formData.name || ''} onChange={(e) => setFormData(p => ({...p, name: e.target.value}))} required />
                         </div>
+                        
+                        {showEmployeeLink && (
+                            <div className="p-4 bg-primary/5 rounded-xl border-2 border-dashed border-primary/20 space-y-2 animate-in zoom-in-95">
+                                <Label className="font-black text-primary flex items-center gap-2">
+                                    <User className="h-4 w-4"/> ربط الحساب بموظف (للعهد النقدية)
+                                </Label>
+                                <InlineSearchList 
+                                    value={formData.employeeId || ''}
+                                    onSelect={(v) => setFormData(p => ({...p, employeeId: v || null}))}
+                                    options={employees.map(e => ({ value: e.id!, label: e.fullName }))}
+                                    placeholder={loadingEmployees ? "جاري التحميل..." : "اختر موظفاً لربط العهدة..."}
+                                    className="bg-white"
+                                />
+                                <p className="text-[10px] text-muted-foreground font-bold pr-1">سيتم استخدام هذا الربط لتصفية العهد آلياً عند تقديم تسوية من الموظف.</p>
+                            </div>
+                        )}
+
                         <div className="grid gap-2">
                             <Label htmlFor="type">نوع الحساب</Label>
                             <Select value={formData.type} onValueChange={(v) => setFormData(p => ({...p, type: v as Account['type']}))} disabled={!!parentAccount || isEditing}>
@@ -327,7 +360,6 @@ export default function ChartOfAccountsPage() {
             setIsFormOpen(false);
             setEditingAccount(null);
             setParentAccount(null);
-            // No need to call fetchAllData, useSubscription handles it.
         } catch (e) {
             console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الحساب.' });
@@ -344,7 +376,6 @@ export default function ChartOfAccountsPage() {
             toast({ title: 'نجاح', description: 'تم حذف الحساب.' });
             setIsAlertOpen(false);
             setAccountToDelete(null);
-            // No need to call fetchAllData, useSubscription handles it.
         } catch (e) {
              console.error(e);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حذف الحساب. قد يكون مرتبطًا ببيانات أخرى.' });
@@ -517,7 +548,7 @@ export default function ChartOfAccountsPage() {
             )}
             
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
                         <AlertDialogDescription>
@@ -534,7 +565,7 @@ export default function ChartOfAccountsPage() {
             </AlertDialog>
             
             <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تنزيل شجرة الحسابات؟</AlertDialogTitle>
                         <AlertDialogDescription>
