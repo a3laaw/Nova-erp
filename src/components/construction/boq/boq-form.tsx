@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -22,7 +23,8 @@ import {
   FileCheck,
   ChevronLeft,
   X,
-  Check
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription, Card } from '@/components/ui/card';
@@ -50,6 +52,7 @@ import type {
   UseFormWatch,
   FieldErrors,
 } from 'react-hook-form';
+import { useToast } from '@/hooks/use-toast';
 
 const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -183,7 +186,7 @@ const BoqItemRowRenderer = React.memo(
       [findLastDescendantIndex, node._index, node.uid, onAdd]
     );
 
-    const itemError = errors?.items?.[node._index];
+    const itemError = (errors?.items as any)?.[node._index];
 
     return (
       <React.Fragment>
@@ -204,7 +207,7 @@ const BoqItemRowRenderer = React.memo(
                 {...register(`items.${node._index}.description`)}
                 placeholder="بيان الأعمال..."
                 rows={1}
-                className={cn('text-[11px] leading-tight mt-0 min-h-[36px] bg-white rounded-lg shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-1 ring-destructive' : '')}
+                className={cn('text-[11px] leading-tight mt-0 min-h-[36px] bg-white rounded-lg shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-2 ring-destructive' : '')}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
@@ -325,6 +328,7 @@ export function BoqForm({
   onSubmit?: (data: BoqFormValues) => void;
 }) {
   const { firestore } = useFirebase();
+  const { toast } = useToast();
   const watchedItems = useWatch({ control, name: "items" });
 
   const { data: masterItemsData, loading: masterItemsLoading } = useSubscription<BoqReferenceItem>(firestore, 'boqReferenceItems', [orderBy('name')]);
@@ -379,6 +383,20 @@ export function BoqForm({
     sortedIndices.forEach((idx) => remove(idx));
   }, [watchedItems, remove]);
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!handleSubmit || !onSubmit) return;
+
+    handleSubmit(onSubmit, (err: any) => {
+        console.error("BOQ Validation Errors:", err);
+        toast({
+            variant: 'destructive',
+            title: 'فشل التحقق من البيانات',
+            description: 'يرجى مراجعة البنود، تأكد من وجود وصف لجميع الأسطر وأن جميع القيم صحيحة.',
+        });
+    })(e);
+  };
+
   return (
     <div className="space-y-4 w-full px-1" dir="rtl">
       <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
@@ -412,7 +430,7 @@ export function BoqForm({
         </div>
       </Card>
 
-      <form onSubmit={(e) => { e.preventDefault(); if (handleSubmit && onSubmit) handleSubmit(onSubmit)(e); }}>
+      <form onSubmit={handleFormSubmit}>
         <div className="space-y-4">
           <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
