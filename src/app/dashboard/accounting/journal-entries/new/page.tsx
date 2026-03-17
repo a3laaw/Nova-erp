@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -77,6 +78,7 @@ export default function NewJournalEntryPage() {
   const [refDataLoading, setRefDataLoading] = useState(true);
   const [entryNumber, setEntryNumber] = useState('جاري التوليد...');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   
   const { register, handleSubmit, control, formState: { errors } } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
@@ -163,7 +165,9 @@ export default function NewJournalEntryPage() {
   const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
 
   const onSubmit = async (data: JournalEntryFormValues) => {
-    if (!firestore || !currentUser) return;
+    if (!firestore || !currentUser || submittingRef.current) return;
+    
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
         await runTransaction(firestore, async (transaction) => {
@@ -232,14 +236,14 @@ export default function NewJournalEntryPage() {
     } catch (error) {
         console.error('Error saving journal entry:', error);
         toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ قيد اليومية.' });
-    } finally {
         setIsSubmitting(false);
+        submittingRef.current = false;
     }
   };
 
   return (
     <Card className="max-w-5xl mx-auto" dir="rtl">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={(e) => { e.preventDefault(); handleSubmit(onSubmit)(e); }}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
@@ -263,12 +267,12 @@ export default function NewJournalEntryPage() {
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="narration">البيان (الوصف)</Label>
-                        <Input id="narration" {...register('narration')} />
+                        <Input id="narration" {...register('narration')} disabled={isSubmitting}/>
                         {errors.narration && <p className="text-xs text-destructive">{errors.narration.message}</p>}
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="reference">المرجع (اختياري)</Label>
-                        <Input id="reference" {...register('reference')} />
+                        <Input id="reference" {...register('reference')} disabled={isSubmitting}/>
                     </div>
                 </div>
                 
@@ -288,20 +292,19 @@ export default function NewJournalEntryPage() {
                         <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                // التغيير: السماح بربط مركز التكلفة لكافة حسابات المصاريف (5) والإيرادات (4)
                                 const showProjectLink = selectedAccount && (selectedAccount.code.startsWith('5') || selectedAccount.code.startsWith('4'));
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
                                         <Controller control={control} name={`lines.${index}.accountId`} render={({ field }) => (
-                                                <InlineSearchList value={field.value} onSelect={field.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading} />
+                                                <InlineSearchList value={field.value} onSelect={field.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading || isSubmitting} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         {showProjectLink ? (
                                             <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
-                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={refDataLoading} />
+                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={refDataLoading || isSubmitting} />
                                             )} />
                                         ) : (
                                             <div className="text-xs text-muted-foreground italic px-2">غير مطلوب لهذا الحساب</div>
@@ -309,34 +312,34 @@ export default function NewJournalEntryPage() {
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="0.001" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                                <Input type="number" step="0.001" className='dir-ltr [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} onWheel={(e) => e.currentTarget.blur()} disabled={isSubmitting} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="0.001" className='dir-ltr' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} />
+                                                <Input type="number" step="0.001" className='dir-ltr [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} onWheel={(e) => e.currentTarget.blur()} disabled={isSubmitting} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.notes`} control={control} render={({ field }) => (
-                                                <Input {...field} value={field.value || ''} />
+                                                <Input {...field} value={field.value || ''} disabled={isSubmitting} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col items-center">
-                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index - 1)} disabled={index === 0}>
+                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index - 1)} disabled={index === 0 || isSubmitting}>
                                                 <ArrowUp className="h-4 w-4" />
                                             </Button>
-                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index + 1)} disabled={index === fields.length - 1}>
+                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index + 1)} disabled={index === fields.length - 1 || isSubmitting}>
                                                 <ArrowDown className="h-4 w-4" />
                                             </Button>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2}>
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2 || isSubmitting}>
                                             <Trash2 className="h-4 w-4 text-destructive" />
                                         </Button>
                                     </TableCell>
@@ -360,7 +363,7 @@ export default function NewJournalEntryPage() {
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })} disabled={isSubmitting}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة سطر
                         </Button>
@@ -378,7 +381,7 @@ export default function NewJournalEntryPage() {
                 )}
             </CardContent>
             <CardFooter className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()}>
+                <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
                     <X className="ml-2 h-4 w-4"/> إلغاء
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>

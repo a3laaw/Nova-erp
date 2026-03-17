@@ -389,7 +389,7 @@ export function BoqForm({
 
           <div className="flex items-center gap-0 bg-white/40 p-1 rounded-full border border-white/60 shadow-lg group">
               <div className="bg-[#7209B7] px-6 py-2.5 rounded-full flex flex-col items-center shadow-xl transition-all group-hover:brightness-110">
-                  <span className="text-[8px] font-black text-white/80 uppercase tracking-widest leading-none mb-1">الإجمالي</span>
+                  <span className="text-[8px] font-black text-white/80 uppercase tracking-widest leading-none mb-1">إجمالي المشروع</span>
                   <div className="text-xl font-black text-white font-mono leading-none flex items-baseline">
                       <span className="text-[9px] ml-1 opacity-70 font-normal">KWD</span>
                       {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 3 })}
@@ -487,9 +487,9 @@ export function BoqForm({
             <Card className="rounded-full border-none shadow-2xl glass-effect py-3 px-8 flex items-center justify-between gap-8 min-w-[50%]">
               <div className="flex items-center gap-4">
                 <Button type="submit" disabled={isSaving} className="h-10 px-8 rounded-full font-black text-sm shadow-xl bg-[#7209B7] text-white gap-2">
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} اعتماد وحفظ
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} اعتماد وحفظ الجدول النهائي
                 </Button>
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-9 px-4 rounded-full font-bold text-xs text-slate-600 hover:bg-white/20">إلغاء</Button>
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-9 px-4 rounded-full font-bold text-xs text-slate-600 hover:bg-white/20">إلغاء التعديلات</Button>
               </div>
               <div className="flex items-center gap-3">
                   <p className="text-[10px] font-black text-[#1e1b4b] text-right leading-none">تم حصر <br/><span className="text-primary text-sm font-black">{fields.length} بنود</span></p>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -97,6 +98,7 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
 
   const originalItemIdsRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
+  const savingRef = useRef(false);
 
   const form = useForm<BoqFormValues>({
     resolver: zodResolver(boqFormSchema),
@@ -104,20 +106,7 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
       name: '',
       clientName: '',
       status: 'تقديري',
-      items: [
-        {
-          uid: generateStableId(),
-          description: '',
-          unit: 'مقطوعية',
-          quantity: 0,
-          sellingUnitPrice: 0,
-          parentId: null,
-          level: 0,
-          isHeader: false,
-          itemId: '',
-          notes: '',
-        },
-      ],
+      items: [],
     },
   });
 
@@ -190,7 +179,9 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
   }, [mode, firestore, boqId, router, toast, form]);
 
   const onSubmit = async (data: BoqFormValues) => {
-    if (!firestore || !currentUser) return;
+    if (!firestore || !currentUser || savingRef.current) return;
+    
+    savingRef.current = true;
     setIsSaving(true);
 
     try {
@@ -276,7 +267,10 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     } catch (error: any) {
       console.error(`❌ Save failed:`, error);
       toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'حدث خطأ غير متوقع.' });
-      if (mountedRef.current) setIsSaving(false);
+      if (mountedRef.current) {
+          setIsSaving(false);
+          savingRef.current = false;
+      }
     }
   };
 
