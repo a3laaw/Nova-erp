@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -413,7 +412,7 @@ export function BoqForm({
         </div>
       </Card>
 
-      <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
+      <form onSubmit={(e) => { e.preventDefault(); if (handleSubmit && onSubmit) handleSubmit(onSubmit)(e); }}>
         <div className="space-y-4">
           <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
