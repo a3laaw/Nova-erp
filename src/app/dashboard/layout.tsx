@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
@@ -15,6 +15,9 @@ import { cn } from '@/lib/utils';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 import { useAppTheme } from '@/context/theme-context';
 
+/**
+ * @fileOverview Dashboard layout with enhanced mount protection to avoid ChunkLoadErrors.
+ */
 export default function DashboardLayout({
   children,
 }: {
@@ -25,37 +28,41 @@ export default function DashboardLayout({
   const { language } = useLanguage();
   const { branding } = useBranding();
   const { theme } = useAppTheme();
+  
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  if (loading) {
+  const handleLogout = () => {
+    logout();
+    router.push('/');
+  };
+
+  if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
         <Loader className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">جاري تحميل بيانات المستخدم...</p>
+        <p className="text-muted-foreground font-bold">جاري تحميل لوحة التحكم...</p>
       </div>
     );
   }
 
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center">
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6">
         <AlertCircle className="h-12 w-12 text-destructive" />
         <h2 className="text-xl font-bold">فشل تحميل بيانات المستخدم</h2>
-        <p className="text-muted-foreground">
-            لا يمكن المتابعة بدون معلومات المستخدم. الرجاء المحاولة مرة أخرى.
+        <p className="text-muted-foreground max-w-sm">
+            لا يمكن المتابعة بدون معلومات المستخدم النشطة. يرجى إعادة الدخول للنظام.
         </p>
-        <Button onClick={() => window.location.reload()} className="mt-4">
+        <Button onClick={() => window.location.reload()} className="mt-4 rounded-xl px-8">
             إعادة تحميل الصفحة
         </Button>
       </div>
     )
   }
-
-  const handleLogout = () => {
-    logout();
-    router.push('/');
-  };
   
-  // Vibrant Glowing Gradient Background for Glass Theme
   const vibrantGlassBackground = "linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%)";
   
   const isGlass = theme === 'glass';
@@ -85,7 +92,7 @@ export default function DashboardLayout({
           )}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
             <main className={cn(
-                "flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-2 lg:p-2 min-w-0",
+                "flex-1 overflow-y-auto overflow-x-hidden p-2 min-w-0",
                 isGlass && "scrollbar-thin scrollbar-thumb-white/20"
             )}>
               {children}
