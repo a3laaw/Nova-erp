@@ -68,7 +68,7 @@ interface PreviewFile {
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
  * - يظهر صورتين فقط والبقية عبر التمرير.
  * - عزل كامل لبكرة الماوس عن الصفحة الرئيسية (Scroll Isolation).
- * - معاينة منبثقة مكبرة عند تحويم الماوس (Hover Preview).
+ * - معاينة منبثقة مكبرة عند تحويم الماوس (Hover Preview) مع حماية التمرير.
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -84,25 +84,23 @@ function SmartPhotoGallery({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [hoveredImage, setHoveredImage] = useState<string | null>(null);
 
-    // ✨ محرك عزل التمرير الجذري (Scroll Isolation Engine)
+    // ✨ محرك عزل التمرير الجذري المحسن (Non-Blocking Engine)
     useEffect(() => {
         const el = scrollRef.current;
         if (!el) return;
 
         const handleWheel = (e: WheelEvent) => {
             if (e.deltaY !== 0) {
-                // منع التمرير العمودي للصفحة تماماً
+                // منع التمرير العمودي للصفحة الرئيسية
                 e.preventDefault();
-                // منع انتشار الحدث للأعلى
                 e.stopPropagation();
                 
-                // تحويل الحركة العمودية للبكرة إلى حركة أفقية للصور
-                // في نظام RTL، نطرح deltaY للتحرك لليسار
+                // تحويل الحركة لبكرة الصور أفقياً (متوافق مع RTL)
                 el.scrollLeft -= e.deltaY;
             }
         };
 
-        // يجب أن يكون المستمع "غير سلبي" للسماح بـ preventDefault
+        // الربط بمستمع أحداث "غير سلبي" للسماح بمنع تمرير الصفحة
         el.addEventListener('wheel', handleWheel, { passive: false });
         return () => el.removeEventListener('wheel', handleWheel);
     }, [files.length]);
@@ -188,13 +186,14 @@ function SmartPhotoGallery({
                 ))}
             </div>
 
-            {/* ✨ المعاينة المنبثقة الخاطفة (Hover Zoom Overlay) ✨ */}
+            {/* ✨ المعاينة المنبثقة الخاطفة - محصنة ضد تداخل الماوس (Pointer Events None) ✨ */}
             {hoveredImage && (
                 <div className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
                      style={{ 
                          top: '50%', 
                          left: '50%', 
-                         transform: 'translate(-50%, -50%)' 
+                         transform: 'translate(-50%, -50%)',
+                         pointerEvents: 'none' // حماية الرؤية حتى لا يسرق الكادر حدث بكرة الماوس
                      }}>
                     <div className="relative w-[400px] h-[400px] rounded-[2.5rem] overflow-hidden border-8 border-white shadow-[0_0_50px_rgba(0,0,0,0.3)] bg-white">
                         <Image src={hoveredImage} alt="Large Preview" fill className="object-contain p-4" />
