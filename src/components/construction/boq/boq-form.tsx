@@ -18,6 +18,7 @@ import {
   ListTree,
   Calculator,
   Info,
+  MessageSquare,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -165,50 +166,68 @@ const BoqItemRowRenderer = React.memo(
 
     return (
       <React.Fragment>
-        <TableRow className={cn('transition-colors', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/20')}>
-          <TableCell className="font-mono text-xs text-muted-foreground text-center border-l px-1">
+        <TableRow className={cn('transition-colors border-b last:border-0', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/20')}>
+          <TableCell className="font-mono text-[10px] text-muted-foreground text-center border-l px-1">
             {wbs}
           </TableCell>
-          <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="px-2">
-            <div className="flex flex-col gap-2 py-1">
+          <TableCell style={{ paddingRight: `${level * 1.2}rem` }} className="px-2">
+            <div className="flex flex-col gap-1.5 py-1">
               <InlineSearchList
                 value={itemId || ''}
                 onSelect={handleMasterItemSelect}
                 options={masterItemsMap.get(parentReferenceId) || []}
                 placeholder={masterItemsLoading ? 'تحميل...' : 'ابحث عن بند...'}
-                className="bg-background shadow-sm h-9"
+                className="bg-background shadow-sm h-8 text-xs"
               />
               <Textarea
                 {...register(`items.${node._index}.description`)}
                 placeholder="بيان الأعمال..."
                 rows={1}
-                className={cn('text-sm mt-1 min-h-[38px] border-muted focus:border-primary transition-all', itemError?.description ? 'border-destructive' : '')}
+                className={cn('text-xs mt-0.5 min-h-[34px] border-muted focus:border-primary transition-all resize-none overflow-hidden h-auto', itemError?.description ? 'border-destructive' : '')}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = `${target.scrollHeight}px`;
+                }}
               />
             </div>
           </TableCell>
           <TableCell className="px-1">
-            <Input {...register(`items.${node._index}.unit`)} className="h-10 text-center bg-background text-sm font-semibold" disabled={isHeader} placeholder="الوحدة" />
+            <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background text-[11px] font-bold rounded-lg border-none shadow-inner" disabled={isHeader} placeholder="الوحدة" />
           </TableCell>
           <TableCell className="px-1">
-            <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-10 dir-ltr text-center font-mono text-lg font-bold min-w-[80px]" disabled={isHeader} />
+            <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner min-w-[70px]" disabled={isHeader} />
           </TableCell>
           <TableCell className="px-1">
-            <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-10 dir-ltr text-center font-mono text-lg font-bold text-primary min-w-[120px]" disabled={isHeader} />
+            <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-9 dir-ltr text-center font-mono text-base font-black text-primary rounded-lg border-none bg-white shadow-inner min-w-[90px]" disabled={isHeader} />
           </TableCell>
-          <TableCell className="text-left font-mono font-bold border-r bg-muted/10 px-3">
-            <div className={cn('py-1 text-lg tracking-tight truncate min-w-[140px]', isHeader ? 'text-primary border-b-2 border-primary/20' : 'text-foreground')}>
+          <TableCell className="text-left font-mono font-black border-r bg-muted/10 px-2">
+            <div className={cn('py-1 text-sm tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
               {isHeader ? '-' : formatCurrency(lineTotal)}
             </div>
+          </TableCell>
+          <TableCell className="px-2 border-r">
+            <Textarea
+              {...register(`items.${node._index}.notes`)}
+              placeholder="ملاحظات..."
+              rows={1}
+              className="text-[10px] min-h-[34px] bg-transparent border-none shadow-none focus-visible:ring-0 resize-none italic"
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = `${target.scrollHeight}px`;
+              }}
+            />
           </TableCell>
           <TableCell className="text-center border-r px-1">
             <div className="flex items-center justify-center gap-1">
               {isHeader && (
-                <Button type="button" size="icon" variant="outline" className="h-8 w-8 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل">
-                  <PlusCircle className="h-4 w-4" />
+                <Button type="button" size="icon" variant="outline" className="h-7 w-7 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل">
+                  <PlusCircle className="h-3.5 w-3.5" />
                 </Button>
               )}
-              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => onDelete(node._index)}>
-                <Trash2 className="h-4 w-4" />
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => onDelete(node._index)}>
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </div>
           </TableCell>
@@ -318,72 +337,88 @@ export function BoqForm({
   return (
     <div className="bg-background">
       <div className="space-y-0">
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-6">
-          <div className="flex justify-between items-center max-w-full px-4 mx-auto">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-xl text-primary shadow-inner"><ListTree className="h-7 w-7" /></div>
-              <div><CardTitle className="text-2xl font-extrabold tracking-tight">مُحرر جداول الكميات</CardTitle><CardDescription className="flex items-center gap-2"><span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />إدارة الحصر والتسعير والبنود</CardDescription></div>
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-4">
+          <div className="flex justify-between items-center max-w-full px-2 mx-auto">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner"><ListTree className="h-6 w-6" /></div>
+              <div>
+                <CardTitle className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+                    مُحرر جداول الكميات
+                    <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold">إدارة الحصر والتسعير المرجعي والبنود الفنية</CardDescription>
+              </div>
             </div>
-            <div className="flex items-center gap-8 bg-muted/30 px-6 py-3 rounded-2xl border">
-              <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">إجمالي المشروع</Label><div className="text-3xl font-black text-primary font-mono tabular-nums">{formatCurrency(grandTotal)}</div></div>
-              <Separator orientation="vertical" className="h-10 mx-4" />
-              <div className="flex flex-col items-start"><Label className="text-[10px] uppercase font-bold text-muted-foreground mb-1">عدد البنود</Label><div className="text-2xl font-bold font-mono text-foreground/80">{fields.length}</div></div>
+            
+            <div className="flex items-center gap-1 bg-white/50 p-1.5 rounded-full border shadow-sm">
+                <div className="bg-primary px-6 py-2.5 rounded-full flex flex-col items-center">
+                    <span className="text-[8px] font-black text-white/70 uppercase tracking-widest leading-none">إجمالي المشروع</span>
+                    <div className="text-xl font-black text-white font-mono leading-none mt-1">
+                        <span className="text-[10px] ml-1">KWD</span>
+                        {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 3 })}
+                    </div>
+                </div>
+                <div className="px-4 py-2 flex flex-col items-center">
+                    <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">عدد البنود</span>
+                    <div className="text-lg font-black text-slate-800 leading-none mt-1">{fields.length}</div>
+                </div>
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
-          <CardContent className="p-0 max-w-full mx-auto mt-6 px-4 pb-32">
-            <div className="grid md:grid-cols-3 gap-8 p-8 mb-6 border rounded-3xl bg-card shadow-sm">
-              <div className="grid gap-2"><Label className="font-bold text-sm text-foreground/70">اسم / مرجع الجدول *</Label><Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-11 text-lg border-2', errors.name ? 'border-destructive' : '')} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
-              <div className="grid gap-2"><Label className="font-bold text-sm text-foreground/70">العميل (المحتمل)</Label><Input {...register('clientName')} className="h-11" placeholder="أدخل اسم العميل..." /></div>
-              <div className="grid gap-2"><Label className="font-bold text-sm text-foreground/70">الحالة التعاقدية</Label><Controller name="status" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-11 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
+          <CardContent className="p-0 max-w-full mx-auto mt-4 px-2 pb-32">
+            <div className="grid md:grid-cols-3 gap-4 p-6 mb-4 border rounded-[2rem] bg-card shadow-sm">
+              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">اسم / مرجع الجدول *</Label><Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-10 text-base font-bold rounded-xl border-2', errors.name ? 'border-destructive' : '')} />{errors.name && <p className="text-[10px] text-destructive px-1">{errors.name.message}</p>}</div>
+              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">العميل (المحتمل)</Label><Input {...register('clientName')} className="h-10 rounded-xl" placeholder="أدخل اسم العميل..." /></div>
+              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">الحالة التعاقدية</Label><Controller name="status" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
             </div>
 
-            <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
-              <div className="overflow-x-auto">
-                <Table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                  <colgroup><col className="w-12" /><col className="min-w-[400px]" /><col className="w-24" /><col className="w-24" /><col className="w-32" /><col className="w-40" /><col className="w-20" /></colgroup>
-                  <TableHeader className="bg-muted/80 backdrop-blur-sm">
-                    <TableRow className="hover:bg-transparent border-b-2 h-14">
-                      <TableHead className="text-center font-bold text-xs uppercase px-1">م</TableHead>
-                      <TableHead className="font-bold px-2">بيان الأعمال</TableHead>
-                      <TableHead className="text-center font-bold px-1">الوحدة</TableHead>
-                      <TableHead className="text-center font-bold px-1">الكمية</TableHead>
-                      <TableHead className="text-center font-bold px-1">سعر الوحدة</TableHead>
-                      <TableHead className="text-left font-bold border-r px-3">الإجمالي</TableHead>
-                      <TableHead className="text-center font-bold border-r px-1">إجراء</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {boqTree.length === 0 ? (
-                      <TableRow><TableCell colSpan={7} className="h-64 text-center"><div className="flex flex-col items-center justify-center gap-4 text-muted-foreground"><Info className="h-12 w-12 opacity-20" /><p>الجدول فارغ حالياً.</p></div></TableCell></TableRow>
-                    ) : (
-                      boqTree.map((node, index) => (
-                        <BoqItemRowRenderer key={node.uid} node={node} level={0} wbs={`${index + 1}`} parentReferenceId={null} control={control} register={register} setValue={setValue} onDelete={handleDelete} onAdd={handleAddItem} watchedItems={watchedItems || []} masterItemsMap={masterItemsMap} masterItemsLoading={masterItemsLoading} errors={errors} />
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+            <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card border-slate-200">
+              <Table className="w-full border-collapse">
+                <TableHeader className="bg-[#7209B7] text-white">
+                  <TableRow className="hover:bg-transparent border-none h-12">
+                    <TableHead className="text-center font-black text-[10px] uppercase text-white border-l border-white/10 w-10">م</TableHead>
+                    <TableHead className="font-black text-xs text-white px-4">بيان الأعمال التفصيلي</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-20">الوحدة</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-24">الكمية</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-32">سعر الوحدة</TableHead>
+                    <TableHead className="text-left font-black text-xs text-white border-l border-white/10 w-40">الإجمالي</TableHead>
+                    <TableHead className="font-black text-xs text-white border-l border-white/10">ملاحظات</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white w-20">إجراء</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {boqTree.length === 0 ? (
+                    <TableRow><TableCell colSpan={8} className="h-64 text-center"><div className="flex flex-col items-center justify-center gap-4 text-muted-foreground"><Info className="h-12 w-12 opacity-20" /><p className="font-bold">الجدول فارغ حالياً.</p></div></TableCell></TableRow>
+                  ) : (
+                    boqTree.map((node, index) => (
+                      <BoqItemRowRenderer key={node.uid} node={node} level={0} wbs={`${index + 1}`} parentReferenceId={null} control={control} register={register} setValue={setValue} onDelete={handleDelete} onAdd={handleAddItem} watchedItems={watchedItems || []} masterItemsMap={masterItemsMap} masterItemsLoading={masterItemsLoading} errors={errors} />
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
 
-            <div className="flex justify-center p-12">
-              <Button type="button" variant="secondary" onClick={handleAddRootSection} className="h-14 px-10 rounded-2xl shadow-lg border-2 border-primary/10 hover:border-primary/30 hover:bg-primary/5 transition-all text-lg font-bold group">
-                <PlusCircle className="ml-3 h-6 w-6 text-primary group-hover:scale-110 transition-transform" />
+            <div className="flex justify-center p-8">
+              <Button type="button" variant="outline" onClick={handleAddRootSection} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 transition-all font-black text-primary gap-2 group">
+                <PlusCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
                 إضافة قسم رئيسي جديد (WBS)
               </Button>
             </div>
           </CardContent>
 
-          <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_20px_rgba(0,0,0,0.05)] no-print">
-            <div className="max-w-7xl mx-auto flex justify-between items-center p-6 px-10">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-full border"><Calculator className="h-4 w-4" />تم حصر وتثمين {fields.length} بنود بدقة</div>
-              <div className="flex gap-4">
-                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-extrabold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[200px]">
+          <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_30px_rgba(0,0,0,0.1)] no-print">
+            <div className="max-w-7xl mx-auto flex justify-between items-center p-5 px-8">
+              <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground bg-muted/50 px-5 py-2 rounded-full border">
+                <Calculator className="h-4 w-4 text-primary" />
+                <span className="text-slate-900 font-black">تم حصر وتثمين {fields.length} بنود بدقة</span>
+              </div>
+              <div className="flex gap-3">
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-xl font-bold">إلغاء</Button>
+                <Button type="submit" disabled={isSaving} className="h-11 px-14 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[220px]">
                   {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin" /> : <Save className="ml-3 h-5 w-5" />}
-                  {isSaving ? 'جاري الحفظ...' : 'حفظ جدول الكميات'}
+                  {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول النهائي'}
                 </Button>
               </div>
             </div>
