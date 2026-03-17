@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -18,6 +17,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, PlusCircle, Trash2, Banknote, Camera, Info, ShieldCheck, Wallet, Target, User, UploadCloud, FileText, X, Image as ImageIcon } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
@@ -202,6 +202,12 @@ export function CustodyReconciliationForm() {
             savingRef.current = false;
         }
     };
+
+    const employeeOptions = useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
+    const combinedEntityOptions = useMemo(() => [
+        ...projects.map(p => ({ value: p.id!, label: `مشروع: ${p.projectName}` })),
+        ...clients.map(c => ({ value: c.id!, label: `عميل: ${c.nameAr}` }))
+    ], [projects, clients]);
 
     return (
         <Card className="max-w-5xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
