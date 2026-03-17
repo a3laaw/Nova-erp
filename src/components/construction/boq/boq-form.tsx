@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -166,7 +167,7 @@ const BoqItemRowRenderer = React.memo(
     return (
       <React.Fragment>
         <TableRow className={cn('transition-colors border-b last:border-0', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/20')}>
-          <TableCell className="font-mono text-[10px] text-muted-foreground text-center border-l px-1">
+          <TableCell className="font-mono text-[10px] text-muted-foreground text-center border-l px-1 w-10">
             {wbs}
           </TableCell>
           <TableCell style={{ paddingRight: `${level * 1.2}rem` }} className="px-2">
@@ -175,14 +176,14 @@ const BoqItemRowRenderer = React.memo(
                 value={itemId || ''}
                 onSelect={handleMasterItemSelect}
                 options={masterItemsMap.get(parentReferenceId) || []}
-                placeholder={masterItemsLoading ? 'تحميل...' : 'ابحث عن بند...'}
-                className="bg-background shadow-sm h-8 text-xs"
+                placeholder={masterItemsLoading ? 'تحميل...' : 'بند مرجعي'}
+                className="bg-background shadow-sm h-8 text-xs border-dashed"
               />
               <Textarea
                 {...register(`items.${node._index}.description`)}
                 placeholder="بيان الأعمال..."
                 rows={1}
-                className={cn('text-xs mt-0.5 min-h-[34px] border-muted focus:border-primary transition-all resize-none overflow-hidden h-auto', itemError?.description ? 'border-destructive' : '')}
+                className={cn('text-xs mt-0.5 min-h-[34px] border-muted focus:border-primary transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'border-destructive' : '')}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
@@ -191,26 +192,26 @@ const BoqItemRowRenderer = React.memo(
               />
             </div>
           </TableCell>
-          <TableCell className="px-1">
-            <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background text-[11px] font-bold rounded-lg border-none shadow-inner" disabled={isHeader} placeholder="الوحدة" />
+          <TableCell className="px-1 w-16">
+            <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background text-[10px] font-bold rounded-lg border-none shadow-inner" disabled={isHeader} placeholder="الوحدة" />
           </TableCell>
-          <TableCell className="px-1">
-            <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner min-w-[70px]" disabled={isHeader} />
+          <TableCell className="px-1 w-20">
+            <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner" disabled={isHeader} />
           </TableCell>
-          <TableCell className="px-1">
-            <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-9 dir-ltr text-center font-mono text-base font-black text-primary rounded-lg border-none bg-white shadow-inner min-w-[90px]" disabled={isHeader} />
+          <TableCell className="px-1 w-24">
+            <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-9 dir-ltr text-center font-mono text-xs font-black text-primary rounded-lg border-none bg-white shadow-inner" disabled={isHeader} />
           </TableCell>
-          <TableCell className="text-left font-mono font-black border-r bg-muted/10 px-2">
-            <div className={cn('py-1 text-sm tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
+          <TableCell className="text-left font-mono font-black border-r bg-muted/10 px-2 w-28">
+            <div className={cn('py-1 text-xs tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
               {isHeader ? '-' : formatCurrency(lineTotal)}
             </div>
           </TableCell>
-          <TableCell className="px-2 border-r">
+          <TableCell className="px-2 border-r w-40">
             <Textarea
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-[10px] min-h-[34px] bg-transparent border-none shadow-none focus-visible:ring-0 resize-none italic"
+              className="text-[10px] min-h-[34px] bg-transparent border-none shadow-none focus-visible:ring-0 resize-none italic font-medium"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -218,7 +219,7 @@ const BoqItemRowRenderer = React.memo(
               }}
             />
           </TableCell>
-          <TableCell className="text-center border-r px-1">
+          <TableCell className="text-center border-r px-1 w-16">
             <div className="flex items-center justify-center gap-1">
               {isHeader && (
                 <Button type="button" size="icon" variant="outline" className="h-7 w-7 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل">
@@ -374,17 +375,17 @@ export function BoqForm({
             </div>
 
             <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card border-slate-200">
-              <Table className="w-full border-collapse">
+              <Table className="w-full border-collapse table-fixed">
                 <TableHeader className="bg-[#7209B7] text-white">
                   <TableRow className="hover:bg-transparent border-none h-12">
                     <TableHead className="text-center font-black text-[10px] uppercase text-white border-l border-white/10 w-10">م</TableHead>
                     <TableHead className="font-black text-xs text-white px-4">بيان الأعمال التفصيلي</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-20">الوحدة</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-24">الكمية</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-32">سعر الوحدة</TableHead>
-                    <TableHead className="text-left font-black text-xs text-white border-l border-white/10 w-40">الإجمالي</TableHead>
-                    <TableHead className="font-black text-xs text-white border-l border-white/10">ملاحظات</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white w-20">إجراء</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-16">الوحدة</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-20">الكمية</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-24">سعر الوحدة</TableHead>
+                    <TableHead className="text-left font-black text-xs text-white border-l border-white/10 w-28">الإجمالي</TableHead>
+                    <TableHead className="font-black text-xs text-white border-l border-white/10 w-40">ملاحظات</TableHead>
+                    <TableHead className="text-center font-black text-xs text-white w-16">إجراء</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
