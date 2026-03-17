@@ -247,12 +247,12 @@ const BoqItemRowRenderer = React.memo(
               {formatCurrency(branchTotal)}
             </div>
           </TableCell>
-          <TableCell className="px-2 border-r w-40">
+          <TableCell className="px-2 border-r w-48">
             <Textarea
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-[10px] min-h-[34px] bg-transparent border-none shadow-none focus-visible:ring-0 resize-none italic font-medium"
+              className="text-[10px] min-h-[36px] bg-white border-none shadow-inner rounded-full px-3 py-2 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -410,9 +410,9 @@ export function BoqForm({
         <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
           <CardContent className="p-0 max-w-full mx-auto mt-4 px-2 pb-32">
             <div className="grid md:grid-cols-3 gap-4 p-6 mb-4 border rounded-[2rem] bg-card shadow-sm">
-              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">اسم / مرجع الجدول *</Label><Input {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-10 text-base font-bold rounded-xl border-2', errors.name ? 'border-destructive' : '')} />{errors.name && <p className="text-[10px] text-destructive px-1">{errors.name.message}</p>}</div>
-              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">العميل (المحتمل)</Label><Input {...register('clientName')} className="h-10 rounded-xl" placeholder="أدخل اسم العميل..." /></div>
-              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">الحالة التعاقدية</Label><Controller name="status" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 rounded-xl border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">اسم / مرجع الجدول *</Label><Input style={{borderRadius: '1.25rem'}} {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-10 text-base font-bold border-2', errors.name ? 'border-destructive' : '')} />{errors.name && <p className="text-[10px] text-destructive px-1">{errors.name.message}</p>}</div>
+              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">العميل (المحتمل)</Label><Input style={{borderRadius: '1.25rem'}} {...register('clientName')} className="h-10" placeholder="أدخل اسم العميل..." /></div>
+              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">الحالة التعاقدية</Label><Controller name="status" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 rounded-[1.25rem] border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
             </div>
 
             <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card border-slate-200">
@@ -425,7 +425,7 @@ export function BoqForm({
                     <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-20">الكمية</TableHead>
                     <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-24">سعر الوحدة</TableHead>
                     <TableHead className="text-left font-black text-xs text-white border-l border-white/10 w-28">الإجمالي</TableHead>
-                    <TableHead className="font-black text-xs text-white border-l border-white/10 w-40">ملاحظات</TableHead>
+                    <TableHead className="font-black text-xs text-white border-l border-white/10 w-48">ملاحظات</TableHead>
                     <TableHead className="text-center font-black text-xs text-white w-16">إجراء</TableHead>
                   </TableRow>
                 </TableHeader>
