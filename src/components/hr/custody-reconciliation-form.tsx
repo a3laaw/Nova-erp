@@ -33,9 +33,29 @@ import Image from 'next/image';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 
 /**
- * مولد المعرفات الفريدة للبنود (Internal Helper)
+ * دالة توليد المعرفات الفريدة
  */
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
+/**
+ * مخطط التحقق (Zod Schema) لتسوية العهدة
+ */
+const itemSchema = z.object({
+  id: z.string(),
+  description: z.string().min(1, "وصف المصروف مطلوب."),
+  amount: z.preprocess((v) => parseFloat(String(v || '0')), z.number().positive("المبلغ مطلوب.")),
+  projectId: z.string().optional().nullable(),
+  clientId: z.string().optional().nullable(),
+});
+
+const reconciliationSchema = z.object({
+  date: z.date({ required_error: 'التاريخ مطلوب.' }),
+  employeeId: z.string().min(1, "الموظف مطلوب."),
+  items: z.array(itemSchema).min(1, 'يجب إضافة بند واحد على الأقل.'),
+  notes: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof reconciliationSchema>;
 
 interface PreviewFile {
     id: string;
@@ -45,8 +65,7 @@ interface PreviewFile {
 
 /**
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
- * - يتبنى نظام "كادر الرؤية الثنائي" (يظهر صورتين فقط والبقية بالتمرير).
- * - يحول بكرة الماوس العمودية إلى حركة أفقية انسيابية.
+ * يظهر صورتين فقط والبقية عبر التمرير بالبكرة أو الأزرار.
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -64,6 +83,7 @@ function SmartPhotoGallery({
     const handleWheel = (e: React.WheelEvent) => {
         if (scrollRef.current) {
             e.preventDefault();
+            // تحويل البكرة العمودية إلى حركة أفقية
             scrollRef.current.scrollLeft += e.deltaY;
         }
     };
@@ -477,7 +497,7 @@ export function CustodyReconciliationForm() {
                 </CardContent>
                 <CardFooter className="flex justify-between gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                     <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي في العهدة:</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي المتوقع:</Label>
                         <p className={cn("text-3xl font-black font-mono tracking-tight transition-colors", custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600")}>
                             {formatCurrency(custodyBalance - totalSpent)}
                         </p>
