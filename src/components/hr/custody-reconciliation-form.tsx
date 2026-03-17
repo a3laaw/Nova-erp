@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, PlusCircle, Trash2, Banknote, Camera, Info, History, ShieldCheck, Wallet, Target, User } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
@@ -32,7 +33,7 @@ import { Separator } from '../ui/separator';
 
 const itemSchema = z.object({
   description: z.string().min(1, "بيان المصروف مطلوب."),
-  amount: z.preprocess((v) => parseFloat(String(v || '0')), z.number().positive("المبلغ مطلوب")),
+  amount: z.preprocess((v) => parseFloat(String(v || '')), z.number().positive("المبلغ مطلوب")),
   projectId: z.string().optional().nullable(),
   clientId: z.string().optional().nullable(),
   file: z.any().optional(),
@@ -69,7 +70,7 @@ export function CustodyReconciliationForm() {
         defaultValues: {
             date: new Date(),
             employeeId: currentUser?.role !== 'Admin' ? currentUser?.employeeId : '',
-            items: [{ description: '', amount: 0, projectId: '', clientId: '' }],
+            items: [{ description: '', amount: '', projectId: '', clientId: '' } as any],
         }
     });
 
@@ -154,7 +155,7 @@ export function CustodyReconciliationForm() {
                         projectName: project?.projectName || null,
                         clientId: item.clientId || null,
                         clientName: client?.nameAr || null,
-                        attachmentUrl: '' // In real app, upload handles this outside transaction
+                        attachmentUrl: '' 
                     };
                 });
 
@@ -185,7 +186,7 @@ export function CustodyReconciliationForm() {
     };
 
     return (
-        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex items-center gap-4">
@@ -293,7 +294,7 @@ export function CustodyReconciliationForm() {
                                 </TableFooter>
                             </Table>
                         </div>
-                        <Button type="button" variant="outline" onClick={() => append({ description: '', amount: 0, projectId: '', clientId: '' })} disabled={isSaving} className="w-full h-14 border-dashed border-2 rounded-2xl gap-3 font-black text-primary hover:bg-primary/5 transition-all">
+                        <Button type="button" variant="outline" onClick={() => append({ description: '', amount: '', projectId: '', clientId: '' } as any)} disabled={isSaving} className="w-full h-14 border-dashed border-2 rounded-2xl gap-3 font-black text-primary hover:bg-primary/5 transition-all">
                             <PlusCircle className="h-6 w-6" /> إضافة فاتورة أخرى
                         </Button>
                     </div>
