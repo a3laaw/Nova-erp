@@ -508,36 +508,39 @@ export function BoqForm({
             </div>
           </Card>
 
-          {/* شريط الأوامر المدمج */}
+          {/* شريط الأوامر المدمج الرشيق */}
           <div className="pb-10 pt-4 flex justify-center">
-            <Card className="rounded-[3rem] border-none shadow-2xl glass-effect p-6 flex flex-row items-center justify-between gap-10 min-w-[60%]">
+            <Card className="rounded-full border-none shadow-2xl glass-effect py-3 px-8 flex flex-row items-center justify-between gap-8 min-w-[50%]">
               
-              <Button 
-                type="submit" 
-                disabled={isSaving} 
-                className="h-14 px-12 rounded-full font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all bg-[#7209B7] text-white gap-3 order-1"
-              >
-                {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
-                اعتماد وحفظ الجدول النهائي
-              </Button>
+              <div className="flex items-center gap-4">
+                <Button 
+                  type="submit" 
+                  disabled={isSaving} 
+                  className="h-10 px-8 rounded-full font-black text-sm shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all bg-[#7209B7] text-white gap-2"
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  اعتماد وحفظ الجدول النهائي
+                </Button>
 
-              <Button 
-                type="button" 
-                variant="ghost" 
-                onClick={onClose} 
-                disabled={isSaving} 
-                className="h-12 px-8 rounded-full font-black text-lg text-slate-600 hover:bg-white/20 order-2"
-              >
-                إلغاء التعديلات
-              </Button>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  onClick={onClose} 
+                  disabled={isSaving} 
+                  className="h-9 px-4 rounded-full font-bold text-xs text-slate-600 hover:bg-white/20"
+                >
+                  إلغاء التعديلات
+                </Button>
+              </div>
               
-              <div className="flex flex-col items-center gap-1 order-3">
+              <div className="flex items-center gap-3">
+                  <p className="text-[10px] font-black text-[#1e1b4b] text-right leading-none">
+                    تم حصر <br/>
+                    <span className="text-primary text-sm font-black">{fields.length} بنود</span>
+                  </p>
                   <div className="p-2 bg-primary/10 rounded-xl">
                     <Calculator className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-[10px] font-black text-[#1e1b4b] text-center">
-                    تم حصر <span className="text-primary text-base px-1">{fields.length}</span> بنود
-                  </p>
               </div>
 
             </Card>
