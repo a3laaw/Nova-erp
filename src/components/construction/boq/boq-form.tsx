@@ -247,12 +247,12 @@ const BoqItemRowRenderer = React.memo(
               {formatCurrency(branchTotal)}
             </div>
           </TableCell>
-          <TableCell className="px-2 border-r w-48">
+          <TableCell className="px-2 border-r w-40">
             <Textarea
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-[10px] min-h-[36px] bg-white border-none shadow-inner rounded-full px-3 py-2 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
+              className="text-[10px] min-h-[36px] bg-white border-none shadow-inner rounded-2xl px-3 py-2 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -380,17 +380,6 @@ export function BoqForm({
       <div className="space-y-0">
         <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-4">
           <div className="flex justify-between items-center max-w-full px-2 mx-auto">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner"><ListTree className="h-6 w-6" /></div>
-              <div>
-                <CardTitle className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-                    مُحرر جداول الكميات
-                    <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold">إدارة الحصر والتسعير المرجعي والبنود الفنية</CardDescription>
-              </div>
-            </div>
-            
             <div className="flex items-center gap-1 bg-white/50 p-1.5 rounded-full border shadow-sm">
                 <div className="bg-primary px-6 py-2.5 rounded-full flex flex-col items-center">
                     <span className="text-[8px] font-black text-white/70 uppercase tracking-widest leading-none">إجمالي المشروع</span>
@@ -404,6 +393,17 @@ export function BoqForm({
                     <div className="text-lg font-black text-slate-800 leading-none mt-1">{fields.length}</div>
                 </div>
             </div>
+
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <CardTitle className="text-xl font-black tracking-tight text-slate-900 flex items-center justify-end gap-2">
+                    مُحرر جداول الكميات
+                    <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold">إدارة الحصر والتسعير المرجعي والبنود الفنية</CardDescription>
+              </div>
+              <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner"><ListTree className="h-6 w-6" /></div>
+            </div>
           </div>
         </div>
 
@@ -416,17 +416,17 @@ export function BoqForm({
             </div>
 
             <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card border-slate-200">
-              <Table className="w-full border-collapse table-fixed">
-                <TableHeader className="bg-[#7209B7] text-white">
+              <Table className="w-full border-collapse">
+                <TableHeader className="bg-primary/10 text-primary">
                   <TableRow className="hover:bg-transparent border-none h-12">
-                    <TableHead className="text-center font-black text-[10px] uppercase text-white border-l border-white/10 w-10">م</TableHead>
-                    <TableHead className="font-black text-xs text-white px-4">بيان الأعمال التفصيلي</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-16">الوحدة</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-20">الكمية</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white border-l border-white/10 w-24">سعر الوحدة</TableHead>
-                    <TableHead className="text-left font-black text-xs text-white border-l border-white/10 w-28">الإجمالي</TableHead>
-                    <TableHead className="font-black text-xs text-white border-l border-white/10 w-48">ملاحظات</TableHead>
-                    <TableHead className="text-center font-black text-xs text-white w-16">إجراء</TableHead>
+                    <TableHead className="text-center font-black text-[10px] uppercase text-primary border-l border-primary/10 w-10">م</TableHead>
+                    <TableHead className="font-black text-xs text-primary px-4">بيان الأعمال التفصيلي</TableHead>
+                    <TableHead className="text-center font-black text-xs text-primary border-l border-primary/10 w-16">الوحدة</TableHead>
+                    <TableHead className="text-center font-black text-xs text-primary border-l border-primary/10 w-20">الكمية</TableHead>
+                    <TableHead className="text-center font-black text-xs text-primary border-l border-primary/10 w-24">سعر الوحدة</TableHead>
+                    <TableHead className="text-left font-black text-xs text-primary border-l border-primary/10 w-28">الإجمالي</TableHead>
+                    <TableHead className="font-black text-xs text-primary border-l border-primary/10 w-40">ملاحظات</TableHead>
+                    <TableHead className="text-center font-black text-xs text-primary w-16">إجراء</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
