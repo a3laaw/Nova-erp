@@ -20,7 +20,9 @@ import {
   Info,
   Package,
   FileCheck,
-  ChevronLeft
+  ChevronLeft,
+  X,
+  Check
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription, Card } from '@/components/ui/card';
@@ -185,24 +187,24 @@ const BoqItemRowRenderer = React.memo(
 
     return (
       <React.Fragment>
-        <TableRow className={cn('transition-colors border-b last:border-0 h-24', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/5')}>
-          <TableCell className="font-mono text-[10px] text-muted-foreground text-center border-l px-1 w-10">
+        <TableRow className={cn('transition-colors border-b last:border-0 h-auto', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/5')}>
+          <TableCell className="font-mono text-[9px] text-muted-foreground text-center border-l px-1 w-8">
             {wbs}
           </TableCell>
-          <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="px-4">
-            <div className="flex flex-col gap-2 py-2">
+          <TableCell style={{ paddingRight: `${level * 1.2}rem` }} className="px-2 py-1.5">
+            <div className="flex flex-col gap-1.5">
               <InlineSearchList
                 value={itemId || ''}
                 onSelect={handleMasterItemSelect}
                 options={masterItemsMap.get(parentReferenceId) || []}
-                placeholder={masterItemsLoading ? 'تحميل...' : 'بند مرجعي'}
-                className="bg-white/50 shadow-sm h-9 text-xs border-dashed rounded-xl"
+                placeholder={masterItemsLoading ? '...' : 'مرجع'}
+                className="bg-white/50 shadow-sm h-7 text-[10px] border-dashed rounded-lg"
               />
               <Textarea
                 {...register(`items.${node._index}.description`)}
-                placeholder="بيان الأعمال التفصيلي..."
+                placeholder="بيان الأعمال..."
                 rows={1}
-                className={cn('text-sm mt-0.5 min-h-[44px] bg-white rounded-xl shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-1 ring-destructive' : '')}
+                className={cn('text-[11px] leading-tight mt-0 min-h-[36px] bg-white rounded-lg shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-1 ring-destructive' : '')}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
@@ -211,52 +213,50 @@ const BoqItemRowRenderer = React.memo(
               />
             </div>
           </TableCell>
-          <TableCell className="px-1 w-20 text-center">
+          <TableCell className="px-1 w-16 text-center">
             {!isHeader ? (
-              <Input {...register(`items.${node._index}.unit`)} className="h-11 text-center bg-white text-xs font-black rounded-full border-none shadow-inner" placeholder="الوحدة" />
+              <Input {...register(`items.${node._index}.unit`)} className="h-8 text-center bg-white text-[10px] font-black rounded-lg border-none shadow-inner" placeholder="وحدة" />
             ) : (
               <span className="text-[10px] text-muted-foreground/40 font-black">-</span>
             )}
           </TableCell>
-          <TableCell className="px-1 w-24 text-center">
+          <TableCell className="px-1 w-20 text-center">
             {!isHeader ? (
               <Input 
                 type="number" 
                 step="any" 
                 {...register(`items.${node._index}.quantity`)} 
                 onWheel={(e) => e.currentTarget.blur()}
-                className="h-11 dir-ltr text-center font-mono text-lg font-black rounded-full border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                placeholder=""
+                className="h-8 dir-ltr text-center font-mono text-sm font-black rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
               />
             ) : (
-              <span className="text-base text-muted-foreground/40 font-black">-</span>
+              <span className="text-xs text-muted-foreground/40 font-black">-</span>
             )}
           </TableCell>
-          <TableCell className="px-1 w-28 text-center">
+          <TableCell className="px-1 w-24 text-center">
             {!isHeader ? (
               <Input 
                 type="number" 
                 step="0.001" 
                 {...register(`items.${node._index}.sellingUnitPrice`)} 
                 onWheel={(e) => e.currentTarget.blur()}
-                className="h-11 dir-ltr text-center font-mono text-sm font-black text-primary rounded-full border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                placeholder=""
+                className="h-8 dir-ltr text-center font-mono text-[11px] font-black text-primary rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
               />
             ) : (
               <span className="text-xs text-muted-foreground/40 font-black">-</span>
             )}
           </TableCell>
-          <TableCell className="text-left font-mono font-black border-r bg-muted/5 px-4 w-32">
-            <div className={cn('py-1 text-sm tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
+          <TableCell className="text-left font-mono font-black border-r bg-muted/5 px-3 w-28">
+            <div className={cn('py-1 text-[11px] tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
               {formatCurrency(branchTotal)}
             </div>
           </TableCell>
-          <TableCell className="px-4 border-r min-w-[200px]">
+          <TableCell className="px-2 border-r min-w-[150px]">
             <Textarea
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-xs min-h-[44px] bg-white border-none shadow-inner rounded-2xl px-4 py-3 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
+              className="text-[10px] min-h-[36px] bg-white border-none shadow-inner rounded-lg px-2 py-2 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -264,15 +264,15 @@ const BoqItemRowRenderer = React.memo(
               }}
             />
           </TableCell>
-          <TableCell className="text-center border-r px-1 w-20">
-            <div className="flex items-center justify-center gap-2">
+          <TableCell className="text-center border-r px-1 w-16">
+            <div className="flex items-center justify-center gap-1">
               {isHeader && (
-                <Button type="button" size="icon" variant="outline" className="h-9 w-9 rounded-full text-primary border-primary/20 hover:bg-primary/10 shadow-sm" onClick={() => handleAddClick(false)}>
-                  <PlusCircle className="h-5 w-5" />
+                <Button type="button" size="icon" variant="outline" className="h-7 w-7 rounded-lg text-primary border-primary/20 hover:bg-primary/10 shadow-sm" onClick={() => handleAddClick(false)}>
+                  <PlusCircle className="h-4 w-4" />
                 </Button>
               )}
-              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-full" onClick={() => onDelete(node._index)}>
-                <Trash2 className="h-5 w-5" />
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 rounded-lg" onClick={() => onDelete(node._index)}>
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </TableCell>
@@ -380,67 +380,63 @@ export function BoqForm({
   }, [watchedItems, remove]);
 
   return (
-    <div className="space-y-6 max-w-full mx-auto" dir="rtl">
-      {/* ✨ RECONSTRUCTED GLASS HEADER (MATCHING IMAGE) ✨ */}
-      <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect">
-        <div className="flex flex-col lg:flex-row justify-between items-center p-8 lg:p-10 gap-8">
-          
-          {/* Right Side: Title & Icon block (Match Image) */}
-          <div className="flex items-center gap-6 order-1 lg:order-2">
-            <div className="p-4 bg-primary/10 rounded-[1.5rem] text-primary shadow-inner border border-primary/20">
-              <ListTree className="h-10 w-10" />
+    <div className="space-y-4 max-w-full mx-auto" dir="rtl">
+      {/* العلوية المدمجة الرشيقة */}
+      <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
+        <div className="flex flex-col lg:flex-row justify-between items-center p-6 lg:px-8 lg:py-6 gap-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20">
+              <ListTree className="h-7 w-7" />
             </div>
             <div className="text-right">
-              <div className="flex items-center gap-3">
-                  <h1 className="text-4xl font-black tracking-tighter text-[#1e1b4b]">مُحرر جداول الكميات</h1>
-                  <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse shadow-[0_0_15px_rgba(34,197,94,0.8)]" />
+              <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-black tracking-tighter text-[#1e1b4b]">مُحرر المقايسة</h1>
+                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               </div>
-              <p className="text-sm font-black text-[#1e1b4b]/60 mt-1 uppercase tracking-widest">إدارة الحصر والتسعير المرجعي والبنود الفنية</p>
+              <p className="text-[10px] font-black text-[#1e1b4b]/60 mt-0.5 uppercase tracking-widest">الحصر والتسعير</p>
             </div>
           </div>
 
-          {/* Left Side: The Smart Pill Stats Box (Match Image) */}
-          <div className="flex items-center gap-0 bg-white/40 p-1.5 rounded-full border border-white/60 shadow-xl order-2 lg:order-1 group">
-              <div className="bg-[#7209B7] px-10 py-4 rounded-full flex flex-col items-center shadow-2xl transition-all group-hover:brightness-110">
-                  <span className="text-[10px] font-black text-white/80 uppercase tracking-[0.2em] leading-none mb-1.5">إجمالي المشروع</span>
-                  <div className="text-3xl font-black text-white font-mono leading-none flex items-baseline">
-                      <span className="text-xs ml-2 opacity-70 font-normal">KWD</span>
+          <div className="flex items-center gap-0 bg-white/40 p-1 rounded-full border border-white/60 shadow-lg group">
+              <div className="bg-[#7209B7] px-6 py-2.5 rounded-full flex flex-col items-center shadow-xl transition-all group-hover:brightness-110">
+                  <span className="text-[8px] font-black text-white/80 uppercase tracking-widest leading-none mb-1">الإجمالي</span>
+                  <div className="text-xl font-black text-white font-mono leading-none flex items-baseline">
+                      <span className="text-[9px] ml-1 opacity-70 font-normal">KWD</span>
                       {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 3 })}
                   </div>
               </div>
-              <div className="px-10 py-4 flex flex-col items-center border-r border-slate-900/10">
-                  <span className="text-[10px] font-black text-[#1e1b4b]/50 uppercase tracking-[0.2em] leading-none mb-1.5">عدد البنود</span>
-                  <div className="text-3xl font-black text-[#1e1b4b] leading-none">{fields.length}</div>
+              <div className="px-6 py-2.5 flex flex-col items-center border-r border-slate-900/10">
+                  <span className="text-[8px] font-black text-[#1e1b4b]/50 uppercase tracking-widest leading-none mb-1">البنود</span>
+                  <div className="text-xl font-black text-[#1e1b4b] leading-none">{fields.length}</div>
               </div>
           </div>
         </div>
       </Card>
 
       <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
-        <div className="space-y-8">
-          {/* Global Info Section */}
-          <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="grid gap-3">
-                <Label className="font-black text-xs text-slate-900/60 uppercase pr-2">اسم / مرجع الجدول *</Label>
-                <Input className="h-14 text-lg font-black rounded-[1.5rem] border-2 bg-white/80 shadow-inner border-primary/10" {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" />
-                {errors.name && <p className="text-xs text-red-600 font-bold px-2">{errors.name.message}</p>}
+        <div className="space-y-4">
+          {/* بيانات المشروع المختصرة */}
+          <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid gap-1.5">
+                <Label className="text-[10px] font-black text-slate-900/60 uppercase pr-1">الاسم / المرجع *</Label>
+                <Input className="h-10 text-sm font-black rounded-xl border-2 bg-white/80 shadow-inner border-primary/10" {...register('name')} placeholder="اسم الجدول..." />
               </div>
-              <div className="grid gap-3">
-                <Label className="font-black text-xs text-slate-900/60 uppercase pr-2">العميل (المحتمل)</Label>
-                <Input className="h-14 text-lg font-black rounded-[1.5rem] border-2 bg-white/80 shadow-inner border-primary/10" {...register('clientName')} placeholder="أدخل اسم العميل..." />
+              <div className="grid gap-1.5">
+                <Label className="text-[10px] font-black text-slate-900/60 uppercase pr-1">العميل</Label>
+                <Input className="h-10 text-sm font-black rounded-xl border-2 bg-white/80 shadow-inner border-primary/10" {...register('clientName')} placeholder="اسم العميل..." />
               </div>
-              <div className="grid gap-3">
-                <Label className="font-black text-xs text-slate-900/60 uppercase pr-2">الحالة التعاقدية</Label>
+              <div className="grid gap-1.5">
+                <Label className="text-[10px] font-black text-slate-900/60 uppercase pr-1">الحالة</Label>
                 <Controller name="status" control={control} render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="h-14 rounded-[1.5rem] border-2 bg-white/80 shadow-inner font-black text-lg border-primary/10">
+                    <SelectTrigger className="h-10 rounded-xl border-2 bg-white/80 shadow-inner font-black text-sm border-primary/10">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent dir="rtl" className="rounded-2xl shadow-2xl border-none">
-                      <SelectItem value="تقديري">تقديري (Estimate)</SelectItem>
-                      <SelectItem value="تعاقدي">تعاقدي (Contractual)</SelectItem>
-                      <SelectItem value="منفذ">منفذ (Executed)</SelectItem>
+                    <SelectContent dir="rtl" className="rounded-xl shadow-2xl border-none">
+                      <SelectItem value="تقديري">تقديري</SelectItem>
+                      <SelectItem value="تعاقدي">تعاقدي</SelectItem>
+                      <SelectItem value="منفذ">منفذ</SelectItem>
                     </SelectContent>
                   </Select>
                 )}/>
@@ -448,29 +444,28 @@ export function BoqForm({
             </div>
           </Card>
 
-          {/* ✨ GIGANT CRYSTAL TABLE ✨ */}
-          <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect">
+          {/* الجدول المجهري البانورامي */}
+          <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
             <Table className="w-full border-collapse">
               <TableHeader className="bg-primary/10">
-                <TableRow className="hover:bg-transparent border-none h-16">
-                  <TableHead className="text-center font-black text-xs uppercase border-l border-white/20 w-12 text-primary">م</TableHead>
-                  <TableHead className="font-black text-sm px-6 text-primary">بيان الأعمال التفصيلي</TableHead>
-                  <TableHead className="text-center font-black text-sm border-l border-white/20 w-24 text-primary">الوحدة</TableHead>
-                  <TableHead className="text-center font-black text-sm border-l border-white/20 w-28 text-primary">الكمية</TableHead>
-                  <TableHead className="text-center font-black text-sm border-l border-white/20 w-32 text-primary">سعر الوحدة</TableHead>
-                  <TableHead className="text-left font-black text-sm border-l border-white/20 w-40 text-primary">الإجمالي</TableHead>
-                  <TableHead className="font-black text-sm border-l border-white/20 w-full min-w-[300px] text-primary">ملاحظات إجرائية</TableHead>
-                  <TableHead className="text-center font-black text-sm w-24 text-primary">إجراء</TableHead>
+                <TableRow className="hover:bg-transparent border-none h-12">
+                  <TableHead className="text-center font-black text-[10px] uppercase border-l border-white/20 w-8 text-primary">م</TableHead>
+                  <TableHead className="font-black text-xs px-4 text-primary">بيان الأعمال التفصيلي</TableHead>
+                  <TableHead className="text-center font-black text-xs border-l border-white/20 w-16 text-primary">وحدة</TableHead>
+                  <TableHead className="text-center font-black text-xs border-l border-white/20 w-20 text-primary">كمية</TableHead>
+                  <TableHead className="text-center font-black text-xs border-l border-white/20 w-24 text-primary">السعر</TableHead>
+                  <TableHead className="text-left font-black text-xs border-l border-white/20 w-28 text-primary">الإجمالي</TableHead>
+                  <TableHead className="font-black text-xs border-l border-white/20 w-full min-w-[200px] text-primary">ملاحظات</TableHead>
+                  <TableHead className="text-center font-black text-xs w-16 text-primary">إجراء</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {boqTree.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-80 text-center">
-                      <div className="flex flex-col items-center justify-center gap-6 opacity-30">
-                        <Package className="h-20 w-20 text-slate-400" />
-                        <p className="text-2xl font-black text-slate-900">الجدول فارغ حالياً.</p>
-                        <p className="text-sm font-bold">ابدأ بإضافة قسم رئيسي جديد.</p>
+                    <TableCell colSpan={8} className="h-64 text-center">
+                      <div className="flex flex-col items-center justify-center gap-4 opacity-30">
+                        <Package className="h-12 w-12 text-slate-400" />
+                        <p className="text-lg font-black text-slate-900">الجدول فارغ.</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -497,55 +492,56 @@ export function BoqForm({
               </TableBody>
             </Table>
 
-            <div className="p-12 flex justify-center border-t border-white/20 bg-muted/5">
+            <div className="p-8 flex justify-center border-t border-white/20 bg-muted/5">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleAddRootSection}
-                className="h-16 px-16 rounded-3xl border-2 border-dashed border-primary/40 bg-white/20 hover:bg-primary/5 hover:border-primary transition-all font-black text-xl text-primary gap-3 group shadow-xl"
+                className="h-12 px-12 rounded-2xl border-2 border-dashed border-primary/40 bg-white/20 hover:bg-primary/5 hover:border-primary transition-all font-black text-lg text-primary gap-2 group shadow-lg"
               >
-                <PlusCircle className="h-7 w-7 group-hover:scale-110 transition-transform" />
-                إضافة قسم رئيسي جديد (WBS)
+                <PlusCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                إضافة قسم رئيسي
               </Button>
             </div>
           </Card>
 
-          {/* ✨ ACTION BAR (INSIDE MAIN SCREEN, NON-FIXED) ✨ */}
-          <div className="pb-20">
-            <Card className="rounded-[3rem] border-none shadow-2xl glass-effect p-8 flex flex-col md:flex-row justify-between items-center gap-8">
-              <div className="flex items-center gap-6 bg-white/40 px-8 py-4 rounded-full border border-white/60 shadow-inner">
-                <Calculator className="h-6 w-6 text-primary" />
-                <span className="text-slate-900 font-black text-lg">تم حصر وتثمين {fields.length} بنود بدقة تامة</span>
-              </div>
+          {/* شريط الأوامر المدمج (محاكاة الصورة المرجعية) */}
+          <div className="pb-10 pt-4 flex justify-center">
+            <Card className="rounded-[3.5rem] border-none shadow-2xl glass-effect p-4 flex flex-row items-center gap-10 min-w-[800px] justify-between">
               
-              <div className="flex items-center gap-4 w-full md:w-auto">
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  onClick={onClose} 
-                  disabled={isSaving} 
-                  className="h-16 px-12 rounded-3xl font-black text-xl text-slate-600 hover:bg-white/20"
-                >
-                  إلغاء التعديلات
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSaving} 
-                  className="h-16 px-20 rounded-[2rem] font-black text-2xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all min-w-[350px] bg-[#7209B7] text-white gap-4"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                      جاري الحفظ...
-                    </>
-                  ) : (
-                    <>
-                      <FileCheck className="h-8 w-8" />
-                      اعتماد وحفظ الجدول النهائي
-                    </>
-                  )}
-                </Button>
+              {/* جهة اليمين: زر الاعتماد (بناءً على RTL - البنفسجي البيضاوي) */}
+              <Button 
+                type="submit" 
+                disabled={isSaving} 
+                className="h-14 px-16 rounded-full font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all bg-[#7209B7] text-white gap-3 order-1"
+              >
+                {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileCheck className="h-6 w-6" />}
+                اعتماد وحفظ الجدول النهائي
+              </Button>
+
+              {/* المنتصف: زر الإلغاء */}
+              <Button 
+                type="button" 
+                variant="ghost" 
+                onClick={onClose} 
+                disabled={isSaving} 
+                className="h-12 px-8 rounded-full font-black text-lg text-slate-600 hover:bg-white/20 order-2"
+              >
+                إلغاء التعديلات
+              </Button>
+              
+              {/* جهة اليسار: كبسولة الإحصاء المستديرة (The Stats Bubble) */}
+              <div className="h-[120px] w-[120px] rounded-full border border-white/60 bg-white/40 shadow-inner flex flex-col items-center justify-center text-center p-4 order-3 group hover:scale-105 transition-all">
+                  <div className="p-1.5 bg-primary/10 rounded-lg mb-1">
+                    <Calculator className="h-3 w-3 text-primary" />
+                  </div>
+                  <p className="text-[10px] font-black text-[#1e1b4b] leading-tight">
+                    تم حصر وتثمين <br/>
+                    <span className="text-lg text-primary">{fields.length}</span> <br/>
+                    بنود بدقة تامة
+                  </p>
               </div>
+
             </Card>
           </div>
         </div>
