@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -18,16 +17,12 @@ import {
   Trash2,
   ListTree,
   Calculator,
-  Info,
-  Package,
-  FileCheck,
-  ChevronLeft,
   X,
-  Check,
-  AlertTriangle
+  AlertTriangle,
+  Package
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { CardTitle, CardContent, CardDescription, Card } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import {
   Select,
@@ -44,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import type {
   Control,
   UseFormRegister,
@@ -68,8 +63,8 @@ export const itemSchema = z.object({
   itemNumber: z.string().optional(),
   description: z.string().min(1, 'الوصف مطلوب.'),
   unit: z.string().optional(),
-  quantity: z.preprocess((v) => (v === '' || v === null ? undefined : parseFloat(String(v))), z.number().min(0).optional()),
-  sellingUnitPrice: z.preprocess((v) => (v === '' || v === null ? undefined : parseFloat(String(v))), z.number().min(0).optional()),
+  quantity: z.preprocess((v) => (v === '' || v === null ? 0 : parseFloat(String(v))), z.number().min(0)),
+  sellingUnitPrice: z.preprocess((v) => (v === '' || v === null ? 0 : parseFloat(String(v))), z.number().min(0)),
   notes: z.string().optional(),
   parentId: z.string().nullable(),
   level: z.number(),
@@ -127,24 +122,17 @@ const BoqItemRowRenderer = React.memo(
     const itemId = useWatch({ control, name: `items.${node._index}.itemId` });
 
     const branchTotal = React.useMemo(() => {
-      if (!isHeader) {
-        return (Number(quantity) || 0) * (Number(price) || 0);
-      }
-
+      if (!isHeader) return (Number(quantity) || 0) * (Number(price) || 0);
       const sumBranch = (parentUid: string): number => {
         let total = 0;
         watchedItems.forEach((item) => {
           if (item.parentId === parentUid) {
-            if (item.isHeader) {
-              total += sumBranch(item.uid);
-            } else {
-              total += (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
-            }
+            if (item.isHeader) total += sumBranch(item.uid);
+            else total += (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
           }
         });
         return total;
       };
-
       return sumBranch(node.uid);
     }, [isHeader, quantity, price, watchedItems, node.uid]);
 
@@ -167,11 +155,8 @@ const BoqItemRowRenderer = React.memo(
       (parentIndex: number): number => {
         let lastIndex = parentIndex;
         for (let i = parentIndex + 1; i < watchedItems.length; i++) {
-          if (watchedItems[i].parentId === watchedItems[parentIndex].uid) {
-            lastIndex = findLastDescendantIndex(i);
-          } else if (watchedItems[i].level <= watchedItems[parentIndex].level) {
-            break;
-          }
+          if (watchedItems[i].parentId === watchedItems[parentIndex].uid) lastIndex = findLastDescendantIndex(i);
+          else if (watchedItems[i].level <= watchedItems[parentIndex].level) break;
         }
         return lastIndex;
       },
@@ -190,11 +175,11 @@ const BoqItemRowRenderer = React.memo(
 
     return (
       <React.Fragment>
-        <TableRow className={cn('transition-colors border-b last:border-0 h-auto', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/5')}>
-          <TableCell className="font-mono text-[9px] text-muted-foreground text-center border-l px-1 w-8">
+        <TableRow className={cn('transition-colors border-b last:border-0 h-auto', isHeader ? 'bg-muted/40 font-bold' : 'hover:bg-muted/5')}>
+          <TableCell className="font-mono text-[9px] text-muted-foreground text-center border-l px-1 w-10">
             {wbs}
           </TableCell>
-          <TableCell style={{ paddingRight: `${level * 1.2}rem` }} className="px-2 py-1.5">
+          <TableCell style={{ paddingRight: `${level * 1.2}rem` }} className="px-2 py-1.5 min-w-[300px]">
             <div className="flex flex-col gap-1.5">
               <InlineSearchList
                 value={itemId || ''}
@@ -207,7 +192,7 @@ const BoqItemRowRenderer = React.memo(
                 {...register(`items.${node._index}.description`)}
                 placeholder="بيان الأعمال..."
                 rows={1}
-                className={cn('text-[11px] leading-tight mt-0 min-h-[36px] bg-white rounded-lg shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-2 ring-destructive' : '')}
+                className={cn('text-[11px] leading-tight bg-white rounded-lg shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-2 ring-destructive' : '')}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
@@ -219,38 +204,20 @@ const BoqItemRowRenderer = React.memo(
           <TableCell className="px-1 w-16 text-center">
             {!isHeader ? (
               <Input {...register(`items.${node._index}.unit`)} className="h-8 text-center bg-white text-[10px] font-black rounded-lg border-none shadow-inner" placeholder="وحدة" />
-            ) : (
-              <span className="text-[10px] text-muted-foreground/40 font-black">-</span>
-            )}
+            ) : <span className="text-[10px] text-muted-foreground/40 font-black">-</span>}
           </TableCell>
           <TableCell className="px-1 w-20 text-center">
             {!isHeader ? (
-              <Input 
-                type="number" 
-                step="any" 
-                {...register(`items.${node._index}.quantity`)} 
-                onWheel={(e) => e.currentTarget.blur()}
-                className="h-8 dir-ltr text-center font-mono text-sm font-black rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-              />
-            ) : (
-              <span className="text-xs text-muted-foreground/40 font-black">-</span>
-            )}
+              <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} onWheel={(e) => e.currentTarget.blur()} className="h-8 dir-ltr text-center font-mono text-sm font-black rounded-lg border-none bg-white shadow-inner" />
+            ) : <span className="text-xs text-muted-foreground/40 font-black">-</span>}
           </TableCell>
           <TableCell className="px-1 w-24 text-center">
             {!isHeader ? (
-              <Input 
-                type="number" 
-                step="0.001" 
-                {...register(`items.${node._index}.sellingUnitPrice`)} 
-                onWheel={(e) => e.currentTarget.blur()}
-                className="h-8 dir-ltr text-center font-mono text-[11px] font-black text-primary rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-              />
-            ) : (
-              <span className="text-xs text-muted-foreground/40 font-black">-</span>
-            )}
+              <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} onWheel={(e) => e.currentTarget.blur()} className="h-8 dir-ltr text-center font-mono text-[11px] font-black text-primary rounded-lg border-none bg-white shadow-inner" />
+            ) : <span className="text-xs text-muted-foreground/40 font-black">-</span>}
           </TableCell>
-          <TableCell className="text-left font-mono font-black border-r bg-muted/5 px-3 w-28">
-            <div className={cn('py-1 text-[11px] tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
+          <TableCell className="text-left font-mono font-black border-r bg-muted/5 px-3 w-32">
+            <div className={cn('py-1 text-[11px] truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
               {formatCurrency(branchTotal)}
             </div>
           </TableCell>
@@ -259,7 +226,7 @@ const BoqItemRowRenderer = React.memo(
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-[10px] min-h-[30px] bg-white border-none shadow-inner rounded-full px-4 py-1.5 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
+              className="text-[10px] min-h-[30px] bg-white border-none shadow-inner rounded-full px-4 py-1.5 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -270,11 +237,11 @@ const BoqItemRowRenderer = React.memo(
           <TableCell className="text-center border-r px-1 w-16">
             <div className="flex items-center justify-center gap-1">
               {isHeader && (
-                <Button type="button" size="icon" variant="outline" className="h-7 w-7 rounded-lg text-primary border-primary/20 hover:bg-primary/10 shadow-sm" onClick={() => handleAddClick(false)}>
+                <Button type="button" size="icon" variant="outline" className="h-7 w-7 rounded-lg text-primary border-primary/20" onClick={() => handleAddClick(false)}>
                   <PlusCircle className="h-4 w-4" />
                 </Button>
               )}
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10 rounded-lg" onClick={() => onDelete(node._index)}>
+              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-lg" onClick={() => onDelete(node._index)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -362,13 +329,13 @@ export function BoqForm({
   }, [watchedItems]);
 
   const handleAddRootSection = React.useCallback(() => {
-    append({ uid: generateStableId(), description: '', unit: '', quantity: undefined as any, sellingUnitPrice: undefined as any, parentId: null, level: 0, isHeader: true, itemId: '' });
+    append({ uid: generateStableId(), description: '', unit: '', quantity: 0, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '' });
   }, [append]);
 
   const handleAddItem = React.useCallback((parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
     const parentItem = watchedItems?.find((f: any) => f.uid === parentId);
     const parentLevel = parentItem ? parentItem.level : -1;
-    insert(insertAtIndex, { uid: generateStableId(), description: '', unit: isHeader ? '' : 'مقطوعية', quantity: undefined as any, sellingUnitPrice: undefined as any, parentId: parentId, level: parentLevel + 1, isHeader: isHeader, itemId: '' });
+    insert(insertAtIndex, { uid: generateStableId(), description: '', unit: isHeader ? '' : 'مقطوعية', quantity: 0, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1, isHeader: isHeader, itemId: '' });
   }, [watchedItems, insert]);
 
   const handleDelete = React.useCallback((index: number) => {
@@ -386,28 +353,21 @@ export function BoqForm({
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!handleSubmit || !onSubmit) return;
-
     handleSubmit(onSubmit, (err: any) => {
-        console.error("BOQ Validation Errors:", err);
-        toast({
-            variant: 'destructive',
-            title: 'فشل التحقق من البيانات',
-            description: 'يرجى مراجعة البنود، تأكد من وجود وصف لجميع الأسطر وأن جميع القيم صحيحة.',
-        });
+        console.error("Validation Error:", err);
+        toast({ variant: 'destructive', title: 'بيانات غير مكتملة', description: 'يرجى مراجعة بيان الأعمال والتأكد من إدخال الوصف لجميع البنود.' });
     })(e);
   };
 
   return (
-    <div className="space-y-4 w-full px-1" dir="rtl">
+    <div className="space-y-4 w-full" dir="rtl">
       <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
-        <div className="flex flex-col lg:flex-row justify-between items-center p-6 lg:px-8 lg:py-6 gap-6">
+        <div className="flex flex-col lg:flex-row justify-between items-center p-6 lg:px-8 gap-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20">
-              <ListTree className="h-7 w-7" />
-            </div>
+            <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20"><ListTree className="h-7 w-7" /></div>
             <div className="text-right">
               <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tighter text-[#1e1b4b]">مُحرر المقايسة</h1>
+                  <h1 className="text-2xl font-black text-[#1e1b4b]">مُحرر المقايسة</h1>
                   <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
               </div>
               <p className="text-[10px] font-black text-[#1e1b4b]/60 mt-0.5 uppercase tracking-widest">إدارة الحصر والتسعير المرجعي</p>
@@ -436,19 +396,17 @@ export function BoqForm({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="grid gap-1.5">
                 <Label className="text-[10px] font-black text-slate-900/60 uppercase pr-1">الاسم / المرجع *</Label>
-                <Input className="h-10 text-sm font-black rounded-xl border-2 bg-white/80 shadow-inner border-primary/10" {...register('name')} placeholder="اسم الجدول..." />
+                <Input className="h-10 text-sm font-black rounded-xl border-2 bg-white/80 shadow-inner border-primary/10" {...register('name')} />
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-[10px] font-black text-slate-900/60 uppercase pr-1">العميل</Label>
-                <Input className="h-10 text-sm font-black rounded-xl border-2 bg-white/80 shadow-inner border-primary/10" {...register('clientName')} placeholder="اسم العميل..." />
+                <Input className="h-10 text-sm font-black rounded-xl border-2 bg-white/80 shadow-inner border-primary/10" {...register('clientName')} />
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-[10px] font-black text-slate-900/60 uppercase pr-1">الحالة</Label>
                 <Controller name="status" control={control} render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="h-10 rounded-xl border-2 bg-white/80 shadow-inner font-black text-sm border-primary/10">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-10 rounded-xl border-2 bg-white/80 shadow-inner font-black text-sm border-primary/10"><SelectValue /></SelectTrigger>
                     <SelectContent dir="rtl" className="rounded-xl shadow-2xl border-none">
                       <SelectItem value="تقديري">تقديري</SelectItem>
                       <SelectItem value="تعاقدي">تعاقدي</SelectItem>
@@ -464,26 +422,19 @@ export function BoqForm({
             <Table className="w-full border-collapse table-fixed">
               <TableHeader className="bg-primary/5">
                 <TableRow className="hover:bg-transparent border-none h-12">
-                  <TableHead className="text-center font-black text-[10px] uppercase border-l border-white/20 w-8 text-primary">م</TableHead>
+                  <TableHead className="text-center font-black text-[10px] uppercase border-l border-white/20 w-10 text-primary">م</TableHead>
                   <TableHead className="font-black text-xs px-4 text-primary">بيان الأعمال التفصيلي</TableHead>
                   <TableHead className="text-center font-black text-xs border-l border-white/20 w-16 text-primary">وحدة</TableHead>
                   <TableHead className="text-center font-black text-xs border-l border-white/20 w-20 text-primary">كمية</TableHead>
                   <TableHead className="text-center font-black text-xs border-l border-white/20 w-24 text-primary">السعر</TableHead>
-                  <TableHead className="text-left font-black text-xs border-l border-white/20 w-28 text-primary">الإجمالي</TableHead>
-                  <TableHead className="font-black text-xs border-l border-white/20 w-40 text-primary">ملاحظات</TableHead>
+                  <TableHead className="text-left font-black text-xs border-l border-white/20 w-32 text-primary">الإجمالي</TableHead>
+                  <TableHead className="font-black text-xs border-l border-white/20 w-48 text-primary">ملاحظات</TableHead>
                   <TableHead className="text-center font-black text-xs w-16 text-primary">إجراء</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {boqTree.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-64 text-center">
-                      <div className="flex flex-col items-center justify-center gap-4 opacity-30">
-                        <Package className="h-12 w-12 text-slate-400" />
-                        <p className="text-lg font-black text-slate-900">الجدول فارغ.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={8} className="h-64 text-center opacity-30"><Package className="h-12 w-12 mx-auto mb-2" /><p className="font-black">الجدول فارغ.</p></TableCell></TableRow>
                 ) : (
                   boqTree.map((node, index) => (
                     <BoqItemRowRenderer
@@ -512,48 +463,25 @@ export function BoqForm({
                 type="button"
                 variant="outline"
                 onClick={handleAddRootSection}
-                className="h-12 px-12 rounded-2xl border-2 border-dashed border-primary/40 bg-white/20 hover:bg-primary/5 hover:border-primary transition-all font-black text-lg text-primary gap-2 group shadow-lg"
+                className="h-12 px-12 rounded-2xl border-2 border-dashed border-primary/40 bg-white/20 hover:bg-primary/5 hover:border-primary transition-all font-black text-lg text-primary gap-2"
               >
-                <PlusCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                إضافة قسم رئيسي
+                <PlusCircle className="h-5 w-5" /> إضافة قسم رئيسي
               </Button>
             </div>
           </Card>
 
           <div className="pb-10 pt-4 flex justify-center">
-            <Card className="rounded-full border-none shadow-2xl glass-effect py-3 px-8 flex flex-row items-center justify-between gap-8 min-w-[50%]">
-              
+            <Card className="rounded-full border-none shadow-2xl glass-effect py-3 px-8 flex items-center justify-between gap-8 min-w-[50%]">
               <div className="flex items-center gap-4">
-                <Button 
-                  type="submit" 
-                  disabled={isSaving} 
-                  className="h-10 px-8 rounded-full font-black text-sm shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all bg-[#7209B7] text-white gap-2"
-                >
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  اعتماد وحفظ الجدول النهائي
+                <Button type="submit" disabled={isSaving} className="h-10 px-8 rounded-full font-black text-sm shadow-xl bg-[#7209B7] text-white gap-2">
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} اعتماد وحفظ
                 </Button>
-
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  onClick={onClose} 
-                  disabled={isSaving} 
-                  className="h-9 px-4 rounded-full font-bold text-xs text-slate-600 hover:bg-white/20"
-                >
-                  إلغاء التعديلات
-                </Button>
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-9 px-4 rounded-full font-bold text-xs text-slate-600 hover:bg-white/20">إلغاء</Button>
               </div>
-              
               <div className="flex items-center gap-3">
-                  <p className="text-[10px] font-black text-[#1e1b4b] text-right leading-none">
-                    تم حصر <br/>
-                    <span className="text-primary text-sm font-black">{fields.length} بنود</span>
-                  </p>
-                  <div className="p-2 bg-primary/10 rounded-xl">
-                    <Calculator className="h-4 w-4 text-primary" />
-                  </div>
+                  <p className="text-[10px] font-black text-[#1e1b4b] text-right leading-none">تم حصر <br/><span className="text-primary text-sm font-black">{fields.length} بنود</span></p>
+                  <div className="p-2 bg-primary/10 rounded-xl"><Calculator className="h-4 w-4 text-primary" /></div>
               </div>
-
             </Card>
           </div>
         </div>

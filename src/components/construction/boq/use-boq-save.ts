@@ -109,7 +109,7 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
           uid: generateStableId(),
           description: '',
           unit: 'مقطوعية',
-          quantity: 1,
+          quantity: 0,
           sellingUnitPrice: 0,
           parentId: null,
           level: 0,
@@ -189,40 +189,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { cancelled = true; };
   }, [mode, firestore, boqId, router, toast, form]);
 
-  useEffect(() => {
-    if (mode !== 'create') return;
-
-    const copiedDataString = sessionStorage.getItem('copiedBoqData');
-    if (!copiedDataString) return;
-
-    try {
-      const copiedData = JSON.parse(copiedDataString);
-      const oldToNewUid = new Map<string, string>();
-
-      const itemsWithNewUids = (copiedData.items || []).map((item: any) => {
-        const newUid = generateStableId();
-        oldToNewUid.set(item.uid, newUid);
-        return { ...item, uid: newUid };
-      });
-
-      const remappedItems = itemsWithNewUids.map((item: any) => ({
-        ...item,
-        parentId: item.parentId ? (oldToNewUid.get(item.parentId) || null) : null
-      }));
-
-      form.reset({
-        ...copiedData,
-        items: remappedItems,
-      });
-
-      toast({ title: 'تم النسخ بنجاح', description: 'تم استنساخ الجدول مع الحفاظ على الهيكل الشجري.' });
-    } catch (error) {
-      console.error('Failed to reconstruct copied BOQ:', error);
-    } finally {
-      sessionStorage.removeItem('copiedBoqData');
-    }
-  }, [mode, form, toast]);
-
   const onSubmit = async (data: BoqFormValues) => {
     if (!firestore || !currentUser) return;
     setIsSaving(true);
@@ -290,7 +256,7 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
         originalItemIdsRef.current.forEach(oldId => {
           if (!currentUids.has(oldId)) {
             operations.push((batch) => {
-              batch.delete(doc(firestore, `boqs/${boqId}/items`, oldId));
+              batch.delete(doc(firestore, `boqs/${targetBoqId}/items`, oldId));
             });
           }
         });
@@ -307,11 +273,10 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
       await commitInChunks(firestore, operations);
       toast({ title: 'نجاح', description: 'تم حفظ جدول الكميات بنجاح.' });
       router.push(`/dashboard/construction/boq/${targetBoqId}`);
-      // Note: isSaving is NOT reset here to prevent double-click during navigation. unmount will handle it.
     } catch (error: any) {
       console.error(`❌ Save failed:`, error);
       toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'حدث خطأ غير متوقع.' });
-      if (mountedRef.current) setIsSaving(false); // Only reset on error to allow retry
+      if (mountedRef.current) setIsSaving(false);
     }
   };
 
