@@ -119,23 +119,18 @@ const BoqItemRowRenderer = React.memo(
     const isHeader = useWatch({ control, name: `items.${node._index}.isHeader` });
     const itemId = useWatch({ control, name: `items.${node._index}.itemId` });
 
-    // ✨ محرك الجمع التراكمي للهيكل الشجري (Hierarchical Summation)
     const branchTotal = React.useMemo(() => {
-      // إذا لم يكن قسماً رئيسياً، نحسب قيمة السطر نفسه
       if (!isHeader) {
         return (Number(quantity) || 0) * (Number(price) || 0);
       }
 
-      // إذا كان قسماً رئيسياً، نقوم بجمع كافة الأبناء (الذين ليسوا أقساماً) التابعين لهذا الفرع
       const sumBranch = (parentUid: string): number => {
         let total = 0;
         watchedItems.forEach((item) => {
           if (item.parentId === parentUid) {
             if (item.isHeader) {
-              // نجمع الأقسام الفرعية بشكل تكراري
               total += sumBranch(item.uid);
             } else {
-              // نجمع البنود النهائية فقط
               total += (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
             }
           }
@@ -214,14 +209,26 @@ const BoqItemRowRenderer = React.memo(
               />
             </div>
           </TableCell>
-          <TableCell className="px-1 w-16">
-            <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background text-[10px] font-bold rounded-lg border-none shadow-inner" disabled={isHeader} placeholder="الوحدة" />
+          <TableCell className="px-1 w-16 text-center">
+            {!isHeader ? (
+              <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background text-[10px] font-bold rounded-lg border-none shadow-inner" placeholder="الوحدة" />
+            ) : (
+              <span className="text-[10px] text-muted-foreground/40 font-black">-</span>
+            )}
           </TableCell>
-          <TableCell className="px-1 w-20">
-            <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner" disabled={isHeader} />
+          <TableCell className="px-1 w-20 text-center">
+            {!isHeader ? (
+              <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner" />
+            ) : (
+              <span className="text-base text-muted-foreground/40 font-black">-</span>
+            )}
           </TableCell>
-          <TableCell className="px-1 w-24">
-            <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-9 dir-ltr text-center font-mono text-xs font-black text-primary rounded-lg border-none bg-white shadow-inner" disabled={isHeader} />
+          <TableCell className="px-1 w-24 text-center">
+            {!isHeader ? (
+              <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-9 dir-ltr text-center font-mono text-xs font-black text-primary rounded-lg border-none bg-white shadow-inner" />
+            ) : (
+              <span className="text-xs text-muted-foreground/40 font-black">-</span>
+            )}
           </TableCell>
           <TableCell className="text-left font-mono font-black border-r bg-muted/10 px-2 w-28">
             <div className={cn('py-1 text-xs tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
