@@ -215,9 +215,9 @@ export interface Employee extends BaseEntity {
     profilePicture?: string;
     hireDate: any;
     residencyExpiry?: any;
-    passportExpiry?: any;        // حقل جديد
-    drivingLicenseExpiry?: any;  // حقل جديد
-    healthCardExpiry?: any;      // حقل جديد
+    passportExpiry?: any;
+    drivingLicenseExpiry?: any;
+    healthCardExpiry?: any;
     dob?: any;
     terminationDate?: any;
     terminationReason?: string;
@@ -240,6 +240,24 @@ export interface Employee extends BaseEntity {
     targetDescription?: number;
     pieceRate?: number;
     dailyRate?: number;
+}
+
+export interface CustodyReconciliation extends BaseEntity {
+    reconciliationNumber: string;
+    employeeId: string;
+    employeeName: string;
+    date: Timestamp | any;
+    totalAmount: number;
+    items: {
+        description: string;
+        amount: number;
+        category: string; // expense account id
+        categoryName: string;
+        attachmentUrl?: string;
+    }[];
+    status: 'pending' | 'approved' | 'rejected';
+    accountantNotes?: string;
+    journalEntryId?: string;
 }
 
 export interface Warehouse extends BaseEntity { name: string; location?: string; isDefault?: boolean; }

@@ -1,35 +1,37 @@
-
 {
   "entities": {
-    "SubsidyQuota": {
-      "title": "Subsidy Quota",
-      "description": "Tracks material quotas provided by the government for private housing projects.",
+    "CustodyReconciliation": {
+      "title": "Custody Reconciliation",
+      "description": "Represents an employee's report of expenses spent from their cash custody.",
       "type": "object",
       "properties": {
-        "itemId": { "type": "string" },
-        "itemName": { "type": "string" },
-        "allocatedQuantity": { "type": "number" },
-        "receivedQuantity": { "type": "number" },
-        "consumedQuantity": { "type": "number" },
-        "unitPrice": { "type": "number", "description": "Market price for evaluation" }
-      }
-    },
-    "ConstructionProject": {
-      "title": "Construction Project",
-      "description": "Main project entity, now with subsidy support.",
-      "type": "object",
-      "properties": {
-        "projectId": { "type": "string" },
-        "projectName": { "type": "string" },
-        "projectCategory": { "type": "string", "enum": ["Private (Subsidized)", "Private (Non-Subsidized)", "Commercial", "Government"] },
-        "subsidyQuotas": { "type": "array", "items": { "$ref": "#/entities/SubsidyQuota" } }
-      }
+        "reconciliationNumber": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "amount": { "type": "number" },
+              "category": { "type": "string" },
+              "categoryName": { "type": "string" },
+              "attachmentUrl": { "type": "string", "format": "uri" }
+            }
+          }
+        },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["employeeId", "date", "items", "totalAmount"]
     }
   },
   "firestore": {
-    "/projects/{projectId}": {
-      "schema": { "$ref": "#/entities/ConstructionProject" },
-      "description": "Stores all construction projects and their subsidy data."
+    "/custody_reconciliations/{id}": {
+      "schema": { "$ref": "#/entities/CustodyReconciliation" },
+      "description": "Stores employee custody reconciliation requests."
     }
   }
 }

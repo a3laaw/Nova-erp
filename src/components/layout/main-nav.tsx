@@ -81,7 +81,8 @@ import {
   Wallet,
   Calculator,
   History,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -203,6 +204,7 @@ const navItems = {
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
+        { href: '/dashboard/hr/custody-reconciliation/new', label: 'تسوية عهدة نقدية', icon: RotateCcw },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarX },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذانات', icon: Clock },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
