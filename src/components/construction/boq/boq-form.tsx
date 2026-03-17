@@ -119,10 +119,32 @@ const BoqItemRowRenderer = React.memo(
     const isHeader = useWatch({ control, name: `items.${node._index}.isHeader` });
     const itemId = useWatch({ control, name: `items.${node._index}.itemId` });
 
-    const lineTotal = React.useMemo(() => {
-      if (isHeader) return 0;
-      return (Number(quantity) || 0) * (Number(price) || 0);
-    }, [isHeader, quantity, price]);
+    // ✨ محرك الجمع التراكمي للهيكل الشجري (Hierarchical Summation)
+    const branchTotal = React.useMemo(() => {
+      // إذا لم يكن قسماً رئيسياً، نحسب قيمة السطر نفسه
+      if (!isHeader) {
+        return (Number(quantity) || 0) * (Number(price) || 0);
+      }
+
+      // إذا كان قسماً رئيسياً، نقوم بجمع كافة الأبناء (الذين ليسوا أقساماً) التابعين لهذا الفرع
+      const sumBranch = (parentUid: string): number => {
+        let total = 0;
+        watchedItems.forEach((item) => {
+          if (item.parentId === parentUid) {
+            if (item.isHeader) {
+              // نجمع الأقسام الفرعية بشكل تكراري
+              total += sumBranch(item.uid);
+            } else {
+              // نجمع البنود النهائية فقط
+              total += (Number(item.quantity) || 0) * (Number(item.sellingUnitPrice) || 0);
+            }
+          }
+        });
+        return total;
+      };
+
+      return sumBranch(node.uid);
+    }, [isHeader, quantity, price, watchedItems, node.uid]);
 
     const handleMasterItemSelect = React.useCallback(
       (value: string) => {
@@ -203,7 +225,7 @@ const BoqItemRowRenderer = React.memo(
           </TableCell>
           <TableCell className="text-left font-mono font-black border-r bg-muted/10 px-2 w-28">
             <div className={cn('py-1 text-xs tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
-              {isHeader ? '-' : formatCurrency(lineTotal)}
+              {formatCurrency(branchTotal)}
             </div>
           </TableCell>
           <TableCell className="px-2 border-r w-40">
