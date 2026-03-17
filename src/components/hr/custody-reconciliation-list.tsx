@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -18,7 +17,14 @@ import { format } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Eye, MoreHorizontal, Trash2, Loader2, Search, Wallet, CheckCircle2, Clock } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, // FIXED: Added missing separator import
+  DropdownMenuTrigger 
+} from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
@@ -139,15 +145,15 @@ export function CustodyReconciliationList() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
-                                            <DropdownMenuLabel>إجراءات المراجعة</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/custody-reconciliation/${item.id}`)}>
+                                            <DropdownMenuLabel className="font-black px-3 py-2">خيارات المراجعة</DropdownMenuLabel>
+                                            <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/custody-reconciliation/${item.id}`)} className="cursor-pointer gap-2 py-3 font-bold">
                                                 <Eye className="ml-2 h-4 w-4" />
                                                 {item.status === 'pending' ? 'مراجعة وربط محاسبي' : 'عرض التفاصيل'}
                                             </DropdownMenuItem>
                                             {item.status === 'pending' && (
                                                 <>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive">
+                                                    <DropdownMenuItem onClick={() => setItemToDelete(item)} className="text-destructive cursor-pointer gap-2 py-3 font-bold focus:bg-red-50">
                                                         <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
                                                     </DropdownMenuItem>
                                                 </>
@@ -163,14 +169,19 @@ export function CustodyReconciliationList() {
         </div>
 
         <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-3xl">
+            <AlertDialogContent dir="rtl" className="rounded-3xl shadow-2xl border-none">
                 <AlertDialogHeader>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner">
+                        <Trash2 className="h-6 w-6" />
+                    </div>
                     <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                    <AlertDialogDescription>سيتم حذف طلب التسوية "{itemToDelete?.reconciliationNumber}" نهائياً من النظام.</AlertDialogDescription>
+                    <AlertDialogDescription className="text-base font-medium leading-relaxed">
+                        سيتم حذف طلب التسوية رقم <strong className="text-foreground">"{itemToDelete?.reconciliationNumber}"</strong> نهائياً من النظام. لا يمكن التراجع عن هذا الإجراء.
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="gap-2">
+                <AlertDialogFooter className="mt-6 gap-2">
                     <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black">
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-8">
                         {isDeleting ? <Loader2 className="animate-spin ml-2 h-4 w-4"/> : 'نعم، حذف الطلب'}
                     </AlertDialogAction>
                 </AlertDialogFooter>
