@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Search, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Copy, Building2 } from 'lucide-react';
+import { PlusCircle, Search, MoreHorizontal, Eye, Pencil, Trash2, Loader2, Copy, Building2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 import Fuse from 'fuse.js';
@@ -216,11 +216,15 @@ export function BoqLibrary() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl">
                                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/construction/boq/${boq.id}`)}>
-                                                    <Eye className="ml-2 h-4 w-4" /> عرض
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/dashboard/construction/boq/${boq.id}`}>
+                                                        <Eye className="ml-2 h-4 w-4" /> عرض
+                                                    </Link>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => router.push(`/dashboard/construction/boq/${boq.id}/edit`)}>
-                                                    <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/dashboard/construction/boq/${boq.id}/edit`}>
+                                                        <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                                    </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleCopy(boq)}>
                                                     <Copy className="ml-2 h-4 w-4" /> استنساخ (نسخ)
@@ -240,15 +244,26 @@ export function BoqLibrary() {
             </div>
 
             <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
-                <AlertDialogContent dir="rtl">
+                <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl glass-effect">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>هل أنت متأكد من الحذف؟</AlertDialogTitle>
-                        <AlertDialogDescription>سيتم حذف جدول الكميات "{itemToDelete?.name}" بشكل دائم. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
+                        <div className="p-4 bg-red-100/20 rounded-3xl w-fit mb-4 border border-red-500/30 shadow-inner">
+                            <AlertTriangle className="h-10 w-10 text-red-600" />
+                        </div>
+                        <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tight">تأكيد الحذف النهائي؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-foreground/80">
+                            سيتم حذف جدول الكميات <strong className="text-foreground">"{itemToDelete?.name}"</strong> وكافة بنوده الفنية والقياسات المرتبطة به نهائياً.
+                            <br /><br />
+                            <span className="text-red-600/70 font-black italic underline decoration-2 underline-offset-4">تنبيه: لا يمكن استعادة هذه البيانات بعد الحذف.</span>
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                            {isDeleting ? <Loader2 className="animate-spin ml-2" /> : 'نعم، قم بالحذف'}
+                    <AlertDialogFooter className="mt-10 gap-3">
+                        <AlertDialogCancel disabled={isDeleting} className="rounded-2xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={handleDelete} 
+                            disabled={isDeleting} 
+                            className="bg-destructive hover:bg-destructive/90 rounded-2xl font-black h-12 px-12 shadow-xl shadow-red-200 min-w-[180px]"
+                        >
+                            {isDeleting ? <Loader2 className="h-5 w-5 animate-spin" /> : 'نعم، حذف نهائي'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
