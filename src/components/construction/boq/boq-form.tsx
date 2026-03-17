@@ -382,10 +382,8 @@ export function BoqForm({
 
   return (
     <div className="space-y-4 w-full px-1" dir="rtl">
-      {/* العلوية المدمجة الرشيقة */}
       <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
         <div className="flex flex-col lg:flex-row justify-between items-center p-6 lg:px-8 lg:py-6 gap-6">
-          {/* Right Side (Title/Icon) */}
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20">
               <ListTree className="h-7 w-7" />
@@ -399,7 +397,6 @@ export function BoqForm({
             </div>
           </div>
 
-          {/* Left Side (Stats) */}
           <div className="flex items-center gap-0 bg-white/40 p-1 rounded-full border border-white/60 shadow-lg group">
               <div className="bg-[#7209B7] px-6 py-2.5 rounded-full flex flex-col items-center shadow-xl transition-all group-hover:brightness-110">
                   <span className="text-[8px] font-black text-white/80 uppercase tracking-widest leading-none mb-1">الإجمالي</span>
@@ -418,7 +415,6 @@ export function BoqForm({
 
       <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
         <div className="space-y-4">
-          {/* بيانات المشروع المختصرة */}
           <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="grid gap-1.5">
@@ -447,7 +443,6 @@ export function BoqForm({
             </div>
           </Card>
 
-          {/* الجدول البانورامي */}
           <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
             <Table className="w-full border-collapse table-fixed">
               <TableHeader className="bg-primary/5">
@@ -508,7 +503,6 @@ export function BoqForm({
             </div>
           </Card>
 
-          {/* شريط الأوامر المدمج الرشيق */}
           <div className="pb-10 pt-4 flex justify-center">
             <Card className="rounded-full border-none shadow-2xl glass-effect py-3 px-8 flex flex-row items-center justify-between gap-8 min-w-[50%]">
               
