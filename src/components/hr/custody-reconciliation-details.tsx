@@ -13,7 +13,7 @@ import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Bankn
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
