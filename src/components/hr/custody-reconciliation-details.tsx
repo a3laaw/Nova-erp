@@ -4,12 +4,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc, orderBy } from 'firebase/firestore';
-import type { CustodyReconciliation, Account, JournalEntry } from '@/lib/types';
+import type { CustodyReconciliation, Account, JournalEntry, ConstructionProject, Client } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote, ImageIcon, FileText, X } from 'lucide-react';
+import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote, ImageIcon, FileText, X, PencilLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -21,6 +21,7 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '../ui/input';
 import Image from 'next/image';
 
 const statusTranslations: Record<string, string> = {
@@ -40,25 +41,64 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
     const { user: currentUser } = useAuth();
 
     const [isSaving, setIsSaving] = useState(false);
+    const [localItems, setLocalItems] = useState<any[]>([]);
     const [mappings, setMappings] = useState<Record<number, string>>({}); // index -> accountId
 
+    // جلب البيانات الأساسية
     const recRef = useMemo(() => (firestore && reconciliationId ? doc(firestore, 'custody_reconciliations', reconciliationId) : null), [firestore, reconciliationId]);
-    const { data: rec, loading: recLoading } = useDocument<CustodyReconciliation>(firestore, recRef?.path || null);
+    const { data: rec, loading: recLoading } = useDocument<CustodyReconciliation>(firestore, recRef ? recRef.path : null);
     
     const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, 'chartOfAccounts', [orderBy('code')]);
+    const { data: projects = [] } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
+    const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
+
+    // تهيئة البيانات المحلية للتعديل
+    useEffect(() => {
+        if (rec) {
+            setLocalItems(rec.items || []);
+            const initialMappings: Record<number, string> = {};
+            rec.items.forEach((item, idx) => {
+                if (item.category) initialMappings[idx] = item.category;
+            });
+            setMappings(initialMappings);
+        }
+    }, [rec]);
 
     const expenseAccounts = useMemo(() => 
         accounts.filter(a => a.type === 'expense').map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
     , [accounts]);
 
-    const handleMappingChange = (index: number, accountId: string) => {
-        setMappings(prev => ({ ...prev, [index]: accountId }));
+    const costCenterOptions = useMemo(() => [
+        ...projects.map(p => ({ value: p.id!, label: `مشروع: ${p.projectName}` })),
+        ...clients.map(c => ({ value: c.id!, label: `عميل: ${c.nameAr}` }))
+    ], [projects, clients]);
+
+    const handleItemChange = (index: number, field: string, value: any) => {
+        const updatedItems = [...localItems];
+        updatedItems[index] = { ...updatedItems[index], [field]: value };
+        
+        // إذا تغير المشروع، نقوم بتحديث الاسم المعروض في المصفوفة المحلية للتدقيق البصري
+        if (field === 'projectId') {
+            const proj = projects.find(p => p.id === value);
+            updatedItems[index].projectName = proj?.projectName || null;
+            updatedItems[index].projectId = value;
+        } else if (field === 'clientId') {
+            const client = clients.find(c => c.id === value);
+            updatedItems[index].clientName = client?.nameAr || null;
+            updatedItems[index].clientId = value;
+        }
+
+        setLocalItems(updatedItems);
     };
+
+    const currentTotal = useMemo(() => 
+        localItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+    , [localItems]);
 
     const handleApprove = async () => {
         if (!firestore || !rec || !currentUser) return;
 
-        const allLinked = rec.items.every((_, idx) => !!mappings[idx]);
+        const allLinked = localItems.every((_, idx) => !!mappings[idx]);
         if (!allLinked) {
             toast({ variant: 'destructive', title: 'توجيه ناقص', description: 'يرجى اختيار حساب مصروف لكل بند قبل الاعتماد المالي.' });
             return;
@@ -79,24 +119,34 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 const newJeRef = doc(collection(firestore, 'journalEntries'));
                 
                 const jeLines: any[] = [];
-                rec.items.forEach((item, idx) => {
+                const finalItemsToSave = localItems.map((item, idx) => {
                     const selectedAcc = accounts.find(a => a.id === mappings[idx])!;
+                    
+                    // إعداد سطر القيد
                     jeLines.push({
                         accountId: selectedAcc.id,
                         accountName: selectedAcc.name,
-                        debit: item.amount,
+                        debit: Number(item.amount),
                         credit: 0,
                         auto_profit_center: item.projectId || null,
                         clientId: item.clientId || null,
                         transactionId: item.projectId || null
                     });
+
+                    // إرجاع البيانات المحدثة للحفظ في مستند التسوية
+                    return {
+                        ...item,
+                        category: mappings[idx],
+                        categoryName: selectedAcc.name
+                    };
                 });
 
+                // سطر الدائن (تصفير العهدة)
                 jeLines.push({
                     accountId: custodyAcc.id,
                     accountName: custodyAcc.name,
                     debit: 0,
-                    credit: rec.totalAmount
+                    credit: currentTotal
                 });
 
                 transaction.set(newJeRef, cleanFirestoreData({
@@ -104,8 +154,8 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     date: rec.date,
                     narration: `اعتماد تسوية عهدة #${rec.reconciliationNumber} - الموظف: ${rec.employeeName}`,
                     status: 'posted',
-                    totalDebit: rec.totalAmount,
-                    totalCredit: rec.totalAmount,
+                    totalDebit: currentTotal,
+                    totalCredit: currentTotal,
                     lines: jeLines,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id
@@ -114,17 +164,14 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 transaction.update(recRef!, {
                     status: 'approved',
                     journalEntryId: newJeRef.id,
-                    items: rec.items.map((item, idx) => ({
-                        ...item,
-                        category: mappings[idx],
-                        categoryName: accounts.find(a => a.id === mappings[idx])?.name
-                    }))
+                    totalAmount: currentTotal, // حفظ المبالغ المحدثة بعد تعديل المحاسب
+                    items: finalItemsToSave
                 });
 
                 transaction.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
             });
 
-            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتصفية مديونية عهدة الموظف بنجاح.' });
+            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية عهدة الموظف بالمبالغ المعدلة.' });
             router.push('/dashboard/hr/custody-reconciliation');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: error.message });
@@ -139,14 +186,17 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
     const isProcessed = rec.status !== 'pending';
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6 pb-20" dir="rtl">
+        <div className="max-w-6xl mx-auto space-y-6 pb-20" dir="rtl">
             <div className="flex items-center justify-between px-2">
                 <button onClick={() => router.back()} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors font-bold">
                     <ArrowRight className="h-4 w-4" /> العودة للقائمة
                 </button>
-                <Badge variant="outline" className={cn("px-4 py-1 font-black", isProcessed ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700")}>
-                    الحالة: {statusTranslations[rec.status]}
-                </Badge>
+                <div className="flex items-center gap-3">
+                    {!isProcessed && <Badge className="bg-primary/10 text-primary border-primary/20 flex items-center gap-1.5"><PencilLine className="h-3 w-3"/> وضع التدقيق والتعديل نشط</Badge>}
+                    <Badge variant="outline" className={cn("px-4 py-1 font-black", isProcessed ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700")}>
+                        {statusTranslations[rec.status]}
+                    </Badge>
+                </div>
             </div>
 
             <Card className="rounded-[2.5rem] shadow-xl border-none overflow-hidden bg-card">
@@ -158,9 +208,9 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                 <User className="h-4 w-4 text-primary" /> الموظف: {rec.employeeName}
                             </CardDescription>
                         </div>
-                        <div className="text-left">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">المبلغ المطلوب تسويته</Label>
-                            <p className="text-3xl font-black text-primary font-mono">{formatCurrency(rec.totalAmount)}</p>
+                        <div className="text-left bg-white p-4 rounded-2xl border shadow-inner">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground block mb-1">إجمالي المبلغ (بعد التدقيق)</Label>
+                            <p className="text-3xl font-black text-primary font-mono">{formatCurrency(currentTotal)}</p>
                         </div>
                     </div>
                 </CardHeader>
@@ -168,22 +218,30 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     <Table>
                         <TableHeader className="bg-muted/30">
                             <TableRow className="h-14">
-                                <TableHead className="px-8 font-black">بيان الموظف والمرفقات</TableHead>
-                                <TableHead className="font-black">المشروع / العميل</TableHead>
-                                <TableHead className="text-center font-black">المبلغ</TableHead>
-                                <TableHead className="w-80 font-black text-primary bg-primary/5">التوجيه المحاسبي (المصروف) *</TableHead>
+                                <TableHead className="px-8 font-black">بيان المصروف والوثائق</TableHead>
+                                <TableHead className="font-black w-64">الارتباط بمشروع / عميل</TableHead>
+                                <TableHead className="text-center font-black w-32">المبلغ (د.ك)</TableHead>
+                                <TableHead className="w-72 font-black text-primary bg-primary/5">توجيه حساب المصروف *</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {rec.items.map((item, idx) => (
+                            {localItems.map((item, idx) => (
                                 <TableRow key={idx} className="h-auto border-b last:border-0 hover:bg-muted/5 transition-colors">
-                                    <TableCell className="px-8 py-6 space-y-4 min-w-[350px]">
-                                        <p className="font-bold text-lg">{item.description}</p>
+                                    <TableCell className="px-8 py-6 space-y-4">
+                                        {isProcessed ? (
+                                            <p className="font-bold text-lg">{item.description}</p>
+                                        ) : (
+                                            <Input 
+                                                value={item.description} 
+                                                onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
+                                                className="font-bold text-base h-10 rounded-xl bg-background border-2"
+                                            />
+                                        )}
                                         
-                                        {item.attachmentUrls && item.attachmentUrls.length > 0 ? (
+                                        {item.attachmentUrls && item.attachmentUrls.length > 0 && (
                                             <ScrollArea className="w-full bg-muted/20 rounded-2xl border h-24">
                                                 <div className="flex p-2 gap-3">
-                                                    {item.attachmentUrls.map((url, imgIdx) => (
+                                                    {item.attachmentUrls.map((url: string, imgIdx: number) => (
                                                         <a 
                                                             key={imgIdx} 
                                                             href={url} 
@@ -194,7 +252,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                                             {url.toLowerCase().includes('.pdf') ? (
                                                                 <div className="flex flex-col items-center justify-center h-full bg-indigo-50">
                                                                     <FileText className="h-6 w-6 text-indigo-600" />
-                                                                    <span className="text-[8px] font-black text-indigo-800">عرض PDF</span>
+                                                                    <span className="text-[8px] font-black text-indigo-800">PDF</span>
                                                                 </div>
                                                             ) : (
                                                                 <Image src={url} alt="Receipt" fill className="object-cover" />
@@ -207,32 +265,53 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                                 </div>
                                                 <ScrollBar orientation="horizontal" />
                                             </ScrollArea>
-                                        ) : (
-                                            <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                                                <X className="h-3 w-3" /> لا توجد مرفقات لهذا البند
-                                            </p>
                                         )}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            {item.projectName && <p className="text-xs font-black text-primary flex items-center gap-1"><Target className="h-3 w-3"/> {item.projectName}</p>}
-                                            {item.clientName && <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1"><User className="h-3 w-3"/> {item.clientName}</p>}
-                                            {!item.projectName && !item.clientName && <span className="text-xs text-muted-foreground italic">عام / إداري</span>}
-                                        </div>
+                                        {isProcessed ? (
+                                            <div className="space-y-1">
+                                                {item.projectName && <p className="text-xs font-black text-primary flex items-center gap-1"><Target className="h-3 w-3"/> {item.projectName}</p>}
+                                                {item.clientName && <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1"><User className="h-3 w-3"/> {item.clientName}</p>}
+                                                {!item.projectName && !item.clientName && <span className="text-xs text-muted-foreground italic">عام / إداري</span>}
+                                            </div>
+                                        ) : (
+                                            <InlineSearchList 
+                                                value={item.projectId || item.clientId || ''}
+                                                onSelect={(v) => {
+                                                    const isProject = projects.some(p => p.id === v);
+                                                    handleItemChange(idx, isProject ? 'projectId' : 'clientId', v);
+                                                }}
+                                                options={costCenterOptions}
+                                                placeholder="اربط بمشروع..."
+                                                className="h-10 rounded-xl text-xs border-dashed"
+                                            />
+                                        )}
                                     </TableCell>
-                                    <TableCell className="text-center font-black font-mono text-xl">{formatCurrency(item.amount)}</TableCell>
+                                    <TableCell className="text-center font-black">
+                                        {isProcessed ? (
+                                            <span className="font-mono text-xl">{formatCurrency(item.amount)}</span>
+                                        ) : (
+                                            <Input 
+                                                type="number" 
+                                                step="any"
+                                                value={item.amount} 
+                                                onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
+                                                className="text-center font-black font-mono text-lg h-10 rounded-xl border-2 border-primary/20 text-primary bg-primary/5"
+                                            />
+                                        )}
+                                    </TableCell>
                                     <TableCell className="bg-primary/[0.02] px-4">
                                         {isProcessed ? (
-                                            <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4 py-1 rounded-full">
+                                            <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4 py-1 rounded-full w-full justify-center">
                                                 {item.categoryName}
                                             </Badge>
                                         ) : (
                                             <InlineSearchList 
                                                 value={mappings[idx] || ''}
-                                                onSelect={(v) => handleMappingChange(idx, v)}
+                                                onSelect={(v) => setMappings(prev => ({ ...prev, [idx]: v }))}
                                                 options={expenseAccounts}
-                                                placeholder="اربط بحساب مصروف..."
-                                                className="bg-white border-primary/20 rounded-xl"
+                                                placeholder="اختر حساب المصروف..."
+                                                className="bg-white border-primary/30 rounded-xl h-10"
                                             />
                                         )}
                                     </TableCell>
@@ -241,8 +320,8 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                         </TableBody>
                         <TableFooter className="bg-muted/10 h-16">
                             <TableRow>
-                                <TableCell colSpan={2} className="text-right px-8 font-black">إجمالي البنود المعالجة:</TableCell>
-                                <TableCell className="text-center font-black font-mono text-xl text-primary">{formatCurrency(rec.totalAmount)}</TableCell>
+                                <TableCell colSpan={2} className="text-right px-8 font-black">إجمالي المصروفات المعالجة:</TableCell>
+                                <TableCell className="text-center font-black font-mono text-xl text-primary">{formatCurrency(currentTotal)}</TableCell>
                                 <TableCell />
                             </TableRow>
                         </TableFooter>
@@ -259,14 +338,15 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 </CardContent>
                 
                 {!isProcessed && (
-                    <CardFooter className="p-8 bg-primary/5 border-t flex justify-between items-center">
+                    <CardFooter className="p-10 bg-primary/5 border-t flex justify-between items-center">
                         <div className="space-y-1">
-                            <p className="text-xs font-bold text-muted-foreground flex items-center gap-2">
-                                <Calculator className="h-4 w-4"/> سيتم توليد قيد يومية آلي مرحّل فور الاعتماد.
+                            <p className="text-sm font-black text-primary flex items-center gap-2">
+                                <Calculator className="h-5 w-5"/> سيتم توليد قيد يومية آلي بالمبالغ المحدثة أعلاه.
                             </p>
+                            <p className="text-[10px] text-muted-foreground font-bold pr-7">التغييرات التي أجريتها الآن لن تُحفظ في المستند الأصلي إلا بعد الضغط على زر الاعتماد.</p>
                         </div>
-                        <Button onClick={handleApprove} disabled={isSaving} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[300px]">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
+                        <Button onClick={handleApprove} disabled={isSaving} className="h-16 px-20 rounded-3xl font-black text-2xl shadow-xl shadow-primary/30 gap-4 min-w-[350px]">
+                            {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
                             اعتماد وترحيل القيد المحاسبي
                         </Button>
                     </CardFooter>
