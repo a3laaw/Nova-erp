@@ -85,7 +85,7 @@ export default function DashboardLayout({
           )}>
             <Header currentUser={user} onLogout={handleLogout} className="no-print" />
             <main className={cn(
-                "flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 min-w-0",
+                "flex-1 overflow-y-auto overflow-x-hidden p-2 md:p-4 lg:p-4 min-w-0",
                 isGlass && "scrollbar-thin scrollbar-thumb-white/20"
             )}>
               {children}

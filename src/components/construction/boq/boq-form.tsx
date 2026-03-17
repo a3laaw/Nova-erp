@@ -18,7 +18,6 @@ import {
   ListTree,
   Calculator,
   Info,
-  MessageSquare,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription } from '@/components/ui/card';
