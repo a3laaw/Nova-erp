@@ -80,13 +80,27 @@ function SmartPhotoGallery({
 }) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    const handleWheel = (e: React.WheelEvent) => {
-        if (scrollRef.current) {
-            e.preventDefault();
-            // تحويل البكرة العمودية إلى حركة أفقية
-            scrollRef.current.scrollLeft += e.deltaY;
-        }
-    };
+    // ✨ تصحيح تضارب التمرير: عزل بكرة الماوس تماماً عن الصفحة الرئيسية
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+
+        const handleNativeWheel = (e: WheelEvent) => {
+            const canScrollLeft = el.scrollLeft > (el.clientWidth - el.scrollWidth);
+            const canScrollRight = el.scrollLeft < 0; // In RTL, scrollLeft is 0 at the start and negative as you move left
+
+            // منع تمرير الصفحة إذا كان هناك إمكانية للتمرير داخل الحاوية
+            if (e.deltaY !== 0) {
+                e.preventDefault();
+                e.stopPropagation();
+                el.scrollLeft += e.deltaY;
+            }
+        };
+
+        // استخدام passive: false لضمان عمل preventDefault()
+        el.addEventListener('wheel', handleNativeWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleNativeWheel);
+    }, [files.length]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
@@ -138,7 +152,6 @@ function SmartPhotoGallery({
 
             <div 
                 ref={scrollRef}
-                onWheel={handleWheel}
                 className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center max-w-[185px] mx-auto overflow-y-hidden"
                 style={{ scrollBehavior: 'smooth' }}
             >
