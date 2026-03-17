@@ -83,6 +83,7 @@
   /* ✨ LIGHT PEARL Dialog & Popover ✨ */
   [data-theme='glass'] [role="dialog"],
   [data-theme='glass'] [data-radix-popper-content-wrapper],
+  [data-theme='glass'] [data-radix-popover-content],
   [data-theme='glass'] [data-radix-select-content],
   [data-theme='glass'] .bg-popover {
     background: linear-gradient(135deg, 
@@ -190,6 +191,15 @@
     .glass-surface { @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm; }
     .hover-lift { @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl; }
     .soft-shadow-input { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
+    
+    /* Utility to completely hide scrollbars but keep functionality */
+    .scrollbar-none {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
+    }
+    .scrollbar-none::-webkit-scrollbar {
+      display: none; /* Chrome, Safari and Opera */
+    }
 }
 
 /* Global Fixes */

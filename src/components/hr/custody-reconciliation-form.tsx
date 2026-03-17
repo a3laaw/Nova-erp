@@ -65,7 +65,7 @@ interface PreviewFile {
 
 /**
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
- * يظهر صورتين فقط والبقية عبر التمرير بالبكرة أو الأزرار.
+ * يظهر صورتين فقط والبقية عبر التمرير بالبكرة أو الأزرار مع إخفاء أشرطة التمرير.
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -139,7 +139,7 @@ function SmartPhotoGallery({
             <div 
                 ref={scrollRef}
                 onWheel={handleWheel}
-                className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center max-w-[185px] mx-auto"
+                className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center max-w-[185px] mx-auto overflow-y-hidden"
                 style={{ scrollBehavior: 'smooth' }}
             >
                 {files.map((p) => (
@@ -430,7 +430,7 @@ export function CustodyReconciliationForm() {
                                     </div>
 
                                     <div className="lg:col-span-5 space-y-2">
-                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">الفواتير والمرفقات (صورتين فقط، البقية بالبكرة)</Label>
+                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">الفواتير والمرفقات (بالبكرة)</Label>
                                         
                                         <div className="flex gap-3 items-center">
                                             <div 
