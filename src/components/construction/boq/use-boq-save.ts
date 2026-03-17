@@ -22,7 +22,6 @@ import { cleanFirestoreData } from '@/lib/utils';
 import { boqFormSchema, type BoqFormValues } from './boq-form';
 import type { Boq, BoqItem } from '@/lib/types';
 
-// ─── مولد ID آمن ومستقر ───
 export const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let id = '';
@@ -34,7 +33,6 @@ export const generateStableId = (): string => {
 
 const MAX_BATCH_OPS = 490;
 
-// ─── معالجة الهيكل الشجري وحساب الإجماليات ───
 function processItemsHierarchy(items: BoqFormValues['items']): {
   finalItems: (BoqFormValues['items'][number] & {
     itemNumber: string;
@@ -128,7 +126,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // ─── تحميل البيانات الأصلية (وضع التعديل) ───
   useEffect(() => {
     if (mode !== 'edit' || !firestore || !boqId) return;
     let cancelled = false;
@@ -192,7 +189,6 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
     return () => { cancelled = true; };
   }, [mode, firestore, boqId, router, toast, form]);
 
-  // ─── منطق النسخ الاستراتيجي: إعادة ربط الشجرة بالمعرفات الجديدة ───
   useEffect(() => {
     if (mode !== 'create') return;
 
@@ -203,14 +199,12 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
       const copiedData = JSON.parse(copiedDataString);
       const oldToNewUid = new Map<string, string>();
 
-      // 1. توليد معرفات جديدة لكل البنود
       const itemsWithNewUids = (copiedData.items || []).map((item: any) => {
         const newUid = generateStableId();
         oldToNewUid.set(item.uid, newUid);
         return { ...item, uid: newUid };
       });
 
-      // 2. إعادة تعيين parentId ليرتبط بالمعرفات الجديدة (Remapping)
       const remappedItems = itemsWithNewUids.map((item: any) => ({
         ...item,
         parentId: item.parentId ? (oldToNewUid.get(item.parentId) || null) : null
@@ -313,12 +307,11 @@ export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
       await commitInChunks(firestore, operations);
       toast({ title: 'نجاح', description: 'تم حفظ جدول الكميات بنجاح.' });
       router.push(`/dashboard/construction/boq/${targetBoqId}`);
-
+      // Note: isSaving is NOT reset here to prevent double-click during navigation. unmount will handle it.
     } catch (error: any) {
       console.error(`❌ Save failed:`, error);
       toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message || 'حدث خطأ غير متوقع.' });
-    } finally {
-      if (mountedRef.current) setIsSaving(false);
+      if (mountedRef.current) setIsSaving(false); // Only reset on error to allow retry
     }
   };
 

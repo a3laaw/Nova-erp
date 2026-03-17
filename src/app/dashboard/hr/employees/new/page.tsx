@@ -72,7 +72,6 @@ export default function NewEmployeePage() {
                     throw new Error('الرقم المدني هذا مسجل بالفعل لموظف آخر.');
                 }
             }
-            // التحقق من تكرار IBAN
             if (newEmployeeData.iban && newEmployeeData.iban.trim() !== '') {
                 const ibanQuery = query(collection(firestore, 'employees'), where('iban', '==', newEmployeeData.iban.trim()));
                 const ibanSnapshot = await getDocs(ibanQuery);
@@ -93,10 +92,6 @@ export default function NewEmployeePage() {
                 transaction.set(employeeCounterRef, { lastNumber: nextNumber }, { merge: true });
                 
                 const newEmployeeNumber = String(nextNumber);
-
-                if (newEmployeeNumber !== employeeNumber) {
-                    console.warn(`Race condition detected for employee number. UI showed ${employeeNumber}, saved as ${newEmployeeNumber}`);
-                }
 
                 const finalEmployeeData = {
                   ...newEmployeeData,
@@ -137,14 +132,12 @@ export default function NewEmployeePage() {
             });
 
             await Promise.all(notificationPromises);
-            
             router.push(`/dashboard/hr/employees`);
-
+            // isSaving remains true during navigation
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'فشل إضافة الموظف.';
             toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
-        } finally {
-            setIsSaving(false);
+            setIsSaving(false); // Reset on error
         }
     }, [firestore, currentUser, toast, router, employeeNumber]);
 

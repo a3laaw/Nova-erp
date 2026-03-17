@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
@@ -25,10 +24,6 @@ export default function NewProjectPage() {
         linkedTransactionId: searchParams.get('transactionId') || '',
     });
 
-    const { data: employees = [] } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
-    const { data: departments = [] } = useSubscription<Department>(firestore, 'departments');
-
-    // --- جلب بيانات العقد لتعبئة المواصفات الفنية آلياً ---
     useEffect(() => {
         const clientId = searchParams.get('clientId');
         const transactionId = searchParams.get('transactionId');
@@ -79,7 +74,6 @@ export default function NewProjectPage() {
                 transaction.set(newProjectRef, cleanFirestoreData(finalProjectData));
                 transaction.set(counterRef, { [`counts.${currentYear}`]: nextNumber }, { merge: true });
 
-                // ربط المعاملة الأصلية بالمشروع المنشأ
                 if (newProjectData.linkedTransactionId) {
                     const txRef = doc(firestore, `clients/${newProjectData.clientId}/transactions/${newProjectData.linkedTransactionId}`);
                     transaction.update(txRef, { projectId: newProjectRef.id });
@@ -88,11 +82,9 @@ export default function NewProjectPage() {
             
             toast({ title: 'تم التأسيس الفني', description: 'تم إنشاء هيكل المشروع وربطه بالعقد المعتمد بنجاح.' });
             router.push('/dashboard/construction/projects');
-            
         } catch (error) {
             console.error(error);
             toast({ title: "خطأ", description: 'فشل تأسيس هيكل المشروع.', variant: "destructive" });
-        } finally {
             setIsSaving(false);
         }
     }, [firestore, currentUser, toast, router]);

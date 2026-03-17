@@ -96,12 +96,11 @@ export default function NewQuotationPage() {
         } else {
             router.push('/dashboard/accounting/quotations');
         }
-
+        // isSaving remains true until navigation
     } catch (error) {
         console.error("Error saving quotation:", error);
         toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم حفظ عرض السعر.' });
-    } finally {
-        setIsSaving(false);
+        setIsSaving(false); // Reset only on error
     }
   }, [firestore, currentUser, toast, router, isGeneratingNumber]);
 
