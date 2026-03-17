@@ -14,7 +14,8 @@ import {
     PieChart,
     ArrowRight,
     PlusCircle,
-    Banknote
+    Banknote,
+    RotateCcw
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -176,22 +177,24 @@ export default function AccountingDashboardPage() {
                             isGlass ? "bg-white/5 border-white/20" : "bg-muted/30"
                         )}>
                             <div className="space-y-1">
+                                <p className="text-sm font-black">تسوية العهد النقدية</p>
+                                <p className="text-[10px] text-muted-foreground font-bold">مراجعة مصروفات الموظفين الميدانية</p>
+                            </div>
+                            <Button asChild size="sm" variant={isGlass ? "default" : "secondary"} className="rounded-xl font-bold">
+                                <Link href="/dashboard/hr/custody-reconciliation">بدء المراجعة</Link>
+                            </Button>
+                        </div>
+                        <div className={cn(
+                            "p-5 rounded-2xl border-2 border-dashed flex items-center justify-between",
+                            isGlass ? "bg-white/5 border-white/20" : "bg-muted/30"
+                        )}>
+                            <div className="space-y-1">
                                 <p className="text-sm font-black">التسوية البنكية الذكية</p>
                                 <p className="text-[10px] text-muted-foreground font-bold">مطابقة كشوف الحساب مع القيود</p>
                             </div>
                             <Button asChild size="sm" variant={isGlass ? "default" : "secondary"} className="rounded-xl font-bold">
                                 <Link href="/dashboard/accounting/reconciliation">بدء التسوية</Link>
                             </Button>
-                        </div>
-                        <div className={cn(
-                            "p-5 rounded-2xl border flex items-center justify-between",
-                            isGlass ? "bg-red-500/10 border-red-500/30" : "bg-red-50/50 border-red-100"
-                        )}>
-                            <div className="space-y-1">
-                                <p className={cn("text-sm font-black", isGlass ? "text-pink-400" : "text-red-700")}>فحص الخلل المالي</p>
-                                <p className={cn("text-[10px] font-bold", isGlass ? "text-white/50" : "text-red-600/70")}>نظام الرقابة اللحظية نشط</p>
-                            </div>
-                            <Badge variant="outline" className="bg-white text-red-600 border-red-200 font-black">نشط</Badge>
                         </div>
                     </CardContent>
                 </Card>
