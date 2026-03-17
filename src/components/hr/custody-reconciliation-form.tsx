@@ -13,10 +13,10 @@ import {
   CardTitle,
   CardFooter,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, PlusCircle, Trash2, Banknote, Camera, Info, History, ShieldCheck, Wallet, Target, User } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
@@ -24,7 +24,7 @@ import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestam
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Account, Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, generateStableId } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, generateStableId, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -179,6 +179,7 @@ export function CustodyReconciliationForm() {
             toast({ title: 'تم إرسال التسوية', description: 'بانتظار مراجعة واعتماد المحاسب المالي.' });
             router.push('/dashboard/hr/employees');
         } catch (error) {
+            console.error("Save error:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إرسال طلب التسوية.' });
             setIsSaving(false);
             savingRef.current = false;
@@ -187,7 +188,7 @@ export function CustodyReconciliationForm() {
 
     return (
         <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
-            <form onSubmit={handleSubmit(onSubmit)}>
+            <form onSubmit={(e) => { e.preventDefault(); if (!isSaving) handleSubmit(onSubmit)(e); }}>
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Wallet className="h-8 w-8"/></div>
@@ -280,7 +281,7 @@ export function CustodyReconciliationForm() {
                                                 />
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground rounded-xl border hover:bg-primary/10 transition-all"><Camera className="h-4 w-4"/></Button>
+                                                <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground rounded-xl border hover:bg-primary/10 transition-all" disabled={isSaving}><Camera className="h-4 w-4"/></Button>
                                             </TableCell>
                                         </TableRow>
                                     )})}
