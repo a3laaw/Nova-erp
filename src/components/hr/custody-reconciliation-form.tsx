@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,13 +19,13 @@ import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft, Search } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client, Account } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn, generateStableId } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -65,7 +65,9 @@ interface PreviewFile {
 
 /**
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
- * يظهر صورتين فقط والبقية عبر التمرير بالبكرة أو الأزرار مع إخفاء أشرطة التمرير.
+ * - يظهر صورتين فقط والبقية عبر التمرير.
+ * - عزل كامل لبكرة الماوس عن الصفحة الرئيسية.
+ * - معاينة منبثقة مكبرة عند تحويم الماوس (Hover Preview).
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -79,17 +81,14 @@ function SmartPhotoGallery({
     isSaving: boolean 
 }) {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [hoveredImage, setHoveredImage] = useState<string | null>(null);
 
-    // ✨ تصحيح تضارب التمرير: عزل بكرة الماوس تماماً عن الصفحة الرئيسية
+    // ✨ عزل التمرير (Native Isolation Engine)
     useEffect(() => {
         const el = scrollRef.current;
         if (!el) return;
 
         const handleNativeWheel = (e: WheelEvent) => {
-            const canScrollLeft = el.scrollLeft > (el.clientWidth - el.scrollWidth);
-            const canScrollRight = el.scrollLeft < 0; // In RTL, scrollLeft is 0 at the start and negative as you move left
-
-            // منع تمرير الصفحة إذا كان هناك إمكانية للتمرير داخل الحاوية
             if (e.deltaY !== 0) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -97,7 +96,6 @@ function SmartPhotoGallery({
             }
         };
 
-        // استخدام passive: false لضمان عمل preventDefault()
         el.addEventListener('wheel', handleNativeWheel, { passive: false });
         return () => el.removeEventListener('wheel', handleNativeWheel);
     }, [files.length]);
@@ -122,9 +120,10 @@ function SmartPhotoGallery({
 
     return (
         <div className="relative group/gallery w-full">
+            {/* أزرار التنقل */}
             {files.length > 2 && (
                 <>
-                    <div className="absolute inset-y-0 -right-2 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                    <div className="absolute inset-y-0 -right-2 z-20 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
                         <Button 
                             type="button" 
                             variant="secondary" 
@@ -135,8 +134,7 @@ function SmartPhotoGallery({
                             <ChevronRight className="h-3 w-3 text-primary" />
                         </Button>
                     </div>
-                    
-                    <div className="absolute inset-y-0 -left-2 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                    <div className="absolute inset-y-0 -left-2 z-20 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
                         <Button 
                             type="button" 
                             variant="secondary" 
@@ -150,13 +148,19 @@ function SmartPhotoGallery({
                 </>
             )}
 
+            {/* حاوية الصور (كادر الرؤية الثنائي) */}
             <div 
                 ref={scrollRef}
                 className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center max-w-[185px] mx-auto overflow-y-hidden"
                 style={{ scrollBehavior: 'smooth' }}
             >
                 {files.map((p) => (
-                    <div key={p.id} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 animate-in zoom-in-95 group/img">
+                    <div 
+                        key={p.id} 
+                        className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 animate-in zoom-in-95 group/img cursor-zoom-in"
+                        onMouseEnter={() => p.file.type.startsWith('image/') && setHoveredImage(p.url)}
+                        onMouseLeave={() => setHoveredImage(null)}
+                    >
                         {p.file.type.startsWith('image/') ? (
                             <Image src={p.url} alt="Receipt" fill className="object-cover" />
                         ) : (
@@ -176,6 +180,23 @@ function SmartPhotoGallery({
                     </div>
                 ))}
             </div>
+
+            {/* ✨ المعاينة المنبثقة الخاطفة (Hover Zoom Overlay) ✨ */}
+            {hoveredImage && (
+                <div className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
+                     style={{ 
+                         top: '50%', 
+                         left: '50%', 
+                         transform: 'translate(-50%, -50%)' 
+                     }}>
+                    <div className="relative w-[400px] h-[400px] rounded-[2.5rem] overflow-hidden border-8 border-white shadow-[0_0_50px_rgba(0,0,0,0.3)] bg-white">
+                        <Image src={hoveredImage} alt="Large Preview" fill className="object-contain p-4" />
+                        <div className="absolute bottom-0 left-0 right-0 bg-primary/80 backdrop-blur-md p-3 text-center">
+                            <p className="text-white font-black text-xs">معاينة خاطفة للمستند</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
