@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,16 +19,17 @@ import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Employee, ConstructionProject, Client, Account, JournalEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, generateStableId } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
+import { useAppTheme } from '@/context/theme-context';
 import Image from 'next/image';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 
@@ -83,13 +84,12 @@ function SmartPhotoGallery({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [hoveredImage, setHoveredImage] = useState<string | null>(null);
 
-    // ✨ محرك عزل التمرير (The Absolute Isolation Engine)
+    // ✨ محرك عزل التمرير الجذري (Scroll Isolation Engine)
     useEffect(() => {
         const el = scrollRef.current;
         if (!el) return;
 
         const handleWheel = (e: WheelEvent) => {
-            // التحقق من وجود تمرير
             if (e.deltaY !== 0) {
                 // منع التمرير العمودي للصفحة تماماً
                 e.preventDefault();
@@ -102,7 +102,7 @@ function SmartPhotoGallery({
             }
         };
 
-        // يجب أن يكون المستمع "غير سلبي" (passive: false) للسماح بـ preventDefault
+        // يجب أن يكون المستمع "غير سلبي" للسماح بـ preventDefault
         el.addEventListener('wheel', handleWheel, { passive: false });
         return () => el.removeEventListener('wheel', handleWheel);
     }, [files.length]);
@@ -213,6 +213,7 @@ export function CustodyReconciliationForm() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const { theme } = useAppTheme();
 
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
@@ -370,11 +371,10 @@ export function CustodyReconciliationForm() {
         ...clients.map(c => ({ value: c.id!, label: `عميل: ${c.nameAr}` }))
     ], [projects, clients]);
 
-    const { theme } = useAppTheme();
-    const cnFunc = (theme === 'glass' ? (...args: any[]) => args.join(' ') : (cls: string) => cls);
+    const isGlass = theme === 'glass';
 
     return (
-        <Card className="max-w-5xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+        <Card className={cn("max-w-5xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden", isGlass && "glass-effect")} dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex items-center gap-4">
