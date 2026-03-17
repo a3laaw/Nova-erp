@@ -44,7 +44,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
     const [localItems, setLocalItems] = useState<any[]>([]);
     const [mappings, setMappings] = useState<Record<number, string>>({}); // index -> accountId
 
-    // جلب البيانات الأساسية
     const recRef = useMemo(() => (firestore && reconciliationId ? doc(firestore, 'custody_reconciliations', reconciliationId) : null), [firestore, reconciliationId]);
     const { data: rec, loading: recLoading } = useDocument<CustodyReconciliation>(firestore, recRef ? recRef.path : null);
     
@@ -52,7 +51,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
     const { data: projects = [] } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
     const { data: clients = [] } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
 
-    // تهيئة البيانات المحلية للتعديل
     useEffect(() => {
         if (rec) {
             setLocalItems(rec.items || []);
@@ -108,7 +106,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
                 
-                // ✨ الدرع الرقابي المحدث: البحث في شجرة الحسابات عن الحساب المربوط بهذا الموظف
+                // ✨ الدرع الرقابي المحدث: البحث في شجرة الحسابات عن الحساب المربوط بهذا الموظف (تحت كود 110103)
                 const custodyAccQuery = query(
                     collection(firestore, 'chartOfAccounts'), 
                     where('employeeId', '==', rec.employeeId),
@@ -117,7 +115,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 const custodyAccSnap = await getDocs(custodyAccQuery);
 
                 if (custodyAccSnap.empty) {
-                    throw new Error(`⚠️ تنبيه رقابي: لم يتم العثور على حساب عهدة مربوط بالموظف ${rec.employeeName} في شجرة الحسابات. يرجى تعديل الحساب في الشجرة وربطه بالموظف أولاً.`);
+                    throw new Error(`⚠️ تنبيه رقابي: لم يتم العثور على حساب عهدة (110103) مربوط بالموظف ${rec.employeeName} في شجرة الحسابات. يرجى تعديل الحساب في الشجرة وربطه بالموظف أولاً.`);
                 }
 
                 const custodyAccDoc = custodyAccSnap.docs[0];
@@ -141,7 +139,8 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                         credit: 0,
                         auto_profit_center: item.projectId || null,
                         clientId: item.clientId || null,
-                        transactionId: item.projectId || null
+                        transactionId: item.projectId || null,
+                        auto_resource_id: rec.employeeId 
                     });
 
                     return {
@@ -180,7 +179,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 transaction.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
             });
 
-            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية عهدة الموظف بناءً على الربط في شجرة الحسابات.' });
+            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية العهدة بناءً على الربط الرسمي في الشجرة.' });
             router.push('/dashboard/hr/custody-reconciliation');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: error.message });
@@ -258,14 +257,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                                             rel="noopener noreferrer"
                                                             className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 hover:scale-105 transition-transform group"
                                                         >
-                                                            {url.toLowerCase().includes('.pdf') ? (
-                                                                <div className="flex flex-col items-center justify-center h-full bg-indigo-50">
-                                                                    <FileText className="h-6 w-6 text-indigo-600" />
-                                                                    <span className="text-[8px] font-black text-indigo-800">PDF</span>
-                                                                </div>
-                                                            ) : (
-                                                                <Image src={url} alt="Receipt" fill className="object-cover" />
-                                                            )}
+                                                            <Image src={url} alt="Receipt" fill className="object-cover" />
                                                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                                 <ImageIcon className="h-4 w-4 text-white" />
                                                             </div>

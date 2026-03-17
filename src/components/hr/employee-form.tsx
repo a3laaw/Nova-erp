@@ -240,28 +240,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {isFoodActivity && (
-                    <section className="space-y-6 p-6 border-2 border-dashed border-indigo-200 bg-indigo-50/10 rounded-[2rem] animate-in zoom-in-95">
-                        <h3 className="font-black text-lg flex items-center gap-2 text-indigo-800">
-                            <FileCheck className="h-5 w-5" /> تراخيص ووثائق إضافية (نشاط غذائي)
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="grid gap-2">
-                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><FileText className="h-3 w-3" /> انتهاء الجواز</Label>
-                                <DateInput value={formData.passportExpiry} onChange={d => handleSelectChange('passportExpiry', d)} className="bg-white" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><ShieldCheck className="h-3 w-3" /> انتهاء كارت الصحة</Label>
-                                <DateInput value={formData.healthCardExpiry} onChange={d => handleSelectChange('healthCardExpiry', d)} className="bg-white" />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label className="font-bold text-indigo-900 mr-1 flex items-center gap-1"><Landmark className="h-3 w-3" /> انتهاء رخصة القيادة</Label>
-                                <DateInput value={formData.drivingLicenseExpiry} onChange={d => handleSelectChange('drivingLicenseExpiry', d)} className="bg-white" />
-                            </div>
-                        </div>
-                    </section>
-                )}
-
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2">
                         <Briefcase className="h-5 w-5 text-primary" /> التعيين والدوام
@@ -354,9 +332,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                         <Separator className="my-2" />
 
+                        {/* ✨ استعادة القسم المعتمد: طريقة الدفع والبيانات البنكية المترابطة ✨ */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="grid gap-2">
-                                <Label className="font-bold text-emerald-900">طريقة استلام الراتب</Label>
+                                <Label htmlFor="salaryPaymentType" className="font-bold text-emerald-900">طريقة استلام الراتب</Label>
                                 <Select value={formData.salaryPaymentType} onValueChange={v => handleSelectChange('salaryPaymentType', v)}>
                                     <SelectTrigger className="h-11 bg-white"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
@@ -393,7 +372,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
             <DialogFooter className="mt-6 pt-6 border-t bg-muted/10 rounded-b-[2rem] p-6">
                 <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="h-12 px-8 rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSaving || isAnalyzing} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
+                <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي
                 </Button>

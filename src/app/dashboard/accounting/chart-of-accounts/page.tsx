@@ -85,7 +85,7 @@ const getTypeFromCode = (code: string): Account['type'] => {
     if (code.startsWith('3')) return 'equity';
     if (code.startsWith('4')) return 'income';
     if (code.startsWith('5')) return 'expense';
-    return 'asset'; // Default
+    return 'asset'; 
 };
 
 
@@ -137,7 +137,6 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         }
     }, [account, parentAccount, isEditing, isOpen, accounts]);
 
-    // جلب الموظفين عند فتح النموذج لتمكين الربط
     useEffect(() => {
         if (isOpen && firestore) {
             setLoadingEmployees(true);
@@ -157,7 +156,8 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         onSave({ ...formData, level, type, statement, balanceType, parentCode: parentAccount?.code || null });
     };
 
-    const showEmployeeLink = parentAccount?.code === '110102' || account?.parentCode === '110102';
+    // ✨ التحديث الجوهري: الربط بالموظف يظهر فقط لحسابات العهد 110103
+    const showEmployeeLink = parentAccount?.code === '110103' || account?.parentCode === '110103';
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -225,24 +225,12 @@ export default function ChartOfAccountsPage() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     
-    // UI and data state
     const [openAccounts, setOpenAccounts] = useState<Set<string>>(new Set(['1', '2', '3', '4', '5']));
     
     const { data: accounts, loading: accountsLoading, error: accountsError } = useSubscription<Account>(firestore, 'chartOfAccounts');
     const { data: journalEntries, loading: entriesLoading, error: entriesError } = useSubscription<JournalEntry>(firestore, 'journalEntries', [where('status', '==', 'posted')]);
     
     const loading = accountsLoading || entriesLoading;
-
-    // Form and Dialog state
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
-    const [confirmSeedText, setConfirmSeedText] = useState('');
-    const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-    const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
-    const [parentAccount, setParentAccount] = useState<Account | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isSeeding, setIsSeeding] = useState(false);
 
     const accountBalances = useMemo(() => {
         if (!accounts || !journalEntries) return new Map<string, number>();
@@ -413,6 +401,15 @@ export default function ChartOfAccountsPage() {
         }
     };
 
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
+    const [confirmSeedText, setConfirmSeedText] = useState('');
+    const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+    const [accountToDelete, setAccountToDelete] = useState<Account | null>(null);
+    const [parentAccount, setParentAccount] = useState<Account | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSeeding, setIsSeeding] = useState(false);
 
     return (
         <div className="space-y-6" dir="rtl">
@@ -427,7 +424,7 @@ export default function ChartOfAccountsPage() {
                         </div>
                          <div className="flex gap-2">
                             <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" disabled={isSeeding}>
-                                {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4 w-4" />}
+                                {isSeeding ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <DownloadCloud className="ml-2 h-4" />}
                                 {isSeeding ? 'جاري التنزيل...' : 'تنزيل شجرة حسابات أساسية'}
                             </Button>
                             <Button onClick={handleAddClick}><PlusCircle className="ml-2 h-4 w-4" /> إضافة حساب رئيسي</Button>
@@ -557,7 +554,7 @@ export default function ChartOfAccountsPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isSaving}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteConfirm} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">
+                        <AlertDialogAction onClick={handleDeleteConfirm} disabled={isSaving} className="bg-destructive hover:bg-destructive/90 rounded-xl">
                             {isSaving ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري الحذف...</> : 'نعم، قم بالحذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -582,7 +579,7 @@ export default function ChartOfAccountsPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={isSeeding}>إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding || confirmSeedText !== 'مسح'} className="bg-destructive hover:bg-destructive/90">
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={isSeeding || confirmSeedText !== 'مسح'} className="bg-destructive hover:bg-destructive/90 rounded-xl">
                             {isSeeding ? <><Loader2 className="ml-2 h-4 w-4 animate-spin"/> جاري التنزيل...</> : 'نعم، قم بالمسح والتنزيل'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
