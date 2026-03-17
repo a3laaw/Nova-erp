@@ -1,17 +1,16 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark, FileText } from 'lucide-react';
+import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark, FileText, Wallet } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import type { Employee, Department, Job } from '@/lib/types';
+import type { Employee, Department, Job, Account } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -48,6 +47,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
     const { data: jobs, loading: jobsLoading } = useSubscription<Job>(firestore, 'jobs', [], true);
+    const { data: accounts, loading: accountsLoading } = useSubscription<Account>(firestore, 'chartOfAccounts', [orderBy('code')]);
 
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
@@ -70,6 +70,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         targetDescription: 0,
         pieceRate: 0,
         dailyRate: 0,
+        custodyAccountId: null,
     });
 
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
@@ -95,6 +96,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                 transportAllowance: Number(initialData.transportAllowance || 0),
                 dailyRate: Number(initialData.dailyRate || 0),
                 contractPercentage: Number(initialData.contractPercentage || 0),
+                custodyAccountId: initialData.custodyAccountId || null,
             });
             setShowHousingAllowance(Number(initialData.housingAllowance) > 0);
             setShowTransportAllowance(Number(initialData.transportAllowance) > 0);
@@ -147,12 +149,19 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
 
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
+    
     const filteredJobOptions = useMemo(() => {
         if (!formData.department) return [];
         const selectedDept = departments.find(d => d.name === formData.department);
         if (!selectedDept) return [];
         return jobs.filter(j => (j as any).parentId === selectedDept.id).map(j => ({ value: j.name, label: j.name }));
     }, [departments, jobs, formData.department]);
+
+    // ✨ تحديد حسابات العهد فقط من شجرة الحسابات لربط الموظف
+    const custodyAccountOptions = useMemo(() => 
+        accounts.filter(a => a.parentCode === '110102' && a.isPayable)
+            .map(a => ({ value: a.id!, label: `${a.name} (${a.code})` }))
+    , [accounts]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -320,36 +329,52 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-emerald-50/20 border-emerald-100">
                     <h3 className="font-black text-lg flex items-center gap-2 text-emerald-800">
-                        <Banknote className="h-5 w-5" /> الرواتب والبدلات
+                        <Banknote className="h-5 w-5" /> الرواتب والربط المالي
                     </h3>
                     
-                    {formData.contractType === 'day_laborer' ? (
-                        <div className="grid gap-2 max-w-xs animate-in zoom-in-95">
-                            <Label className="font-black text-emerald-900">أجرة اليومية (د.ك) *</Label>
-                            <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} className="h-12 text-2xl font-black text-center border-2 border-emerald-200 bg-white rounded-2xl" />
+                    <div className="grid gap-6">
+                        <div className="grid gap-2 p-4 bg-white rounded-2xl border-2 border-dashed border-emerald-200">
+                            <Label className="font-black text-emerald-900 flex items-center gap-2">
+                                <Wallet className="h-4 w-4" /> ربط حساب العهدة في الشجرة *
+                            </Label>
+                            <InlineSearchList 
+                                value={formData.custodyAccountId || ''} 
+                                onSelect={v => handleSelectChange('custodyAccountId', v)} 
+                                options={custodyAccountOptions}
+                                placeholder={accountsLoading ? "جاري تحميل الشجرة..." : "اختر حساب العهدة المخصص..."}
+                                disabled={accountsLoading || isSaving}
+                            />
+                            <p className="text-[9px] text-emerald-700 font-bold pr-1">هذا الربط جوهري لتمكين الموظف من رفع تسويات العهدة آلياً.</p>
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="grid gap-2">
-                                <Label className="font-bold text-emerald-900">الراتب الأساسي *</Label>
-                                <Input id="basicSalary" type="number" step="0.001" value={formData.basicSalary} onChange={handleInputChange} className="h-11 font-mono font-bold bg-white" />
+
+                        {formData.contractType === 'day_laborer' ? (
+                            <div className="grid gap-2 max-w-xs animate-in zoom-in-95">
+                                <Label className="font-black text-emerald-900">أجرة اليومية (د.ك) *</Label>
+                                <Input id="dailyRate" type="number" step="0.001" value={formData.dailyRate} onChange={handleInputChange} className="h-12 text-2xl font-black text-center border-2 border-emerald-200 bg-white rounded-2xl" />
                             </div>
-                            <div className="grid gap-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Checkbox id="h-allow" checked={showHousingAllowance} onCheckedChange={c => setShowHousingAllowance(!!c)} />
-                                    <Label htmlFor="h-allow" className="text-xs font-bold">بدل سكن</Label>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid gap-2">
+                                    <Label className="font-bold text-emerald-900">الراتب الأساسي *</Label>
+                                    <Input id="basicSalary" type="number" step="0.001" value={formData.basicSalary} onChange={handleInputChange} className="h-11 font-mono font-bold bg-white" />
                                 </div>
-                                <Input id="housingAllowance" type="number" step="0.001" value={formData.housingAllowance} onChange={handleInputChange} disabled={!showHousingAllowance} className="h-11 bg-white" />
-                            </div>
-                            <div className="grid gap-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Checkbox id="t-allow" checked={showTransportAllowance} onCheckedChange={c => setShowTransportAllowance(!!c)} />
-                                    <Label htmlFor="t-allow" className="text-xs font-bold">بدل مواصلات</Label>
+                                <div className="grid gap-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Checkbox id="h-allow" checked={showHousingAllowance} onCheckedChange={c => setShowHousingAllowance(!!c)} />
+                                        <Label htmlFor="h-allow" className="text-xs font-bold">بدل سكن</Label>
+                                    </div>
+                                    <Input id="housingAllowance" type="number" step="0.001" value={formData.housingAllowance} onChange={handleInputChange} disabled={!showHousingAllowance} className="h-11 bg-white" />
                                 </div>
-                                <Input id="transportAllowance" type="number" step="0.001" value={formData.transportAllowance} onChange={handleInputChange} disabled={!showTransportAllowance} className="h-11 bg-white" />
+                                <div className="grid gap-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Checkbox id="t-allow" checked={showTransportAllowance} onCheckedChange={c => setShowTransportAllowance(!!c)} />
+                                        <Label htmlFor="t-allow" className="text-xs font-bold">بدل مواصلات</Label>
+                                    </div>
+                                    <Input id="transportAllowance" type="number" step="0.001" value={formData.transportAllowance} onChange={handleInputChange} disabled={!showTransportAllowance} className="h-11 bg-white" />
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </section>
             </div>
 

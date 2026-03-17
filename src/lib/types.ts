@@ -240,6 +240,7 @@ export interface Employee extends BaseEntity {
     targetDescription?: number;
     pieceRate?: number;
     dailyRate?: number;
+    custodyAccountId?: string | null; // الحساب المالي المرتبط بالعهدة في شجرة الحسابات
 }
 
 export interface CustodyReconciliation extends BaseEntity {

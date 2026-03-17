@@ -4,12 +4,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc, orderBy } from 'firebase/firestore';
-import type { CustodyReconciliation, Account, JournalEntry, ConstructionProject, Client } from '@/lib/types';
+import type { CustodyReconciliation, Account, JournalEntry, ConstructionProject, Client, Employee } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote, ImageIcon, FileText, X, PencilLine } from 'lucide-react';
+import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote, ImageIcon, FileText, X, PencilLine, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -17,11 +17,11 @@ import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
-import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '../ui/input';
+import { Input } from '@/components/ui/input';
 import Image from 'next/image';
 
 const statusTranslations: Record<string, string> = {
@@ -108,13 +108,24 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
+                
+                // ✨ الدرع الرقابي: جلب ملف الموظف للتأكد من حساب العهدة المربوط به
+                const empSnap = await transaction.get(doc(firestore, 'employees', rec.employeeId));
+                if (!empSnap.exists()) throw new Error("لم يتم العثور على ملف الموظف.");
+                const employee = empSnap.data() as Employee;
+
+                if (!employee.custodyAccountId) {
+                    throw new Error(`⚠️ تنبيه رقابي: الموظف ${rec.employeeName} غير مربوط بحساب عهدة في شجرة الحسابات. يرجى تعديل ملفه أولاً.`);
+                }
+
+                const custodyAccSnap = await transaction.get(doc(firestore, 'chartOfAccounts', employee.custodyAccountId));
+                if (!custodyAccSnap.exists()) throw new Error("حساب العهدة المربوط بالموظف غير موجود في شجرة الحسابات.");
+                const custodyAcc = { id: custodyAccSnap.id, ...custodyAccSnap.data() } as Account;
+
                 const jeCounterRef = doc(firestore, 'counters', 'journalEntries');
                 const jeCounterDoc = await transaction.get(jeCounterRef);
                 const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const jeNumber = `JV-REC-${currentYear}-${String(nextJeNum).padStart(4, '0')}`;
-
-                const custodyAcc = accounts.find(a => a.parentCode === '110102' && a.name.includes(rec.employeeName));
-                if (!custodyAcc) throw new Error(`لم يتم العثور على حساب عهدة للموظف ${rec.employeeName} في شجرة الحسابات.`);
 
                 const newJeRef = doc(collection(firestore, 'journalEntries'));
                 
@@ -141,9 +152,9 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     };
                 });
 
-                // سطر الدائن (تصفير العهدة)
+                // سطر الدائن (تصفير العهدة من حساب الموظف المربوط رسمياً)
                 jeLines.push({
-                    accountId: custodyAcc.id,
+                    accountId: custodyAcc.id!,
                     accountName: custodyAcc.name,
                     debit: 0,
                     credit: currentTotal
@@ -164,7 +175,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 transaction.update(recRef!, {
                     status: 'approved',
                     journalEntryId: newJeRef.id,
-                    totalAmount: currentTotal, // حفظ المبالغ المحدثة بعد تعديل المحاسب
+                    totalAmount: currentTotal, 
                     items: finalItemsToSave
                 });
 
@@ -218,9 +229,9 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     <Table>
                         <TableHeader className="bg-muted/30">
                             <TableRow className="h-14">
-                                <TableHead className="px-8 font-black">بيان المصروف والوثائق</TableHead>
-                                <TableHead className="font-black w-64">الارتباط بمشروع / عميل</TableHead>
-                                <TableHead className="text-center font-black w-32">المبلغ (د.ك)</TableHead>
+                                <TableHead className="px-8 font-black text-slate-900">بيان المصروف والوثائق</TableHead>
+                                <TableHead className="font-black w-64 text-slate-900">الارتباط بمشروع / عميل</TableHead>
+                                <TableHead className="text-center font-black w-32 text-slate-900">المبلغ (د.ك)</TableHead>
                                 <TableHead className="w-72 font-black text-primary bg-primary/5">توجيه حساب المصروف *</TableHead>
                             </TableRow>
                         </TableHeader>
