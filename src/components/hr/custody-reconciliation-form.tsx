@@ -19,9 +19,9 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft, MousePointer2 } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client, Account } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -56,8 +56,9 @@ interface PreviewFile {
 }
 
 /**
- * مكون معرض المعاينة الذكي:
- * يدعم التنقل عبر بكره الماوس وأزرار الملاحة الاحترافية.
+ * مكون منصة المعاينة الذكية (Smart Preview Deck):
+ * يعمل بنظام "كادر الرؤية الثنائي"؛ يظهر صورتين فقط والبقية عبر التمرير.
+ * يدعم التمرير الأفقي عبر بكرة الماوس أوتوماتيكياً.
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -72,7 +73,7 @@ function SmartPhotoGallery({
 }) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // تحويل التمرير العمودي للبكرة إلى تمرير أفقي انسيابي
+    // محرك تحويل بكرة الماوس العمودية إلى حركة أفقية انسيابية
     const handleWheel = (e: React.WheelEvent) => {
         if (scrollRef.current) {
             e.preventDefault();
@@ -82,7 +83,7 @@ function SmartPhotoGallery({
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollRef.current) {
-            const scrollAmount = 200;
+            const scrollAmount = 180;
             scrollRef.current.scrollBy({ 
                 left: direction === 'left' ? -scrollAmount : scrollAmount, 
                 behavior: 'smooth' 
@@ -100,36 +101,40 @@ function SmartPhotoGallery({
 
     return (
         <div className="relative group/gallery w-full">
-            {/* أزرار التنقل الاحترافية */}
-            <div className="absolute inset-y-0 -right-3 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
-                <Button 
-                    type="button" 
-                    variant="secondary" 
-                    size="icon" 
-                    className="h-7 w-7 rounded-full shadow-lg bg-white/90 border border-primary/20"
-                    onClick={() => scroll('right')}
-                >
-                    <ChevronRight className="h-4 w-4 text-primary" />
-                </Button>
-            </div>
-            
-            <div className="absolute inset-y-0 -left-3 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
-                <Button 
-                    type="button" 
-                    variant="secondary" 
-                    size="icon" 
-                    className="h-7 w-7 rounded-full shadow-lg bg-white/90 border border-primary/20"
-                    onClick={() => scroll('left')}
-                >
-                    <ChevronLeft className="h-4 w-4 text-primary" />
-                </Button>
-            </div>
+            {/* أزرار التنقل تظهر عند وجود أكثر من صورتين لسهولة الوصول */}
+            {files.length > 2 && (
+                <>
+                    <div className="absolute inset-y-0 -right-2 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                        <Button 
+                            type="button" 
+                            variant="secondary" 
+                            size="icon" 
+                            className="h-6 w-6 rounded-full shadow-lg bg-white/90 border border-primary/20"
+                            onClick={() => scroll('right')}
+                        >
+                            <ChevronRight className="h-3 w-3 text-primary" />
+                        </Button>
+                    </div>
+                    
+                    <div className="absolute inset-y-0 -left-2 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                        <Button 
+                            type="button" 
+                            variant="secondary" 
+                            size="icon" 
+                            className="h-6 w-6 rounded-full shadow-lg bg-white/90 border border-primary/20"
+                            onClick={() => scroll('left')}
+                        >
+                            <ChevronLeft className="h-3 w-3 text-primary" />
+                        </Button>
+                    </div>
+                </>
+            )}
 
-            {/* حاوية المعاينة مع دعم البكرة */}
+            {/* حاوية "كادر الرؤية الثنائي": محددة العرض لإظهار صورتين فقط */}
             <div 
                 ref={scrollRef}
                 onWheel={handleWheel}
-                className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center"
+                className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center max-w-[185px] mx-auto"
                 style={{ scrollBehavior: 'smooth' }}
             >
                 {files.map((p) => (
@@ -146,7 +151,7 @@ function SmartPhotoGallery({
                             type="button" 
                             onClick={() => onRemove(p.id)}
                             disabled={isSaving}
-                            className="absolute top-0.5 left-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity shadow-md"
+                            className="absolute top-0.5 left-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity shadow-md z-20"
                         >
                             <X className="h-3 w-3" />
                         </button>
@@ -168,7 +173,7 @@ export function CustodyReconciliationForm() {
     const [custodyBalance, setCustodyBalance] = useState(0);
     const [loadingBalance, setLoadingBalance] = useState(false);
     
-    // إدارة الصور المرفوعة لكل بند
+    // إدارة المرفقات لكل بند
     const [previews, setPreviews] = useState<Record<string, PreviewFile[]>>({});
     const [isDragging, setIsDragging] = useState<string | null>(null);
 
@@ -182,7 +187,7 @@ export function CustodyReconciliationForm() {
         defaultValues: {
             date: new Date(),
             employeeId: currentUser?.role !== 'Admin' ? currentUser?.employeeId : '',
-            items: [{ id: generateStableId(), description: '', amount: '', projectId: '', clientId: '' } as any],
+            items: [{ id: generateId(), description: '', amount: '', projectId: '', clientId: '' } as any],
         }
     });
 
@@ -224,7 +229,7 @@ export function CustodyReconciliationForm() {
         if (!files || files.length === 0) return;
         
         const newFiles: PreviewFile[] = Array.from(files).map(file => ({
-            id: generateStableId(),
+            id: generateId(),
             url: URL.createObjectURL(file),
             file: file
         }));
@@ -305,7 +310,7 @@ export function CustodyReconciliationForm() {
             });
 
             toast({ title: 'تم إرسال التسوية', description: 'بانتظار مراجعة واعتماد المحاسب المالي.' });
-            router.push('/dashboard/hr/employees');
+            router.push('/dashboard/hr/custody-reconciliation');
         } catch (error) {
             console.error("Save error:", error);
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إرسال طلب التسوية.' });
@@ -322,13 +327,13 @@ export function CustodyReconciliationForm() {
 
     return (
         <Card className="max-w-5xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
-            <form onSubmit={(e) => { e.preventDefault(); if (!isSaving) handleSubmit(onSubmit)(e); }}>
+            <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Wallet className="h-8 w-8"/></div>
                         <div>
-                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية (واجهة متطورة)</CardTitle>
-                            <CardDescription>ارفع الفواتير، تنقل بالبكرة أو بالأزرار، ودع المحاسب يكمل الربط المالي.</CardDescription>
+                            <CardTitle className="text-2xl font-black text-slate-900">تسوية عهدة نقدية (منصة الميدان)</CardTitle>
+                            <CardDescription className="text-base font-medium">وثق مصروفاتك وارفع صور الفواتير؛ سيقوم المحاسب بربطها محاسبياً لاحقاً.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -365,15 +370,17 @@ export function CustodyReconciliationForm() {
                     <div className="space-y-6">
                         <div className="flex justify-between items-center px-2">
                             <Label className="text-xl font-black flex items-center gap-2 text-foreground">
-                                <ScrollText className="h-5 w-5 text-primary" /> قائمة بنود التسوية
+                                <ScrollText className="h-5 w-5 text-primary" /> قائمة بنود المصروفات
                             </Label>
                             <Badge variant="outline" className="font-bold border-primary/20 text-primary bg-primary/5 px-4 h-7 rounded-full">
-                                {fields.length} بنود مدرجة
+                                {fields.length} بنود
                             </Badge>
                         </div>
 
                         <div className="space-y-6">
-                            {fields.map((field, index) => (
+                            {fields.map((field, index) => {
+                                const rowItem = watchedItems?.[index];
+                                return (
                                 <div key={field.id} className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-8 bg-white border-2 rounded-[2.5rem] shadow-sm hover:shadow-md transition-all group relative">
                                     
                                     <div className="lg:col-span-4 space-y-4">
@@ -381,22 +388,22 @@ export function CustodyReconciliationForm() {
                                             <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">بيان المصروف *</Label>
                                             <Input 
                                                 {...register(`items.${index}.description`)} 
-                                                placeholder="مثال: فاتورة بنزين، ضيافة..." 
+                                                placeholder="مثال: فاتورة بنزين، صيانة طارئة..." 
                                                 className="h-11 rounded-xl border-2 font-bold bg-muted/5 shadow-inner" 
                                                 disabled={isSaving}
                                             />
                                         </div>
                                         <div className="grid gap-1.5">
-                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">ارتباط (مشروع/عميل)</Label>
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">الارتباط بمشروع/عميل</Label>
                                             <Controller
                                                 control={control}
                                                 name={`items.${index}.projectId`}
-                                                render={({ field: catField }) => (
+                                                render={({ field: projField }) => (
                                                     <InlineSearchList 
-                                                        value={catField.value || ''} 
-                                                        onSelect={catField.onChange} 
+                                                        value={projField.value || ''} 
+                                                        onSelect={projField.onChange} 
                                                         options={combinedEntityOptions} 
-                                                        placeholder="اختر المشروع..." 
+                                                        placeholder="اختر المشروع (اختياري)..." 
                                                         className="h-11 rounded-xl border-dashed"
                                                         disabled={isSaving}
                                                     />
@@ -419,7 +426,7 @@ export function CustodyReconciliationForm() {
                                     </div>
 
                                     <div className="lg:col-span-5 space-y-2">
-                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">المرفقات (بكرة الماوس أو أزرار للتنقل)</Label>
+                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">الفواتير والمرفقات (صورتين فقط، البقية بالبكرة)</Label>
                                         
                                         <div className="flex gap-3 items-center">
                                             {/* منطقة الرفع الجانبية */}
@@ -428,12 +435,12 @@ export function CustodyReconciliationForm() {
                                                 onDragLeave={() => setIsDragging(null)}
                                                 onDrop={(e) => { e.preventDefault(); setIsDragging(null); handleFileDrop(field.id, e.dataTransfer.files); }}
                                                 className={cn(
-                                                    "w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer relative",
+                                                    "w-20 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer relative",
                                                     isDragging === field.id ? "bg-primary/10 border-primary scale-105" : "bg-muted/30 border-muted-foreground/20 hover:bg-muted/50"
                                                 )}
                                             >
-                                                <UploadCloud className="h-6 w-6 text-primary opacity-40" />
-                                                <span className="text-[8px] font-black text-primary text-center leading-tight">إدراج<br/>ملفات</span>
+                                                <UploadCloud className="h-5 w-5 text-primary opacity-40" />
+                                                <span className="text-[8px] font-black text-primary text-center leading-tight">إدراج</span>
                                                 <input 
                                                     type="file" 
                                                     multiple
@@ -444,7 +451,7 @@ export function CustodyReconciliationForm() {
                                                 />
                                             </div>
 
-                                            {/* معرض المعاينة الذكي بالبكرة والأزرار */}
+                                            {/* معرض المعاينة الذكي (كادر ثنائي) */}
                                             <SmartPhotoGallery 
                                                 itemId={field.id} 
                                                 files={previews[field.id] || []} 
@@ -461,21 +468,21 @@ export function CustodyReconciliationForm() {
                                             size="icon" 
                                             onClick={() => remove(index)} 
                                             disabled={fields.length <= 1 || isSaving}
-                                            className="h-10 w-10 text-destructive hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                            className="h-10 w-10 text-destructive hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
                                             <Trash2 className="h-5 w-5" />
                                         </Button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
 
                         <Button 
                             type="button" 
                             variant="outline" 
-                            onClick={() => append({ id: generateStableId(), description: '', amount: '', projectId: '', clientId: '' } as any)} 
+                            onClick={() => append({ id: generateId(), description: '', amount: '', projectId: '', clientId: '' } as any)} 
                             disabled={isSaving} 
-                            className="w-full h-14 border-dashed border-2 rounded-[2rem] gap-3 font-black text-primary hover:bg-primary/5 transition-all shadow-sm active:scale-[0.99]"
+                            className="w-full h-14 border-dashed border-2 rounded-[2rem] gap-3 font-black text-primary hover:bg-primary/5 transition-all shadow-sm"
                         >
                             <PlusCircle className="h-6 w-6 text-primary" /> إضافة بند مصروف إضافي للتسوية
                         </Button>
@@ -483,20 +490,20 @@ export function CustodyReconciliationForm() {
 
                     <div className="grid gap-3 p-8 bg-white/40 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10">
                         <Label className="font-black text-gray-700 pr-2">ملاحظات إضافية للمحاسب</Label>
-                        <Textarea {...register('notes')} placeholder="أدخل أي توضيحات إضافية حول المصروفات..." className="rounded-2xl border-none shadow-inner text-base p-6 min-h-[120px]" rows={3} disabled={isSaving}/>
+                        <Textarea {...register('notes')} placeholder="أدخل أي توضيحات إضافية حول المصروفات المذكورة..." className="rounded-2xl border-none shadow-inner text-base p-6 min-h-[120px]" rows={3} disabled={isSaving}/>
                     </div>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                     <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي المتوقع:</Label>
-                        <p className={cn("text-3xl font-black font-mono tracking-tight", custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600")}>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي في العهدة:</Label>
+                        <p className={cn("text-3xl font-black font-mono tracking-tight transition-colors", custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600")}>
                             {formatCurrency(custodyBalance - totalSpent)}
                         </p>
                     </div>
                     <Button 
                         type="submit" 
                         disabled={isSaving || totalSpent === 0} 
-                        className="h-16 px-20 rounded-3xl font-black text-2xl shadow-2xl shadow-primary/30 min-w-[350px] gap-4 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        className="h-16 px-20 rounded-3xl font-black text-2xl shadow-2xl shadow-primary/30 min-w-[350px] gap-4"
                     >
                         {isSaving ? (
                             <>
