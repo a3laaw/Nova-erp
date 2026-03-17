@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -208,12 +209,24 @@ const BoqItemRowRenderer = React.memo(
           </TableCell>
           <TableCell className="px-1 w-20 text-center">
             {!isHeader ? (
-              <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} onWheel={(e) => e.currentTarget.blur()} className="h-8 dir-ltr text-center font-mono text-sm font-black rounded-lg border-none bg-white shadow-inner" />
+              <Input 
+                type="number" 
+                step="any" 
+                {...register(`items.${node._index}.quantity`)} 
+                onWheel={(e) => e.currentTarget.blur()} 
+                className="h-8 dir-ltr text-center font-mono text-sm font-black rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
             ) : <span className="text-xs text-muted-foreground/40 font-black">-</span>}
           </TableCell>
           <TableCell className="px-1 w-24 text-center">
             {!isHeader ? (
-              <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} onWheel={(e) => e.currentTarget.blur()} className="h-8 dir-ltr text-center font-mono text-[11px] font-black text-primary rounded-lg border-none bg-white shadow-inner" />
+              <Input 
+                type="number" 
+                step="0.001" 
+                {...register(`items.${node._index}.sellingUnitPrice`)} 
+                onWheel={(e) => e.currentTarget.blur()} 
+                className="h-8 dir-ltr text-center font-mono text-[11px] font-black text-primary rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
             ) : <span className="text-xs text-muted-foreground/40 font-black">-</span>}
           </TableCell>
           <TableCell className="text-left font-mono font-black border-r bg-muted/5 px-3 w-32">
