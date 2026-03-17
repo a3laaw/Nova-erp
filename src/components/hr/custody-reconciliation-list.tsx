@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -126,7 +127,7 @@ export function CustodyReconciliationList() {
                                 <TableCell className="font-bold text-xs opacity-60">{formatDate(item.createdAt)}</TableCell>
                                 <TableCell className="text-left font-mono font-black text-[#2E5BCC] text-lg">{formatCurrency(item.totalAmount)}</TableCell>
                                 <TableCell>
-                                    <Badge variant="outline" className={cn("px-3 font-black text-[9px]", statusColors[item.status])}>
+                                    <Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[item.status])}>
                                         {statusTranslations[item.status]}
                                     </Badge>
                                 </TableCell>
@@ -138,6 +139,7 @@ export function CustodyReconciliationList() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
+                                            <DropdownMenuLabel>إجراءات المراجعة</DropdownMenuLabel>
                                             <DropdownMenuItem onClick={() => router.push(`/dashboard/hr/custody-reconciliation/${item.id}`)}>
                                                 <Eye className="ml-2 h-4 w-4" />
                                                 {item.status === 'pending' ? 'مراجعة وربط محاسبي' : 'عرض التفاصيل'}

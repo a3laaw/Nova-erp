@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc, orderBy } from 'firebase/firestore';
 import type { CustodyReconciliation, Account, JournalEntry } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,12 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+
+const statusTranslations: Record<string, string> = {
+    pending: 'بانتظار المراجعة',
+    approved: 'تم الاعتماد والترحيل',
+    rejected: 'مرفوضة',
+};
 
 interface Props {
   reconciliationId: string;
