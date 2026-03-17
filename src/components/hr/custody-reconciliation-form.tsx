@@ -19,13 +19,13 @@ import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft, Search } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client, Account } from '@/lib/types';
+import type { Employee, ConstructionProject, Client, Account, JournalEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, cn, generateStableId } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, generateStableId } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -66,7 +66,7 @@ interface PreviewFile {
 /**
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
  * - يظهر صورتين فقط والبقية عبر التمرير.
- * - عزل كامل لبكرة الماوس عن الصفحة الرئيسية.
+ * - عزل كامل لبكرة الماوس عن الصفحة الرئيسية (Scroll Isolation).
  * - معاينة منبثقة مكبرة عند تحويم الماوس (Hover Preview).
  */
 function SmartPhotoGallery({ 
@@ -83,21 +83,28 @@ function SmartPhotoGallery({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [hoveredImage, setHoveredImage] = useState<string | null>(null);
 
-    // ✨ عزل التمرير (Native Isolation Engine)
+    // ✨ محرك عزل التمرير (The Absolute Isolation Engine)
     useEffect(() => {
         const el = scrollRef.current;
         if (!el) return;
 
-        const handleNativeWheel = (e: WheelEvent) => {
+        const handleWheel = (e: WheelEvent) => {
+            // التحقق من وجود تمرير
             if (e.deltaY !== 0) {
+                // منع التمرير العمودي للصفحة تماماً
                 e.preventDefault();
+                // منع انتشار الحدث للأعلى
                 e.stopPropagation();
-                el.scrollLeft += e.deltaY;
+                
+                // تحويل الحركة العمودية للبكرة إلى حركة أفقية للصور
+                // في نظام RTL، نطرح deltaY للتحرك لليسار
+                el.scrollLeft -= e.deltaY;
             }
         };
 
-        el.addEventListener('wheel', handleNativeWheel, { passive: false });
-        return () => el.removeEventListener('wheel', handleNativeWheel);
+        // يجب أن يكون المستمع "غير سلبي" (passive: false) للسماح بـ preventDefault
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
     }, [files.length]);
 
     const scroll = (direction: 'left' | 'right') => {
@@ -120,7 +127,7 @@ function SmartPhotoGallery({
 
     return (
         <div className="relative group/gallery w-full">
-            {/* أزرار التنقل */}
+            {/* أزرار التنقل السريع */}
             {files.length > 2 && (
                 <>
                     <div className="absolute inset-y-0 -right-2 z-20 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
@@ -363,6 +370,9 @@ export function CustodyReconciliationForm() {
         ...clients.map(c => ({ value: c.id!, label: `عميل: ${c.nameAr}` }))
     ], [projects, clients]);
 
+    const { theme } = useAppTheme();
+    const cnFunc = (theme === 'glass' ? (...args: any[]) => args.join(' ') : (cls: string) => cls);
+
     return (
         <Card className="max-w-5xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
@@ -471,10 +481,7 @@ export function CustodyReconciliationForm() {
                                                 onDragOver={(e) => { e.preventDefault(); setIsDragging(field.id); }}
                                                 onDragLeave={() => setIsDragging(null)}
                                                 onDrop={(e) => { e.preventDefault(); setIsDragging(null); handleFileDrop(field.id, e.dataTransfer.files); }}
-                                                className={cn(
-                                                    "w-20 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer relative",
-                                                    isDragging === field.id ? "bg-primary/10 border-primary scale-105" : "bg-muted/30 border-muted-foreground/20 hover:bg-muted/50"
-                                                )}
+                                                className="w-20 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer relative bg-muted/30 border-muted-foreground/20 hover:bg-muted/50"
                                             >
                                                 <UploadCloud className="h-5 w-5 text-primary opacity-40" />
                                                 <span className="text-[8px] font-black text-primary text-center leading-tight">إدراج</span>
