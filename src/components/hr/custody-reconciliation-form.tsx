@@ -19,7 +19,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft, MousePointer2 } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -55,6 +55,108 @@ interface PreviewFile {
     file: File;
 }
 
+/**
+ * مكون معرض المعاينة الذكي:
+ * يدعم التنقل عبر بكره الماوس وأزرار الملاحة الاحترافية.
+ */
+function SmartPhotoGallery({ 
+    itemId, 
+    files, 
+    onRemove, 
+    isSaving 
+}: { 
+    itemId: string, 
+    files: PreviewFile[], 
+    onRemove: (fid: string) => void,
+    isSaving: boolean 
+}) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // تحويل التمرير العمودي للبكرة إلى تمرير أفقي انسيابي
+    const handleWheel = (e: React.WheelEvent) => {
+        if (scrollRef.current) {
+            e.preventDefault();
+            scrollRef.current.scrollLeft += e.deltaY;
+        }
+    };
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollRef.current) {
+            const scrollAmount = 200;
+            scrollRef.current.scrollBy({ 
+                left: direction === 'left' ? -scrollAmount : scrollAmount, 
+                behavior: 'smooth' 
+            });
+        }
+    };
+
+    if (files.length === 0) {
+        return (
+            <div className="flex items-center justify-center w-full h-24 opacity-30 italic text-[10px] font-bold border-2 border-dashed rounded-2xl">
+                بانتظار إرفاق المستندات...
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative group/gallery w-full">
+            {/* أزرار التنقل الاحترافية */}
+            <div className="absolute inset-y-0 -right-3 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                <Button 
+                    type="button" 
+                    variant="secondary" 
+                    size="icon" 
+                    className="h-7 w-7 rounded-full shadow-lg bg-white/90 border border-primary/20"
+                    onClick={() => scroll('right')}
+                >
+                    <ChevronRight className="h-4 w-4 text-primary" />
+                </Button>
+            </div>
+            
+            <div className="absolute inset-y-0 -left-3 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
+                <Button 
+                    type="button" 
+                    variant="secondary" 
+                    size="icon" 
+                    className="h-7 w-7 rounded-full shadow-lg bg-white/90 border border-primary/20"
+                    onClick={() => scroll('left')}
+                >
+                    <ChevronLeft className="h-4 w-4 text-primary" />
+                </Button>
+            </div>
+
+            {/* حاوية المعاينة مع دعم البكرة */}
+            <div 
+                ref={scrollRef}
+                onWheel={handleWheel}
+                className="flex p-2 gap-3 overflow-x-auto scrollbar-none bg-muted/10 rounded-2xl border-2 border-white shadow-inner h-24 items-center"
+                style={{ scrollBehavior: 'smooth' }}
+            >
+                {files.map((p) => (
+                    <div key={p.id} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 animate-in zoom-in-95 group/img">
+                        {p.file.type.startsWith('image/') ? (
+                            <Image src={p.url} alt="Receipt" fill className="object-cover" />
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full bg-indigo-50">
+                                <FileText className="h-6 w-6 text-indigo-600" />
+                                <span className="text-[7px] font-black text-indigo-800 truncate px-1 w-full text-center">{p.file.name}</span>
+                            </div>
+                        )}
+                        <button 
+                            type="button" 
+                            onClick={() => onRemove(p.id)}
+                            disabled={isSaving}
+                            className="absolute top-0.5 left-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity shadow-md"
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function CustodyReconciliationForm() {
     const { firestore, storage } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -66,7 +168,7 @@ export function CustodyReconciliationForm() {
     const [custodyBalance, setCustodyBalance] = useState(0);
     const [loadingBalance, setLoadingBalance] = useState(false);
     
-    // إدارة مصفوفة صور لكل بند بنمط شريط أفقي
+    // إدارة الصور المرفوعة لكل بند
     const [previews, setPreviews] = useState<Record<string, PreviewFile[]>>({});
     const [isDragging, setIsDragging] = useState<string | null>(null);
 
@@ -131,8 +233,6 @@ export function CustodyReconciliationForm() {
             ...prev, 
             [itemId]: [...(prev[itemId] || []), ...newFiles] 
         }));
-        
-        toast({ title: 'تمت إضافة الصور', description: `تم إدراج ${newFiles.length} ملفات في شريط المعاينة.` });
     };
 
     const removeFile = (itemId: string, fileId: string) => {
@@ -176,7 +276,7 @@ export function CustodyReconciliationForm() {
                     projectName: project?.projectName || null,
                     clientId: item.clientId || null,
                     clientName: client?.nameAr || null,
-                    attachmentUrls: attachmentUrls // تم التحديث لمصفوفة
+                    attachmentUrls: attachmentUrls
                 });
             }
 
@@ -227,8 +327,8 @@ export function CustodyReconciliationForm() {
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Wallet className="h-8 w-8"/></div>
                         <div>
-                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية (رفع متعدد)</CardTitle>
-                            <CardDescription>ارفع عدة فواتير لكل بند مصروف، وسيتم عرضها كشريط معاينة أفقي للمحاسب.</CardDescription>
+                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية (واجهة متطورة)</CardTitle>
+                            <CardDescription>ارفع الفواتير، تنقل بالبكرة أو بالأزرار، ودع المحاسب يكمل الربط المالي.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -265,7 +365,7 @@ export function CustodyReconciliationForm() {
                     <div className="space-y-6">
                         <div className="flex justify-between items-center px-2">
                             <Label className="text-xl font-black flex items-center gap-2 text-foreground">
-                                <ScrollText className="h-5 w-5 text-primary" /> قائمة المصروفات
+                                <ScrollText className="h-5 w-5 text-primary" /> قائمة بنود التسوية
                             </Label>
                             <Badge variant="outline" className="font-bold border-primary/20 text-primary bg-primary/5 px-4 h-7 rounded-full">
                                 {fields.length} بنود مدرجة
@@ -287,7 +387,7 @@ export function CustodyReconciliationForm() {
                                             />
                                         </div>
                                         <div className="grid gap-1.5">
-                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">ارتباط (اختياري)</Label>
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">ارتباط (مشروع/عميل)</Label>
                                             <Controller
                                                 control={control}
                                                 name={`items.${index}.projectId`}
@@ -296,7 +396,7 @@ export function CustodyReconciliationForm() {
                                                         value={catField.value || ''} 
                                                         onSelect={catField.onChange} 
                                                         options={combinedEntityOptions} 
-                                                        placeholder="مشروع أو عميل..." 
+                                                        placeholder="اختر المشروع..." 
                                                         className="h-11 rounded-xl border-dashed"
                                                         disabled={isSaving}
                                                     />
@@ -319,21 +419,21 @@ export function CustodyReconciliationForm() {
                                     </div>
 
                                     <div className="lg:col-span-5 space-y-2">
-                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">شريط معاينة الفواتير (رفع متعدد)</Label>
+                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">المرفقات (بكرة الماوس أو أزرار للتنقل)</Label>
                                         
-                                        <div className="flex gap-3">
-                                            {/* منطقة الرفع الجانبية الصغيرة */}
+                                        <div className="flex gap-3 items-center">
+                                            {/* منطقة الرفع الجانبية */}
                                             <div 
                                                 onDragOver={(e) => { e.preventDefault(); setIsDragging(field.id); }}
                                                 onDragLeave={() => setIsDragging(null)}
                                                 onDrop={(e) => { e.preventDefault(); setIsDragging(null); handleFileDrop(field.id, e.dataTransfer.files); }}
                                                 className={cn(
-                                                    "w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer",
+                                                    "w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer relative",
                                                     isDragging === field.id ? "bg-primary/10 border-primary scale-105" : "bg-muted/30 border-muted-foreground/20 hover:bg-muted/50"
                                                 )}
                                             >
                                                 <UploadCloud className="h-6 w-6 text-primary opacity-40" />
-                                                <span className="text-[8px] font-black text-primary text-center leading-tight">إدراج<br/>فواتير</span>
+                                                <span className="text-[8px] font-black text-primary text-center leading-tight">إدراج<br/>ملفات</span>
                                                 <input 
                                                     type="file" 
                                                     multiple
@@ -344,35 +444,13 @@ export function CustodyReconciliationForm() {
                                                 />
                                             </div>
 
-                                            {/* شريط الصور الأفقي */}
-                                            <ScrollArea className="flex-grow bg-muted/10 rounded-2xl border h-24">
-                                                <div className="flex p-2 gap-3">
-                                                    {(previews[field.id] || []).length === 0 ? (
-                                                        <div className="flex items-center justify-center w-full h-20 opacity-30 italic text-[10px] font-bold">بانتظار إرفاق المستندات...</div>
-                                                    ) : (
-                                                        previews[field.id].map((p) => (
-                                                            <div key={p.id} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 animate-in zoom-in-95 group/img">
-                                                                {p.file.type.startsWith('image/') ? (
-                                                                    <Image src={p.url} alt="Strip" fill className="object-cover" />
-                                                                ) : (
-                                                                    <div className="flex flex-col items-center justify-center h-full bg-indigo-50">
-                                                                        <FileText className="h-6 w-6 text-indigo-600" />
-                                                                        <span className="text-[7px] font-black text-indigo-800 truncate px-1 w-full text-center">{p.file.name}</span>
-                                                                    </div>
-                                                                )}
-                                                                <button 
-                                                                    type="button" 
-                                                                    onClick={() => removeFile(field.id, p.id)}
-                                                                    className="absolute top-0.5 left-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity"
-                                                                >
-                                                                    <X className="h-3 w-3" />
-                                                                </button>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                                <ScrollBar orientation="horizontal" />
-                                            </ScrollArea>
+                                            {/* معرض المعاينة الذكي بالبكرة والأزرار */}
+                                            <SmartPhotoGallery 
+                                                itemId={field.id} 
+                                                files={previews[field.id] || []} 
+                                                onRemove={(fid) => removeFile(field.id, fid)} 
+                                                isSaving={isSaving}
+                                            />
                                         </div>
                                     </div>
 
@@ -383,7 +461,7 @@ export function CustodyReconciliationForm() {
                                             size="icon" 
                                             onClick={() => remove(index)} 
                                             disabled={fields.length <= 1 || isSaving}
-                                            className="h-10 w-10 text-destructive hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="h-10 w-10 text-destructive hover:bg-red-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                                         >
                                             <Trash2 className="h-5 w-5" />
                                         </Button>
@@ -404,22 +482,14 @@ export function CustodyReconciliationForm() {
                     </div>
 
                     <div className="grid gap-3 p-8 bg-white/40 rounded-[2.5rem] border-2 border-dashed border-muted-foreground/10">
-                        <Label className="font-black text-gray-700 pr-2">ملاحظات إضافية للمحاسب المالي</Label>
-                        <Textarea 
-                            {...register('notes')} 
-                            placeholder="اشرح أي تفاصيل إضافية أو مبررات لهذه المصروفات..." 
-                            className="rounded-3xl border-none shadow-inner text-base p-6 min-h-[120px] bg-white/50" 
-                            disabled={isSaving}
-                        />
+                        <Label className="font-black text-gray-700 pr-2">ملاحظات إضافية للمحاسب</Label>
+                        <Textarea {...register('notes')} placeholder="أدخل أي توضيحات إضافية حول المصروفات..." className="rounded-2xl border-none shadow-inner text-base p-6 min-h-[120px]" rows={3} disabled={isSaving}/>
                     </div>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                     <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">صافي الرصيد المتبقي بعد الخصم:</Label>
-                        <p className={cn(
-                            "text-3xl font-black font-mono tracking-tight", 
-                            custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600"
-                        )}>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي المتوقع:</Label>
+                        <p className={cn("text-3xl font-black font-mono tracking-tight", custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600")}>
                             {formatCurrency(custodyBalance - totalSpent)}
                         </p>
                     </div>
@@ -431,7 +501,7 @@ export function CustodyReconciliationForm() {
                         {isSaving ? (
                             <>
                                 <Loader2 className="animate-spin h-8 w-8"/>
-                                <span>جاري معالجة ورفع الملفات...</span>
+                                <span>جاري الحفظ والرفع...</span>
                             </>
                         ) : (
                             <>
