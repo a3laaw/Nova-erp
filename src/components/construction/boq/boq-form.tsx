@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -251,12 +252,12 @@ const BoqItemRowRenderer = React.memo(
               {formatCurrency(branchTotal)}
             </div>
           </TableCell>
-          <TableCell className="px-2 border-r min-w-[150px]">
+          <TableCell className="px-2 border-r w-48">
             <Textarea
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-[10px] min-h-[36px] bg-white border-none shadow-inner rounded-lg px-2 py-2 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
+              className="text-[10px] min-h-[30px] bg-white border-none shadow-inner rounded-full px-4 py-1.5 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -380,10 +381,11 @@ export function BoqForm({
   }, [watchedItems, remove]);
 
   return (
-    <div className="space-y-4 max-w-full mx-auto" dir="rtl">
+    <div className="space-y-4 w-full px-1" dir="rtl">
       {/* العلوية المدمجة الرشيقة */}
       <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
         <div className="flex flex-col lg:flex-row justify-between items-center p-6 lg:px-8 lg:py-6 gap-6">
+          {/* Right Side (Title/Icon) */}
           <div className="flex items-center gap-4">
             <div className="p-3 bg-primary/10 rounded-2xl text-primary border border-primary/20">
               <ListTree className="h-7 w-7" />
@@ -391,12 +393,13 @@ export function BoqForm({
             <div className="text-right">
               <div className="flex items-center gap-2">
                   <h1 className="text-2xl font-black tracking-tighter text-[#1e1b4b]">مُحرر المقايسة</h1>
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
               </div>
-              <p className="text-[10px] font-black text-[#1e1b4b]/60 mt-0.5 uppercase tracking-widest">الحصر والتسعير</p>
+              <p className="text-[10px] font-black text-[#1e1b4b]/60 mt-0.5 uppercase tracking-widest">إدارة الحصر والتسعير المرجعي</p>
             </div>
           </div>
 
+          {/* Left Side (Stats) */}
           <div className="flex items-center gap-0 bg-white/40 p-1 rounded-full border border-white/60 shadow-lg group">
               <div className="bg-[#7209B7] px-6 py-2.5 rounded-full flex flex-col items-center shadow-xl transition-all group-hover:brightness-110">
                   <span className="text-[8px] font-black text-white/80 uppercase tracking-widest leading-none mb-1">الإجمالي</span>
@@ -444,10 +447,10 @@ export function BoqForm({
             </div>
           </Card>
 
-          {/* الجدول المجهري البانورامي */}
+          {/* الجدول البانورامي */}
           <Card className="rounded-[2rem] border-none shadow-xl overflow-hidden glass-effect">
-            <Table className="w-full border-collapse">
-              <TableHeader className="bg-primary/10">
+            <Table className="w-full border-collapse table-fixed">
+              <TableHeader className="bg-primary/5">
                 <TableRow className="hover:bg-transparent border-none h-12">
                   <TableHead className="text-center font-black text-[10px] uppercase border-l border-white/20 w-8 text-primary">م</TableHead>
                   <TableHead className="font-black text-xs px-4 text-primary">بيان الأعمال التفصيلي</TableHead>
@@ -455,7 +458,7 @@ export function BoqForm({
                   <TableHead className="text-center font-black text-xs border-l border-white/20 w-20 text-primary">كمية</TableHead>
                   <TableHead className="text-center font-black text-xs border-l border-white/20 w-24 text-primary">السعر</TableHead>
                   <TableHead className="text-left font-black text-xs border-l border-white/20 w-28 text-primary">الإجمالي</TableHead>
-                  <TableHead className="font-black text-xs border-l border-white/20 w-full min-w-[200px] text-primary">ملاحظات</TableHead>
+                  <TableHead className="font-black text-xs border-l border-white/20 w-40 text-primary">ملاحظات</TableHead>
                   <TableHead className="text-center font-black text-xs w-16 text-primary">إجراء</TableHead>
                 </TableRow>
               </TableHeader>
@@ -505,21 +508,19 @@ export function BoqForm({
             </div>
           </Card>
 
-          {/* شريط الأوامر المدمج (محاكاة الصورة المرجعية) */}
+          {/* شريط الأوامر المدمج */}
           <div className="pb-10 pt-4 flex justify-center">
-            <Card className="rounded-[3.5rem] border-none shadow-2xl glass-effect p-4 flex flex-row items-center gap-10 min-w-[800px] justify-between">
+            <Card className="rounded-[3rem] border-none shadow-2xl glass-effect p-6 flex flex-row items-center justify-between gap-10 min-w-[60%]">
               
-              {/* جهة اليمين: زر الاعتماد (بناءً على RTL - البنفسجي البيضاوي) */}
               <Button 
                 type="submit" 
                 disabled={isSaving} 
-                className="h-14 px-16 rounded-full font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all bg-[#7209B7] text-white gap-3 order-1"
+                className="h-14 px-12 rounded-full font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all bg-[#7209B7] text-white gap-3 order-1"
               >
-                {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <FileCheck className="h-6 w-6" />}
+                {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
                 اعتماد وحفظ الجدول النهائي
               </Button>
 
-              {/* المنتصف: زر الإلغاء */}
               <Button 
                 type="button" 
                 variant="ghost" 
@@ -530,15 +531,12 @@ export function BoqForm({
                 إلغاء التعديلات
               </Button>
               
-              {/* جهة اليسار: كبسولة الإحصاء المستديرة (The Stats Bubble) */}
-              <div className="h-[120px] w-[120px] rounded-full border border-white/60 bg-white/40 shadow-inner flex flex-col items-center justify-center text-center p-4 order-3 group hover:scale-105 transition-all">
-                  <div className="p-1.5 bg-primary/10 rounded-lg mb-1">
-                    <Calculator className="h-3 w-3 text-primary" />
+              <div className="flex flex-col items-center gap-1 order-3">
+                  <div className="p-2 bg-primary/10 rounded-xl">
+                    <Calculator className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-[10px] font-black text-[#1e1b4b] leading-tight">
-                    تم حصر وتثمين <br/>
-                    <span className="text-lg text-primary">{fields.length}</span> <br/>
-                    بنود بدقة تامة
+                  <p className="text-[10px] font-black text-[#1e1b4b] text-center">
+                    تم حصر <span className="text-primary text-base px-1">{fields.length}</span> بنود
                   </p>
               </div>
 
