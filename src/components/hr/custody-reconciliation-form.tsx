@@ -17,11 +17,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Banknote, Camera, Info, History, ShieldCheck, Wallet } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Banknote, Camera, Info, History, ShieldCheck, Wallet, Target, User } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Account, Employee, CustodyReconciliation, JournalEntry } from '@/lib/types';
+import type { Account, Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, generateStableId } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -33,7 +33,8 @@ import { Separator } from '../ui/separator';
 const itemSchema = z.object({
   description: z.string().min(1, "بيان المصروف مطلوب."),
   amount: z.preprocess((v) => parseFloat(String(v || '0')), z.number().positive("المبلغ مطلوب")),
-  category: z.string().min(1, "تصنيف المصروف مطلوب."),
+  projectId: z.string().optional().nullable(),
+  clientId: z.string().optional().nullable(),
   file: z.any().optional(),
 });
 
@@ -59,6 +60,8 @@ export function CustodyReconciliationForm() {
     const [loadingBalance, setLoadingBalance] = useState(false);
 
     const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+    const { data: projects = [], loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
+    const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, 'clients', [orderBy('nameAr')]);
     const { data: accounts = [] } = useSubscription<Account>(firestore, 'chartOfAccounts', [orderBy('code')]);
 
     const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<FormValues>({
@@ -66,7 +69,7 @@ export function CustodyReconciliationForm() {
         defaultValues: {
             date: new Date(),
             employeeId: currentUser?.role !== 'Admin' ? currentUser?.employeeId : '',
-            items: [{ description: '', amount: 0, category: '' }],
+            items: [{ description: '', amount: 0, projectId: '', clientId: '' }],
         }
     });
 
@@ -78,7 +81,6 @@ export function CustodyReconciliationForm() {
         (watchedItems || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
     [watchedItems]);
 
-    // ✨ محرك رصيد العهدة اللحظي
     useEffect(() => {
         if (!firestore || !selectedEmployeeId) {
             setCustodyBalance(0);
@@ -87,7 +89,8 @@ export function CustodyReconciliationForm() {
         setLoadingBalance(true);
         const fetchBalance = async () => {
             try {
-                const custodyAcc = accounts.find(a => a.parentCode === '110102' && a.name.includes(employees.find(e => e.id === selectedEmployeeId)?.fullName || ''));
+                const emp = employees.find(e => e.id === selectedEmployeeId);
+                const custodyAcc = accounts.find(a => a.parentCode === '110102' && a.name.includes(emp?.fullName || ''));
                 if (!custodyAcc) {
                     setCustodyBalance(0);
                     return;
@@ -117,7 +120,10 @@ export function CustodyReconciliationForm() {
     }, [firestore]);
 
     const employeeOptions = useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
-    const expenseAccountOptions = useMemo(() => accounts.filter(a => a.code.startsWith('5')).map(a => ({ value: a.id!, label: `${a.name} (${a.code})` })), [accounts]);
+    const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: `مشروع: ${p.projectName}` })), [projects]);
+    const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: `عميل: ${c.nameAr}` })), [clients]);
+    
+    const combinedEntityOptions = useMemo(() => [...projectOptions, ...clientOptions], [projectOptions, clientOptions]);
 
     const onSubmit = async (data: FormValues) => {
         if (!firestore || !currentUser || !storage) return;
@@ -126,8 +132,10 @@ export function CustodyReconciliationForm() {
             return;
         }
 
+        if (savingRef.current) return;
         savingRef.current = true;
         setIsSaving(true);
+
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
@@ -136,22 +144,19 @@ export function CustodyReconciliationForm() {
                 const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const finalRecNumber = `REC-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
 
-                const processedItems = [];
-                for (const item of data.items) {
-                    const acc = accounts.find(a => a.id === item.category);
-                    let attachmentUrl = '';
-                    
-                    // Upload logic inside loop (Simplified for transaction context)
-                    // Note: In real production, upload outside transaction then commit IDs
-                    
-                    processedItems.push({
+                const processedItems = data.items.map(item => {
+                    const project = projects.find(p => p.id === item.projectId);
+                    const client = clients.find(c => c.id === item.clientId);
+                    return {
                         description: item.description,
                         amount: Number(item.amount),
-                        category: item.category,
-                        categoryName: acc?.name || '',
-                        attachmentUrl
-                    });
-                }
+                        projectId: item.projectId || null,
+                        projectName: project?.projectName || null,
+                        clientId: item.clientId || null,
+                        clientName: client?.nameAr || null,
+                        attachmentUrl: '' // In real app, upload handles this outside transaction
+                    };
+                });
 
                 const newRecRef = doc(collection(firestore, 'custody_reconciliations'));
                 transaction.set(newRecRef, cleanFirestoreData({
@@ -171,7 +176,7 @@ export function CustodyReconciliationForm() {
             });
 
             toast({ title: 'تم إرسال التسوية', description: 'بانتظار مراجعة واعتماد المحاسب المالي.' });
-            router.push('/dashboard/hr');
+            router.push('/dashboard/hr/employees');
         } catch (error) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'فشل إرسال طلب التسوية.' });
             setIsSaving(false);
@@ -180,21 +185,21 @@ export function CustodyReconciliationForm() {
     };
 
     return (
-        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect" dir="rtl">
             <form onSubmit={handleSubmit(onSubmit)}>
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Wallet className="h-8 w-8"/></div>
                         <div>
-                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية</CardTitle>
-                            <CardDescription>قم بإدخال مصروفاتك الميدانية وإرفاق الفواتير لتصفية عهدتك المالية.</CardDescription>
+                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية للموظف</CardTitle>
+                            <CardDescription>أدخل مصروفاتك واربطها بالمشروع أو العميل. سيتولى المحاسب ربطها بالحسابات المالية.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-8 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="grid gap-2">
-                            <Label className="font-bold">الموظف صاحب العهدة</Label>
+                            <Label className="font-bold mr-1">الموظف صاحب العهدة</Label>
                             <Controller
                                 control={control}
                                 name="employeeId"
@@ -205,13 +210,14 @@ export function CustodyReconciliationForm() {
                                         options={employeeOptions}
                                         placeholder="ابحث عن الموظف..."
                                         disabled={currentUser?.role !== 'Admin' || isSaving}
+                                        className="h-12 rounded-2xl"
                                     />
                                 )}
                             />
                         </div>
-                        <div className="bg-primary/5 p-4 rounded-2xl border-2 border-dashed border-primary/20 flex items-center justify-between shadow-inner">
+                        <div className="bg-white/50 p-4 rounded-3xl border-2 border-dashed border-primary/20 flex items-center justify-between shadow-inner">
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-black uppercase text-primary">رصيد العهدة الحالي</Label>
+                                <Label className="text-[10px] font-black uppercase text-primary">الرصيد المتاح للتحميل</Label>
                                 <p className="text-2xl font-black text-primary font-mono">
                                     {loadingBalance ? <Loader2 className="h-4 w-4 animate-spin"/> : formatCurrency(custodyBalance)}
                                 </p>
@@ -222,48 +228,64 @@ export function CustodyReconciliationForm() {
 
                     <div className="space-y-4">
                         <Label className="text-xl font-black flex items-center gap-2">
-                            <ShoppingCart className="h-5 w-5 text-primary" /> تفاصيل المصروفات
+                            <PlusCircle className="h-5 w-5 text-primary" /> قائمة المصروفات الميدانية
                         </Label>
-                        <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-card">
+                        <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
                             <Table>
-                                <TableHeader className="bg-muted/50">
-                                    <TableRow className="h-14">
-                                        <TableHead className="w-[60px]"></TableHead>
-                                        <TableHead className="font-bold">بيان المصروف (الفاتورة)</TableHead>
-                                        <TableHead className="w-48 font-bold">التصنيف المحاسبي</TableHead>
-                                        <TableHead className="w-32 text-center font-bold">المبلغ</TableHead>
-                                        <TableHead className="w-16 text-center">📷</TableHead>
+                                <TableHeader className="bg-muted/50 h-14">
+                                    <TableRow className="border-none">
+                                        <TableHead className="w-[60px] text-center"></TableHead>
+                                        <TableHead className="font-black text-[#7209B7]">بيان الفاتورة</TableHead>
+                                        <TableHead className="w-64 font-black text-[#7209B7]">المشروع / العميل المرتبط</TableHead>
+                                        <TableHead className="w-32 text-center font-black text-[#7209B7]">المبلغ</TableHead>
+                                        <TableHead className="w-16 text-center text-[#7209B7]"><Camera className="h-4 w-4 mx-auto"/></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {fields.map((field, index) => (
-                                        <TableRow key={field.id} className="h-16 border-b last:border-0 hover:bg-muted/5">
+                                    {fields.map((field, index) => {
+                                        const item = watchedItems?.[index];
+                                        return (
+                                        <TableRow key={field.id} className="h-20 hover:bg-primary/5 transition-colors border-b last:border-0">
                                             <TableCell className="text-center">
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1 || isSaving} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
                                             </TableCell>
                                             <TableCell>
-                                                <Input {...register(`items.${index}.description`)} placeholder="مثال: بترول سيارة، قرطاسية..." className="border-none shadow-none font-bold bg-transparent" />
+                                                <Input {...register(`items.${index}.description`)} placeholder="بترول، غداء عمال، قرطاسية..." className="border-none shadow-none font-bold bg-transparent text-gray-800" disabled={isSaving} />
                                             </TableCell>
                                             <TableCell>
                                                 <Controller
                                                     control={control}
-                                                    name={`items.${index}.category`}
+                                                    name={`items.${index}.projectId`}
                                                     render={({ field: catField }) => (
-                                                        <InlineSearchList value={catField.value} onSelect={catField.onChange} options={expenseAccountOptions} placeholder="نوع المصروف..." className="h-8 text-xs border-dashed" />
+                                                        <InlineSearchList 
+                                                            value={catField.value || ''} 
+                                                            onSelect={catField.onChange} 
+                                                            options={combinedEntityOptions} 
+                                                            placeholder="اربط بمشروع..." 
+                                                            className="h-9 text-[10px] border-dashed rounded-xl"
+                                                            disabled={isSaving}
+                                                        />
                                                     )}
                                                 />
                                             </TableCell>
-                                            <TableCell>
-                                                <Input type="number" step="any" {...register(`items.${index}.amount`)} onWheel={(e) => e.currentTarget.blur()} className="dir-ltr text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <TableCell className="bg-primary/[0.02]">
+                                                <Input 
+                                                    type="number" 
+                                                    step="any" 
+                                                    {...register(`items.${index}.amount`)} 
+                                                    onWheel={(e) => e.currentTarget.blur()}
+                                                    disabled={isSaving}
+                                                    className="dir-ltr text-center font-black text-xl text-primary border-none shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                                />
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><Camera className="h-4 w-4"/></Button>
+                                                <Button type="button" variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground rounded-xl border hover:bg-primary/10 transition-all"><Camera className="h-4 w-4"/></Button>
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )})}
                                 </TableBody>
                                 <TableFooter className="bg-primary/5 h-20">
-                                    <TableRow>
+                                    <TableRow className="border-none">
                                         <TableCell colSpan={3} className="text-right px-12 font-black text-xl">إجمالي مصروفات التسوية:</TableCell>
                                         <TableCell className="text-center font-mono text-2xl font-black text-primary">{formatCurrency(totalSpent)}</TableCell>
                                         <TableCell />
@@ -271,32 +293,29 @@ export function CustodyReconciliationForm() {
                                 </TableFooter>
                             </Table>
                         </div>
-                        <Button type="button" variant="outline" onClick={() => append({ description: '', amount: 0, category: '' })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold hover:bg-primary/5 transition-all">
-                            <PlusCircle className="h-5 w-5 text-primary" /> إضافة سطر مصروف آخر
+                        <Button type="button" variant="outline" onClick={() => append({ description: '', amount: 0, projectId: '', clientId: '' })} disabled={isSaving} className="w-full h-14 border-dashed border-2 rounded-2xl gap-3 font-black text-primary hover:bg-primary/5 transition-all">
+                            <PlusCircle className="h-6 w-6" /> إضافة فاتورة أخرى
                         </Button>
                     </div>
 
-                    <div className="grid gap-3">
-                        <Label className="font-bold text-gray-700 pr-2">ملاحظات إضافية</Label>
-                        <Textarea {...register('notes')} placeholder="أي تفاصيل أخرى للمحاسب..." className="rounded-2xl border-2" rows={3}/>
+                    <div className="grid gap-3 p-6 bg-white/40 rounded-3xl border-2 border-dashed border-muted-foreground/10">
+                        <Label className="font-black text-gray-700 pr-2">ملاحظات إضافية للمحاسب</Label>
+                        <Textarea {...register('notes')} placeholder="أدخل أي توضيحات إضافية حول المصروفات..." className="rounded-2xl border-none shadow-inner text-base" rows={3} disabled={isSaving}/>
                     </div>
                 </CardContent>
-                <CardFooter className="flex justify-between gap-4 p-10 border-t bg-muted/10">
+                <CardFooter className="flex justify-between gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                     <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي بعد التسوية:</Label>
-                        <p className={cn("text-xl font-black font-mono", custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600")}>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي المتوقع:</Label>
+                        <p className={cn("text-2xl font-black font-mono", custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600")}>
                             {formatCurrency(custodyBalance - totalSpent)}
                         </p>
                     </div>
-                    <Button type="submit" disabled={isSaving || totalSpent === 0} className="h-14 px-16 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 min-w-[300px] gap-3">
-                        {isSaving ? <Loader2 className="ml-3 h-6 w-6 animate-spin"/> : <Save className="ml-3 h-6 w-6"/>}
-                        إرسال طلب التسوية للمراجعة
+                    <Button type="submit" disabled={isSaving || totalSpent === 0} className="h-16 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 min-w-[320px] gap-4 transition-all">
+                        {isSaving ? <Loader2 className="animate-spin h-8 w-8"/> : <Save className="h-8 w-8"/>}
+                        اعتماد وإرسال للمراجعة
                     </Button>
                 </CardFooter>
             </form>
         </Card>
     );
 }
-
-import { ShoppingCart } from 'lucide-react';
-import { zodResolver } from '@hookform/resolvers/zod';

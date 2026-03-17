@@ -251,8 +251,12 @@ export interface CustodyReconciliation extends BaseEntity {
     items: {
         description: string;
         amount: number;
-        category: string; // expense account id
-        categoryName: string;
+        category?: string; // Filled by accountant
+        categoryName?: string; // Filled by accountant
+        projectId?: string; // Selected by employee
+        projectName?: string;
+        clientId?: string; // Selected by employee
+        clientName?: string;
         attachmentUrl?: string;
     }[];
     status: 'pending' | 'approved' | 'rejected';

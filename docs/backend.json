@@ -16,7 +16,11 @@
             "properties": {
               "description": { "type": "string" },
               "amount": { "type": "number" },
-              "category": { "type": "string" },
+              "projectId": { "type": "string" },
+              "projectName": { "type": "string" },
+              "clientId": { "type": "string" },
+              "clientName": { "type": "string" },
+              "category": { "type": "string", "description": "Expense account ID (Filled by accountant)" },
               "categoryName": { "type": "string" },
               "attachmentUrl": { "type": "string", "format": "uri" }
             }
