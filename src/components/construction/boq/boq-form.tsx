@@ -61,8 +61,8 @@ export const itemSchema = z.object({
   itemNumber: z.string().optional(),
   description: z.string().min(1, 'الوصف مطلوب.'),
   unit: z.string().optional(),
-  quantity: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
-  sellingUnitPrice: z.preprocess((v) => parseFloat(String(v || '0')), z.number().min(0)),
+  quantity: z.preprocess((v) => (v === '' ? 0 : parseFloat(String(v || '0'))), z.number().min(0)),
+  sellingUnitPrice: z.preprocess((v) => (v === '' ? 0 : parseFloat(String(v || '0'))), z.number().min(0)),
   notes: z.string().optional(),
   parentId: z.string().nullable(),
   level: z.number(),
@@ -218,14 +218,26 @@ const BoqItemRowRenderer = React.memo(
           </TableCell>
           <TableCell className="px-1 w-20 text-center">
             {!isHeader ? (
-              <Input type="number" step="any" {...register(`items.${node._index}.quantity`)} className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner" />
+              <Input 
+                type="number" 
+                step="any" 
+                {...register(`items.${node._index}.quantity`)} 
+                onWheel={(e) => e.currentTarget.blur()}
+                className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
             ) : (
               <span className="text-base text-muted-foreground/40 font-black">-</span>
             )}
           </TableCell>
           <TableCell className="px-1 w-24 text-center">
             {!isHeader ? (
-              <Input type="number" step="0.001" {...register(`items.${node._index}.sellingUnitPrice`)} className="h-9 dir-ltr text-center font-mono text-xs font-black text-primary rounded-lg border-none bg-white shadow-inner" />
+              <Input 
+                type="number" 
+                step="0.001" 
+                {...register(`items.${node._index}.sellingUnitPrice`)} 
+                onWheel={(e) => e.currentTarget.blur()}
+                className="h-9 dir-ltr text-center font-mono text-xs font-black text-primary rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
             ) : (
               <span className="text-xs text-muted-foreground/40 font-black">-</span>
             )}
@@ -342,13 +354,13 @@ export function BoqForm({
   }, [watchedItems]);
 
   const handleAddRootSection = React.useCallback(() => {
-    append({ uid: generateStableId(), description: '', unit: '', quantity: 1, sellingUnitPrice: 0, parentId: null, level: 0, isHeader: true, itemId: '' });
+    append({ uid: generateStableId(), description: '', unit: '', quantity: undefined as any, sellingUnitPrice: undefined as any, parentId: null, level: 0, isHeader: true, itemId: '' });
   }, [append]);
 
   const handleAddItem = React.useCallback((parentId: string | null, isHeader: boolean, insertAtIndex: number) => {
     const parentItem = watchedItems?.find((f: any) => f.uid === parentId);
     const parentLevel = parentItem ? parentItem.level : -1;
-    insert(insertAtIndex, { uid: generateStableId(), description: '', unit: isHeader ? '' : 'مقطوعية', quantity: 1, sellingUnitPrice: 0, parentId: parentId, level: parentLevel + 1, isHeader: isHeader, itemId: '' });
+    insert(insertAtIndex, { uid: generateStableId(), description: '', unit: isHeader ? '' : 'مقطوعية', quantity: undefined as any, sellingUnitPrice: undefined as any, parentId: parentId, level: parentLevel + 1, isHeader: isHeader, itemId: '' });
   }, [watchedItems, insert]);
 
   const handleDelete = React.useCallback((index: number) => {
