@@ -19,17 +19,18 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, PlusCircle, Trash2, Banknote, Camera, Info, ShieldCheck, Wallet, Target, User, UploadCloud, FileText, X, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText } from 'lucide-react';
 import { useFirebase, useSubscription, useStorage } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Account, Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client } from '@/lib/types';
+import type { Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client, Account } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, generateStableId, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import Image from 'next/image';
+import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 
 const itemSchema = z.object({
   id: z.string(),
@@ -37,7 +38,6 @@ const itemSchema = z.object({
   amount: z.preprocess((v) => parseFloat(String(v || '')), z.number().positive("المبلغ مطلوب")),
   projectId: z.string().optional().nullable(),
   clientId: z.string().optional().nullable(),
-  attachmentUrl: z.string().optional(),
 });
 
 const reconciliationSchema = z.object({
@@ -49,6 +49,12 @@ const reconciliationSchema = z.object({
 
 type FormValues = z.infer<typeof reconciliationSchema>;
 
+interface PreviewFile {
+    id: string;
+    url: string;
+    file: File;
+}
+
 export function CustodyReconciliationForm() {
     const { firestore, storage } = useFirebase();
     const { user: currentUser } = useAuth();
@@ -57,12 +63,11 @@ export function CustodyReconciliationForm() {
 
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
-    const [recNumber, setRecNumber] = useState('جاري التوليد...');
     const [custodyBalance, setCustodyBalance] = useState(0);
     const [loadingBalance, setLoadingBalance] = useState(false);
     
-    // لإدارة الملفات المرفوعة قبل الحفظ النهائي
-    const [previews, setPreviews] = useState<Record<string, { url: string, file: File }>>({});
+    // إدارة مصفوفة صور لكل بند بنمط شريط أفقي
+    const [previews, setPreviews] = useState<Record<string, PreviewFile[]>>({});
     const [isDragging, setIsDragging] = useState<string | null>(null);
 
     const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
@@ -113,24 +118,28 @@ export function CustodyReconciliationForm() {
         fetchBalance();
     }, [selectedEmployeeId, firestore, accounts, employees]);
 
-    useEffect(() => {
-        if (!firestore) return;
-        const generateNumber = async () => {
-            const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'custodyReconciliations');
-            const counterDoc = await getDoc(counterRef);
-            const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-            setRecNumber(`REC-${currentYear}-${String(nextNumber).padStart(4, '0')}`);
-        };
-        generateNumber();
-    }, [firestore]);
-
     const handleFileDrop = (itemId: string, files: FileList | null) => {
         if (!files || files.length === 0) return;
-        const file = files[0];
-        const url = URL.createObjectURL(file);
-        setPreviews(prev => ({ ...prev, [itemId]: { url, file } }));
-        toast({ title: 'تم إرفاق المستند', description: 'سيتم رفعه عند حفظ التسوية.' });
+        
+        const newFiles: PreviewFile[] = Array.from(files).map(file => ({
+            id: generateStableId(),
+            url: URL.createObjectURL(file),
+            file: file
+        }));
+
+        setPreviews(prev => ({ 
+            ...prev, 
+            [itemId]: [...(prev[itemId] || []), ...newFiles] 
+        }));
+        
+        toast({ title: 'تمت إضافة الصور', description: `تم إدراج ${newFiles.length} ملفات في شريط المعاينة.` });
+    };
+
+    const removeFile = (itemId: string, fileId: string) => {
+        setPreviews(prev => ({
+            ...prev,
+            [itemId]: (prev[itemId] || []).filter(f => f.id !== fileId)
+        }));
     };
 
     const onSubmit = async (data: FormValues) => {
@@ -147,12 +156,14 @@ export function CustodyReconciliationForm() {
         try {
             const finalItems = [];
             for (const item of data.items) {
-                let attachmentUrl = '';
-                const fileData = previews[item.id];
-                if (fileData) {
+                const attachmentUrls: string[] = [];
+                const filesForThisItem = previews[item.id] || [];
+                
+                for (const fileData of filesForThisItem) {
                     const storageRef = ref(storage, `reconciliations/${currentUser.id}/${Date.now()}_${fileData.file.name}`);
                     const uploadResult = await uploadBytes(storageRef, fileData.file);
-                    attachmentUrl = await getDownloadURL(uploadResult.ref);
+                    const url = await getDownloadURL(uploadResult.ref);
+                    attachmentUrls.push(url);
                 }
 
                 const project = projects.find(p => p.id === item.projectId);
@@ -165,7 +176,7 @@ export function CustodyReconciliationForm() {
                     projectName: project?.projectName || null,
                     clientId: item.clientId || null,
                     clientName: client?.nameAr || null,
-                    attachmentUrl
+                    attachmentUrls: attachmentUrls // تم التحديث لمصفوفة
                 });
             }
 
@@ -216,8 +227,8 @@ export function CustodyReconciliationForm() {
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Wallet className="h-8 w-8"/></div>
                         <div>
-                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية (مطورة)</CardTitle>
-                            <CardDescription>اسحب وأفلت الفواتير لتعبئة المرفقات ومعاينتها لحظياً بنظام Odoo الاحترافي.</CardDescription>
+                            <CardTitle className="text-2xl font-black">تسوية عهدة نقدية (رفع متعدد)</CardTitle>
+                            <CardDescription>ارفع عدة فواتير لكل بند مصروف، وسيتم عرضها كشريط معاينة أفقي للمحاسب.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -242,7 +253,7 @@ export function CustodyReconciliationForm() {
                         </div>
                         <div className="bg-white/50 p-4 rounded-3xl border-2 border-dashed border-primary/20 flex items-center justify-between shadow-inner">
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-black uppercase text-primary">الرصيد المتاح للتحميل</Label>
+                                <Label className="text-[10px] font-black uppercase text-primary">الرصيد المتاح حالياً</Label>
                                 <p className="text-2xl font-black text-primary font-mono">
                                     {loadingBalance ? <Loader2 className="h-4 w-4 animate-spin"/> : formatCurrency(custodyBalance)}
                                 </p>
@@ -253,29 +264,30 @@ export function CustodyReconciliationForm() {
 
                     <div className="space-y-6">
                         <div className="flex justify-between items-center px-2">
-                            <Label className="text-xl font-black flex items-center gap-2">
-                                <PlusCircle className="h-5 w-5 text-primary" /> قائمة بنود التسوية
+                            <Label className="text-xl font-black flex items-center gap-2 text-foreground">
+                                <ScrollText className="h-5 w-5 text-primary" /> قائمة المصروفات
                             </Label>
-                            <Badge variant="outline" className="font-bold border-primary/20 text-primary bg-primary/5">
+                            <Badge variant="outline" className="font-bold border-primary/20 text-primary bg-primary/5 px-4 h-7 rounded-full">
                                 {fields.length} بنود مدرجة
                             </Badge>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             {fields.map((field, index) => (
-                                <div key={field.id} className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-6 bg-white border-2 rounded-[2rem] shadow-sm hover:shadow-md transition-all group relative">
+                                <div key={field.id} className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-8 bg-white border-2 rounded-[2.5rem] shadow-sm hover:shadow-md transition-all group relative">
+                                    
                                     <div className="lg:col-span-4 space-y-4">
                                         <div className="grid gap-1.5">
-                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">بيان المصروف</Label>
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">بيان المصروف *</Label>
                                             <Input 
                                                 {...register(`items.${index}.description`)} 
-                                                placeholder="بترول، غداء عمال..." 
-                                                className="h-11 rounded-xl border-2 font-bold" 
+                                                placeholder="مثال: فاتورة بنزين، ضيافة..." 
+                                                className="h-11 rounded-xl border-2 font-bold bg-muted/5 shadow-inner" 
                                                 disabled={isSaving}
                                             />
                                         </div>
                                         <div className="grid gap-1.5">
-                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">المشروع / العميل</Label>
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">ارتباط (اختياري)</Label>
                                             <Controller
                                                 control={control}
                                                 name={`items.${index}.projectId`}
@@ -284,7 +296,7 @@ export function CustodyReconciliationForm() {
                                                         value={catField.value || ''} 
                                                         onSelect={catField.onChange} 
                                                         options={combinedEntityOptions} 
-                                                        placeholder="اربط بمشروع..." 
+                                                        placeholder="مشروع أو عميل..." 
                                                         className="h-11 rounded-xl border-dashed"
                                                         disabled={isSaving}
                                                     />
@@ -293,65 +305,74 @@ export function CustodyReconciliationForm() {
                                         </div>
                                     </div>
 
-                                    <div className="lg:col-span-2 flex flex-col justify-center gap-1.5">
-                                        <Label className="text-[10px] font-black text-primary uppercase pr-1">المبلغ (د.ك)</Label>
+                                    <div className="lg:col-span-2 flex flex-col justify-center gap-1.5 px-4 lg:border-r lg:border-l">
+                                        <Label className="text-[10px] font-black text-primary uppercase text-center">المبلغ المستحق</Label>
                                         <Input 
                                             type="number" 
                                             step="any" 
                                             {...register(`items.${index}.amount`)} 
                                             onWheel={(e) => e.currentTarget.blur()}
                                             disabled={isSaving}
+                                            placeholder="0.000"
                                             className="h-14 text-2xl font-black text-primary text-center rounded-2xl border-2 border-primary/20 bg-primary/[0.02] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                                         />
                                     </div>
 
-                                    <div className="lg:col-span-5 relative">
-                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1 block mb-1.5">المرفقات (سحب وإفلات)</Label>
-                                        <div 
-                                            onDragOver={(e) => { e.preventDefault(); setIsDragging(field.id); }}
-                                            onDragLeave={() => setIsDragging(null)}
-                                            onDrop={(e) => { e.preventDefault(); setIsDragging(null); handleFileDrop(field.id, e.dataTransfer.files); }}
-                                            className={cn(
-                                                "h-32 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden group/drop",
-                                                isDragging === field.id ? "bg-primary/10 border-primary scale-[1.02]" : "bg-muted/30 border-muted-foreground/20 hover:bg-muted/50",
-                                                previews[field.id] && "border-solid border-green-500/30 bg-green-50/10"
-                                            )}
-                                        >
-                                            {previews[field.id] ? (
-                                                <div className="absolute inset-0 group/preview animate-in fade-in zoom-in duration-300">
-                                                    {previews[field.id].file.type.startsWith('image/') ? (
-                                                        <Image src={previews[field.id].url} alt="Receipt" fill className="object-cover" />
+                                    <div className="lg:col-span-5 space-y-2">
+                                        <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">شريط معاينة الفواتير (رفع متعدد)</Label>
+                                        
+                                        <div className="flex gap-3">
+                                            {/* منطقة الرفع الجانبية الصغيرة */}
+                                            <div 
+                                                onDragOver={(e) => { e.preventDefault(); setIsDragging(field.id); }}
+                                                onDragLeave={() => setIsDragging(null)}
+                                                onDrop={(e) => { e.preventDefault(); setIsDragging(null); handleFileDrop(field.id, e.dataTransfer.files); }}
+                                                className={cn(
+                                                    "w-24 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer",
+                                                    isDragging === field.id ? "bg-primary/10 border-primary scale-105" : "bg-muted/30 border-muted-foreground/20 hover:bg-muted/50"
+                                                )}
+                                            >
+                                                <UploadCloud className="h-6 w-6 text-primary opacity-40" />
+                                                <span className="text-[8px] font-black text-primary text-center leading-tight">إدراج<br/>فواتير</span>
+                                                <input 
+                                                    type="file" 
+                                                    multiple
+                                                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                                                    onChange={(e) => handleFileDrop(field.id, e.target.files)}
+                                                    accept="image/*,.pdf"
+                                                    disabled={isSaving}
+                                                />
+                                            </div>
+
+                                            {/* شريط الصور الأفقي */}
+                                            <ScrollArea className="flex-grow bg-muted/10 rounded-2xl border h-24">
+                                                <div className="flex p-2 gap-3">
+                                                    {(previews[field.id] || []).length === 0 ? (
+                                                        <div className="flex items-center justify-center w-full h-20 opacity-30 italic text-[10px] font-bold">بانتظار إرفاق المستندات...</div>
                                                     ) : (
-                                                        <div className="flex flex-col items-center justify-center h-full gap-2">
-                                                            <FileText className="h-10 w-10 text-primary" />
-                                                            <span className="text-[10px] font-bold text-primary truncate max-w-[150px]">{previews[field.id].file.name}</span>
-                                                        </div>
+                                                        previews[field.id].map((p) => (
+                                                            <div key={p.id} className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 animate-in zoom-in-95 group/img">
+                                                                {p.file.type.startsWith('image/') ? (
+                                                                    <Image src={p.url} alt="Strip" fill className="object-cover" />
+                                                                ) : (
+                                                                    <div className="flex flex-col items-center justify-center h-full bg-indigo-50">
+                                                                        <FileText className="h-6 w-6 text-indigo-600" />
+                                                                        <span className="text-[7px] font-black text-indigo-800 truncate px-1 w-full text-center">{p.file.name}</span>
+                                                                    </div>
+                                                                )}
+                                                                <button 
+                                                                    type="button" 
+                                                                    onClick={() => removeFile(field.id, p.id)}
+                                                                    className="absolute top-0.5 left-0.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                                                >
+                                                                    <X className="h-3 w-3" />
+                                                                </button>
+                                                            </div>
+                                                        ))
                                                     )}
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/preview:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <Button 
-                                                            type="button" 
-                                                            variant="destructive" 
-                                                            size="icon" 
-                                                            className="rounded-full h-8 w-8"
-                                                            onClick={() => setPreviews(prev => { const n = {...prev}; delete n[field.id]; return n; })}
-                                                        >
-                                                            <X className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
                                                 </div>
-                                            ) : (
-                                                <>
-                                                    <UploadCloud className="h-8 w-8 text-muted-foreground opacity-30 group-hover/drop:scale-110 group-hover/drop:text-primary transition-all" />
-                                                    <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60">اسحب الفاتورة هنا</p>
-                                                </>
-                                            )}
-                                            <input 
-                                                type="file" 
-                                                className="absolute inset-0 opacity-0 cursor-pointer" 
-                                                onChange={(e) => handleFileDrop(field.id, e.target.files)}
-                                                accept="image/*,.pdf"
-                                                disabled={isSaving}
-                                            />
+                                                <ScrollBar orientation="horizontal" />
+                                            </ScrollArea>
                                         </div>
                                     </div>
 
@@ -376,9 +397,9 @@ export function CustodyReconciliationForm() {
                             variant="outline" 
                             onClick={() => append({ id: generateStableId(), description: '', amount: '', projectId: '', clientId: '' } as any)} 
                             disabled={isSaving} 
-                            className="w-full h-14 border-dashed border-2 rounded-3xl gap-3 font-black text-primary hover:bg-primary/5 transition-all shadow-sm active:scale-[0.99]"
+                            className="w-full h-14 border-dashed border-2 rounded-[2rem] gap-3 font-black text-primary hover:bg-primary/5 transition-all shadow-sm active:scale-[0.99]"
                         >
-                            <PlusCircle className="h-6 w-6 text-primary" /> إضافة فاتورة مصروف أخرى
+                            <PlusCircle className="h-6 w-6 text-primary" /> إضافة بند مصروف إضافي للتسوية
                         </Button>
                     </div>
 
@@ -386,15 +407,15 @@ export function CustodyReconciliationForm() {
                         <Label className="font-black text-gray-700 pr-2">ملاحظات إضافية للمحاسب المالي</Label>
                         <Textarea 
                             {...register('notes')} 
-                            placeholder="اشرح أي تفاصيل إضافية حول المصروفات المرفوعة..." 
-                            className="rounded-3xl border-none shadow-inner text-base p-6 min-h-[120px]" 
+                            placeholder="اشرح أي تفاصيل إضافية أو مبررات لهذه المصروفات..." 
+                            className="rounded-3xl border-none shadow-inner text-base p-6 min-h-[120px] bg-white/50" 
                             disabled={isSaving}
                         />
                     </div>
                 </CardContent>
                 <CardFooter className="flex justify-between gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                     <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">الرصيد المتبقي بعد التسوية:</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">صافي الرصيد المتبقي بعد الخصم:</Label>
                         <p className={cn(
                             "text-3xl font-black font-mono tracking-tight", 
                             custodyBalance - totalSpent < 0 ? "text-red-600" : "text-green-600"
@@ -410,12 +431,12 @@ export function CustodyReconciliationForm() {
                         {isSaving ? (
                             <>
                                 <Loader2 className="animate-spin h-8 w-8"/>
-                                <span>جاري المعالجة...</span>
+                                <span>جاري معالجة ورفع الملفات...</span>
                             </>
                         ) : (
                             <>
                                 <Save className="h-8 w-8"/>
-                                <span>اعتماد وإرسال للمراجعة</span>
+                                <span>اعتماد وإرسال التسوية</span>
                             </>
                         )}
                     </Button>

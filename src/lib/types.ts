@@ -257,7 +257,7 @@ export interface CustodyReconciliation extends BaseEntity {
         projectName?: string;
         clientId?: string; // Selected by employee
         clientName?: string;
-        attachmentUrl?: string;
+        attachmentUrls?: string[]; // تم التحديث لمصفوفة صور
     }[];
     status: 'pending' | 'approved' | 'rejected';
     accountantNotes?: string;
@@ -276,7 +276,6 @@ export interface TransactionType extends BaseEntity { name: string; order?: numb
 export interface Company extends BaseEntity { name: string; nameEn?: string; phone?: string; email?: string; crNumber?: string; parentCompanyId?: string | null; activityType?: string; address?: string; licenseExpiryDate?: any; adLicenseExpiryDate?: any; isActive?: boolean; }
 export interface ConstructionType extends BaseEntity { name: string; }
 export interface WorkStage extends BaseEntity { name: string; order?: number; stageType: 'sequential' | 'parallel'; trackingType: 'duration' | 'occurrence' | 'none'; expectedDurationDays?: number | null; maxOccurrences?: number | null; allowedRoles?: string[]; allowedDuringStages?: string[]; nextStageIds?: string[]; enableModificationTracking?: boolean; }
-export interface PermissionRequest extends BaseEntity { employeeId: string; employeeName: string; type: 'late_arrival' | 'early_departure'; date: any; reason: string; status: 'pending' | 'approved' | 'rejected'; approvedBy?: string; approvedAt?: any; rejectionReason?: string; }
 export interface Holiday extends BaseEntity { name: string; date: any; }
 
 export interface AttendanceRecord {
@@ -352,4 +351,16 @@ export interface PaymentMethod {
     percentageFee: number;
     expenseAccountId: string;
     expenseAccountName: string;
+}
+
+export interface PermissionRequest extends BaseEntity { 
+    employeeId: string; 
+    employeeName: string; 
+    type: 'late_arrival' | 'early_departure'; 
+    date: any; 
+    reason: string; 
+    status: 'pending' | 'approved' | 'rejected'; 
+    approvedBy?: string; 
+    approvedAt?: any; 
+    rejectionReason?: string; 
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -7,10 +6,10 @@ import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { doc, runTransaction, collection, serverTimestamp, getDocs, query, where, Timestamp, getDoc, orderBy } from 'firebase/firestore';
 import type { CustodyReconciliation, Account, JournalEntry } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, CheckCircle2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote } from 'lucide-react';
+import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote, ImageIcon, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -20,6 +19,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+import { ScrollArea, ScrollBar } from '../ui/scroll-area';
+import Image from 'next/image';
 
 const statusTranslations: Record<string, string> = {
     pending: 'بانتظار المراجعة',
@@ -56,7 +57,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
     const handleApprove = async () => {
         if (!firestore || !rec || !currentUser) return;
 
-        // التحقق من ربط كافة الحسابات
         const allLinked = rec.items.every((_, idx) => !!mappings[idx]);
         if (!allLinked) {
             toast({ variant: 'destructive', title: 'توجيه ناقص', description: 'يرجى اختيار حساب مصروف لكل بند قبل الاعتماد المالي.' });
@@ -72,14 +72,12 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 const nextJeNum = ((jeCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const jeNumber = `JV-REC-${currentYear}-${String(nextJeNum).padStart(4, '0')}`;
 
-                // البحث عن حساب عهدة الموظف (تحت 110102)
                 const custodyAcc = accounts.find(a => a.parentCode === '110102' && a.name.includes(rec.employeeName));
                 if (!custodyAcc) throw new Error(`لم يتم العثور على حساب عهدة للموظف ${rec.employeeName} في شجرة الحسابات.`);
 
                 const newJeRef = doc(collection(firestore, 'journalEntries'));
                 
                 const jeLines: any[] = [];
-                // 1. أسطر المصاريف (Debits)
                 rec.items.forEach((item, idx) => {
                     const selectedAcc = accounts.find(a => a.id === mappings[idx])!;
                     jeLines.push({
@@ -93,7 +91,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     });
                 });
 
-                // 2. سطر العهدة (Credit)
                 jeLines.push({
                     accountId: custodyAcc.id,
                     accountName: custodyAcc.name,
@@ -101,7 +98,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     credit: rec.totalAmount
                 });
 
-                // ترحيل القيد
                 transaction.set(newJeRef, cleanFirestoreData({
                     entryNumber: jeNumber,
                     date: rec.date,
@@ -114,7 +110,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     createdBy: currentUser.id
                 }));
 
-                // تحديث حالة التسوية
                 transaction.update(recRef!, {
                     status: 'approved',
                     journalEntryId: newJeRef.id,
@@ -172,7 +167,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     <Table>
                         <TableHeader className="bg-muted/30">
                             <TableRow className="h-14">
-                                <TableHead className="px-8 font-black">بيان الموظف</TableHead>
+                                <TableHead className="px-8 font-black">بيان الموظف والمرفقات</TableHead>
                                 <TableHead className="font-black">المشروع / العميل</TableHead>
                                 <TableHead className="text-center font-black">المبلغ</TableHead>
                                 <TableHead className="w-80 font-black text-primary bg-primary/5">التوجيه المحاسبي (المصروف) *</TableHead>
@@ -180,8 +175,44 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                         </TableHeader>
                         <TableBody>
                             {rec.items.map((item, idx) => (
-                                <TableRow key={idx} className="h-20 border-b last:border-0 hover:bg-muted/5 transition-colors">
-                                    <TableCell className="px-8 font-bold">{item.description}</TableCell>
+                                <TableRow key={idx} className="h-auto border-b last:border-0 hover:bg-muted/5 transition-colors">
+                                    <TableCell className="px-8 py-6 space-y-4 min-w-[350px]">
+                                        <p className="font-bold text-lg">{item.description}</p>
+                                        
+                                        {/* شريط عرض الصور المتعددة للمحاسب */}
+                                        {item.attachmentUrls && item.attachmentUrls.length > 0 ? (
+                                            <ScrollArea className="w-full bg-muted/20 rounded-2xl border h-24">
+                                                <div className="flex p-2 gap-3">
+                                                    {item.attachmentUrls.map((url, imgIdx) => (
+                                                        <a 
+                                                            key={imgIdx} 
+                                                            href={url} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-sm flex-shrink-0 hover:scale-105 transition-transform group"
+                                                        >
+                                                            {url.toLowerCase().includes('.pdf') ? (
+                                                                <div className="flex flex-col items-center justify-center h-full bg-indigo-50">
+                                                                    <FileText className="h-6 w-6 text-indigo-600" />
+                                                                    <span className="text-[8px] font-black text-indigo-800">عرض PDF</span>
+                                                                </div>
+                                                            ) : (
+                                                                <Image src={url} alt="Receipt" fill className="object-cover" />
+                                                            )}
+                                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                <ImageIcon className="h-4 w-4 text-white" />
+                                                            </div>
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                                <ScrollBar orientation="horizontal" />
+                                            </ScrollArea>
+                                        ) : (
+                                            <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                                                <X className="h-3 w-3" /> لا توجد مرفقات لهذا البند
+                                            </p>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             {item.projectName && <p className="text-xs font-black text-primary flex items-center gap-1"><Target className="h-3 w-3"/> {item.projectName}</p>}
@@ -189,10 +220,10 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                             {!item.projectName && !item.clientName && <span className="text-xs text-muted-foreground italic">عام / إداري</span>}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-center font-black font-mono text-lg">{formatCurrency(item.amount)}</TableCell>
+                                    <TableCell className="text-center font-black font-mono text-xl">{formatCurrency(item.amount)}</TableCell>
                                     <TableCell className="bg-primary/[0.02] px-4">
                                         {isProcessed ? (
-                                            <Badge variant="outline" className="bg-white text-primary border-primary/20 font-bold px-4 py-1">
+                                            <Badge variant="outline" className="bg-white text-primary border-primary/20 font-black px-4 py-1 rounded-full">
                                                 {item.categoryName}
                                             </Badge>
                                         ) : (
@@ -210,7 +241,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                         </TableBody>
                         <TableFooter className="bg-muted/10 h-16">
                             <TableRow>
-                                <TableCell colSpan={2} className="text-right px-8 font-black">إجمالي البنود:</TableCell>
+                                <TableCell colSpan={2} className="text-right px-8 font-black">إجمالي البنود المعالجة:</TableCell>
                                 <TableCell className="text-center font-black font-mono text-xl text-primary">{formatCurrency(rec.totalAmount)}</TableCell>
                                 <TableCell />
                             </TableRow>
@@ -219,7 +250,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
 
                     <div className="p-8 space-y-4">
                         <Label className="font-black text-lg flex items-center gap-2">
-                            <ShieldCheck className="h-5 w-5 text-primary" /> ملاحظات المراجعة النهائية
+                            <ShieldCheck className="h-5 w-5 text-primary" /> ملاحظات الموظف وبيانات التسوية
                         </Label>
                         <div className="p-6 bg-muted/20 rounded-[2rem] border-2 border-dashed text-sm italic leading-relaxed">
                             {rec.notes || 'لم يتم إدراج ملاحظات إضافية من الموظف.'}
@@ -231,11 +262,11 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                     <CardFooter className="p-8 bg-primary/5 border-t flex justify-between items-center">
                         <div className="space-y-1">
                             <p className="text-xs font-bold text-muted-foreground flex items-center gap-2">
-                                <Calculator className="h-4 w-4"/> سيتم توليد قيد يومية آلي فور الاعتماد.
+                                <Calculator className="h-4 w-4"/> سيتم توليد قيد يومية آلي مرحّل فور الاعتماد.
                             </p>
                         </div>
-                        <Button onClick={handleApprove} disabled={isSaving} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3 min-w-[300px]">
-                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
+                        <Button onClick={handleApprove} disabled={isSaving} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[300px]">
+                            {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
                             اعتماد وترحيل القيد المحاسبي
                         </Button>
                     </CardFooter>
