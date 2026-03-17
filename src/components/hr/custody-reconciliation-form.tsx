@@ -19,17 +19,18 @@ import { Label } from '../ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
-import { useFirebase, useSubscription, useStorage } from '@/firebase';
+import { Loader2, Save, X, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, ImageIcon, ScrollText, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
+import { useFirebase, useStorage } from '@/firebase';
+import { useSubscription } from '@/hooks/use-subscription';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Employee, ConstructionProject, Client, Account, JournalEntry } from '@/lib/types';
+import type { Employee, ConstructionProject, Client, Account, JournalEntry, CustodyReconciliation } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, numberToArabicWords } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
-import { DateInput } from '@/components/ui/date-input';
 import { useAppTheme } from '@/context/theme-context';
+import { DateInput } from '@/components/ui/date-input';
 import Image from 'next/image';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 
@@ -68,7 +69,7 @@ interface PreviewFile {
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
  * - يظهر صورتين فقط والبقية عبر التمرير.
  * - عزل كامل لبكرة الماوس عن الصفحة الرئيسية (Scroll Isolation).
- * - معاينة منبثقة مكبرة عند تحويم الماوس (Hover Preview) مع حماية التمرير.
+ * - معاينة منبثقة مكبرة "شفافة" (pointer-events-none) لا تعيق التمرير.
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -84,14 +85,14 @@ function SmartPhotoGallery({
     const scrollRef = useRef<HTMLDivElement>(null);
     const [hoveredImage, setHoveredImage] = useState<string | null>(null);
 
-    // ✨ محرك عزل التمرير الجذري المحسن (Non-Blocking Engine)
+    // ✨ محرك عزل التمرير الجذري (Native Event Capture)
     useEffect(() => {
         const el = scrollRef.current;
         if (!el) return;
 
         const handleWheel = (e: WheelEvent) => {
             if (e.deltaY !== 0) {
-                // منع التمرير العمودي للصفحة الرئيسية
+                // منع التمرير العمودي للصفحة الرئيسية تماماً
                 e.preventDefault();
                 e.stopPropagation();
                 
@@ -186,19 +187,19 @@ function SmartPhotoGallery({
                 ))}
             </div>
 
-            {/* ✨ المعاينة المنبثقة الخاطفة - محصنة ضد تداخل الماوس (Pointer Events None) ✨ */}
+            {/* ✨ المعاينة المنبثقة الخاطفة (Pointer Events None) - لا تعيق التمرير ✨ */}
             {hoveredImage && (
                 <div className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-200"
                      style={{ 
                          top: '50%', 
                          left: '50%', 
                          transform: 'translate(-50%, -50%)',
-                         pointerEvents: 'none' // حماية الرؤية حتى لا يسرق الكادر حدث بكرة الماوس
+                         pointerEvents: 'none' 
                      }}>
                     <div className="relative w-[400px] h-[400px] rounded-[2.5rem] overflow-hidden border-8 border-white shadow-[0_0_50px_rgba(0,0,0,0.3)] bg-white">
                         <Image src={hoveredImage} alt="Large Preview" fill className="object-contain p-4" />
                         <div className="absolute bottom-0 left-0 right-0 bg-primary/80 backdrop-blur-md p-3 text-center">
-                            <p className="text-white font-black text-xs">معاينة خاطفة للمستند</p>
+                            <p className="text-white font-black text-xs">معاينة خاطفة للفاتورة</p>
                         </div>
                     </div>
                 </div>
@@ -220,7 +221,6 @@ export function CustodyReconciliationForm() {
     const [loadingBalance, setLoadingBalance] = useState(false);
     
     const [previews, setPreviews] = useState<Record<string, PreviewFile[]>>({});
-    const [isDragging, setIsDragging] = useState<string | null>(null);
 
     const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     const { data: projects = [], loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, 'projects', [where('status', '==', 'قيد التنفيذ')]);
@@ -420,13 +420,14 @@ export function CustodyReconciliationForm() {
                                 <ScrollText className="h-5 w-5 text-primary" /> قائمة بنود المصروفات
                             </Label>
                             <Badge variant="outline" className="font-bold border-primary/20 text-primary bg-primary/5 px-4 h-7 rounded-full">
-                                {fields.length} بنود
+                                {fields.length} بنود مدرجة
                             </Badge>
                         </div>
 
                         <div className="space-y-6">
                             {fields.map((field, index) => {
                                 const rowItem = watchedItems?.[index];
+                                const lineTotal = (Number(rowItem?.amount) || 0);
                                 return (
                                 <div key={field.id} className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-8 bg-white border-2 rounded-[2.5rem] shadow-sm hover:shadow-md transition-all group relative">
                                     
@@ -441,7 +442,9 @@ export function CustodyReconciliationForm() {
                                             />
                                         </div>
                                         <div className="grid gap-1.5">
-                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">الارتباط بمشروع/عميل</Label>
+                                            <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1 flex items-center gap-1">
+                                                <Target className="h-3 w-3" /> الارتباط بمشروع / مركز تكلفة
+                                            </Label>
                                             <Controller
                                                 control={control}
                                                 name={`items.${index}.projectId`}
@@ -477,9 +480,6 @@ export function CustodyReconciliationForm() {
                                         
                                         <div className="flex gap-3 items-center">
                                             <div 
-                                                onDragOver={(e) => { e.preventDefault(); setIsDragging(field.id); }}
-                                                onDragLeave={() => setIsDragging(null)}
-                                                onDrop={(e) => { e.preventDefault(); setIsDragging(null); handleFileDrop(field.id, e.dataTransfer.files); }}
                                                 className="w-20 h-24 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-1 shrink-0 transition-all cursor-pointer relative bg-muted/30 border-muted-foreground/20 hover:bg-muted/50"
                                             >
                                                 <UploadCloud className="h-5 w-5 text-primary opacity-40" />
