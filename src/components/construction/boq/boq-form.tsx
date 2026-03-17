@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -380,6 +379,7 @@ export function BoqForm({
       <div className="space-y-0">
         <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-4">
           <div className="flex justify-between items-center max-w-full px-2 mx-auto">
+            {/* Left Side: Stats (Numbers) - The Image Style Pill */}
             <div className="flex items-center gap-1 bg-white/50 p-1.5 rounded-full border shadow-sm">
                 <div className="bg-primary px-6 py-2.5 rounded-full flex flex-col items-center">
                     <span className="text-[8px] font-black text-white/70 uppercase tracking-widest leading-none">إجمالي المشروع</span>
@@ -394,6 +394,7 @@ export function BoqForm({
                 </div>
             </div>
 
+            {/* Right Side: Title/Icon (Speech) */}
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <CardTitle className="text-xl font-black tracking-tight text-slate-900 flex items-center justify-end gap-2">
@@ -402,7 +403,9 @@ export function BoqForm({
                 </CardTitle>
                 <CardDescription className="text-[10px] font-bold">إدارة الحصر والتسعير المرجعي والبنود الفنية</CardDescription>
               </div>
-              <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner"><ListTree className="h-6 w-6" /></div>
+              <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                <ListTree className="h-6 w-6" />
+              </div>
             </div>
           </div>
         </div>
@@ -410,9 +413,30 @@ export function BoqForm({
         <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
           <CardContent className="p-0 max-w-full mx-auto mt-4 px-2 pb-32">
             <div className="grid md:grid-cols-3 gap-4 p-6 mb-4 border rounded-[2rem] bg-card shadow-sm">
-              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">اسم / مرجع الجدول *</Label><Input style={{borderRadius: '1.25rem'}} {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-10 text-base font-bold border-2', errors.name ? 'border-destructive' : '')} />{errors.name && <p className="text-[10px] text-destructive px-1">{errors.name.message}</p>}</div>
-              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">العميل (المحتمل)</Label><Input style={{borderRadius: '1.25rem'}} {...register('clientName')} className="h-10" placeholder="أدخل اسم العميل..." /></div>
-              <div className="grid gap-1.5"><Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">الحالة التعاقدية</Label><Controller name="status" control={control} render={({ field }) => (<Select onValueChange={field.onChange} value={field.value}><SelectTrigger className="h-10 rounded-[1.25rem] border-2 font-bold"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="تقديري">تقديري</SelectItem><SelectItem value="تعاقدي">تعاقدي</SelectItem><SelectItem value="منفذ">منفذ</SelectItem></SelectContent></Select>)}/></div>
+              <div className="grid gap-1.5">
+                <Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">اسم / مرجع الجدول *</Label>
+                <Input style={{borderRadius: '1.25rem'}} {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-10 text-base font-bold border-2', errors.name ? 'border-destructive' : '')} />
+                {errors.name && <p className="text-[10px] text-destructive px-1">{errors.name.message}</p>}
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">العميل (المحتمل)</Label>
+                <Input style={{borderRadius: '1.25rem'}} {...register('clientName')} className="h-10" placeholder="أدخل اسم العميل..." />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">الحالة التعاقدية</Label>
+                <Controller name="status" control={control} render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="h-10 rounded-[1.25rem] border-2 font-bold">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl">
+                      <SelectItem value="تقديري">تقديري</SelectItem>
+                      <SelectItem value="تعاقدي">تعاقدي</SelectItem>
+                      <SelectItem value="منفذ">منفذ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}/>
+              </div>
             </div>
 
             <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card border-slate-200">
@@ -431,10 +455,32 @@ export function BoqForm({
                 </TableHeader>
                 <TableBody>
                   {boqTree.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="h-64 text-center"><div className="flex flex-col items-center justify-center gap-4 text-muted-foreground"><Info className="h-12 w-12 opacity-20" /><p className="font-bold">الجدول فارغ حالياً.</p></div></TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-64 text-center">
+                        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
+                          <Info className="h-12 w-12 opacity-20" />
+                          <p className="font-bold">الجدول فارغ حالياً. ابدأ بإضافة قسم رئيسي لتنظيم حصر الكميات.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     boqTree.map((node, index) => (
-                      <BoqItemRowRenderer key={node.uid} node={node} level={0} wbs={`${index + 1}`} parentReferenceId={null} control={control} register={register} setValue={setValue} onDelete={handleDelete} onAdd={handleAddItem} watchedItems={watchedItems || []} masterItemsMap={masterItemsMap} masterItemsLoading={masterItemsLoading} errors={errors} />
+                      <BoqItemRowRenderer
+                        key={node.uid}
+                        node={node}
+                        level={0}
+                        wbs={`${index + 1}`}
+                        parentReferenceId={null}
+                        control={control}
+                        register={register}
+                        setValue={setValue}
+                        onDelete={handleDelete}
+                        onAdd={handleAddItem}
+                        watchedItems={watchedItems || []}
+                        masterItemsMap={masterItemsMap}
+                        masterItemsLoading={masterItemsLoading}
+                        errors={errors}
+                      />
                     ))
                   )}
                 </TableBody>
@@ -442,7 +488,12 @@ export function BoqForm({
             </div>
 
             <div className="flex justify-center p-8">
-              <Button type="button" variant="outline" onClick={handleAddRootSection} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 transition-all font-black text-primary gap-2 group">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddRootSection}
+                className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 transition-all font-black text-primary gap-2 group"
+              >
                 <PlusCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
                 إضافة قسم رئيسي جديد (WBS)
               </Button>
@@ -458,8 +509,17 @@ export function BoqForm({
               <div className="flex gap-3">
                 <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-xl font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSaving} className="h-11 px-14 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[220px]">
-                  {isSaving ? <Loader2 className="ml-3 h-5 w-5 animate-spin" /> : <Save className="ml-3 h-5 w-5" />}
-                  {isSaving ? 'جاري الحفظ...' : 'حفظ الجدول النهائي'}
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="ml-3 h-5 w-5 animate-spin" />
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="ml-3 h-5 w-5" />
+                      حفظ الجدول النهائي
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
