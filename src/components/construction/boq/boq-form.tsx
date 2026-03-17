@@ -18,6 +18,7 @@ import {
   ListTree,
   Calculator,
   Info,
+  Package,
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -60,8 +61,8 @@ export const itemSchema = z.object({
   itemNumber: z.string().optional(),
   description: z.string().min(1, 'الوصف مطلوب.'),
   unit: z.string().optional(),
-  quantity: z.preprocess((v) => (v === '' ? 0 : parseFloat(String(v || '0'))), z.number().min(0)),
-  sellingUnitPrice: z.preprocess((v) => (v === '' ? 0 : parseFloat(String(v || '0'))), z.number().min(0)),
+  quantity: z.preprocess((v) => (v === '' || v === null ? undefined : parseFloat(String(v))), z.number().min(0).optional()),
+  sellingUnitPrice: z.preprocess((v) => (v === '' || v === null ? undefined : parseFloat(String(v))), z.number().min(0).optional()),
   notes: z.string().optional(),
   parentId: z.string().nullable(),
   level: z.number(),
@@ -182,24 +183,24 @@ const BoqItemRowRenderer = React.memo(
 
     return (
       <React.Fragment>
-        <TableRow className={cn('transition-colors border-b last:border-0', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/20')}>
+        <TableRow className={cn('transition-colors border-b last:border-0 h-24', isHeader ? 'bg-muted/40 font-bold border-b-2' : 'hover:bg-muted/5')}>
           <TableCell className="font-mono text-[10px] text-muted-foreground text-center border-l px-1 w-10">
             {wbs}
           </TableCell>
-          <TableCell style={{ paddingRight: `${level * 1.2}rem` }} className="px-2">
-            <div className="flex flex-col gap-1.5 py-1">
+          <TableCell style={{ paddingRight: `${level * 1.5}rem` }} className="px-4">
+            <div className="flex flex-col gap-2 py-2">
               <InlineSearchList
                 value={itemId || ''}
                 onSelect={handleMasterItemSelect}
                 options={masterItemsMap.get(parentReferenceId) || []}
                 placeholder={masterItemsLoading ? 'تحميل...' : 'بند مرجعي'}
-                className="bg-background shadow-sm h-8 text-xs border-dashed"
+                className="bg-white/50 shadow-sm h-9 text-xs border-dashed rounded-xl"
               />
               <Textarea
                 {...register(`items.${node._index}.description`)}
-                placeholder="بيان الأعمال..."
+                placeholder="بيان الأعمال التفصيلي..."
                 rows={1}
-                className={cn('text-xs mt-0.5 min-h-[34px] border-muted focus:border-primary transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'border-destructive' : '')}
+                className={cn('text-sm mt-0.5 min-h-[44px] bg-white rounded-xl shadow-inner border-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all resize-none overflow-hidden h-auto font-bold text-gray-800', itemError?.description ? 'ring-1 ring-destructive' : '')}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
@@ -208,50 +209,52 @@ const BoqItemRowRenderer = React.memo(
               />
             </div>
           </TableCell>
-          <TableCell className="px-1 w-16 text-center">
-            {!isHeader ? (
-              <Input {...register(`items.${node._index}.unit`)} className="h-9 text-center bg-background text-[10px] font-bold rounded-lg border-none shadow-inner" placeholder="الوحدة" />
-            ) : (
-              <span className="text-[10px] text-muted-foreground/40 font-black">-</span>
-            )}
-          </TableCell>
           <TableCell className="px-1 w-20 text-center">
             {!isHeader ? (
-              <Input 
-                type="number" 
-                step="any" 
-                {...register(`items.${node._index}.quantity`)} 
-                onWheel={(e) => e.currentTarget.blur()}
-                className="h-9 dir-ltr text-center font-mono text-base font-black rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-              />
+              <Input {...register(`items.${node._index}.unit`)} className="h-11 text-center bg-white text-xs font-black rounded-full border-none shadow-inner" placeholder="الوحدة" />
             ) : (
-              <span className="text-base text-muted-foreground/40 font-black">-</span>
+              <span className="text-[10px] text-muted-foreground/40 font-black">-</span>
             )}
           </TableCell>
           <TableCell className="px-1 w-24 text-center">
             {!isHeader ? (
               <Input 
                 type="number" 
+                step="any" 
+                {...register(`items.${node._index}.quantity`)} 
+                onWheel={(e) => e.currentTarget.blur()}
+                className="h-11 dir-ltr text-center font-mono text-lg font-black rounded-full border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                placeholder=""
+              />
+            ) : (
+              <span className="text-base text-muted-foreground/40 font-black">-</span>
+            )}
+          </TableCell>
+          <TableCell className="px-1 w-28 text-center">
+            {!isHeader ? (
+              <Input 
+                type="number" 
                 step="0.001" 
                 {...register(`items.${node._index}.sellingUnitPrice`)} 
                 onWheel={(e) => e.currentTarget.blur()}
-                className="h-9 dir-ltr text-center font-mono text-xs font-black text-primary rounded-lg border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                className="h-11 dir-ltr text-center font-mono text-sm font-black text-primary rounded-full border-none bg-white shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                placeholder=""
               />
             ) : (
               <span className="text-xs text-muted-foreground/40 font-black">-</span>
             )}
           </TableCell>
-          <TableCell className="text-left font-mono font-black border-r bg-muted/10 px-2 w-28">
-            <div className={cn('py-1 text-xs tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
+          <TableCell className="text-left font-mono font-black border-r bg-muted/5 px-4 w-32">
+            <div className={cn('py-1 text-sm tracking-tight truncate', isHeader ? 'text-primary border-b border-primary/20' : 'text-foreground')}>
               {formatCurrency(branchTotal)}
             </div>
           </TableCell>
-          <TableCell className="px-2 border-r w-40">
+          <TableCell className="px-4 border-r min-w-[200px]">
             <Textarea
               {...register(`items.${node._index}.notes`)}
               placeholder="ملاحظات..."
               rows={1}
-              className="text-[10px] min-h-[36px] bg-white border-none shadow-inner rounded-2xl px-3 py-2 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
+              className="text-xs min-h-[44px] bg-white border-none shadow-inner rounded-2xl px-4 py-3 focus-visible:ring-1 focus-visible:ring-primary/20 transition-all resize-none overflow-hidden h-auto font-medium text-gray-800"
               onInput={(e) => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -259,15 +262,15 @@ const BoqItemRowRenderer = React.memo(
               }}
             />
           </TableCell>
-          <TableCell className="text-center border-r px-1 w-16">
-            <div className="flex items-center justify-center gap-1">
+          <TableCell className="text-center border-r px-1 w-20">
+            <div className="flex items-center justify-center gap-2">
               {isHeader && (
-                <Button type="button" size="icon" variant="outline" className="h-7 w-7 text-primary border-primary/20 hover:bg-primary/10" onClick={() => handleAddClick(false)} title="إضافة بند عمل">
-                  <PlusCircle className="h-3.5 w-3.5" />
+                <Button type="button" size="icon" variant="outline" className="h-9 w-9 rounded-full text-primary border-primary/20 hover:bg-primary/10 shadow-sm" onClick={() => handleAddClick(false)}>
+                  <PlusCircle className="h-5 w-5" />
                 </Button>
               )}
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" onClick={() => onDelete(node._index)}>
-                <Trash2 className="h-3.5 w-3.5" />
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-full" onClick={() => onDelete(node._index)}>
+                <Trash2 className="h-5 w-5" />
               </Button>
             </div>
           </TableCell>
@@ -375,61 +378,64 @@ export function BoqForm({
   }, [watchedItems, remove]);
 
   return (
-    <div className="bg-background">
+    <div className="min-h-screen bg-transparent">
       <div className="space-y-0">
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b shadow-sm p-4">
-          <div className="flex justify-between items-center max-w-full px-2 mx-auto">
-            {/* Left Side: Stats (Numbers) - The Image Style Pill */}
-            <div className="flex items-center gap-1 bg-white/50 p-1.5 rounded-full border shadow-sm">
-                <div className="bg-primary px-6 py-2.5 rounded-full flex flex-col items-center">
-                    <span className="text-[8px] font-black text-white/70 uppercase tracking-widest leading-none">إجمالي المشروع</span>
-                    <div className="text-xl font-black text-white font-mono leading-none mt-1">
-                        <span className="text-[10px] ml-1">KWD</span>
+        {/* ✨ GLASS HEADER: Stats on Right, Title on Left (Match Image) ✨ */}
+        <div className="sticky top-0 z-40 bg-white/10 backdrop-blur-2xl border-b border-white/20 shadow-xl p-6">
+          <div className="flex flex-row-reverse justify-between items-center max-w-full px-4">
+            
+            {/* Right Side: The Pill Stats Box (Match Image) */}
+            <div className="flex items-center gap-0 bg-white/40 p-1 rounded-full border border-white/60 shadow-lg group">
+                <div className="bg-[#7209B7] px-8 py-3 rounded-full flex flex-col items-center shadow-2xl transition-all group-hover:brightness-110">
+                    <span className="text-[10px] font-black text-white/80 uppercase tracking-[0.2em] leading-none mb-1">إجمالي المشروع</span>
+                    <div className="text-2xl font-black text-white font-mono leading-none">
+                        <span className="text-xs ml-1.5 opacity-70 font-normal">KWD</span>
                         {grandTotal.toLocaleString('en-US', { minimumFractionDigits: 3 })}
                     </div>
                 </div>
-                <div className="px-4 py-2 flex flex-col items-center">
-                    <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest leading-none">عدد البنود</span>
-                    <div className="text-lg font-black text-slate-800 leading-none mt-1">{fields.length}</div>
+                <div className="px-8 py-3 flex flex-col items-center">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] leading-none mb-1">عدد البنود</span>
+                    <div className="text-2xl font-black text-slate-900 leading-none">{fields.length}</div>
                 </div>
             </div>
 
-            {/* Right Side: Title/Icon (Speech) */}
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <CardTitle className="text-xl font-black tracking-tight text-slate-900 flex items-center justify-end gap-2">
-                    مُحرر جداول الكميات
-                    <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold">إدارة الحصر والتسعير المرجعي والبنود الفنية</CardDescription>
+            {/* Left Side: Title & Icon block (Match Image) */}
+            <div className="flex items-center gap-5">
+              <div className="p-4 bg-[#7209B7]/10 rounded-[1.5rem] text-[#7209B7] shadow-inner border border-[#7209B7]/20">
+                <ListTree className="h-8 w-8" />
               </div>
-              <div className="p-2.5 bg-primary/10 rounded-2xl text-primary shadow-inner">
-                <ListTree className="h-6 w-6" />
+              <div className="text-right">
+                <div className="flex items-center gap-3">
+                    <CardTitle className="text-3xl font-black tracking-tighter text-slate-900">مُحرر جداول الكميات</CardTitle>
+                    <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
+                </div>
+                <CardDescription className="text-sm font-black text-slate-600/80 mt-1">إدارة الحصر والتسعير المرجعي والبنود الفنية</CardDescription>
               </div>
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit && onSubmit ? handleSubmit(onSubmit) : undefined}>
-          <CardContent className="p-0 max-w-full mx-auto mt-4 px-2 pb-32">
-            <div className="grid md:grid-cols-3 gap-4 p-6 mb-4 border rounded-[2rem] bg-card shadow-sm">
-              <div className="grid gap-1.5">
-                <Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">اسم / مرجع الجدول *</Label>
-                <Input style={{borderRadius: '1.25rem'}} {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" className={cn('h-10 text-base font-bold border-2', errors.name ? 'border-destructive' : '')} />
-                {errors.name && <p className="text-[10px] text-destructive px-1">{errors.name.message}</p>}
+          <CardContent className="p-0 max-w-full mx-auto mt-6 px-4 pb-40">
+            {/* Global Info Section */}
+            <div className="grid md:grid-cols-3 gap-6 p-8 mb-8 border-none rounded-[3rem] glass-effect shadow-2xl">
+              <div className="grid gap-2">
+                <Label className="font-black text-xs text-slate-900/60 uppercase pr-2">اسم / مرجع الجدول *</Label>
+                <Input className="h-12 text-lg font-black rounded-[1.5rem] border-2 bg-white/80 shadow-inner" {...register('name')} placeholder="مثال: جدول كميات فيلا السيد محمد" />
+                {errors.name && <p className="text-xs text-red-600 font-bold px-2">{errors.name.message}</p>}
               </div>
-              <div className="grid gap-1.5">
-                <Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">العميل (المحتمل)</Label>
-                <Input style={{borderRadius: '1.25rem'}} {...register('clientName')} className="h-10" placeholder="أدخل اسم العميل..." />
+              <div className="grid gap-2">
+                <Label className="font-black text-xs text-slate-900/60 uppercase pr-2">العميل (المحتمل)</Label>
+                <Input className="h-12 text-lg font-black rounded-[1.5rem] border-2 bg-white/80 shadow-inner" {...register('clientName')} placeholder="أدخل اسم العميل..." />
               </div>
-              <div className="grid gap-1.5">
-                <Label className="font-black text-[10px] text-muted-foreground uppercase pr-1">الحالة التعاقدية</Label>
+              <div className="grid gap-2">
+                <Label className="font-black text-xs text-slate-900/60 uppercase pr-2">الحالة التعاقدية</Label>
                 <Controller name="status" control={control} render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="h-10 rounded-[1.25rem] border-2 font-bold">
+                    <SelectTrigger className="h-12 rounded-[1.5rem] border-2 bg-white/80 shadow-inner font-black text-lg">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent dir="rtl">
+                    <SelectContent dir="rtl" className="rounded-2xl shadow-2xl border-none">
                       <SelectItem value="تقديري">تقديري</SelectItem>
                       <SelectItem value="تعاقدي">تعاقدي</SelectItem>
                       <SelectItem value="منفذ">منفذ</SelectItem>
@@ -439,27 +445,29 @@ export function BoqForm({
               </div>
             </div>
 
-            <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card border-slate-200">
-              <Table className="w-full border-collapse">
-                <TableHeader className="bg-primary/10 text-primary">
-                  <TableRow className="hover:bg-transparent border-none h-12">
-                    <TableHead className="text-center font-black text-[10px] uppercase text-primary border-l border-primary/10 w-10">م</TableHead>
-                    <TableHead className="font-black text-xs text-primary px-4">بيان الأعمال التفصيلي</TableHead>
-                    <TableHead className="text-center font-black text-xs text-primary border-l border-primary/10 w-16">الوحدة</TableHead>
-                    <TableHead className="text-center font-black text-xs text-primary border-l border-primary/10 w-20">الكمية</TableHead>
-                    <TableHead className="text-center font-black text-xs text-primary border-l border-primary/10 w-24">سعر الوحدة</TableHead>
-                    <TableHead className="text-left font-black text-xs text-primary border-l border-primary/10 w-28">الإجمالي</TableHead>
-                    <TableHead className="font-black text-xs text-primary border-l border-primary/10 w-40">ملاحظات</TableHead>
-                    <TableHead className="text-center font-black text-xs text-primary w-16">إجراء</TableHead>
+            {/* ✨ GIGANT GANTT STYLE TABLE: No Scroll ✨ */}
+            <div className="rounded-[3rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.15)] border-none glass-effect">
+              <Table className="w-full border-collapse table-auto">
+                <TableHeader className="bg-[#7209B7]/10 text-[#7209B7]">
+                  <TableRow className="hover:bg-transparent border-none h-16">
+                    <TableHead className="text-center font-black text-xs uppercase border-l border-[#7209B7]/10 w-12">م</TableHead>
+                    <TableHead className="font-black text-sm px-6">بيان الأعمال التفصيلي</TableHead>
+                    <TableHead className="text-center font-black text-sm border-l border-[#7209B7]/10 w-24">الوحدة</TableHead>
+                    <TableHead className="text-center font-black text-sm border-l border-[#7209B7]/10 w-28">الكمية</TableHead>
+                    <TableHead className="text-center font-black text-sm border-l border-[#7209B7]/10 w-32">سعر الوحدة</TableHead>
+                    <TableHead className="text-left font-black text-sm border-l border-[#7209B7]/10 w-40">الإجمالي</TableHead>
+                    <TableHead className="font-black text-sm border-l border-[#7209B7]/10 w-full min-w-[250px]">ملاحظات إجرائية</TableHead>
+                    <TableHead className="text-center font-black text-sm w-20">إجراء</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {boqTree.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-64 text-center">
-                        <div className="flex flex-col items-center justify-center gap-4 text-muted-foreground">
-                          <Info className="h-12 w-12 opacity-20" />
-                          <p className="font-bold">الجدول فارغ حالياً. ابدأ بإضافة قسم رئيسي لتنظيم حصر الكميات.</p>
+                      <TableCell colSpan={8} className="h-80 text-center">
+                        <div className="flex flex-col items-center justify-center gap-6 opacity-30">
+                          <Package className="h-20 w-20 text-slate-400" />
+                          <p className="text-2xl font-black text-slate-900">الجدول فارغ حالياً.</p>
+                          <p className="text-sm font-bold">ابدأ بإضافة قسم رئيسي لتنظيم حصر الكميات.</p>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -487,37 +495,38 @@ export function BoqForm({
               </Table>
             </div>
 
-            <div className="flex justify-center p-8">
+            <div className="flex justify-center p-12">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleAddRootSection}
-                className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 transition-all font-black text-primary gap-2 group"
+                className="h-16 px-16 rounded-3xl border-2 border-dashed border-primary/40 bg-white/20 hover:bg-primary/5 hover:border-primary transition-all font-black text-xl text-primary gap-3 group shadow-xl"
               >
-                <PlusCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                <PlusCircle className="h-7 w-7 group-hover:scale-110 transition-transform" />
                 إضافة قسم رئيسي جديد (WBS)
               </Button>
             </div>
           </CardContent>
 
-          <div className="fixed bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t shadow-[0_-10px_30px_rgba(0,0,0,0.1)] no-print">
-            <div className="max-w-7xl mx-auto flex justify-between items-center p-5 px-8">
-              <div className="flex items-center gap-3 text-xs font-bold text-muted-foreground bg-muted/50 px-5 py-2 rounded-full border">
-                <Calculator className="h-4 w-4 text-primary" />
-                <span className="text-slate-900 font-black">تم حصر وتثمين {fields.length} بنود بدقة</span>
+          {/* Fixed Footer Toolbar */}
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-2xl border-t border-white/20 shadow-[0_-15px_50px_rgba(0,0,0,0.15)] no-print">
+            <div className="max-w-screen-2xl mx-auto flex justify-between items-center p-6 px-10">
+              <div className="flex items-center gap-4 bg-white/40 px-6 py-3 rounded-full border border-white/60 shadow-inner">
+                <Calculator className="h-5 w-5 text-primary" />
+                <span className="text-slate-900 font-black text-base">تم حصر وتثمين {fields.length} بنود بدقة تامة</span>
               </div>
-              <div className="flex gap-3">
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-11 px-8 rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={isSaving} className="h-11 px-14 rounded-xl font-black text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all min-w-[220px]">
+              <div className="flex gap-4">
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg text-slate-600">إلغاء</Button>
+                <Button type="submit" disabled={isSaving} className="h-14 px-20 rounded-2xl font-black text-xl shadow-2xl shadow-primary/30 hover:shadow-primary/50 transition-all min-w-[300px] bg-[#7209B7] text-white">
                   {isSaving ? (
                     <>
-                      <Loader2 className="ml-3 h-5 w-5 animate-spin" />
+                      <Loader2 className="ml-3 h-6 w-6 animate-spin" />
                       جاري الحفظ...
                     </>
                   ) : (
                     <>
-                      <Save className="ml-3 h-5 w-5" />
-                      حفظ الجدول النهائي
+                      <Save className="ml-3 h-6 w-6" />
+                      اعتماد وحفظ الجدول النهائي
                     </>
                   )}
                 </Button>
