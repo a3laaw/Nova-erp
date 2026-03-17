@@ -16,7 +16,7 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, PlusCircle, Trash2, Wallet, Target, User, UploadCloud, FileText, X, ImageIcon, ScrollText, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -25,29 +25,17 @@ import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestam
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Employee, CustodyReconciliation, JournalEntry, ConstructionProject, Client, Account } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData, generateStableId, cn } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
 import Image from 'next/image';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 
-const itemSchema = z.object({
-  id: z.string(),
-  description: z.string().min(1, "بيان المصروف مطلوب."),
-  amount: z.preprocess((v) => parseFloat(String(v || '')), z.number().positive("المبلغ مطلوب")),
-  projectId: z.string().optional().nullable(),
-  clientId: z.string().optional().nullable(),
-});
-
-const reconciliationSchema = z.object({
-  date: z.date({ required_error: 'التاريخ مطلوب.' }),
-  employeeId: z.string().min(1, "الموظف مطلوب."),
-  items: z.array(itemSchema).min(1, 'يجب إضافة بند مصروف واحد على الأقل.'),
-  notes: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof reconciliationSchema>;
+/**
+ * مولد المعرفات الفريدة للبنود (Internal Helper)
+ */
+const generateId = () => Math.random().toString(36).substring(2, 9);
 
 interface PreviewFile {
     id: string;
@@ -57,8 +45,8 @@ interface PreviewFile {
 
 /**
  * مكون منصة المعاينة الذكية (Smart Preview Deck):
- * يعمل بنظام "كادر الرؤية الثنائي"؛ يظهر صورتين فقط والبقية عبر التمرير.
- * يدعم التمرير الأفقي عبر بكرة الماوس أوتوماتيكياً.
+ * - يتبنى نظام "كادر الرؤية الثنائي" (يظهر صورتين فقط والبقية بالتمرير).
+ * - يحول بكرة الماوس العمودية إلى حركة أفقية انسيابية.
  */
 function SmartPhotoGallery({ 
     itemId, 
@@ -73,7 +61,6 @@ function SmartPhotoGallery({
 }) {
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // محرك تحويل بكرة الماوس العمودية إلى حركة أفقية انسيابية
     const handleWheel = (e: React.WheelEvent) => {
         if (scrollRef.current) {
             e.preventDefault();
@@ -101,7 +88,6 @@ function SmartPhotoGallery({
 
     return (
         <div className="relative group/gallery w-full">
-            {/* أزرار التنقل تظهر عند وجود أكثر من صورتين لسهولة الوصول */}
             {files.length > 2 && (
                 <>
                     <div className="absolute inset-y-0 -right-2 z-10 flex items-center opacity-0 group-hover/gallery:opacity-100 transition-opacity">
@@ -130,7 +116,6 @@ function SmartPhotoGallery({
                 </>
             )}
 
-            {/* حاوية "كادر الرؤية الثنائي": محددة العرض لإظهار صورتين فقط */}
             <div 
                 ref={scrollRef}
                 onWheel={handleWheel}
@@ -173,7 +158,6 @@ export function CustodyReconciliationForm() {
     const [custodyBalance, setCustodyBalance] = useState(0);
     const [loadingBalance, setLoadingBalance] = useState(false);
     
-    // إدارة المرفقات لكل بند
     const [previews, setPreviews] = useState<Record<string, PreviewFile[]>>({});
     const [isDragging, setIsDragging] = useState<string | null>(null);
 
@@ -429,7 +413,6 @@ export function CustodyReconciliationForm() {
                                         <Label className="text-[10px] font-black text-muted-foreground uppercase pr-1">الفواتير والمرفقات (صورتين فقط، البقية بالبكرة)</Label>
                                         
                                         <div className="flex gap-3 items-center">
-                                            {/* منطقة الرفع الجانبية */}
                                             <div 
                                                 onDragOver={(e) => { e.preventDefault(); setIsDragging(field.id); }}
                                                 onDragLeave={() => setIsDragging(null)}
@@ -451,7 +434,6 @@ export function CustodyReconciliationForm() {
                                                 />
                                             </div>
 
-                                            {/* معرض المعاينة الذكي (كادر ثنائي) */}
                                             <SmartPhotoGallery 
                                                 itemId={field.id} 
                                                 files={previews[field.id] || []} 
