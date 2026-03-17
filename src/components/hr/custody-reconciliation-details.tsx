@@ -234,7 +234,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                             <Input 
                                                 value={item.description} 
                                                 onChange={(e) => handleItemChange(idx, 'description', e.target.value)}
-                                                className="font-bold text-base h-10 rounded-xl bg-background border-2"
+                                                className="font-bold text-base h-10 rounded-xl bg-white border-2 text-foreground shadow-sm"
                                             />
                                         )}
                                         
@@ -283,7 +283,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                                 }}
                                                 options={costCenterOptions}
                                                 placeholder="اربط بمشروع..."
-                                                className="h-10 rounded-xl text-xs border-dashed"
+                                                className="h-10 rounded-xl text-xs border-dashed bg-white shadow-sm"
                                             />
                                         )}
                                     </TableCell>
@@ -296,7 +296,8 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                                 step="any"
                                                 value={item.amount} 
                                                 onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
-                                                className="text-center font-black font-mono text-lg h-10 rounded-xl border-2 border-primary/20 text-primary bg-primary/5"
+                                                className="text-center font-black font-mono text-lg h-10 rounded-xl border-2 border-primary/20 text-primary bg-white shadow-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                onWheel={(e) => e.currentTarget.blur()}
                                             />
                                         )}
                                     </TableCell>
@@ -311,7 +312,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                                                 onSelect={(v) => setMappings(prev => ({ ...prev, [idx]: v }))}
                                                 options={expenseAccounts}
                                                 placeholder="اختر حساب المصروف..."
-                                                className="bg-white border-primary/30 rounded-xl h-10"
+                                                className="bg-white border-primary/30 rounded-xl h-10 shadow-sm"
                                             />
                                         )}
                                     </TableCell>
@@ -331,7 +332,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                         <Label className="font-black text-lg flex items-center gap-2">
                             <ShieldCheck className="h-5 w-5 text-primary" /> ملاحظات الموظف وبيانات التسوية
                         </Label>
-                        <div className="p-6 bg-muted/20 rounded-[2rem] border-2 border-dashed text-sm italic leading-relaxed">
+                        <div className="p-6 bg-white rounded-[2rem] border-2 border-dashed text-sm italic leading-relaxed shadow-inner">
                             {rec.notes || 'لم يتم إدراج ملاحظات إضافية من الموظف.'}
                         </div>
                     </div>
