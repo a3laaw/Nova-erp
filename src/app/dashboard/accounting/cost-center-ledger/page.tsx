@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import type { Account, JournalEntry, ConstructionProject, Department } from '@/lib/types';
+import type { Account, JournalEntry, ConstructionProject, Department, Employee } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Search, FileText, Target, Building2, ListTree, Info, PieChart, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Loader2, Printer, Search, FileText, Target, Building2, ListTree, Info, PieChart, ArrowUpRight, ArrowDownLeft, UserCheck } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +39,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 
 interface LedgerLine {
     date: Date;
@@ -47,6 +48,7 @@ interface LedgerLine {
     accountName: string;
     debit: number;
     credit: number;
+    balance: number;
     entryId: string;
 }
 
@@ -56,13 +58,14 @@ export default function CostCenterLedgerPage() {
     const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();
 
-    const [centerType, setCenterType] = useState<'project' | 'department'>('project');
+    const [centerType, setCenterType] = useState<'project' | 'department' | 'employee'>('project');
     const [selectedCenterId, setSelectedCenterId] = useState('');
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
     
     const [projects, setProjects] = useState<ConstructionProject[]>([]);
     const [departments, setDepartments] = useState<Department[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -74,19 +77,21 @@ export default function CostCenterLedgerPage() {
         netBalance: number;
     } | null>(null);
 
-    // جلب البيانات المرجعية
+    // جلب كافة البيانات المرجعية المطلوبة لبناء محرك البحث
     useEffect(() => {
         if (!firestore) return;
         const fetchData = async () => {
             try {
-                const [accSnap, projectsSnap, deptsSnap] = await Promise.all([
+                const [accSnap, projectsSnap, deptsSnap, empSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
                     getDocs(collection(firestore, 'projects')),
-                    getDocs(collection(firestore, 'departments'))
+                    getDocs(collection(firestore, 'departments')),
+                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active')))
                 ]);
                 setAccounts(accSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
                 setProjects(projectsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ConstructionProject)));
                 setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
+                setEmployees(empSnap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching ledger refs:", err);
@@ -98,10 +103,12 @@ export default function CostCenterLedgerPage() {
 
     const centerOptions = useMemo(() => {
         if (centerType === 'project') {
-            return projects.map(p => ({ value: p.id!, label: p.projectName }));
+            return projects.map(p => ({ value: p.id!, label: `مشروع: ${p.projectName}` }));
+        } else if (centerType === 'department') {
+            return departments.map(d => ({ value: d.id!, label: `قسم: ${d.name}` }));
         }
-        return departments.map(d => ({ value: d.id!, label: d.name }));
-    }, [centerType, projects, departments]);
+        return employees.map(e => ({ value: e.id!, label: `الموظف: ${e.fullName}` }));
+    }, [centerType, projects, departments, employees]);
 
     const handleGenerate = async () => {
         if (!firestore || !selectedCenterId || !dateFrom || !dateTo) {
@@ -130,9 +137,10 @@ export default function CostCenterLedgerPage() {
                 if (!entryDate || entryDate < startDate || entryDate > endDate) return;
 
                 entry.lines.forEach(line => {
-                    const match = centerType === 'project' 
-                        ? line.auto_profit_center === selectedCenterId
-                        : line.auto_dept_id === selectedCenterId;
+                    let match = false;
+                    if (centerType === 'project') match = line.auto_profit_center === selectedCenterId;
+                    else if (centerType === 'department') match = line.auto_dept_id === selectedCenterId;
+                    else if (centerType === 'employee') match = line.auto_resource_id === selectedCenterId;
 
                     if (match) {
                         const debit = line.debit || 0;
@@ -144,6 +152,7 @@ export default function CostCenterLedgerPage() {
                             accountName: line.accountName,
                             debit,
                             credit,
+                            balance: 0, // Calculated after sorting
                             entryId: docSnap.id
                         });
                         totalDebit += debit;
@@ -152,14 +161,20 @@ export default function CostCenterLedgerPage() {
                 });
             });
 
-            // ترتيب زمنياً
+            // الترتيب الزمني وحساب الرصيد المتدفق
             lines.sort((a, b) => a.date.getTime() - b.date.getTime());
+            
+            let runningBalance = 0;
+            lines.forEach(line => {
+                runningBalance += line.debit - line.credit;
+                line.balance = runningBalance;
+            });
 
             setReportData({
                 lines,
                 totalDebit,
                 totalCredit,
-                netBalance: totalDebit - totalCredit
+                netBalance: runningBalance
             });
 
             toast({ title: 'تم استخراج الكشف', description: `تمت معالجة ${lines.length} حركة مالية لهذا المركز.` });
@@ -180,20 +195,23 @@ export default function CostCenterLedgerPage() {
                 <CardHeader className="bg-primary/5 pb-6 border-b">
                     <CardTitle className="text-xl font-black flex items-center gap-2">
                         <PieChart className="text-primary h-6 w-6"/>
-                        كشف حركة مراكز التكلفة (المشاريع والأقسام)
+                        محرك مراكز التكلفة (مشاريع - أقسام - موظفين)
                     </CardTitle>
-                    <CardDescription>تحليل عمودي لكافة الحركات المالية المرتبطة بمشروع أو قسم محدد من كافة الحسابات.</CardDescription>
+                    <CardDescription>تحليل عمودي لكافة الحركات المالية المرتبطة بكيان محدد عبر كافة حسابات الشجرة.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8">
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                         <div className="flex justify-center">
                             <Tabs value={centerType} onValueChange={(v: any) => { setCenterType(v); setSelectedCenterId(''); setReportData(null); }} className="w-fit">
-                                <TabsList className="bg-muted p-1 rounded-2xl border">
-                                    <TabsTrigger value="project" className="rounded-xl font-bold gap-2 px-8">
-                                        <Target className="h-4 w-4"/> تتبع مشروع (Main)
+                                <TabsList className="bg-muted p-1 rounded-2xl border h-auto">
+                                    <TabsTrigger value="project" className="rounded-xl font-bold gap-2 px-8 py-2.5">
+                                        <Target className="h-4 w-4"/> تتبع مشروع
                                     </TabsTrigger>
-                                    <TabsTrigger value="department" className="rounded-xl font-bold gap-2 px-8">
-                                        <Building2 className="h-4 w-4"/> تتبع قسم (Additional)
+                                    <TabsTrigger value="department" className="rounded-xl font-bold gap-2 px-8 py-2.5">
+                                        <Building2 className="h-4 w-4"/> تتبع قسم
+                                    </TabsTrigger>
+                                    <TabsTrigger value="employee" className="rounded-xl font-bold gap-2 px-8 py-2.5">
+                                        <UserCheck className="h-4 w-4"/> تتبع موظف/مهندس
                                     </TabsTrigger>
                                 </TabsList>
                             </Tabs>
@@ -201,13 +219,15 @@ export default function CostCenterLedgerPage() {
 
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                             <div className="md:col-span-5 grid gap-2">
-                                <Label className="font-black text-gray-700 pr-1">اختر {centerType === 'project' ? 'المشروع' : 'القسم'} *</Label>
+                                <Label className="font-black text-gray-700 pr-1">
+                                    {centerType === 'project' ? 'اختر المشروع المستهدف' : centerType === 'department' ? 'اختر القسم' : 'اختر الموظف/المهندس المختص'} *
+                                </Label>
                                 <InlineSearchList 
                                     value={selectedCenterId}
                                     onSelect={setSelectedCenterId}
                                     options={centerOptions}
                                     placeholder={loading ? "جاري التحميل..." : "ابحث واختر..."}
-                                    className="h-12 rounded-2xl bg-white border-2"
+                                    className="h-12 rounded-2xl bg-white border-2 soft-shadow-input"
                                 />
                             </div>
                             <div className="md:col-span-2 grid gap-2">
@@ -225,7 +245,7 @@ export default function CostCenterLedgerPage() {
                                     className="w-full h-12 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20"
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin h-5 w-5"/> : <Search className="h-5 w-5" />}
-                                    استخراج تقرير المركز
+                                    استخراج التقرير
                                 </Button>
                             </div>
                         </div>
@@ -240,8 +260,8 @@ export default function CostCenterLedgerPage() {
                             {/* Header Section */}
                             <div className="flex justify-between items-start border-b-4 border-primary pb-8 mb-10">
                                 <div className="text-left space-y-1">
-                                    <h2 className="text-3xl font-black text-primary tracking-tighter">كشف حركة مركز تكلفة</h2>
-                                    <p className="text-lg font-bold text-gray-500 tracking-widest font-mono uppercase">Cost Center Statement</p>
+                                    <h2 className="text-3xl font-black text-primary tracking-tighter">كشف حركة مالي مخصص</h2>
+                                    <p className="text-lg font-bold text-gray-500 tracking-widest font-mono uppercase">Cost Center Performance</p>
                                     <p className="text-xs font-bold text-muted-foreground mt-2">تاريخ الاستخراج: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ar })}</p>
                                 </div>
                                 <div className="flex items-center gap-4">
@@ -256,12 +276,16 @@ export default function CostCenterLedgerPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 p-8 bg-muted/30 rounded-[2rem] border-2 border-dashed border-primary/10">
                                 <div className="space-y-4">
                                     <div>
-                                        <Label className="text-[10px] uppercase font-black text-muted-foreground mb-1 block">المركز المختار:</Label>
+                                        <Label className="text-[10px] uppercase font-black text-muted-foreground mb-1 block">المركز المختار للمراجعة:</Label>
                                         <p className="text-2xl font-black text-primary">
-                                            {centerType === 'project' ? projects.find(p => p.id === selectedCenterId)?.projectName : departments.find(d => d.id === selectedCenterId)?.name}
+                                            {centerType === 'project' ? projects.find(p => p.id === selectedCenterId)?.projectName : 
+                                             centerType === 'department' ? departments.find(d => d.id === selectedCenterId)?.name :
+                                             employees.find(e => e.id === selectedCenterId)?.fullName}
                                         </p>
                                         <Badge variant="secondary" className="mt-1 font-bold">
-                                            {centerType === 'project' ? 'مركز تكلفة رئيسي (مشروع)' : 'مركز تكلفة إضافي (قسم)'}
+                                            {centerType === 'project' ? 'مركز تكلفة رئيسي (مشروع)' : 
+                                             centerType === 'department' ? 'مركز تكلفة إضافي (قسم)' : 
+                                             'تتبع أداء (موظف مختص)'}
                                         </Badge>
                                     </div>
                                     <div className="flex gap-6 pt-2">
@@ -270,11 +294,11 @@ export default function CostCenterLedgerPage() {
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end justify-center text-left">
-                                    <Label className="text-[10px] uppercase font-black text-primary mb-1">صافي الفرق المالي</Label>
+                                    <Label className="text-[10px] uppercase font-black text-primary mb-1">صافي الرصيد المتدفق</Label>
                                     <p className={cn("text-4xl font-black font-mono tracking-tighter", reportData.netBalance >= 0 ? "text-primary" : "text-red-600")}>
                                         {formatCurrency(reportData.netBalance)}
                                     </p>
-                                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">(مدين - دائن)</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground mt-2 italic">(إجمالي المدين - إجمالي الدائن)</p>
                                 </div>
                             </div>
 
@@ -282,11 +306,12 @@ export default function CostCenterLedgerPage() {
                                 <Table>
                                     <TableHeader className="bg-muted/80">
                                         <TableRow className="h-14 border-b-2">
-                                            <TableHead className="w-32 font-bold text-center border-l">التاريخ</TableHead>
+                                            <TableHead className="w-28 font-bold text-center border-l">التاريخ</TableHead>
                                             <TableHead className="w-32 font-bold text-center border-l">رقم القيد</TableHead>
-                                            <TableHead className="px-6 font-bold text-foreground">الحساب المتأثر والبيان</TableHead>
-                                            <TableHead className="w-32 text-left font-bold text-foreground">مدين (+)</TableHead>
-                                            <TableHead className="w-32 text-left font-bold text-foreground">دائن (-)</TableHead>
+                                            <TableHead className="px-6 font-bold text-foreground">البيان والحساب المتأثر</TableHead>
+                                            <TableHead className="w-28 text-left font-bold text-foreground">مدين (+)</TableHead>
+                                            <TableHead className="w-28 text-left font-bold text-foreground">دائن (-)</TableHead>
+                                            <TableHead className="w-32 text-left font-black text-primary border-r bg-primary/5 px-4">الرصيد</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -301,35 +326,29 @@ export default function CostCenterLedgerPage() {
                                                     <p className="text-[9px] text-muted-foreground font-black uppercase mb-1">الحساب: {line.accountName}</p>
                                                     <p className="font-bold text-xs text-gray-800 leading-relaxed">{line.narration}</p>
                                                 </TableCell>
-                                                <TableCell className="text-left font-mono font-black text-base text-blue-600">
-                                                    {line.debit > 0 ? (
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            {formatCurrency(line.debit)}
-                                                            <ArrowUpRight className="h-3 w-3 opacity-30" />
-                                                        </div>
-                                                    ) : '-'}
+                                                <TableCell className="text-left font-mono font-black text-sm text-blue-600">
+                                                    {line.debit > 0 ? formatCurrency(line.debit) : '-'}
                                                 </TableCell>
-                                                <TableCell className="text-left font-mono font-black text-base text-amber-600">
-                                                    {line.credit > 0 ? (
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            {formatCurrency(line.credit)}
-                                                            <ArrowDownLeft className="h-3 w-3 opacity-30" />
-                                                        </div>
-                                                    ) : '-'}
+                                                <TableCell className="text-left font-mono font-black text-sm text-amber-600">
+                                                    {line.credit > 0 ? formatCurrency(line.credit) : '-'}
+                                                </TableCell>
+                                                <TableCell className="text-left font-mono font-black text-base px-4 bg-primary/[0.02] border-r border-primary/10">
+                                                    {formatCurrency(line.balance)}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
                                         {reportData.lines.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد حركات مسجلة لهذا المركز خلال الفترة المختارة.</TableCell>
+                                                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد حركات مسجلة لهذا المركز خلال الفترة المختارة.</TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>
                                     <TableFooter className="bg-muted/20">
                                         <TableRow className="h-20 font-black border-t-4 border-primary/20">
-                                            <TableCell colSpan={3} className="text-right px-12 text-xl">إجمالي المركز المالي للفترة:</TableCell>
-                                            <TableCell className="text-left font-mono text-xl text-blue-700">{formatCurrency(reportData.totalDebit)}</TableCell>
-                                            <TableCell className="text-left font-mono text-xl text-amber-700">{formatCurrency(reportData.totalCredit)}</TableCell>
+                                            <TableCell colSpan={3} className="text-right px-12 text-lg">إجمالي الحركة للمركز:</TableCell>
+                                            <TableCell className="text-left font-mono text-lg text-blue-700">{formatCurrency(reportData.totalDebit)}</TableCell>
+                                            <TableCell className="text-left font-mono text-lg text-amber-700">{formatCurrency(reportData.totalCredit)}</TableCell>
+                                            <TableCell className="bg-primary/5 border-r border-primary/20" />
                                         </TableRow>
                                     </TableFooter>
                                 </Table>
@@ -360,8 +379,8 @@ export default function CostCenterLedgerPage() {
                     <div className="p-10 bg-muted rounded-full mb-6">
                         <ListTree className="h-24 w-24 text-muted-foreground" />
                     </div>
-                    <h3 className="text-3xl font-black text-muted-foreground">بانتظار تحديد مركز التكلفة</h3>
-                    <p className="text-lg font-bold mt-2">اختر المشروع أو القسم واضغط على "استخراج" لرؤية التاريخ المالي الكامل.</p>
+                    <h3 className="text-3xl font-black text-muted-foreground">بانتظار تحديد البعد المالي</h3>
+                    <p className="text-lg font-bold mt-2">اختر المشروع، القسم، أو الموظف واضغط على "استخراج التقرير" لرؤية التاريخ المالي الكامل.</p>
                 </div>
             )}
         </div>
