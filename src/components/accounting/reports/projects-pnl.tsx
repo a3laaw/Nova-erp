@@ -8,7 +8,7 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Loader2, Search, TrendingUp, TrendingDown, Target, User, FileSearch, Printer } from 'lucide-react';
+import { Loader2, Search, TrendingUp, TrendingDown, Target, User, FileSearch, Printer, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
