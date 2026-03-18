@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, getDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
 import {
   Card,
@@ -27,21 +27,23 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { formatCurrency } from '@/lib/utils';
-import { Loader2, Printer, ArrowRight, Search } from 'lucide-react';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Loader2, Printer, Search, FileText, ArrowRight, ListTree } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import Link from 'next/link';
 import { useBranding } from '@/context/branding-context';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
+import { toFirestoreDate } from '@/services/date-converter';
+import Link from 'next/link';
 
 interface StatementLine {
     date: Date;
     entryNumber: string;
     narration: string;
+    accountName: string; // لإظهار اسم الحساب الفرعي في حال اختيار حساب رئيسي
     debit: number;
     credit: number;
     balance: number;
@@ -55,286 +57,333 @@ export default function GeneralLedgerPage() {
     const { branding, loading: brandingLoading } = useBranding();
 
     const [accounts, setAccounts] = useState<Account[]>([]);
-    const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isGenerating, setIsGenerating] = useState(false);
     
-    // --- Filters ---
-    const [accountId, setAccountId] = useState('');
-    const [dateFrom, setDateFrom] = useState<Date | undefined>();
-    const [dateTo, setDateTo] = useState<Date | undefined>();
-    const [statusFilter, setStatusFilter] = useState<'all' | 'posted' | 'draft'>('posted');
+    // --- الفلاتر ---
+    const [selectedAccountId, setSelectedAccountId] = useState('');
+    const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+    const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
+    const [statusFilter, setStatusFilter] = useState<'posted' | 'all'>('posted');
 
-    useEffect(() => {
-        // Set default date range on client-side to avoid hydration mismatch
-        const now = new Date();
-        setDateFrom(startOfMonth(now));
-        setDateTo(endOfMonth(now));
-    }, []);
+    // --- نتائج الكشف المثبتة ---
+    const [ledgerData, setLedgerData] = useState<{
+        openingBalance: number;
+        lines: StatementLine[];
+        totalDebit: number;
+        totalCredit: number;
+        finalBalance: number;
+    } | null>(null);
 
-    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان يسبق البداية
+    // جلب شجرة الحسابات عند التحميل
     useEffect(() => {
-        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
-            setDateTo(undefined);
-            toast({
-                variant: 'destructive',
-                title: 'خطأ منطقي',
-                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
-            });
-        }
-    }, [dateFrom, dateTo, toast]);
-
-    // --- Data Fetching ---
-    useEffect(() => {
-        if (!firestore) {
+        if (!firestore) return;
+        getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))).then(snap => {
+            setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
             setLoading(false);
-            return;
-        };
-
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                    getDocs(query(collection(firestore, 'journalEntries'))),
-                ]);
-
-                const fetchedAccounts = accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account));
-                setAccounts(fetchedAccounts);
-                
-                const fetchedEntries = entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry));
-                setJournalEntries(fetchedEntries);
-
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
+        });
     }, [firestore]);
-    
+
     const accountOptions = useMemo(() => 
         accounts.map(acc => ({
             value: acc.id!,
-            label: `${acc.name} (${acc.code})`
+            label: `${acc.name} (${acc.code})`,
+            searchKey: acc.code
         }))
     , [accounts]);
 
-    // --- Statement Calculation ---
-    const statementData = useMemo(() => {
-        if (!accountId || !dateFrom || !dateTo || loading) {
-            return { openingBalance: 0, lines: [], totalDebit: 0, totalCredit: 0, finalBalance: 0 };
+    // محرك استخراج الكشف (The Ledger Engine)
+    const handleGenerateLedger = async () => {
+        if (!firestore || !selectedAccountId || !dateFrom || !dateTo) {
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار الحساب والفترة الزمنية.' });
+            return;
         }
 
-        const startDate = dateFrom;
-        const endDate = new Date(dateTo);
-        endDate.setHours(23, 59, 59, 999);
-        
-        let relevantEntries = journalEntries;
-        if (statusFilter !== 'all') {
-            relevantEntries = relevantEntries.filter(entry => entry.status === statusFilter);
-        }
-
-        const openingBalance = relevantEntries
-            .filter(entry => entry.date.toDate() < startDate)
-            .flatMap(entry => entry.lines)
-            .filter(line => line.accountId === accountId)
-            .reduce((balance, line) => balance + (line.debit || 0) - (line.credit || 0), 0);
-        
-        const transactionsInPeriod = relevantEntries
-            .filter(entry => {
-                const entryDate = entry.date.toDate();
-                return entryDate >= startDate && entryDate <= endDate;
-            })
-            .flatMap(entry => 
-                entry.lines
-                    .filter(line => line.accountId === accountId)
-                    .map(line => ({
-                        date: entry.date.toDate(),
-                        entryNumber: entry.entryNumber,
-                        narration: entry.narration,
-                        debit: line.debit || 0,
-                        credit: line.credit || 0,
-                        entryId: entry.id!
-                    }))
-            )
-            .sort((a,b) => a.date.getTime() - b.date.getTime());
-        
-        let runningBalance = openingBalance;
-        const lines: StatementLine[] = transactionsInPeriod.map(tx => {
-            runningBalance += tx.debit - tx.credit;
-            return { ...tx, balance: runningBalance };
-        });
-        
-        const totalDebit = lines.reduce((sum, line) => sum + line.debit, 0);
-        const totalCredit = lines.reduce((sum, line) => sum + line.credit, 0);
-
-        return { openingBalance, lines, totalDebit, totalCredit, finalBalance: runningBalance };
-
-    }, [accountId, dateFrom, dateTo, statusFilter, journalEntries, loading]);
-
-
-    const handlePrint = () => {
-        import('html2pdf.js').then(module => {
-            const html2pdf = module.default;
-            const element = document.getElementById('printable-area');
-            if (!element) return;
-            const opt = {
-                margin:       [0.5, 0.5, 0.5, 0.5],
-                filename:     `GeneralLedger_${accountId}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        setIsGenerating(true);
+        try {
+            const selectedAccount = accounts.find(a => a.id === selectedAccountId)!;
+            
+            // 1. تحديد كافة الحسابات المستهدفة (الحساب نفسه + كافة الحسابات الفرعية التابعة له)
+            const targetAccountIds = new Set<string>([selectedAccountId]);
+            
+            const findChildren = (parentCode: string) => {
+                accounts.forEach(acc => {
+                    if (acc.parentCode === parentCode) {
+                        targetAccountIds.add(acc.id!);
+                        findChildren(acc.code); // تكرار شجري
+                    }
+                });
             };
-            html2pdf().from(element).set(opt).save();
-        });
+            findChildren(selectedAccount.code);
+
+            // 2. جلب الحركات التاريخية للرصيد الافتتاحي
+            const startDate = startOfDay(dateFrom);
+            const endDate = endOfDay(dateTo);
+
+            const entriesQuery = query(
+                collection(firestore, 'journalEntries'),
+                where('status', '==', 'posted') // الرصيد الافتتاحي دائماً من المرحل فقط
+            );
+            const entriesSnap = await getDocs(entriesQuery);
+            const allEntries = entriesSnap.docs.map(d => ({ id: d.id, ...d.data() } as JournalEntry));
+
+            let openingBalance = 0;
+            const transactionsInPeriod: any[] = [];
+
+            allEntries.forEach(entry => {
+                const entryDate = toFirestoreDate(entry.date)!;
+                
+                entry.lines.forEach(line => {
+                    if (targetAccountIds.has(line.accountId)) {
+                        const amount = (line.debit || 0) - (line.credit || 0);
+                        
+                        if (entryDate < startDate) {
+                            openingBalance += amount;
+                        } else if (entryDate <= endDate) {
+                            // التحقق من فلتر الحالة للحركات داخل الفترة
+                            if (statusFilter === 'all' || entry.status === 'posted') {
+                                transactionsInPeriod.push({
+                                    date: entryDate,
+                                    entryNumber: entry.entryNumber,
+                                    narration: entry.narration,
+                                    accountName: line.accountName,
+                                    debit: line.debit || 0,
+                                    credit: line.credit || 0,
+                                    entryId: entry.id!
+                                });
+                            }
+                        }
+                    }
+                });
+            });
+
+            // 3. ترتيب الحركات زمنياً وحساب الرصيد المتدفق
+            transactionsInPeriod.sort((a, b) => a.date.getTime() - b.date.getTime());
+            
+            let runningBalance = openingBalance;
+            const lines: StatementLine[] = transactionsInPeriod.map(tx => {
+                runningBalance += tx.debit - tx.credit;
+                return { ...tx, balance: runningBalance };
+            });
+
+            const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+            const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+
+            setLedgerData({
+                openingBalance,
+                lines,
+                totalDebit,
+                totalCredit,
+                finalBalance: runningBalance
+            });
+
+            toast({ title: 'تم استخراج الكشف', description: `تمت معالجة ${lines.length} حركة مالية.` });
+
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استخراج كشف الحساب.' });
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
-    const selectedAccount = accounts.find(a => a.id === accountId);
-    const isLoading = loading || brandingLoading;
+    const handlePrint = () => window.print();
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-            <Card className="mb-4 no-print">
-                <CardHeader>
-                    <CardTitle>دفتر الأستاذ العام</CardTitle>
-                    <CardDescription>عرض تفصيلي لجميع الحركات على حساب محدد.</CardDescription>
+            {/* واجهة التحكم - مخفية عند الطباعة */}
+            <Card className="mb-6 no-print rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
+                <CardHeader className="bg-primary/5 pb-6 border-b">
+                    <CardTitle className="text-xl font-black flex items-center gap-2">
+                        <ListTree className="text-primary h-6 w-6"/>
+                        محرك كشوف الحسابات التفصيلي
+                    </CardTitle>
+                    <CardDescription>اختر الحساب (رئيسي أو فرعي) والنطاق الزمني لتوليد كشف الحساب الرسمي.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                     <div className="grid gap-2 lg:col-span-2">
-                        <Label htmlFor="account">الحساب</Label>
-                        <InlineSearchList 
-                            value={accountId}
-                            onSelect={setAccountId}
-                            options={accountOptions}
-                            placeholder={loading ? 'جاري تحميل الحسابات...' : 'اختر حسابًا لعرضه...'}
-                            disabled={loading}
-                        />
-                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="dateFrom">التاريخ من</Label>
-                        <DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
-                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="dateTo">التاريخ إلى</Label>
-                        <DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
-                     </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="statusFilter">حالة القيود</Label>
-                        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                            <SelectTrigger id="statusFilter"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">الكل</SelectItem>
-                                <SelectItem value="posted">المرحّلة فقط</SelectItem>
-                                <SelectItem value="draft">المسودات فقط</SelectItem>
+                <CardContent className="p-8">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                        <div className="md:col-span-5 grid gap-2">
+                            <Label className="font-black text-gray-700 pr-1">الحساب المستهدف (ابحث بالاسم أو الرمز) *</Label>
+                            <InlineSearchList 
+                                value={selectedAccountId}
+                                onSelect={setSelectedAccountId}
+                                options={accountOptions}
+                                placeholder={loading ? "جاري جلب الشجرة..." : "اختر حساباً..."}
+                                className="h-12 rounded-2xl bg-white border-2"
+                            />
+                        </div>
+                        <div className="md:col-span-2 grid gap-2">
+                            <Label className="font-bold text-xs pr-1">من تاريخ</Label>
+                            <DateInput value={dateFrom} onChange={setDateFrom} className="h-12 bg-white" />
+                        </div>
+                        <div className="md:col-span-2 grid gap-2">
+                            <Label className="font-bold text-xs pr-1">إلى تاريخ</Label>
+                            <DateInput value={dateTo} onChange={setDateTo} className="h-12 bg-white" />
+                        </div>
+                        <div className="md:col-span-3">
+                            <Button 
+                                onClick={handleGenerateLedger} 
+                                disabled={isGenerating || !selectedAccountId}
+                                className="w-full h-12 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-primary/20"
+                            >
+                                {isGenerating ? <Loader2 className="animate-spin h-5 w-5"/> : <Search className="h-5 w-5" />}
+                                استخراج كشف الحساب
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    <div className="mt-6 flex items-center gap-4 p-4 bg-muted/30 rounded-2xl border-2 border-dashed">
+                        <Label className="font-bold text-xs">حالة القيود المشمولة:</Label>
+                        <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                            <SelectTrigger className="w-48 h-9 rounded-xl bg-white border-none shadow-sm font-bold text-xs"><SelectValue/></SelectTrigger>
+                            <SelectContent dir="rtl">
+                                <SelectItem value="posted">المرحلة فقط (رسمي)</SelectItem>
+                                <SelectItem value="all">الكل (شامل المسودات)</SelectItem>
                             </SelectContent>
                         </Select>
-                     </div>
+                        <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
+                            <Info className="h-3 w-3" /> ملاحظة: عند اختيار حساب رئيسي، سيتم دمج كافة حركات الحسابات الفرعية التابعة له تلقائياً.
+                        </p>
+                    </div>
                 </CardContent>
             </Card>
-            
-            {!accountId && !isLoading && (
-                <Card>
-                    <CardContent className="p-12 text-center text-muted-foreground">
-                        الرجاء اختيار حساب لعرض دفتر الأستاذ الخاص به.
-                    </CardContent>
-                </Card>
-            )}
 
-            {isLoading && accountId && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
-
-            {accountId && !isLoading && dateFrom && dateTo && (
-                <Card id="printable-area" className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none">
-                    <CardHeader className="p-8 md:p-12">
-                        {branding?.letterhead_image_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img 
-                                src={branding.letterhead_image_url} 
-                                alt={`${branding.company_name || ''} Letterhead`}
-                                className="w-full h-auto object-contain max-h-[150px] mb-4"
-                            />
-                        ) : (
-                            <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                                <div className="text-left flex-shrink-0">
-                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">دفتر الأستاذ العام</h2>
-                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">General Ledger</p>
-                                    <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                   <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                    <div>
-                                        <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                        <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                        <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
+            {/* عرض الكشف المستخرج */}
+            {ledgerData ? (
+                <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                    <Card id="printable-area" className="bg-white dark:bg-card shadow-2xl rounded-[2.5rem] overflow-hidden print:shadow-none print:border-none border-none">
+                        {/* ترويسة الطباعة */}
+                        <div className="p-8 sm:p-12">
+                            {branding?.letterhead_image_url ? (
+                                <img src={branding.letterhead_image_url} alt="Letterhead" className="w-full h-auto mb-10" />
+                            ) : (
+                                <div className="flex justify-between items-start border-b-4 border-primary pb-8 mb-10">
+                                    <div className="text-left space-y-1">
+                                        <h2 className="text-3xl font-black text-primary tracking-tighter">كشف حساب تفصيلي</h2>
+                                        <p className="text-lg font-bold text-gray-500 tracking-widest font-mono uppercase">Detailed General Ledger</p>
+                                        <p className="text-xs font-bold text-muted-foreground mt-2">تاريخ الاستخراج: {format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ar })}</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <Logo className="h-20 w-20 !p-3 shadow-inner border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                        <div>
+                                            <h1 className="text-xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
+                                            <p className="text-xs text-muted-foreground max-w-xs">{branding?.address}</p>
+                                        </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* ملخص الحساب المختار */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 p-8 bg-muted/30 rounded-[2rem] border-2 border-dashed border-primary/10">
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-[10px] uppercase font-black text-muted-foreground mb-1 block">الحساب المالي:</Label>
+                                        <p className="text-2xl font-black text-primary">{accounts.find(a => a.id === selectedAccountId)?.name}</p>
+                                        <p className="font-mono text-sm font-bold opacity-60">رمز الحساب: {accounts.find(a => a.id === selectedAccountId)?.code}</p>
+                                    </div>
+                                    <div className="flex gap-6 pt-2">
+                                        <div><Label className="text-[10px] font-bold text-muted-foreground">من تاريخ</Label><p className="font-bold text-sm">{dateFrom ? format(dateFrom, 'dd/MM/yyyy') : '-'}</p></div>
+                                        <div><Label className="text-[10px] font-bold text-muted-foreground">إلى تاريخ</Label><p className="font-bold text-sm">{dateTo ? format(dateTo, 'dd/MM/yyyy') : '-'}</p></div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end justify-center text-left">
+                                    <Label className="text-[10px] uppercase font-black text-primary mb-1">الرصيد الختامي الحالي</Label>
+                                    <p className={cn("text-4xl font-black font-mono tracking-tighter", ledgerData.finalBalance >= 0 ? "text-primary" : "text-red-600")}>
+                                        {formatCurrency(ledgerData.finalBalance)}
+                                    </p>
+                                    <Badge variant="outline" className="mt-2 bg-white font-bold">{statusFilter === 'all' ? 'رصيد تقديري (شامل المسودات)' : 'رصيد معتمد (مرحّل)'}</Badge>
+                                </div>
                             </div>
-                        )}
-                         <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">الحساب:</span> {selectedAccount?.name} ({selectedAccount?.code})</p>
-                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(dateFrom, 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(dateTo, 'dd/MM/yyyy')}</p>
-                         </div>
-                    </CardHeader>
-                    <CardContent className="px-8 md:px-12">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead className="w-[100px]">التاريخ</TableHead>
-                                    <TableHead className="w-[120px]">رقم القيد</TableHead>
-                                    <TableHead>البيان</TableHead>
-                                    <TableHead className="text-left w-[110px]">مدين</TableHead>
-                                    <TableHead className="text-left w-[110px]">دائن</TableHead>
-                                    <TableHead className="text-left w-[120px]">الرصيد</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell colSpan={6} className="font-semibold">الرصيد الافتتاحي للفترة</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.openingBalance)}</TableCell>
-                                </TableRow>
-                                {statementData.lines.map((line, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell>{format(line.date, 'dd/MM/yyyy')}</TableCell>
-                                        <TableCell className="font-mono hover:underline text-primary">
-                                            <Link href={`/dashboard/accounting/journal-entries/${line.entryId}`}>
-                                               {line.entryNumber}
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell>{line.narration}</TableCell>
-                                        <TableCell className="text-left font-mono">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
-                                        <TableCell className="text-left font-mono">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
-                                        <TableCell className="text-left font-mono">{formatCurrency(line.balance)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {statementData.lines.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center">لا توجد حركات في هذه الفترة.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                            <TableFooter>
-                                <TableRow className="font-bold bg-muted/50">
-                                    <TableCell colSpan={3}>إجمالي الحركات</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.totalDebit)}</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.totalCredit)}</TableCell>
-                                    <TableCell colSpan={1}></TableCell>
-                                </TableRow>
-                                <TableRow className="font-bold text-lg bg-muted">
-                                    <TableCell colSpan={6}>الرصيد النهائي</TableCell>
-                                    <TableCell className="text-left font-mono">{formatCurrency(statementData.finalBalance)}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </CardContent>
-                    <CardFooter className="p-8 md:p-12 flex justify-end items-center no-print">
-                        <Button onClick={handlePrint} disabled={!accountId}>
-                            <Printer className="ml-2 h-4 w-4" />
-                            طباعة / تصدير PDF
+
+                            {/* جدول الحركات */}
+                            <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
+                                <Table>
+                                    <TableHeader className="bg-muted/80">
+                                        <TableRow className="h-14 border-b-2">
+                                            <TableHead className="w-28 font-bold text-center border-l">التاريخ</TableHead>
+                                            <TableHead className="w-32 font-bold text-center border-l">رقم القيد</TableHead>
+                                            <TableHead className="px-6 font-bold text-foreground">البيان والتفاصيل</TableHead>
+                                            <TableHead className="w-32 text-left font-bold text-foreground">مدين</TableHead>
+                                            <TableHead className="w-32 text-left font-bold text-foreground">دائن</TableHead>
+                                            <TableHead className="w-40 text-left font-black text-primary bg-primary/5 px-6 border-r">الرصيد</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow className="bg-muted/40 h-14 italic">
+                                            <TableCell colSpan={5} className="text-right px-10 font-bold text-gray-600">الرصيد الافتتاحي للفترة المحددة</TableCell>
+                                            <TableCell className="text-left font-mono font-black px-6 border-r">{formatCurrency(ledgerData.openingBalance)}</TableCell>
+                                        </TableRow>
+                                        {ledgerData.lines.map((line, idx) => (
+                                            <TableRow key={idx} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
+                                                <TableCell className="text-center font-bold text-xs opacity-60">{format(line.date, 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell className="text-center font-mono font-black text-xs text-primary/80">
+                                                    <Link href={`/dashboard/accounting/journal-entries/${line.entryId}`} className="hover:underline no-print">{line.entryNumber}</Link>
+                                                    <span className="hidden print:inline">{line.entryNumber}</span>
+                                                </TableCell>
+                                                <TableCell className="px-6">
+                                                    <p className="font-bold text-sm text-gray-800">{line.narration}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-medium mt-0.5">الحساب المتأثر: {line.accountName}</p>
+                                                </TableCell>
+                                                <TableCell className="text-left font-mono font-black text-lg text-green-600">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
+                                                <TableCell className="text-left font-mono font-black text-lg text-red-600">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
+                                                <TableCell className="text-left font-mono font-black text-xl px-6 bg-primary/[0.02] border-r border-primary/10 group-hover:bg-primary/5">
+                                                    {formatCurrency(line.balance)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {ledgerData.lines.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">لا توجد حركات مسجلة خلال هذه الفترة.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                    <TableFooter className="bg-muted/20">
+                                        <TableRow className="h-16 font-black border-t-2">
+                                            <TableCell colSpan={3} className="text-right px-10">إجمالي حركات الفترة:</TableCell>
+                                            <TableCell className="text-left font-mono text-green-700">{formatCurrency(ledgerData.totalDebit)}</TableCell>
+                                            <TableCell className="text-left font-mono text-red-700">{formatCurrency(ledgerData.totalCredit)}</TableCell>
+                                            <TableCell className="bg-primary/5 border-r border-primary/20" />
+                                        </TableRow>
+                                        <TableRow className="h-24 bg-primary/5 border-t-4 border-primary/20">
+                                            <TableCell colSpan={5} className="text-right px-12 font-black text-2xl text-primary">الرصيد الختامي الإجمالي:</TableCell>
+                                            <TableCell className="text-left font-mono text-3xl font-black text-primary px-6 border-r border-primary/20">{formatCurrency(ledgerData.finalBalance)}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                </Table>
+                            </div>
+
+                            {/* تذييل الطباعة والاعتمادات */}
+                            <div className="hidden print:grid grid-cols-2 gap-20 mt-32 text-center text-xs font-black uppercase text-muted-foreground">
+                                <div className="space-y-16">
+                                    <p className="text-foreground border-b-2 border-foreground pb-2">إعداد المحاسب</p>
+                                    <div className="pt-2 border-t border-dashed">التوقيع</div>
+                                </div>
+                                <div className="space-y-16">
+                                    <p className="text-foreground border-b-2 border-foreground pb-2">اعتماد المدير المالي</p>
+                                    <div className="pt-2 border-t border-dashed">الختم الرسمي</div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                    
+                    <div className="flex justify-end no-print pb-20">
+                        <Button onClick={handlePrint} className="h-14 px-12 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30">
+                            <Printer className="h-6 w-6" />
+                            طباعة كشف الحساب الرسمي
                         </Button>
-                    </CardFooter>
-                </Card>
+                    </div>
+                </div>
+            ) : (
+                <div className="h-[60vh] flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 opacity-30 grayscale transition-all">
+                    <div className="p-10 bg-muted rounded-full mb-6">
+                        <FileText className="h-24 w-24 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-3xl font-black text-muted-foreground">بانتظار تحديد الحساب</h3>
+                    <p className="text-lg font-bold mt-2">اختر حساباً من الأعلى واضغط على "استخراج" لعرض الحركات المالية.</p>
+                </div>
             )}
         </div>
     );
 }
+
+import { Info } from 'lucide-react';
