@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import type { Account, JournalEntry } from '@/lib/types';
+import type { Account, JournalEntry, ConstructionProject } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Search, FileText, ArrowRight, ListTree, Info } from 'lucide-react';
+import { Loader2, Printer, Search, FileText, ArrowRight, ListTree, Info, Target } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -48,6 +48,7 @@ interface StatementLine {
     credit: number;
     balance: number;
     entryId: string;
+    costCenterName?: string;
 }
 
 export default function GeneralLedgerPage() {
@@ -57,6 +58,7 @@ export default function GeneralLedgerPage() {
     const { branding, loading: brandingLoading } = useBranding();
 
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [projects, setProjects] = useState<ConstructionProject[]>([]);
     const [loading, setLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     
@@ -75,16 +77,24 @@ export default function GeneralLedgerPage() {
         finalBalance: number;
     } | null>(null);
 
-    // جلب شجرة الحسابات عند التحميل
+    // جلب البيانات المرجعية
     useEffect(() => {
         if (!firestore) return;
-        getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))).then(snap => {
-            setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
-            setLoading(false);
-        }).catch(err => {
-            console.error("Error fetching accounts:", err);
-            setLoading(false);
-        });
+        const fetchData = async () => {
+            try {
+                const [accountsSnap, projectsSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                    getDocs(collection(firestore, 'projects'))
+                ]);
+                setAccounts(accountsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
+                setProjects(projectsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ConstructionProject)));
+                setLoading(false);
+            } catch (err) {
+                console.error("Error fetching ledger refs:", err);
+                setLoading(false);
+            }
+        };
+        fetchData();
     }, [firestore]);
 
     const accountOptions = useMemo(() => 
@@ -94,6 +104,8 @@ export default function GeneralLedgerPage() {
             searchKey: acc.code
         }))
     , [accounts]);
+
+    const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p.projectName])), [projects]);
 
     // محرك استخراج الكشف (The Ledger Engine)
     const handleGenerateLedger = async () => {
@@ -158,7 +170,8 @@ export default function GeneralLedgerPage() {
                                     accountName: line.accountName,
                                     debit: line.debit || 0,
                                     credit: line.credit || 0,
-                                    entryId: entry.id!
+                                    entryId: entry.id!,
+                                    costCenterName: line.auto_profit_center ? projectMap.get(line.auto_profit_center) : null
                                 });
                             }
                         }
@@ -190,7 +203,7 @@ export default function GeneralLedgerPage() {
 
         } catch (error) {
             console.error("Ledger Generation Error:", error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استخراج كشف الحساب. يرجى مراجعة سجلات الخادم.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استخراج كشف الحساب.' });
         } finally {
             setIsGenerating(false);
         }
@@ -276,7 +289,7 @@ export default function GeneralLedgerPage() {
                                         <Logo className="h-20 w-20 !p-3 shadow-inner border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                                         <div>
                                             <h1 className="text-xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                                            <p className="text-xs text-muted-foreground max-w-xs">{branding?.address}</p>
+                                            <p className="text-xs text-muted-foreground max-xs leading-relaxed">{branding?.address}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -323,7 +336,7 @@ export default function GeneralLedgerPage() {
                                             <TableCell className="text-left font-mono font-black px-6 border-r">{formatCurrency(ledgerData.openingBalance)}</TableCell>
                                         </TableRow>
                                         {ledgerData.lines.map((line, idx) => (
-                                            <TableRow key={idx} className="h-16 hover:bg-muted/5 transition-colors border-b last:border-0 group">
+                                            <TableRow key={idx} className="h-20 hover:bg-muted/5 transition-colors border-b last:border-0 group">
                                                 <TableCell className="text-center font-bold text-xs opacity-60">{format(line.date, 'dd/MM/yyyy')}</TableCell>
                                                 <TableCell className="text-center font-mono font-black text-xs text-primary/80">
                                                     <Link href={`/dashboard/accounting/journal-entries/${line.entryId}`} className="hover:underline no-print">{line.entryNumber}</Link>
@@ -331,7 +344,15 @@ export default function GeneralLedgerPage() {
                                                 </TableCell>
                                                 <TableCell className="px-6">
                                                     <p className="font-bold text-sm text-gray-800">{line.narration}</p>
-                                                    <p className="text-[10px] text-muted-foreground font-medium mt-0.5">الحساب المتأثر: {line.accountName}</p>
+                                                    <div className="flex items-center gap-3 mt-1.5">
+                                                        <span className="text-[10px] text-muted-foreground font-medium">الحساب: {line.accountName}</span>
+                                                        {line.costCenterName && (
+                                                            <div className="flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
+                                                                <Target className="h-2 w-2 text-primary"/>
+                                                                <span className="text-[9px] font-black text-primary uppercase">{line.costCenterName}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-left font-mono font-black text-lg text-green-600">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
                                                 <TableCell className="text-left font-mono font-black text-lg text-red-600">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
