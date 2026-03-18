@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -25,10 +24,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Search, FileText, ArrowRight, ListTree } from 'lucide-react';
+import { Loader2, Printer, Search, FileText, ArrowRight, ListTree, Info } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -43,7 +42,7 @@ interface StatementLine {
     date: Date;
     entryNumber: string;
     narration: string;
-    accountName: string; // لإظهار اسم الحساب الفرعي في حال اختيار حساب رئيسي
+    accountName: string; 
     debit: number;
     credit: number;
     balance: number;
@@ -81,6 +80,9 @@ export default function GeneralLedgerPage() {
         getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))).then(snap => {
             setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
             setLoading(false);
+        }).catch(err => {
+            console.error("Error fetching accounts:", err);
+            setLoading(false);
         });
     }, [firestore]);
 
@@ -110,7 +112,7 @@ export default function GeneralLedgerPage() {
                 accounts.forEach(acc => {
                     if (acc.parentCode === parentCode) {
                         targetAccountIds.add(acc.id!);
-                        findChildren(acc.code); // تكرار شجري
+                        findChildren(acc.code); 
                     }
                 });
             };
@@ -121,8 +123,7 @@ export default function GeneralLedgerPage() {
             const endDate = endOfDay(dateTo);
 
             const entriesQuery = query(
-                collection(firestore, 'journalEntries'),
-                where('status', '==', 'posted') // الرصيد الافتتاحي دائماً من المرحل فقط
+                collection(firestore, 'journalEntries')
             );
             const entriesSnap = await getDocs(entriesQuery);
             const allEntries = entriesSnap.docs.map(d => ({ id: d.id, ...d.data() } as JournalEntry));
@@ -131,17 +132,24 @@ export default function GeneralLedgerPage() {
             const transactionsInPeriod: any[] = [];
 
             allEntries.forEach(entry => {
-                const entryDate = toFirestoreDate(entry.date)!;
+                const entryDate = toFirestoreDate(entry.date);
+                if (!entryDate) return;
                 
+                const isPosted = entry.status === 'posted';
+                const matchesStatus = statusFilter === 'all' || isPosted;
+
                 entry.lines.forEach(line => {
                     if (targetAccountIds.has(line.accountId)) {
                         const amount = (line.debit || 0) - (line.credit || 0);
                         
+                        // الرصيد الافتتاحي دائماً من القيود المرحلة فقط لضمان سلامة الأرصدة التراكمية
                         if (entryDate < startDate) {
-                            openingBalance += amount;
+                            if (isPosted) {
+                                openingBalance += amount;
+                            }
                         } else if (entryDate <= endDate) {
-                            // التحقق من فلتر الحالة للحركات داخل الفترة
-                            if (statusFilter === 'all' || entry.status === 'posted') {
+                            // الحركات داخل الفترة تخضع لفلتر الحالة المختار
+                            if (matchesStatus) {
                                 transactionsInPeriod.push({
                                     date: entryDate,
                                     entryNumber: entry.entryNumber,
@@ -180,8 +188,8 @@ export default function GeneralLedgerPage() {
             toast({ title: 'تم استخراج الكشف', description: `تمت معالجة ${lines.length} حركة مالية.` });
 
         } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استخراج كشف الحساب.' });
+            console.error("Ledger Generation Error:", error);
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل استخراج كشف الحساب. يرجى مراجعة سجلات الخادم.' });
         } finally {
             setIsGenerating(false);
         }
@@ -355,11 +363,11 @@ export default function GeneralLedgerPage() {
                             {/* تذييل الطباعة والاعتمادات */}
                             <div className="hidden print:grid grid-cols-2 gap-20 mt-32 text-center text-xs font-black uppercase text-muted-foreground">
                                 <div className="space-y-16">
-                                    <p className="text-foreground border-b-2 border-foreground pb-2">إعداد المحاسب</p>
+                                    <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">إعداد المحاسب</p>
                                     <div className="pt-2 border-t border-dashed">التوقيع</div>
                                 </div>
                                 <div className="space-y-16">
-                                    <p className="text-foreground border-b-2 border-foreground pb-2">اعتماد المدير المالي</p>
+                                    <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">اعتماد المدير المالي</p>
                                     <div className="pt-2 border-t border-dashed">الختم الرسمي</div>
                                 </div>
                             </div>
@@ -385,5 +393,3 @@ export default function GeneralLedgerPage() {
         </div>
     );
 }
-
-import { Info } from 'lucide-react';
