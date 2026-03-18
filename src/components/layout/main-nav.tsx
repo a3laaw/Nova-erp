@@ -82,7 +82,8 @@ import {
   Calculator,
   History,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  ListTree
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -186,6 +187,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ (كشوف الحسابات)', icon: ListTree },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
