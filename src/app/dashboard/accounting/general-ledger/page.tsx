@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
