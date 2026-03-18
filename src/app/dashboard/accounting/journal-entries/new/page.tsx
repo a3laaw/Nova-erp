@@ -26,7 +26,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown, Target } from 'lucide-react';
+import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown, Target, Building2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
 import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
@@ -43,6 +43,7 @@ const lineSchema = z.object({
   credit: z.any(),
   notes: z.string().optional(),
   projectLink: z.string().optional(),
+  deptId: z.string().optional(), // مركز تكلفة إضافي
 });
 
 const journalEntrySchema = z.object({
@@ -80,7 +81,7 @@ export default function NewJournalEntryPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
   
-  const { register, handleSubmit, control, formState: { errors } } = useForm<JournalEntryFormValues>({
+  const { register, handleSubmit, control, formState: { errors }, setValue } = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
     mode: 'onChange',
     defaultValues: {
@@ -88,8 +89,8 @@ export default function NewJournalEntryPage() {
       narration: '',
       reference: '',
       lines: [
-        { accountId: '', debit: '', credit: '', notes: '', projectLink: '' },
-        { accountId: '', debit: '', credit: '', notes: '', projectLink: '' },
+        { accountId: '', debit: '', credit: '', notes: '', projectLink: '', deptId: '' },
+        { accountId: '', debit: '', credit: '', notes: '', projectLink: '', deptId: '' },
       ],
     },
   });
@@ -163,6 +164,7 @@ export default function NewJournalEntryPage() {
   , [accounts]);
 
   const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
+  const deptOptions = useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
 
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore || !currentUser || submittingRef.current) return;
@@ -194,8 +196,10 @@ export default function NewJournalEntryPage() {
                     accountName: account?.name || 'Unknown Account',
                     debit: Number(line.debit) || 0,
                     credit: Number(line.credit) || 0,
-                    notes: line.notes || ''
+                    notes: line.notes || '',
+                    auto_dept_id: line.deptId || null
                 };
+
                 if (line.projectLink) {
                     const [clientId, transactionId] = line.projectLink.split('/');
                     const project = projects.find(p => p.id === transactionId);
@@ -206,6 +210,7 @@ export default function NewJournalEntryPage() {
                         newLine.transactionId = transactionId;
                         newLine.auto_profit_center = transactionId;
                         newLine.auto_resource_id = project.assignedEngineerId;
+                        // إذا تم اختيار مشروع، يتم تجاوز القسم المختار يدوياً بالقسم المرتبط بالمهندس لضمان سلامة الربط
                         if (department) {
                             newLine.auto_dept_id = department.id;
                         }
@@ -230,7 +235,7 @@ export default function NewJournalEntryPage() {
             });
         });
         
-        toast({ title: 'نجاح', description: 'تم حفظ قيد اليومية كمسودة.' });
+        toast({ title: 'نجاح', description: 'تم حفظ قيد اليومية كمسودة مع ربط مراكز التكلفة.' });
         router.push('/dashboard/accounting/journal-entries');
 
     } catch (error) {
@@ -242,13 +247,13 @@ export default function NewJournalEntryPage() {
   };
 
   return (
-    <Card className="max-w-5xl mx-auto" dir="rtl">
+    <Card className="max-w-6xl mx-auto" dir="rtl">
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(onSubmit)(e); }}>
             <CardHeader>
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle>قيد يومية جديد</CardTitle>
-                        <CardDescription>أدخل تفاصيل القيد وتأكد من توازن المدين والدائن مع ربط مراكز التكلفة.</CardDescription>
+                        <CardTitle>قيد يومية جديد (إسناد مراكز التكلفة)</CardTitle>
+                        <CardDescription>أدخل تفاصيل القيد مع إمكانية ربط كل سطر بمشروع (مركز رئيسي) أو قسم (مركز إضافي).</CardDescription>
                     </div>
                      <div className="text-right">
                         <Label>رقم القيد</Label>
@@ -280,19 +285,20 @@ export default function NewJournalEntryPage() {
                      <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="min-w-[250px]">الحساب</TableHead>
-                                <TableHead className="min-w-[200px]">مركز التكلفة / المشروع</TableHead>
-                                <TableHead className="min-w-[120px]">مدين</TableHead>
-                                <TableHead className="min-w-[120px]">دائن</TableHead>
-                                <TableHead className="min-w-[200px]">ملاحظات</TableHead>
-                                <TableHead><span className="sr-only">ترتيب</span></TableHead>
+                                <TableHead className="min-w-[220px]">الحساب</TableHead>
+                                <TableHead className="min-w-[180px]">المشروع (مركز رئيسي)</TableHead>
+                                <TableHead className="min-w-[150px]">القسم (مركز إضافي)</TableHead>
+                                <TableHead className="min-w-[100px]">مدين</TableHead>
+                                <TableHead className="min-w-[100px]">دائن</TableHead>
+                                <TableHead className="min-w-[150px]">ملاحظات</TableHead>
                                 <TableHead><span className="sr-only">حذف</span></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {fields.map((field, index) => {
                                 const selectedAccount = accounts.find(a => a.id === lines[index]?.accountId);
-                                const showProjectLink = selectedAccount && (selectedAccount.code.startsWith('5') || selectedAccount.code.startsWith('4'));
+                                // السماح بربط مراكز التكلفة لكافة بنود المصاريف والإيرادات (أكواد 4 و 5)
+                                const isAnalytical = selectedAccount && (selectedAccount.code.startsWith('5') || selectedAccount.code.startsWith('4'));
                                 return (
                                 <TableRow key={field.id}>
                                     <TableCell>
@@ -302,41 +308,40 @@ export default function NewJournalEntryPage() {
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        {showProjectLink ? (
-                                            <Controller control={control} name={`lines.${index}.projectLink`} render={({ field }) => (
-                                                <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={refDataLoading || isSubmitting} />
+                                        {isAnalytical ? (
+                                            <Controller control={control} name={`lines.${index}.projectLink`} render={({ field: f }) => (
+                                                <InlineSearchList value={f.value || ''} onSelect={f.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={refDataLoading || isSubmitting} className="text-xs h-9" />
                                             )} />
                                         ) : (
-                                            <div className="text-xs text-muted-foreground italic px-2">غير مطلوب لهذا الحساب</div>
+                                            <div className="text-[10px] text-muted-foreground italic px-2">غير متاح</div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell>
+                                        {isAnalytical ? (
+                                            <Controller control={control} name={`lines.${index}.deptId`} render={({ field: f }) => (
+                                                <InlineSearchList value={f.value || ''} onSelect={f.onChange} options={deptOptions} placeholder="اختر القسم..." disabled={refDataLoading || isSubmitting || !!lines[index]?.projectLink} className="text-xs h-9" />
+                                            )} />
+                                        ) : (
+                                            <div className="text-[10px] text-muted-foreground italic px-2">غير متاح</div>
                                         )}
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.debit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="0.001" className='dir-ltr [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} onWheel={(e) => e.currentTarget.blur()} disabled={isSubmitting} />
+                                                <Input type="number" step="0.001" className='dir-ltr h-9 text-sm' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} disabled={isSubmitting} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.credit`} control={control} render={({ field }) => (
-                                                <Input type="number" step="0.001" className='dir-ltr [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} onWheel={(e) => e.currentTarget.blur()} disabled={isSubmitting} />
+                                                <Input type="number" step="0.001" className='dir-ltr h-9 text-sm' {...field} onChange={e => field.onChange(e.target.value)} value={field.value || ''} disabled={isSubmitting} />
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell>
                                         <Controller name={`lines.${index}.notes`} control={control} render={({ field }) => (
-                                                <Input {...field} value={field.value || ''} disabled={isSubmitting} />
+                                                <Input {...field} value={field.value || ''} disabled={isSubmitting} className="h-9 text-xs" />
                                             )}
                                         />
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col items-center">
-                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index - 1)} disabled={index === 0 || isSubmitting}>
-                                                <ArrowUp className="h-4 w-4" />
-                                            </Button>
-                                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(index, index + 1)} disabled={index === fields.length - 1 || isSubmitting}>
-                                                <ArrowDown className="h-4 w-4" />
-                                            </Button>
-                                        </div>
                                     </TableCell>
                                     <TableCell>
                                         <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2 || isSubmitting}>
@@ -347,23 +352,16 @@ export default function NewJournalEntryPage() {
                             )})}
                         </TableBody>
                         <TableFooter>
-                            <TableRow>
-                                <TableCell colSpan={2} className="font-bold">الإجمالي</TableCell>
+                            <TableRow className="bg-muted/30">
+                                <TableCell colSpan={3} className="font-bold">الإجمالي</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="font-bold font-mono text-left">{formatCurrency(totalCredit)}</TableCell>
-                                <TableCell colSpan={3}></TableCell>
-                            </TableRow>
-                            <TableRow>
-                                <TableCell colSpan={2} className="font-bold">الفرق</TableCell>
-                                <TableCell colSpan={2} className={`font-bold font-mono text-left ${Math.abs(balance) > 0.001 ? 'text-destructive' : 'text-green-600'}`}>
-                                    {formatCurrency(balance)}
-                                </TableCell>
-                                <TableCell colSpan={3}></TableCell>
+                                <TableCell colSpan={2}></TableCell>
                             </TableRow>
                         </TableFooter>
                     </Table>
                      <div className="flex justify-start mt-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '' })} disabled={isSubmitting}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '', deptId: '' })} disabled={isSubmitting}>
                             <PlusCircle className="ml-2 h-4 w-4" />
                             إضافة سطر
                         </Button>
@@ -373,20 +371,20 @@ export default function NewJournalEntryPage() {
                  {errors.lines && (
                     <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>خطأ في القيد</AlertTitle>
+                        <AlertTitle>خطأ في ميزان القيد</AlertTitle>
                         <AlertDescription>
-                            {errors.lines.message || (errors.lines.root && errors.lines.root.message) || 'الرجاء التأكد من أن جميع الحقول مملوءة بشكل صحيح وأن القيد متوازن.'}
+                            {errors.lines.message || 'الرجاء التأكد من توازن المدين والدائن.'}
                         </AlertDescription>
                     </Alert>
                 )}
             </CardContent>
-            <CardFooter className="flex justify-end gap-2">
+            <CardFooter className="flex justify-end gap-2 border-t pt-6 bg-muted/10">
                 <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
                     <X className="ml-2 h-4 w-4"/> إلغاء
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting} className="h-12 px-12 rounded-xl font-black text-lg">
                     {isSubmitting ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                    {isSubmitting ? 'جاري الحفظ...' : 'حفظ كمسودة'}
+                    حفظ القيد المبوب
                 </Button>
             </CardFooter>
         </form>

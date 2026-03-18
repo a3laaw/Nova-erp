@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
-import type { Account, JournalEntry, ConstructionProject } from '@/lib/types';
+import type { Account, JournalEntry, ConstructionProject, Department } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -28,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Search, FileText, ArrowRight, ListTree, Info, Target } from 'lucide-react';
+import { Loader2, Printer, Search, FileText, ArrowRight, ListTree, Info, Target, Building2 } from 'lucide-react';
 import { Logo } from '@/components/layout/logo';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -49,6 +50,7 @@ interface StatementLine {
     balance: number;
     entryId: string;
     costCenterName?: string;
+    departmentName?: string;
 }
 
 export default function GeneralLedgerPage() {
@@ -59,6 +61,7 @@ export default function GeneralLedgerPage() {
 
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [projects, setProjects] = useState<ConstructionProject[]>([]);
+    const [departments, setDepartments] = useState<Department[]>([]);
     const [loading, setLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     
@@ -82,12 +85,14 @@ export default function GeneralLedgerPage() {
         if (!firestore) return;
         const fetchData = async () => {
             try {
-                const [accountsSnap, projectsSnap] = await Promise.all([
+                const [accountsSnap, projectsSnap, deptsSnap] = await Promise.all([
                     getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                    getDocs(collection(firestore, 'projects'))
+                    getDocs(collection(firestore, 'projects')),
+                    getDocs(collection(firestore, 'departments'))
                 ]);
                 setAccounts(accountsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
                 setProjects(projectsSnap.docs.map(d => ({ id: d.id, ...d.data() } as ConstructionProject)));
+                setDepartments(deptsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Department)));
                 setLoading(false);
             } catch (err) {
                 console.error("Error fetching ledger refs:", err);
@@ -106,6 +111,7 @@ export default function GeneralLedgerPage() {
     , [accounts]);
 
     const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p.projectName])), [projects]);
+    const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
     // محرك استخراج الكشف (The Ledger Engine)
     const handleGenerateLedger = async () => {
@@ -171,7 +177,8 @@ export default function GeneralLedgerPage() {
                                     debit: line.debit || 0,
                                     credit: line.credit || 0,
                                     entryId: entry.id!,
-                                    costCenterName: line.auto_profit_center ? projectMap.get(line.auto_profit_center) : null
+                                    costCenterName: line.auto_profit_center ? projectMap.get(line.auto_profit_center) : null,
+                                    departmentName: line.auto_dept_id ? deptMap.get(line.auto_dept_id) : null
                                 });
                             }
                         }
@@ -218,14 +225,14 @@ export default function GeneralLedgerPage() {
                 <CardHeader className="bg-primary/5 pb-6 border-b">
                     <CardTitle className="text-xl font-black flex items-center gap-2">
                         <ListTree className="text-primary h-6 w-6"/>
-                        محرك كشوف الحسابات التفصيلي
+                        محرك كشوف الحسابات وتتبع مراكز التكلفة
                     </CardTitle>
-                    <CardDescription>اختر الحساب (رئيسي أو فرعي) والنطاق الزمني لتوليد كشف الحساب الرسمي.</CardDescription>
+                    <CardDescription>تحليل الحركات المالية المجمعة مع إمكانية فرز التكاليف المباشرة (المشاريع) والإدارية (الأقسام).</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                         <div className="md:col-span-5 grid gap-2">
-                            <Label className="font-black text-gray-700 pr-1">الحساب المستهدف (ابحث بالاسم أو الرمز) *</Label>
+                            <Label className="font-black text-gray-700 pr-1">الحساب المستهدف (رئيسي أو فرعي) *</Label>
                             <InlineSearchList 
                                 value={selectedAccountId}
                                 onSelect={setSelectedAccountId}
@@ -264,7 +271,7 @@ export default function GeneralLedgerPage() {
                             </SelectContent>
                         </Select>
                         <p className="text-[10px] text-muted-foreground italic flex items-center gap-1">
-                            <Info className="h-3 w-3" /> ملاحظة: عند اختيار حساب رئيسي، سيتم دمج كافة حركات الحسابات الفرعية التابعة له تلقائياً.
+                            <Info className="h-3 w-3" /> ملاحظة: الكشف يدمج كافة مراكز التكلفة المرتبطة بالحساب آلياً.
                         </p>
                     </div>
                 </CardContent>
@@ -272,7 +279,7 @@ export default function GeneralLedgerPage() {
 
             {/* عرض الكشف المستخرج */}
             {ledgerData ? (
-                <div className="max-w-5xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
                     <Card id="printable-area" className="bg-white dark:bg-card shadow-2xl rounded-[2.5rem] overflow-hidden print:shadow-none print:border-none border-none">
                         {/* ترويسة الطباعة */}
                         <div className="p-8 sm:p-12">
@@ -325,57 +332,68 @@ export default function GeneralLedgerPage() {
                                             <TableHead className="w-28 font-bold text-center border-l">التاريخ</TableHead>
                                             <TableHead className="w-32 font-bold text-center border-l">رقم القيد</TableHead>
                                             <TableHead className="px-6 font-bold text-foreground">البيان والتفاصيل</TableHead>
-                                            <TableHead className="w-32 text-left font-bold text-foreground">مدين</TableHead>
-                                            <TableHead className="w-32 text-left font-bold text-foreground">دائن</TableHead>
-                                            <TableHead className="w-40 text-left font-black text-primary bg-primary/5 px-6 border-r">الرصيد</TableHead>
+                                            <TableHead className="min-w-[150px] font-bold text-foreground">مركز التكلفة</TableHead>
+                                            <TableHead className="w-28 text-left font-bold text-foreground">مدين</TableHead>
+                                            <TableHead className="w-28 text-left font-bold text-foreground">دائن</TableHead>
+                                            <TableHead className="w-32 text-left font-black text-primary bg-primary/5 px-6 border-r">الرصيد</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         <TableRow className="bg-muted/40 h-14 italic">
-                                            <TableCell colSpan={5} className="text-right px-10 font-bold text-gray-600">الرصيد الافتتاحي للفترة المحددة</TableCell>
+                                            <TableCell colSpan={6} className="text-right px-10 font-bold text-gray-600">الرصيد الافتتاحي للفترة المحددة</TableCell>
                                             <TableCell className="text-left font-mono font-black px-6 border-r">{formatCurrency(ledgerData.openingBalance)}</TableCell>
                                         </TableRow>
                                         {ledgerData.lines.map((line, idx) => (
-                                            <TableRow key={idx} className="h-20 hover:bg-muted/5 transition-colors border-b last:border-0 group">
-                                                <TableCell className="text-center font-bold text-xs opacity-60">{format(line.date, 'dd/MM/yyyy')}</TableCell>
-                                                <TableCell className="text-center font-mono font-black text-xs text-primary/80">
+                                            <TableRow key={idx} className="h-auto hover:bg-muted/5 transition-colors border-b last:border-0 group">
+                                                <TableCell className="text-center font-bold text-[10px] opacity-60 py-4">{format(line.date, 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell className="text-center font-mono font-black text-[10px] text-primary/80">
                                                     <Link href={`/dashboard/accounting/journal-entries/${line.entryId}`} className="hover:underline no-print">{line.entryNumber}</Link>
                                                     <span className="hidden print:inline">{line.entryNumber}</span>
                                                 </TableCell>
-                                                <TableCell className="px-6">
-                                                    <p className="font-bold text-sm text-gray-800">{line.narration}</p>
-                                                    <div className="flex items-center gap-3 mt-1.5">
-                                                        <span className="text-[10px] text-muted-foreground font-medium">الحساب: {line.accountName}</span>
-                                                        {line.costCenterName && (
-                                                            <div className="flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-lg border border-primary/10">
-                                                                <Target className="h-2 w-2 text-primary"/>
-                                                                <span className="text-[9px] font-black text-primary uppercase">{line.costCenterName}</span>
-                                                            </div>
+                                                <TableCell className="px-6 py-4">
+                                                    <p className="font-bold text-xs text-gray-800 leading-relaxed">{line.narration}</p>
+                                                    <p className="text-[9px] text-muted-foreground font-medium mt-1">الحساب: {line.accountName}</p>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        {line.costCenterName ? (
+                                                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 text-[8px] font-black w-fit gap-1">
+                                                                <Target className="h-2 w-2"/> {line.costCenterName}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-[9px] text-muted-foreground italic">بدون مشروع</span>
+                                                        )}
+                                                        {line.departmentName ? (
+                                                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[8px] font-black w-fit gap-1">
+                                                                <Building2 className="h-2 w-2"/> {line.departmentName}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-[9px] text-muted-foreground italic">بدون قسم</span>
                                                         )}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="text-left font-mono font-black text-lg text-green-600">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
-                                                <TableCell className="text-left font-mono font-black text-lg text-red-600">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
-                                                <TableCell className="text-left font-mono font-black text-xl px-6 bg-primary/[0.02] border-r border-primary/10 group-hover:bg-primary/5">
+                                                <TableCell className="text-left font-mono font-black text-base text-green-600">{line.debit > 0 ? formatCurrency(line.debit) : '-'}</TableCell>
+                                                <TableCell className="text-left font-mono font-black text-base text-red-600">{line.credit > 0 ? formatCurrency(line.credit) : '-'}</TableCell>
+                                                <TableCell className="text-left font-mono font-black text-lg px-6 bg-primary/[0.02] border-r border-primary/10 group-hover:bg-primary/5 transition-colors">
                                                     {formatCurrency(line.balance)}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
                                         {ledgerData.lines.length === 0 && (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">لا توجد حركات مسجلة خلال هذه الفترة.</TableCell>
+                                                <TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">لا توجد حركات مسجلة خلال هذه الفترة.</TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>
                                     <TableFooter className="bg-muted/20">
                                         <TableRow className="h-16 font-black border-t-2">
-                                            <TableCell colSpan={3} className="text-right px-10">إجمالي حركات الفترة:</TableCell>
+                                            <TableCell colSpan={4} className="text-right px-10">إجمالي حركات الفترة:</TableCell>
                                             <TableCell className="text-left font-mono text-green-700">{formatCurrency(ledgerData.totalDebit)}</TableCell>
                                             <TableCell className="text-left font-mono text-red-700">{formatCurrency(ledgerData.totalCredit)}</TableCell>
                                             <TableCell className="bg-primary/5 border-r border-primary/20" />
                                         </TableRow>
                                         <TableRow className="h-24 bg-primary/5 border-t-4 border-primary/20">
-                                            <TableCell colSpan={5} className="text-right px-12 font-black text-2xl text-primary">الرصيد الختامي الإجمالي:</TableCell>
+                                            <TableCell colSpan={6} className="text-right px-12 font-black text-2xl text-primary">الرصيد الختامي الإجمالي:</TableCell>
                                             <TableCell className="text-left font-mono text-3xl font-black text-primary px-6 border-r border-primary/20">{formatCurrency(ledgerData.finalBalance)}</TableCell>
                                         </TableRow>
                                     </TableFooter>
@@ -409,7 +427,7 @@ export default function GeneralLedgerPage() {
                         <FileText className="h-24 w-24 text-muted-foreground" />
                     </div>
                     <h3 className="text-3xl font-black text-muted-foreground">بانتظار تحديد الحساب</h3>
-                    <p className="text-lg font-bold mt-2">اختر حساباً من الأعلى واضغط على "استخراج" لعرض الحركات المالية.</p>
+                    <p className="text-lg font-bold mt-2">اختر حساباً من الأعلى واضغط على "استخراج" لعرض الحركات المالية ومراكز تكلفتها.</p>
                 </div>
             )}
         </div>
