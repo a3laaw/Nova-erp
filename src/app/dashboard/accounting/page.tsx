@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -15,7 +16,8 @@ import {
     ArrowRight,
     PlusCircle,
     Banknote,
-    RotateCcw
+    RotateCcw,
+    ListTree
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -156,7 +158,8 @@ export default function AccountingDashboardPage() {
                         <QuickLink href="/dashboard/accounting/income-statement" label="قائمة الدخل" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/balance-sheet" label="المركز المالي" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/trial-balance" label="ميزان المراجعة" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ" isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ العام" isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/cost-center-ledger" label="كشف حركة مراكز التكلفة" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/client-statements" label="كشوفات العملاء" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/vendor-statements" label="حسابات الموردين" isGlass={isGlass} />
                     </CardContent>

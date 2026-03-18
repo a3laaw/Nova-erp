@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -25,6 +26,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'payment-vouchers': 'سندات الصرف',
     'journal-entries': 'قيود اليومية',
     'chart-of-accounts': 'شجرة الحسابات',
+    'general-ledger': 'دفتر الأستاذ العام',
+    'cost-center-ledger': 'كشف حركة مراكز التكلفة',
     invoices: 'الفواتير',
     assistant: 'المساعد الذكي',
     employees: 'الموظفين',
@@ -47,7 +50,6 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'equity-statement': 'قائمة التغير في حقوق الملكية',
     'financial-statement-notes': 'الإيضاحات المتممة',
     'trial-balance': 'ميزان المراجعة',
-    'general-ledger': 'دفتر الأستاذ العام',
     statement: 'كشف حساب',
     'bank-reconciliation': 'التسوية البنكية',
     'classifications': 'الفئات',
@@ -102,6 +104,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'payment-vouchers': 'Payment Vouchers',
     'journal-entries': 'Journal Entries',
     'chart-of-accounts': 'Chart of Accounts',
+    'general-ledger': 'General Ledger',
+    'cost-center-ledger': 'Cost Center Ledger',
     invoices: 'Invoices',
     assistant: 'AI Assistant',
     employees: 'Employees',
@@ -124,7 +128,6 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'equity-statement': 'Statement of Equity',
     'financial-statement-notes': 'Notes to Financial Statements',
     'trial-balance': 'Trial Balance',
-    'general-ledger': 'General Ledger',
     statement: 'Statement',
     'bank-reconciliation': 'Bank Reconciliation',
     'classifications': 'Categories',
