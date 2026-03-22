@@ -44,7 +44,6 @@ import { ar } from 'date-fns/locale';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { Checkbox } from '../ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -248,11 +247,12 @@ export function AttendanceUploader() {
                                     }
                                 }
 
-                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
+                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: sortedTimes[0], checkOut1: sortedTimes[sortedTimes.length - 1], checkIn2: null, checkOut2: null, allPunches: sortedTimes, status, anomalyDescription: anomaly, manualDeductionDays: manualDeduction, auditStatus });
                             } else if (activeLeave) {
                                 employeeRecords.push({ 
                                     date: Timestamp.fromDate(stableDay), 
                                     employeeId: emp.id!, 
+                                    checkIn1: null, checkOut1: null, checkIn2: null, checkOut2: null,
                                     status: 'present', 
                                     anomalyDescription: `إجازة ${leaveTypeTranslations[activeLeave.leaveType] || ''} (مزامنة آلية)`, 
                                     manualDeductionDays: 0, 
@@ -260,7 +260,7 @@ export function AttendanceUploader() {
                                     allPunches: [] 
                                 } as any);
                             } else {
-                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, status: 'absent', anomalyDescription: 'غائب (بدون بصمة)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
+                                employeeRecords.push({ date: Timestamp.fromDate(stableDay), employeeId: emp.id!, checkIn1: null, checkOut1: null, checkIn2: null, checkOut2: null, status: 'absent', anomalyDescription: 'غائب (بدون بصمة)', manualDeductionDays: 1, auditStatus: 'pending', allPunches: [] } as any);
                             }
                         }
                     }

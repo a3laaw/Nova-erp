@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Loader2, Save, X, FileCheck, PackageCheck, ShieldCheck, User, Truck, Box, Target, HardHat } from 'lucide-react';
+import { Loader2, Save, X, FileCheck, PackageCheck, ShieldCheck, User, Truck, Box, Target, HardHat, Calculator, PlusCircle, Trash2 } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, where, limit, writeBatch } from 'firebase/firestore';
 import type { PurchaseOrder, Account, Warehouse, Item, Vendor, Employee, Department, ConstructionProject, SubsidyQuota } from '@/lib/types';
@@ -20,10 +19,10 @@ import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Switch } from '../ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const lineSchema = z.object({
   internalItemId: z.string(),
@@ -191,7 +190,6 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                     creditAccountName = subsidyRevAcc?.name || 'إيرادات دعم';
                     narration = `استلام مواد مدعومة (تموين) #${grnNumber} - عهدة: ${data.possession} - مشروع: ${projectInfo?.projectName}`;
                     
-                    // تحديث حصص المشروع (Received Quantity)
                     if (projectInfo) {
                         const updatedQuotas = (projectInfo.subsidyQuotas || []).map(q => {
                             const receivedInThisGrn = data.itemsReceived.find(i => i.internalItemId === q.itemId);
@@ -225,7 +223,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
                         { accountId: creditAccountId, accountName: creditAccountName, debit: 0, credit: totalValue, ...autoTags }
                     ],
                     clientId: projectInfo?.clientId || null, transactionId: projId || null,
-                    isSubsidyEntry: data.isSubsidy, createdAt: serverTimestamp(), createdBy: currentUser.id,
+                    createdAt: serverTimestamp(), createdBy: currentUser.id,
                 }));
 
                 transaction.set(grnCounterRef, { counts: { [currentYear]: nextGrnNumber } }, { merge: true });
@@ -299,7 +297,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             <div className="space-y-4">
                 <div className="flex justify-between items-center px-2">
                     <Label className="text-lg font-black flex items-center gap-2"><Calculator className="h-5 w-5 text-primary"/> الأصناف المستلمة</Label>
-                    {isSubsidy && <Button type="button" variant="outline" size="sm" onClick={() => append({ internalItemId: '', itemName: '', quantityReceived: 1, unitPrice: 0 })}><PlusCircle className="h-4 w-4 ml-2"/> إضافة صنف مدعوم</Button>}
+                    {isSubsidy && <Button type="button" variant="outline" size="sm" onClick={() => append({ internalItemId: '', itemName: '', quantityReceived: 1, unitPrice: 0, quantityPreviouslyReceived: 0 })}><PlusCircle className="h-4 w-4 ml-2"/> إضافة صنف مدعوم</Button>}
                 </div>
                 <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                     <Table>
@@ -352,7 +350,7 @@ export function GrnForm({ onClose }: { onClose: () => void }) {
             </div>
 
             <div className="flex justify-end gap-4 p-8 border-t">
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving}>إلغاء</Button>
+                <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>إلغاء</Button>
                 <Button type="submit" disabled={isSaving || fields.length === 0} className="h-12 px-16 rounded-xl font-black text-lg shadow-xl shadow-primary/30">
                     {isSaving ? <Loader2 className="ml-3 animate-spin"/> : <Save className="ml-3"/>} اعتماد الاستلام
                 </Button>

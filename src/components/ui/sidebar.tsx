@@ -252,7 +252,7 @@ Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
-  React.ComponentProps<typeof Button>
+  React.ComponentProps<typeof Button> & { asChild?: boolean; showOnHover?: boolean }
 >(({ className, onClick, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
 

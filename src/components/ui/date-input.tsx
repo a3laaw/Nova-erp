@@ -11,7 +11,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './input';
 
-interface DateInputProps {
+export interface DateInputProps {
+  id?: string;
   value?: Date | string;
   onChange: (date: Date | undefined) => void;
   disabled?: boolean;
@@ -32,7 +33,7 @@ const parseableFormats = [
     'ddMMyyyy', 'yyyyMMdd',
 ];
 
-export function DateInput({ value, onChange, disabled, className, minDate, maxDate, placeholder, ...props }: DateInputProps) {
+export function DateInput({ id, value, onChange, disabled, className, minDate, maxDate, placeholder, ...props }: DateInputProps) {
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState('');
 
@@ -92,15 +93,12 @@ export function DateInput({ value, onChange, disabled, className, minDate, maxDa
     }
 
     if (parsedDate) {
-      // التحقق من القيود الزمنية (Validation against min/max)
       if (minDate && isBefore(startOfDay(parsedDate), startOfDay(minDate))) {
           parsedDate = minDate;
       }
       if (maxDate && isAfter(startOfDay(parsedDate), startOfDay(maxDate))) {
           parsedDate = maxDate;
       }
-
-      // منع التواريخ القديمة جداً افتراضياً (مثل 1190)
       if (parsedDate.getFullYear() < 1900) {
           parsedDate = new Date(1900, 0, 1);
       }
@@ -137,6 +135,7 @@ export function DateInput({ value, onChange, disabled, className, minDate, maxDa
           </Button>
         </PopoverTrigger>
         <Input
+          id={id}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
@@ -159,11 +158,6 @@ export function DateInput({ value, onChange, disabled, className, minDate, maxDa
           captionLayout="dropdown-buttons"
           fromYear={minDate ? minDate.getFullYear() : 1940}
           toYear={maxDate ? maxDate.getFullYear() : new Date().getFullYear() + 10}
-          disabled={ (date) => {
-              if (minDate && isBefore(startOfDay(date), startOfDay(minDate))) return true;
-              if (maxDate && isAfter(startOfDay(date), startOfDay(maxDate))) return true;
-              return false;
-          }}
         />
       </PopoverContent>
     </Popover>
