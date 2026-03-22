@@ -9,9 +9,8 @@ import { Label } from '@/components/ui/label';
 import { DateInput } from '@/components/ui/date-input';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { UserCheck, Search, TrendingUp, Loader2, FileSearch } from 'lucide-react';
+import { UserCheck, Search, Loader2, FileSearch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ResourceStats {
@@ -28,7 +27,7 @@ interface ResourceStats {
  * يربط الأرباح الميدانية بالمسؤول المالي للمشروع (Resource) لبيان مساهمة الموظف.
  */
 export function ResourceAnalysisReport() {
-  const { journalEntries, employees, accounts, departments, loading: dataLoading } = useAnalyticalData();
+  const { journalEntries, employees, accounts, loading: dataLoading } = useAnalyticalData();
   const { toast } = useToast();
   
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));

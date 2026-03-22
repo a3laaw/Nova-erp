@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -188,7 +187,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: ListTree },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ (كشوف الحسابات)', icon: ListTree },
         { href: '/dashboard/accounting/cost-center-ledger', label: 'كشف حركة مراكز التكلفة', icon: PieChart },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },

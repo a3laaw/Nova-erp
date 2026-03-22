@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -195,7 +194,7 @@ export default function CostCenterLedgerPage() {
                 <CardHeader className="bg-primary/5 pb-6 border-b">
                     <CardTitle className="text-xl font-black flex items-center gap-2">
                         <PieChart className="text-primary h-6 w-6"/>
-                        محرك مراكز التكلفة (مشاريع - أقسام - موظفين)
+                        محرك كشف حركة مركز التكلفة (Cost Center Ledger)
                     </CardTitle>
                     <CardDescription>تحليل عمودي لكافة الحركات المالية المرتبطة بكيان محدد عبر كافة حسابات الشجرة.</CardDescription>
                 </CardHeader>

@@ -257,7 +257,7 @@ export interface CustodyReconciliation extends BaseEntity {
         projectName?: string;
         clientId?: string; // Selected by employee
         clientName?: string;
-        attachmentUrls?: string[]; // تم التحديث لمصفوفة صور
+        attachmentUrls?: string[]; 
     }[];
     status: 'pending' | 'approved' | 'rejected';
     accountantNotes?: string;
@@ -277,7 +277,7 @@ export interface Account extends BaseEntity {
     isPayable: boolean; 
     statement: 'Balance Sheet' | 'Income Statement'; 
     balanceType: 'Debit' | 'Credit'; 
-    employeeId?: string | null; // الحقل الجديد لربط الحساب بالموظف
+    employeeId?: string | null; 
 }
 export interface Department extends BaseEntity { name: string; order?: number; activityTypes?: string[]; }
 export interface Governorate extends BaseEntity { name: string; order?: number; }
@@ -322,7 +322,7 @@ export interface Payslip extends BaseEntity {
     earnings: { basicSalary: number; housingAllowance: number; transportAllowance: number; commission: number; }; 
     deductions: { 
         absenceDeduction: number; 
-        lateDeduction: number; // حقل جديد لفصل استقطاعات التأخير
+        lateDeduction: number; 
         otherDeductions: number; 
     }; 
     netSalary: number; 

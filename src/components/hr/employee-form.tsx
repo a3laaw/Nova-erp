@@ -75,8 +75,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
 
-    const isFoodActivity = useMemo(() => branding?.activityType === 'food_delivery', [branding]);
-
     useEffect(() => {
         if (initialData) {
             setFormData({
@@ -332,7 +330,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                         <Separator className="my-2" />
 
-                        {/* ✨ استعادة القسم المعتمد: طريقة الدفع والبيانات البنكية المترابطة ✨ */}
+                        {/* ✨ القسم المستعاد: طريقة الدفع والبيانات البنكية المترابطة ✨ */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="salaryPaymentType" className="font-bold text-emerald-900">طريقة استلام الراتب</Label>
