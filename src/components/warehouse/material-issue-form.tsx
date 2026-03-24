@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -13,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info, ShoppingCart, User, ShieldCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, Timestamp } from 'firebase/firestore';
 import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse, Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -148,7 +147,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         if (!boqItemId) return itemOptions;
         const boqItem = boqItems.find(i => i.id === boqItemId);
         if (!boqItem || !boqItem.itemId) return itemOptions;
-        const allowedCategoryIds = new Set(categories.filter(cat => cat.boqReferenceItemIds?.includes(boqItem.itemId!)).map(c => c.id));
+        const allowedCategoryIds = new Set(categories.filter(cat => (cat.boqReferenceItemIds || []).includes(boqItem.itemId!)).map(c => c.id));
         return allItems.filter(item => allowedCategoryIds.has(item.categoryId)).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku }));
     }, [boqItems, allItems, categories, itemOptions]);
 
@@ -359,7 +358,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                         </TableBody>
                         <TableFooter className="bg-primary/5">
                             <TableRow className="h-20 border-t-4 border-primary/20">
-                                <TableCell colSpan={issueType === 'project_site' ? 4 : 3} className="text-right px-8 font-black text-xl">إجمالي قيمة التكلفة المنصرفة:</TableCell>
+                                <TableCell colSpan={issueType === 'project_site' ? 4 : 3} className="text-right px-12 font-black text-xl">إجمالي قيمة التكلفة المنصرفة:</TableCell>
                                 <TableCell className="text-left font-mono text-2xl font-black text-primary px-6 border-r bg-primary/5">{formatCurrency(totalCost)}</TableCell>
                             </TableRow>
                         </TableFooter>

@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, Save, ArrowRight, ShieldCheck, Calculator, Target, User, Banknote, ImageIcon, FileText, X, PencilLine, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -20,8 +21,7 @@ import { useAuth } from '@/context/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
+import { Input } from '../ui/input';
 import Image from 'next/image';
 
 const statusTranslations: Record<string, string> = {
@@ -106,7 +106,6 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
                 
-                // ✨ الدرع الرقابي المحدث: البحث في شجرة الحسابات عن الحساب المربوط بهذا الموظف (تحت كود 110103)
                 const custodyAccQuery = query(
                     collection(firestore, 'chartOfAccounts'), 
                     where('employeeId', '==', rec.employeeId),
@@ -115,7 +114,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 const custodyAccSnap = await getDocs(custodyAccQuery);
 
                 if (custodyAccSnap.empty) {
-                    throw new Error(`⚠️ تنبيه رقابي: لم يتم العثور على حساب عهدة (110103) مربوط بالموظف ${rec.employeeName} في شجرة الحسابات. يرجى تعديل الحساب في الشجرة وربطه بالموظف أولاً.`);
+                    throw new Error(`⚠️ تنبيه رقابي: لم يتم العثور على حساب عهدة مربوط بالموظف ${rec.employeeName} في شجرة الحسابات.`);
                 }
 
                 const custodyAccDoc = custodyAccSnap.docs[0];
@@ -179,7 +178,7 @@ export function CustodyReconciliationDetails({ reconciliationId }: Props) {
                 transaction.set(jeCounterRef, { counts: { [currentYear]: nextJeNum } }, { merge: true });
             });
 
-            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية العهدة بناءً على الربط الرسمي في الشجرة.' });
+            toast({ title: 'تم الاعتماد والترحيل', description: 'تم إنشاء قيد اليومية وتحديث مديونية العهدة بنجاح.' });
             router.push('/dashboard/hr/custody-reconciliation');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'خطأ في الربط المالي', description: error.message });

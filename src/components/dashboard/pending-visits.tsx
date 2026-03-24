@@ -71,7 +71,7 @@ export function PendingVisits() {
             return;
         }
 
-        const clientIds = [...new Set(processedVisits.map(v => v.clientId).filter(Boolean) as string[])];
+        const clientIds = Array.from(new Set(processedVisits.map(v => v.clientId).filter(Boolean) as string[]));
         const newClientIdsToFetch = clientIds.filter(id => !clientsMap.has(id));
 
         if (newClientIdsToFetch.length === 0) {
@@ -82,11 +82,18 @@ export function PendingVisits() {
         const fetchClients = async () => {
             try {
                 const newClientsMap = new Map<string, Client>();
-                const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', newClientIdsToFetch));
-                const clientsSnapshot = await getDocs(clientsQuery);
-                clientsSnapshot.forEach(doc => {
-                    newClientsMap.set(doc.id, doc.data() as Client);
-                });
+                const chunks = [];
+                for (let i = 0; i < newClientIdsToFetch.length; i += 10) {
+                    chunks.push(newClientIdsToFetch.slice(i, i + 10));
+                }
+
+                for (const chunk of chunks) {
+                    const clientsQuery = query(collection(firestore, 'clients'), where('__name__', 'in', chunk));
+                    const clientsSnapshot = await getDocs(clientsQuery);
+                    clientsSnapshot.forEach(doc => {
+                        newClientsMap.set(doc.id, doc.data() as Client);
+                    });
+                }
                 setClientsMap(prev => new Map([...prev, ...newClientsMap]));
             } catch (error) {
                 console.error("Error fetching clients:", error);
@@ -96,7 +103,7 @@ export function PendingVisits() {
         };
 
         fetchClients();
-    }, [processedVisits, firestore]);
+    }, [processedVisits, firestore, clientsMap]);
     
     const augmentedVisits = useMemo(() => {
         return processedVisits.map(visit => ({

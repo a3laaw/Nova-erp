@@ -1,6 +1,6 @@
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم التحديث لدعم كافة الأنواع المفقودة والخصائص الناقصة بناءً على التدقيق الفني.
+ * تم التحديث ليتوافق مع معايير TypeScript الصارمة وحل كافة أخطاء الأنماط المفقودة.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -8,8 +8,8 @@ import { Timestamp } from 'firebase/firestore';
 export interface BaseEntity {
   id?: string;
   companyId?: string;           
-  createdAt?: Timestamp | any; // جعلها اختيارية لدعم البيانات الافتراضية
-  createdBy?: string;          // جعلها اختيارية لدعم البيانات الافتراضية
+  createdAt?: Timestamp | any; 
+  createdBy?: string;          
   updatedAt?: Timestamp | any;
 }
 
@@ -50,14 +50,14 @@ export interface Appointment extends BaseEntity {
   engineerId: string;
   engineerName?: string;
   appointmentDate: Timestamp | any;
-  date?: Timestamp | any; // Alias for compatibility
+  date?: Timestamp | any; 
   time?: string;
   duration?: number;
   type: 'architectural' | 'room' | string;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
   notes?: string;
   meetingRoom?: string;
-  roomId?: string; // Alias
+  roomId?: string; 
   color?: string;
   visitCount?: number;
   workStageUpdated?: boolean;
@@ -74,7 +74,7 @@ export interface Boq extends BaseEntity {
   projectId?: string | null;
   items?: BoqItem[];
   totalValue: number;
-  totalAmount?: number; // Alias
+  totalAmount?: number; 
   itemCount: number;
   status: 'تقديري' | 'تعاقدي' | 'منفذ' | string;
 }
@@ -166,10 +166,10 @@ export interface Project extends BaseEntity {
 
 export interface EngineeringDiscipline {
   id: string;
-  name: { ar: string; en: string };
+  name: string;
   stages: {
     id: string;
-    name: { ar: string; en: string };
+    name: string;
     status: 'Completed' | 'In Progress' | 'Pending';
   }[];
 }
@@ -182,7 +182,7 @@ export interface UserProfile {
   role: 'Admin' | 'HR' | 'Accountant' | 'Engineer' | 'Secretary' | 'User';
   isActive: boolean;
   employeeId?: string;
-  companyId?: string;
+  companyId: string;
   fullName?: string;
   jobTitle?: string;
   avatarUrl?: string;
@@ -197,21 +197,6 @@ export interface Job extends BaseEntity {
   department?: string;
   parentId?: string;
   order?: number;
-}
-
-export type SubcontractorType = {
-    id?: string;
-    name: string;
-} | string;
-
-export interface SubsidyQuota {
-    itemId: string;
-    itemName: string;
-    allocatedAmount: number; 
-    allocatedQuantity: number; 
-    receivedQuantity: number;
-    consumedQuantity: number;
-    unitPrice: number; 
 }
 
 export interface TechnicalSpecifications {
@@ -262,6 +247,16 @@ export interface ConstructionProject extends BaseEntity, TechnicalSpecifications
     boqId?: string;             
     linkedTransactionId?: string; 
     subsidyQuotas?: SubsidyQuota[];
+}
+
+export interface SubsidyQuota {
+    itemId: string;
+    itemName: string;
+    allocatedAmount: number; 
+    allocatedQuantity: number; 
+    receivedQuantity: number;
+    consumedQuantity: number;
+    unitPrice: number; 
 }
 
 export interface ContractTemplate extends BaseEntity {
@@ -452,3 +447,4 @@ export interface PurchaseOrder extends BaseEntity { poNumber: string; vendorId: 
 export interface RequestForQuotation extends BaseEntity { rfqNumber: string; date: any; vendorIds: string[]; prospectiveVendors?: { id: string; name: string; }[]; items: { id: string; internalItemId: string; itemName: string; quantity: number; }[]; status: 'draft' | 'sent' | 'closed' | 'cancelled'; awardedPoIds?: string[]; awardedItems?: Record<string, string>; projectId?: string; }
 export interface SupplierQuotation extends BaseEntity { rfqId: string; vendorId: string; quotationReference?: string; date: any; items: { rfqItemId: string; unitPrice: number; }[]; discountAmount?: number; deliveryFees?: number; deliveryTimeDays?: number | null; paymentTerms?: string; }
 export interface PermissionRequest extends BaseEntity { employeeId: string; employeeName: string; type: 'late_arrival' | 'early_departure'; date: any; reason: string; status: 'pending' | 'approved' | 'rejected'; }
+export type Subcontractor = { id?: string; name: string; type: string; specialization?: string; contactPerson?: string; phone?: string; mobile: string; email?: string; address?: string; bankAccount?: { bankName: string; accountNumber: string; iban: string; }; isActive: boolean; blacklisted: boolean; blacklistedReason?: string; performanceRating?: number; createdAt?: Timestamp | any; };

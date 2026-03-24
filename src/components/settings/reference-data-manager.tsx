@@ -1,11 +1,11 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, orderBy, doc, addDoc, updateDoc, deleteDoc, writeBatch, getDocs, collectionGroup, where, serverTimestamp, deleteField, limit } from 'firebase/firestore';
-import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType, BoqReferenceItem, SubcontractorType, ConstructionWorkStage, Employee, WorkShift } from '@/lib/types';
+import type { Department, Job, Governorate, Area, TransactionType, UserRole, WorkStage, CompanyActivityType, BoqReferenceItem, SubcontractorType, ConstructionWorkStage, Employee } from '@/lib/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -28,7 +28,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, Pencil, Trash2, Loader2, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen, GitBranch, LayoutGrid, Building, FileText, Globe, Workflow, ArrowRight, Clock, ShieldCheck, ChevronDown, ListTree } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Save, PlusCircle, DownloadCloud, Users, Construction, Search, ClipboardCheck, Minus, Folder, FolderOpen, GitBranch, LayoutGrid, Building, FileText, Globe, Workflow, ArrowRight, Clock, ShieldCheck, ChevronDown, ListTree, Settings2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -36,7 +36,7 @@ import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '../ui/badge';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '../ui/switch';
 import { Textarea } from '../ui/textarea';
 import { defaultDepartments, defaultJobs, defaultGovernorates, defaultAreas, defaultTransactionTypes, defaultWorkStages } from '@/lib/default-reference-data';
@@ -369,8 +369,8 @@ function ManagerView({
     } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsSaving(false); }
   };
 
-  const openDeleteDialog = (item: {id: string, name: string}, type: 'primary' | 'secondary') => {
-      setItemToDelete({ ...item, type });
+  const openDeleteDialog = (item: any, type: 'primary' | 'secondary') => {
+      setItemToDelete({ id: item.id, name: item.name, type });
       setIsDeleteDialogOpen(true);
   }
 
@@ -567,7 +567,7 @@ function ManagerView({
                             </div>
                             <ScrollArea className="flex-1 p-8">
                                 {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-2xl"/><Skeleton className="h-16 w-full rounded-2xl"/></div> :
-                                secondaryItems.length === 0 ? <div className="h-64 flex flex-col items-center justify-center grayscale opacity-20"><icon className="h-16 w-16 mb-4"/><p className="font-bold">لا يوجد {secondaryTitle} حالياً.</p></div> :
+                                secondaryItems.length === 0 ? <div className="h-64 flex flex-col items-center justify-center grayscale opacity-20"><PlusCircle className="h-16 w-16 mb-4"/><p className="font-bold">لا يوجد {secondaryTitle} حالياً.</p></div> :
                                 <div className="grid gap-4">
                                     {secondaryItems.map(item => (
                                         <div key={item.id} className="flex items-center justify-between p-5 border-2 border-transparent bg-slate-50/50 rounded-[1.5rem] hover:bg-white hover:border-primary/10 hover:shadow-md transition-all group">
@@ -647,152 +647,3 @@ function ManagerView({
     </div>
   );
 }
-
-// --- Unified ReferenceDataManager Dashboard ---
-export function ReferenceDataManager() {
-    const [view, setView] = useState<'dashboard' | 'depts' | 'locations' | 'transactionTypes' | 'workStages' | 'subcontractorTypes' | 'companyActivityTypes' | 'boqReferenceItems' | 'constructionWorkflow'>('dashboard');
-    const [counts, setCounts] = useState({ depts: 0, jobs: 0, govs: 0, areas: 0, transactionTypes: 0, workStages: 0, subcontractorTypes: 0, subcontractorSpecializations: 0, companyActivityTypes: 0, boqReferenceItems: 0, constructionTypes: 0 });
-    const [loadingCounts, setLoadingCounts] = useState(true);
-    const { firestore } = useFirebase();
-    
-    const { data: companyActivityTypes, loading: activityTypesLoading } = useSubscription<CompanyActivityType>(firestore, 'companyActivityTypes');
-    const { data: subcontractorTypes, loading: subcontractorTypesLoading } = useSubscription<SubcontractorType>(firestore, 'subcontractorTypes');
-    const { data: transactionTypes, loading: transactionTypesLoading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
-
-    useEffect(() => {
-        if (!firestore) return;
-        setLoadingCounts(true);
-        const fetchCounts = async () => {
-            try {
-                const [depts, govs, jobs, areas, tt, ws, st, ss, cat, boq, ct] = await Promise.all([
-                    getDocs(collection(firestore, 'departments')), getDocs(collection(firestore, 'governorates')),
-                    getDocs(collectionGroup(firestore, 'jobs')), getDocs(collectionGroup(firestore, 'areas')),
-                    getDocs(collection(firestore, 'transactionTypes')), getDocs(collectionGroup(firestore, 'workStages')),
-                    getDocs(collection(firestore, 'subcontractorTypes')), getDocs(collectionGroup(firestore, 'specializations')),
-                    getDocs(collection(firestore, 'companyActivityTypes')), getDocs(collection(firestore, 'boqReferenceItems')),
-                    getDocs(collection(firestore, 'construction_types')),
-                ]);
-                setCounts({ depts: depts.size, govs: govs.size, jobs: jobs.size, areas: areas.size, transactionTypes: tt.size, workStages: ws.size, subcontractorTypes: st.size, subcontractorSpecializations: ss.size, companyActivityTypes: cat.size, boqReferenceItems: boq.size, constructionTypes: ct.size });
-            } finally { setLoadingCounts(false); }
-        };
-        fetchCounts();
-    }, [firestore]);
-
-    if (view === 'dashboard') {
-        return (
-            <div className="space-y-10" dir="rtl">
-                <Card className="border-none shadow-sm rounded-[2.5rem] overflow-hidden bg-gradient-to-l from-white to-blue-50">
-                    <CardHeader className="pb-8 px-8 border-b">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Settings2 className="h-8 w-8" /></div>
-                            <div><CardTitle className="text-3xl font-black">إدارة البيانات المرجعية</CardTitle><CardDescription className="text-base font-medium">التحكم في القوائم المنسدلة وسير العمل وتصنيفات الموارد في النظام.</CardDescription></div>
-                        </div>
-                    </CardHeader>
-                </Card>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    <StatCard title="الأقسام والوظائف" count={counts.depts + counts.jobs} icon={<Building className="h-6 w-6"/>} onNavigate={() => setView('depts')} colorClass="bg-blue-100 text-blue-700" loading={loadingCounts} />
-                    <StatCard title="المحافظات والمناطق" count={counts.govs + counts.areas} icon={<Globe className="h-6 w-6"/>} onNavigate={() => setView('locations')} colorClass="bg-cyan-100 text-cyan-700" loading={loadingCounts} />
-                    <StatCard title="أنواع المعاملات" count={counts.transactionTypes} icon={<FileText className="h-6 w-6"/>} onNavigate={() => setView('transactionTypes')} colorClass="bg-red-100 text-red-700" loading={loadingCounts} />
-                    <StatCard title="سير العمل (Office)" count={counts.workStages} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => setView('workStages')} colorClass="bg-purple-100 text-purple-700" loading={loadingCounts} />
-                    <StatCard title="تخصصات المقاولين" count={counts.subcontractorTypes} icon={<Users className="h-6 w-6"/>} onNavigate={() => setView('subcontractorTypes')} colorClass="bg-indigo-100 text-indigo-700" loading={loadingCounts} />
-                    <StatCard title="أنشطة الشركة" count={counts.companyActivityTypes} icon={<Building className="h-6 w-6"/>} onNavigate={() => setView('companyActivityTypes')} colorClass="bg-orange-100 text-orange-700" loading={loadingCounts} />
-                    <StatCard title="بنود المقايسات (BOQ)" count={counts.boqReferenceItems} icon={<ClipboardCheck className="h-6 w-6"/>} onNavigate={() => setView('boqReferenceItems')} colorClass="bg-green-100 text-green-700" loading={loadingCounts} />
-                    <StatCard title="سير عمل المقاولات" count={counts.constructionTypes} icon={<LayoutGrid className="h-6 w-6"/>} onNavigate={() => setView('constructionWorkflow')} colorClass="bg-blue-100 text-blue-700" loading={loadingCounts} />
-                </div>
-            </div>
-        );
-    }
-
-    // Individual views based on selection
-    if (view === 'depts') return <ManagerView primaryTitle="إدارة الأقسام" primarySingularTitle="قسم" primaryCollectionName="departments" secondaryTitle="المسميات الوظيفية" secondarySingularTitle="وظيفة" secondaryCollectionName="jobs" icon={<Building />} onBack={() => setView('dashboard')} companyActivityTypes={companyActivityTypes} headerGradient="bg-gradient-to-l from-white to-blue-50" iconColorClass="text-blue-600" />
-    if (view === 'locations') return <ManagerView primaryTitle="المحافظات" primarySingularTitle="محافظة" primaryCollectionName="governorates" secondaryTitle="المناطق التابعة" secondarySingularTitle="منطقة" secondaryCollectionName="areas" icon={<Globe />} onBack={() => setView('dashboard')} headerGradient="bg-gradient-to-l from-white to-cyan-50" iconColorClass="text-cyan-600" />
-    if (view === 'transactionTypes') return <UnifiedTransactionTypeManager onBack={() => setView('dashboard')} companyActivityTypes={companyActivityTypes} />
-    if (view === 'workStages') return <ManagerView primaryTitle="أنواع المعاملات" primarySingularTitle="نوع معاملة" primaryCollectionName="transactionTypes" secondaryTitle="مراحل سير العمل" secondarySingularTitle="مرحلة" secondaryCollectionName="workStages" icon={<Workflow />} disablePrimaryActions onBack={() => setView('dashboard')} headerGradient="bg-gradient-to-l from-white to-purple-50" iconColorClass="text-purple-600" />
-    if (view === 'subcontractorTypes') return <ManagerView primaryTitle="أنواع المقاولين" primarySingularTitle="نوع المقاول" primaryCollectionName="subcontractorTypes" secondaryTitle="التخصصات الدقيقة" secondarySingularTitle="تخصص" secondaryCollectionName="specializations" icon={<Users />} onBack={() => setView('dashboard')} headerGradient="bg-gradient-to-l from-white to-indigo-50" iconColorClass="text-indigo-600" />
-    if (view === 'companyActivityTypes') return <ManagerView primaryTitle="أنشطة الشركة" primarySingularTitle="نشاط" primaryCollectionName="companyActivityTypes" icon={<Building />} onBack={() => setView('dashboard')} headerGradient="bg-gradient-to-l from-white to-orange-50" iconColorClass="text-orange-600" />
-    if (view === 'boqReferenceItems') return <ManagerView primaryTitle="بنود المقايسات المرجعية" primarySingularTitle="بند" primaryCollectionName="boqReferenceItems" icon={<ClipboardCheck />} onBack={() => setView('dashboard')} subcontractorTypes={subcontractorTypes} transactionTypes={transactionTypes} companyActivityTypes={companyActivityTypes} headerGradient="bg-gradient-to-l from-white to-green-50" iconColorClass="text-green-600" />
-    if (view === 'constructionWorkflow') return <ManagerView primaryTitle="أنواع المقاولات" primarySingularTitle="نوع مقاولات" primaryCollectionName="construction_types" secondaryTitle="المراحل الشجرية" secondarySingularTitle="مرحلة" secondaryCollectionName="stages" icon={<LayoutGrid />} onBack={() => setView('dashboard')} headerGradient="bg-gradient-to-l from-white to-blue-50" iconColorClass="text-blue-600" />
-
-    return null;
-}
-
-function UnifiedTransactionTypeManager({ onBack, companyActivityTypes }: { onBack: () => void, companyActivityTypes: CompanyActivityType[] }) {
-    const { firestore } = useFirebase();
-    const { toast } = useToast();
-    const { data: transactionTypes, loading } = useSubscription<TransactionType>(firestore, 'transactionTypes');
-    const { data: departments } = useSubscription<Department>(firestore, 'departments');
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<TransactionType | null>(null);
-    const [itemName, setItemName] = useState('');
-    const [itemActivityType, setItemActivityType] = useState('');
-    const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
-    const [isSaving, setIsSaving] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
-    const departmentsMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
-    const departmentOptions = useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
-
-    const handleSave = async () => {
-        if (!firestore || !itemName.trim()) return;
-        setIsSaving(true);
-        try {
-            const dataToSave = { name: itemName, departmentIds: selectedDepartments, activityType: itemActivityType };
-            if (editingItem) await updateDoc(doc(firestore, 'transactionTypes', editingItem.id!), dataToSave);
-            else await addDoc(collection(firestore, 'transactionTypes'), { ...dataToSave, order: transactionTypes.length });
-            toast({ title: 'نجاح' }); setIsDialogOpen(false);
-        } finally { setIsSaving(false); }
-    };
-
-    return (
-        <div className="space-y-6" dir="rtl">
-            <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-red-50">
-                <CardHeader className="pb-8 px-8">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-red-600/10 rounded-2xl text-red-600 shadow-inner"><FileText className="h-8 w-8" /></div>
-                            <div><CardTitle className="text-3xl font-black">إدارة أنواع المعاملات</CardTitle><CardDescription className="text-base font-medium">تحديد الخدمات التي يقدمها المكتب الهندسي وربطها بالأقسام المعنية.</CardDescription></div>
-                        </div>
-                        <Button onClick={onBack} variant="ghost" className="rounded-xl font-bold gap-2 text-red-700 hover:bg-red-50"><ArrowRight className="h-4 w-4" /> العودة</Button>
-                    </div>
-                </CardHeader>
-            </Card>
-
-            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
-                <CardHeader className="bg-muted/10 border-b p-8">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="relative w-full md:w-80"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="بحث..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-11 rounded-xl bg-white" /></div>
-                        <Button onClick={() => { setEditingItem(null); setItemName(''); setItemActivityType(''); setSelectedDepartments([]); setIsDialogOpen(true); }} className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-red-100 bg-red-600 hover:bg-red-700"><PlusCircle className="h-5 w-5" /> إضافة نوع جديد</Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-8">
-                    <div className="border rounded-2xl overflow-hidden shadow-inner">
-                        <Table>
-                            <TableHeader className="bg-muted/50"><TableRow><TableHead className="px-6 font-bold">اسم المعاملة</TableHead><TableHead className="font-bold">النشاط</TableHead><TableHead className="font-bold">الأقسام المشرفة</TableHead><TableHead className="w-[80px]"></TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {loading ? <TableRow><TableCell colSpan={4} className="p-8 text-center"><Loader2 className="animate-spin mx-auto text-primary"/></TableCell></TableRow> : 
-                                transactionTypes.filter(t => !searchQuery || t.name.includes(searchQuery)).map(item => (
-                                    <TableRow key={item.id} className="h-16 hover:bg-muted/30"><TableCell className="px-6 font-black text-gray-800">{item.name}</TableCell><TableCell><Badge variant="secondary" className="bg-red-50 text-red-700 border-red-100 font-bold">{item.activityType}</Badge></TableCell><TableCell><div className="flex flex-wrap gap-1">{item.departmentIds?.map(id => <Badge key={id} variant="outline" className="text-[10px]">{departmentsMap.get(id) || '...'}</Badge>)}</div></TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => { setEditingItem(item); setItemName(item.name); setItemActivityType(item.activityType || ''); setSelectedDepartments(item.departmentIds || []); setIsDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button></TableCell></TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent dir="rtl" className="max-w-md rounded-3xl p-8 border-none shadow-2xl">
-                    <DialogHeader><DialogTitle className="text-2xl font-black">{editingItem ? 'تعديل' : 'إضافة'} نوع معاملة</DialogTitle></DialogHeader>
-                    <div className="grid gap-6 py-6">
-                        <div className="grid gap-2"><Label className="font-bold pr-1">اسم المعاملة *</Label><Input value={itemName} onChange={e => setItemName(e.target.value)} disabled={isSaving} className="h-12 rounded-2xl border-2 shadow-inner" /></div>
-                        <div className="grid gap-2"><Label className="font-bold pr-1">نوع النشاط</Label><Select value={itemActivityType} onValueChange={setItemActivityType}><SelectTrigger className="h-12 rounded-2xl border-2"><SelectValue placeholder="اختر..." /></SelectTrigger><SelectContent dir="rtl">{companyActivityTypes.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent></Select></div>
-                        <div className="grid gap-2"><Label className="font-bold pr-1">الأقسام المرتبطة</Label><MultiSelect options={departmentOptions} selected={selectedDepartments} onChange={setSelectedDepartments} className="rounded-xl"/></div>
-                    </div>
-                    <DialogFooter className="gap-2 pt-4 border-t"><Button variant="ghost" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>إلغاء</Button><Button onClick={handleSave} disabled={isSaving || !itemName.trim()} className="rounded-xl h-11 px-10 font-black gap-2 shadow-lg shadow-primary/20">{isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : <Save className="h-4 w-4"/>} حفظ النوع</Button></DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </div>
-    );
-}
-
-import { Settings2 } from 'lucide-react';
-

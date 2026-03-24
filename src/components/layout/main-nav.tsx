@@ -83,7 +83,8 @@ import {
   History,
   Sparkles,
   RotateCcw,
-  ListTree
+  ListTree,
+  Key
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -224,6 +225,8 @@ const navItems = {
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
+        { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: Users },
+        { href: '/dashboard/settings/roles', label: 'الأدوار والصلاحيات', icon: Key },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
         { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },

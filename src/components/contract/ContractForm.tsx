@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -14,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Loader2, Save, X, PlusCircle, Trash2 } from 'lucide-react';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -76,7 +76,7 @@ export function ContractForm({ client, transaction, onCancel }: ContractFormProp
                 const clausesFromBoq = items.map(item => ({
                     id: item.id!,
                     name: item.description,
-                    amount: (item.plannedQuantity || 0) * (item.plannedUnitPrice || 0)
+                    amount: (item.quantity || 0) * (item.sellingUnitPrice || 0)
                 }));
                 setValue('clauses', clausesFromBoq);
             } else {
@@ -155,7 +155,7 @@ export function ContractForm({ client, transaction, onCancel }: ContractFormProp
                             </TableBody>
                             <TableFooter><TableRow className="bg-muted"><TableCell className="font-bold text-lg">الإجمالي</TableCell><TableCell colSpan={2} className="text-left font-bold font-mono text-lg">{formatCurrency(calculatedTotal)}</TableCell></TableRow></TableFooter>
                         </Table>
-                        {errors.clauses && <p className="p-2 text-xs text-destructive">{errors.clauses.message || errors.clauses.root?.message}</p>}
+                        {errors.clauses && <p className="p-2 text-xs text-destructive">{(errors.clauses as any).message || (errors.clauses as any).root?.message}</p>}
                     </div>
                      <Button type="button" variant="outline" size="sm" onClick={() => append({ id: new Date().toISOString(), name: '', amount: 0 })}>
                         <PlusCircle className="ml-2 h-4"/> إضافة دفعة
