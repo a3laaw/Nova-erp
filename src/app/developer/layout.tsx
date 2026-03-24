@@ -4,9 +4,13 @@ import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShieldCheck, Terminal, Building2, UserCog } from 'lucide-react';
+import { LogOut, Terminal, Activity, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/**
+ * غلاف لوحة تحكم المطور (Master Layout):
+ * يتميز بنمط زجاجي مظلم يعكس قوة التحكم السيادي.
+ */
 export default function DeveloperLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
@@ -19,41 +23,49 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
   if (loading || user?.role !== 'Developer') return null;
 
+  const masterBackground = "linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)";
+
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col relative" dir="rtl">
-      {/* الديكور الزجاجي الخلفي */}
-      <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-indigo-600/20 to-transparent pointer-events-none" />
+    <div className="min-h-screen flex flex-col relative text-white" dir="rtl" style={{ background: masterBackground }}>
+      {/* خلفية تكنو زجاجية */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
       
-      <header className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-xl border-b border-white/10 px-8 py-4 flex justify-between items-center shadow-2xl">
+      <header className="sticky top-0 z-50 bg-slate-950/60 backdrop-blur-2xl border-b border-white/10 px-8 py-4 flex justify-between items-center shadow-2xl">
         <div className="flex items-center gap-4">
             <div className="p-2.5 bg-indigo-600 rounded-2xl shadow-[0_0_20px_rgba(79,70,229,0.4)]">
                 <Terminal className="h-6 w-6 text-white" />
             </div>
             <div className="flex flex-col">
                 <span className="font-black text-xl text-white tracking-tighter leading-none">Developer Console</span>
-                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">Nova ERP Master Control</span>
+                <div className="flex items-center gap-2 mt-1">
+                    <div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sovereign Admin Environment</span>
+                </div>
             </div>
         </div>
         
         <div className="flex items-center gap-6">
           <div className="text-left hidden sm:block">
-            <p className="text-xs font-black text-indigo-400">ADMIN ROOT</p>
-            <p className="text-[10px] text-white/60 font-mono">{user.email}</p>
+            <p className="text-[10px] font-black text-indigo-400 text-left uppercase">Root Session</p>
+            <p className="text-xs text-white/60 font-mono font-bold">{user.email}</p>
           </div>
-          <Button onClick={logout} variant="destructive" size="sm" className="h-10 rounded-xl font-black gap-2 shadow-lg shadow-red-900/20 bg-red-600 hover:bg-red-700">
-            <LogOut className="h-4 w-4" /> خروج
+          <Button onClick={logout} variant="destructive" size="sm" className="h-10 rounded-xl font-black gap-2 shadow-lg shadow-red-900/40 bg-red-600 hover:bg-red-700 border-b-4 border-red-900">
+            <LogOut className="h-4 w-4" /> خروج آمن
           </Button>
         </div>
       </header>
 
-      <main className="flex-1 p-8 relative z-10">
-        <div className="max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {children}
-        </div>
+      <main className="flex-1 p-8 relative z-10 max-w-[1600px] mx-auto w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {children}
       </main>
 
-      <footer className="p-6 text-center text-[10px] font-black text-white/20 uppercase tracking-[0.5em]">
-        Nova ERP — Multitenancy Engine v2.0
+      <footer className="p-6 text-center border-t border-white/5 bg-black/20">
+        <div className="flex items-center justify-center gap-2 opacity-30 group hover:opacity-100 transition-opacity">
+            <ShieldAlert className="h-3 w-3 text-indigo-400" />
+            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.5em]">
+                Nova ERP — Master Infrastructure Core v2.5
+            </p>
+        </div>
       </footer>
     </div>
   );

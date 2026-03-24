@@ -10,13 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Lock, ShieldCheck, Building2, User, Sparkles } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, Building2, User, Sparkles, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة دخول الشركات (Main Gateway):
- * تم تصميمها بنمط Glass Pearl لتعكس الفخامة والاحترافية للعملاء.
+ * بوابة دخول الشركات (Main Client Gateway):
+ * تم تصميمها بنمط Glass Pearl لتعكس الفخامة والاحترافية.
+ * ملاحظة: تم إخفاء رابط المطور ليكون مساره سرياً ومستقلاً.
  */
 export default function LoginPage() {
   const { login } = useAuth();
@@ -37,6 +38,7 @@ export default function LoginPage() {
     if (!firestore) return;
     const fetchCompanies = async () => {
         try {
+            // جلب المنشآت النشطة فقط من مشروع الماستر
             const q = query(collection(firestore, 'companies'), where('isActive', '==', true), orderBy('name'));
             const snap = await getDocs(q);
             setCompanies(snap.docs.map(d => ({ id: d.id, ...d.data() } as Company)));
@@ -52,15 +54,15 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.companyId) {
-        toast({ variant: 'destructive', title: 'تنبيه', description: 'يرجى اختيار الشركة أولاً.' });
+        toast({ variant: 'destructive', title: 'تنبيه إجرائي', description: 'يرجى اختيار المنشأة التابع لها أولاً.' });
         return;
     }
     setIsLoading(true);
     try {
         await login(formData.email, formData.password, formData.companyId);
-        toast({ title: 'تم الدخول بنجاح' });
+        toast({ title: 'مرحباً بك في Nova ERP' });
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'فشل الدخول', description: error.message });
+        toast({ variant: 'destructive', title: 'فشل تسجيل الدخول', description: 'تأكد من صحة البريد وكلمة المرور لهذه المنشأة.' });
     } finally {
         setIsLoading(false);
     }
@@ -70,7 +72,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* عناصر جمالية في الخلفية */}
+      {/* عناصر جمالية في الخلفية - Glass Pearl Theme */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
@@ -83,18 +85,18 @@ export default function LoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.2em]">Purple Suite v2.0</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.2em]">إدارة الأعمال المتكاملة</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <Building2 className="h-3 w-3" /> اختر الشركة المستضيفة
+                        <Building2 className="h-3 w-3" /> اختر منشأتك
                     </Label>
                     <Select value={formData.companyId} onValueChange={(v) => setFormData(p => ({...p, companyId: v}))}>
-                        <SelectTrigger className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-black text-[#1e1b4b] shadow-inner hover:bg-white/50 transition-all">
-                            <SelectValue placeholder={loadingCompanies ? "جاري جلب المنشآت..." : "اختر شركتك..."} />
+                        <SelectTrigger className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-black text-[#1e1b4b] shadow-inner hover:bg-white/50 transition-all border-2">
+                            <SelectValue placeholder={loadingCompanies ? "جاري جلب المنشآت..." : "اختر الشركة/المكتب..."} />
                         </SelectTrigger>
                         <SelectContent dir="rtl" className="rounded-2xl border-none shadow-2xl backdrop-blur-xl bg-white/90">
                             {companies.map(c => <SelectItem key={c.id} value={c.id!} className="font-bold py-3">{c.name}</SelectItem>)}
@@ -104,13 +106,13 @@ export default function LoginPage() {
 
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> البريد الإلكتروني
+                        <User className="h-3 w-3" /> البريد الإلكتروني للموظف
                     </Label>
                     <Input 
                         type="email" 
                         value={formData.email} 
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all" 
+                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
                     />
                 </div>
@@ -123,19 +125,20 @@ export default function LoginPage() {
                         type="password" 
                         value={formData.password} 
                         onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
-                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all" 
+                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
                     />
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-indigo-900/20 bg-[#1e1b4b] text-white hover:bg-black transition-all active:scale-95">
-                    {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول المنصة"}
+                <Button type="submit" disabled={isLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-indigo-900/20 bg-[#1e1b4b] text-white hover:bg-black transition-all active:scale-95 border-b-4 border-black">
+                    {isLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
+                    دخول المنصة
                 </Button>
             </form>
         </CardContent>
         <div className="bg-white/10 p-4 text-center border-t border-white/10">
             <p className="text-[10px] font-black text-[#1e1b4b]/40 uppercase tracking-widest">
-                Protected by Nova Security Core
+                Protected by Nova Security Core v2.0
             </p>
         </div>
       </Card>
