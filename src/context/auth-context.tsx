@@ -2,8 +2,8 @@
 'use client';
 
 /**
- * @fileOverview سياق المصادقة السيادي (Sovereign Auth Context).
- * يدعم الدخول المزدوج للمطور الرئيسي (Master) وموظفي الشركات (Tenants).
+ * @fileOverview سياق المصادقة السيادي المطور (Smart Identity Discovery).
+ * يقوم النظام بالتعرف آلياً على الشركة التابع لها المستخدم عبر البريد الإلكتروني.
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import type { UserProfile, Company } from '@/lib/types';
+import type { UserProfile, Company, GlobalUserIndex } from '@/lib/types';
 import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useCompany } from './company-context';
 
@@ -22,7 +22,7 @@ export interface AuthenticatedUser extends UserProfile {
 interface AuthContextType {
   user: AuthenticatedUser | null;
   loading: boolean;
-  login: (email: string, password: string, companyId?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -35,16 +35,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // مراقبة حالة الجلسة وتأمين المسارات
+  // مراقبة حالة الجلسة السيادية
   useEffect(() => {
     if (!masterAuth || !masterFirestore) return;
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         if (firebaseUser) {
-            // التحقق إذا كان المستخدم مطوراً في مشروع الماستر
+            // أولاً: فحص إذا كان مطوراً (Super Admin)
             const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
             if (devDoc.exists()) {
                 setUser({ ...devDoc.data() as UserProfile, uid: firebaseUser.uid });
+                setLoading(false);
+                return;
+            }
+
+            // ثانياً: إذا كان مستخدماً عادياً، نبحث عنه في الفهرس العالمي
+            const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
+            
+            if (!userIndexSnap.empty) {
+                const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
+                const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
+                
+                if (companyDoc.exists()) {
+                    const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
+                    const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
+                    
+                    const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', firebaseUser.email));
+                    const tenantUserSnap = await getDocs(tenantUserQuery);
+                    
+                    if (!tenantUserSnap.empty) {
+                        const userData = tenantUserSnap.docs[0].data() as UserProfile;
+                        setCurrentCompany(company);
+                        setUser({ ...userData, uid: firebaseUser.uid });
+                    }
+                }
             }
         } else {
             setUser(null);
@@ -53,48 +77,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [masterAuth, masterFirestore]);
+  }, [masterAuth, masterFirestore, setCurrentCompany]);
 
-  const login = async (email: string, password: string, companyId?: string) => {
+  const login = async (email: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("Connection Error");
 
-    // A) دخول المطور (Developer Login) - في مشروع الماستر
-    if (email === process.env.NEXT_PUBLIC_DEV_EMAIL) {
-      const userCredential = await signInWithEmailAndPassword(masterAuth, email, password);
-      const userRecord = userCredential.user;
-      
-      const devDoc = await getDoc(doc(masterFirestore, 'developers', userRecord.uid));
-      if (!devDoc.exists()) {
-          await signOut(masterAuth);
-          throw new Error('غير مصرح لك بالدخول كمطور سيادي.');
-      }
-
-      setUser({ ...devDoc.data() as UserProfile, uid: userRecord.uid });
-      document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
-      router.push('/developer');
-      return;
+    // 1. الاكتشاف الذكي للهوية (Smart Identity Discovery)
+    // نبحث في الفهرس العالمي بمشروع الماستر لمعرفة لمن ينتمي هذا البريد
+    const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', email.toLowerCase().trim())));
+    
+    // A) حالة المطور الرئيسي (Root Access)
+    if (email.toLowerCase().trim() === process.env.NEXT_PUBLIC_DEV_EMAIL) {
+        await signInWithEmailAndPassword(masterAuth, email, password);
+        document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
+        router.push('/developer');
+        return;
     }
 
-    // B) دخول موظف شركة (Tenant Login) - في مشروع الشركة المستأجرة
-    if (!companyId) throw new Error('يرجى اختيار المنشأة التابع لها أولاً.');
+    if (userIndexSnap.empty) throw new Error('عذراً، هذا الحساب غير مسجل في أي منشأة تابعة لـ Nova ERP.');
 
-    const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
-    if (!companyDoc.exists()) throw new Error('الشركة غير موجودة في سجلات الماستر.');
+    const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
+    
+    // 2. جلب بيانات الشركة التابع لها
+    const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
+    if (!companyDoc.exists()) throw new Error('الشركة التابع لها هذا الحساب غير موجودة.');
     const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
 
-    if (!company.isActive) throw new Error('هذه الشركة معطلة حالياً. يرجى مراجعة إدارة Nova ERP.');
+    if (!company.isActive) throw new Error('هذه المنشأة معطلة حالياً. يرجى مراجعة إدارة Nova ERP.');
 
-    const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, companyId);
+    // 3. التوجيه والمصادقة في مشروع الشركة المعزول
+    const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
 
     try {
-        const companyUserCred = await signInWithEmailAndPassword(companyAuth, email, password);
-        const userQuery = query(collection(companyFirestore, 'users'), where('email', '==', email));
-        const userSnap = await getDocs(userQuery);
+        await signInWithEmailAndPassword(companyAuth, email, password);
+        const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', email));
+        const tenantUserSnap = await getDocs(tenantUserQuery);
         
-        if (userSnap.empty) throw new Error('لا يوجد حساب مستخدم مرتبط بهذا البريد في هذه الشركة.');
-        const userData = userSnap.docs[0].data() as UserProfile;
+        if (tenantUserSnap.empty) throw new Error('فشل الوصول لبيانات الملف الشخصي في قاعدة بيانات الشركة.');
+        const userData = tenantUserSnap.docs[0].data() as UserProfile;
         
-        if (!userData.isActive) throw new Error('حساب الموظف معطّل بقرار إداري.');
+        if (!userData.isActive) throw new Error('حساب الموظف معطّل بقرار إداري داخلي.');
 
         setCurrentCompany(company);
         setUser({ ...userData, uid: companyAuth.currentUser!.uid });

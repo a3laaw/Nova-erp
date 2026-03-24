@@ -1,7 +1,6 @@
 
 /**
  * @fileOverview القاموس البرمجي الشامل لنظام Nova ERP المطور.
- * تم تحديثه ليشمل كافة الأنواع المفقودة والخصائص المطلوبة للرقابة المالية والفنية.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -15,9 +14,9 @@ export interface BaseEntity {
 }
 
 // === 1. إدارة الشركات والمنشآت (Tenants) ===
-export interface Company {
-  id?: string;
+export interface Company extends BaseEntity {
   name: string;
+  nameEn?: string;
   firebaseProjectId: string;
   firebaseConfig: {
     apiKey: string;
@@ -29,10 +28,20 @@ export interface Company {
   };
   isActive: boolean;
   adminEmail: string;
-  createdAt: Timestamp | any;
-  createdBy: string;
-  logoUrl?: string;
-  subscriptionPlan?: 'basic' | 'pro' | 'enterprise';
+  phone?: string;
+  address?: string;
+  activityType?: string;
+  status: 'pending' | 'active' | 'suspended';
+}
+
+/**
+ * فهرس المستخدمين العالمي (Global User Index):
+ * يُخزن في مشروع الماستر لربط البريد الإلكتروني بالشركة التابع لها.
+ */
+export interface GlobalUserIndex {
+    email: string;
+    companyId: string;
+    role: string;
 }
 
 // === 2. إدارة العملاء والمعاملات ===

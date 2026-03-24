@@ -4,13 +4,13 @@ import type { NextRequest } from 'next/server';
 
 /**
  * @fileOverview Middleware لتأمين المسارات السيادية.
- * يقوم بفحص Session Cookies لتوجيه المطور للوحة التحكم والموظف للوحة الشركة.
+ * تم تحديثه للسماح بالوصول لصفحة التسجيل الجديدة /register.
  */
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // 1. السماح بالدخول العام لصفحات الدخول فقط
-  if (path === '/' || path === '/developer/login' || path.startsWith('/api')) {
+  // 1. السماح بالدخول العام لصفحات الدخول والتسجيل فقط
+  if (path === '/' || path === '/register' || path === '/developer/login' || path.startsWith('/api')) {
     return NextResponse.next();
   }
 

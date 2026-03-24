@@ -2,64 +2,36 @@
 'use client';
 
 /**
- * @fileOverview بوابة دخول الشركات (Main Client Gateway).
- * تم تصميمها بنمط Glass Pearl لتعكس الفخامة والاحترافية.
+ * @fileOverview بوابة دخول Nova ERP الموحدة (Zero-Knowledge Entry).
+ * تم حذف اختيار الشركة لضمان السلاسة؛ النظام يتعرف على المستخدم من بريده.
  */
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import type { Company } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Lock, ShieldCheck, Building2, User, Sparkles, LogIn } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const { firestore: masterFirestore } = useFirebase();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
-
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    companyId: ''
   });
-
-  useEffect(() => {
-    if (!masterFirestore) return;
-    const fetchCompanies = async () => {
-        try {
-            const q = query(collection(masterFirestore, 'companies'), where('isActive', '==', true), orderBy('name'));
-            const snap = await getDocs(q);
-            setCompanies(snap.docs.map(d => ({ id: d.id, ...d.data() } as Company)));
-        } catch (e) {
-            console.error("Master Company Fetch Error:", e);
-        } finally {
-            setLoadingCompanies(false);
-        }
-    };
-    fetchCompanies();
-  }, [masterFirestore]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.companyId) {
-        toast({ variant: 'destructive', title: 'تنبيه إجرائي', description: 'يرجى اختيار المنشأة التابع لها أولاً.' });
-        return;
-    }
     setIsLoading(true);
     try {
-        await login(formData.email, formData.password, formData.companyId);
+        await login(formData.email, formData.password);
         toast({ title: 'مرحباً بك في Nova ERP' });
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'فشل تسجيل الدخول', description: error.message || 'تأكد من بيانات الاعتماد.' });
@@ -72,7 +44,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* Background Decorative Elements */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
@@ -85,28 +56,14 @@ export default function LoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.3em]">إدارة الأعمال المتكاملة</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.3em]">بوابة الدخول الموحدة</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <Building2 className="h-3 w-3" /> اختر منشأتك
-                    </Label>
-                    <Select value={formData.companyId} onValueChange={(v) => setFormData(p => ({...p, companyId: v}))}>
-                        <SelectTrigger className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-black text-[#1e1b4b] shadow-inner hover:bg-white/50 transition-all border-2">
-                            <SelectValue placeholder={loadingCompanies ? "جاري جلب المنشآت..." : "اختر الشركة/المكتب..."} />
-                        </SelectTrigger>
-                        <SelectContent dir="rtl" className="rounded-2xl border-none shadow-2xl backdrop-blur-xl bg-white/95">
-                            {companies.map(c => <SelectItem key={c.id} value={c.id!} className="font-bold py-3">{c.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div className="grid gap-2">
-                    <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> البريد الإلكتروني للموظف
+                        <User className="h-3 w-3" /> البريد الإلكتروني المعتمد
                     </Label>
                     <Input 
                         type="email" 
@@ -114,12 +71,13 @@ export default function LoginPage() {
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
+                        placeholder="yourname@company.com"
                     />
                 </div>
 
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <Lock className="h-3 w-3" /> كلمة المرور
+                        <Lock className="h-3 w-3" /> كلمة المرور السيادية
                     </Label>
                     <Input 
                         type="password" 
@@ -135,10 +93,21 @@ export default function LoginPage() {
                     دخول المنصة
                 </Button>
             </form>
+
+            <div className="pt-4 border-t border-white/10 flex flex-col gap-4">
+                <p className="text-center text-xs font-bold text-[#1e1b4b]/60 uppercase tracking-widest">— هل تملك مكتباً هندسياً؟ —</p>
+                <Button asChild variant="outline" className="h-12 rounded-2xl border-white/40 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2">
+                    <Link href="/register">
+                        <Building2 className="h-4 w-4" />
+                        سجل شركتك الآن في Nova
+                        <ArrowLeft className="h-4 w-4 mr-auto" />
+                    </Link>
+                </Button>
+            </div>
         </CardContent>
         <div className="bg-white/10 p-4 text-center border-t border-white/10">
             <p className="text-[10px] font-black text-[#1e1b4b]/40 uppercase tracking-widest">
-                Nova ERP — Future of Business v2.5
+                Nova ERP — Multi-Tenant Autonomous Environment
             </p>
         </div>
       </Card>
