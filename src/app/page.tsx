@@ -1,152 +1,135 @@
-
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader } from 'lucide-react';
-import { Logo } from '@/components/layout/logo';
-import { useBranding } from '@/context/branding-context';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/auth-context';
+import { useFirebase } from '@/firebase';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import type { Company } from '@/lib/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Wallet, Users, Calendar, Briefcase, Bot } from 'lucide-react';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
-import Image from 'next/image';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Lock, ShieldCheck, Building2, User } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
-const features = [
-  {
-    title: 'محاسبة متكاملة',
-    description: 'من شجرة الحسابات وقيود اليومية إلى القوائم المالية المتوافقة مع المعايير الدولية.',
-    icon: <Wallet className="h-8 w-8" />,
-    image: PlaceHolderImages.find(p => p.id === 'feature-accounting'),
-  },
-  {
-    title: 'إدارة الموارد البشرية',
-    description: 'ملفات الموظفين، نظام الإجازات، معالجة الرواتب، وحساب نهاية الخدمة بسهولة.',
-    icon: <Users className="h-8 w-8" />,
-    image: PlaceHolderImages.find(p => p.id === 'feature-hr'),
-  },
-  {
-    title: 'نظام مواعيد ذكي',
-    description: 'تقويم مزدوج يمنع تعارض الحجوزات تلقائياً مع تخصيص كامل لأوقات الدوام.',
-    icon: <Calendar className="h-8 w-8" />,
-    image: PlaceHolderImages.find(p => p.id === 'feature-appointments'),
-  },
-  {
-    title: 'إدارة المشاريع والعقود',
-    description: 'تتبع مراحل عمل كل معاملة، وإدارة العقود والدفعات المرتبطة بها.',
-    icon: <Briefcase className="h-8 w-8" />,
-    image: PlaceHolderImages.find(p => p.id === 'feature-projects'),
-  },
-];
+export default function LoginPage() {
+  const { login } = useAuth();
+  const { firestore } = useFirebase();
+  const { toast } = useToast();
 
-export default function LandingPage() {
-  const heroImage = PlaceHolderImages.find(p => p.id === 'login-background');
-  
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    companyId: ''
+  });
+
+  useEffect(() => {
+    if (!firestore) return;
+    const fetchCompanies = async () => {
+        try {
+            const q = query(collection(firestore, 'companies'), where('isActive', '==', true), orderBy('name'));
+            const snap = await getDocs(q);
+            setCompanies(snap.docs.map(d => ({ id: d.id, ...d.data() } as Company)));
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingCompanies(false);
+        }
+    };
+    fetchCompanies();
+  }, [firestore]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+        await login(formData.email, formData.password, isDevMode ? undefined : formData.companyId);
+        toast({ title: 'تم الدخول بنجاح' });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'فشل الدخول', description: error.message });
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="px-4 lg:px-6 h-16 flex items-center shadow-sm">
-        <Link href="/" className="flex items-center justify-center">
-          <span className="text-xl font-bold">Nova ERP</span>
-        </Link>
-        <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Button asChild>
-            <Link href="/dashboard">
-              الدخول إلى النظام
-              <ArrowLeft className="mr-2 h-4 w-4" />
-            </Link>
-          </Button>
-        </nav>
-      </header>
-
-      <main className="flex-1">
-        <section className="relative w-full pt-24 md:pt-32 lg:pt-40">
-          <div className="absolute inset-0 z-0">
-            {heroImage && (
-              <Image
-                src={heroImage.imageUrl}
-                alt={heroImage.description}
-                fill
-                className="object-cover opacity-10"
-                data-ai-hint={heroImage.imageHint}
-                priority
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
-          </div>
-          <div className="container px-4 md:px-6 relative z-10">
-            <div className="flex flex-col items-center space-y-4 text-center">
-              <div className="space-y-4">
-                <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none">
-                  النظام المتكامل لإدارة أعمالك الهندسية
-                </h1>
-                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
-                  من المحاسبة والموارد البشرية إلى إدارة المشاريع والمواعيد، Nova ERP يوفر لك كل ما تحتاجه في مكان واحد.
-                </p>
-              </div>
-              <div className="space-x-4">
-                <Button size="lg" asChild>
-                  <Link href="/dashboard">
-                    ابدأ الآن
-                  </Link>
-                </Button>
-              </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4" dir="rtl">
+      <Card className="w-full max-w-md rounded-[2.5rem] shadow-2xl border-none overflow-hidden">
+        <CardHeader className="bg-slate-900 text-white p-8 text-center">
+            <div className="bg-white/10 p-4 rounded-3xl w-fit mx-auto mb-4 backdrop-blur-md">
+                <ShieldCheck className="h-10 w-10 text-white" />
             </div>
-          </div>
-        </section>
+            <CardTitle className="text-3xl font-black tracking-tight">Nova ERP</CardTitle>
+            <CardDescription className="text-slate-400 font-bold mt-2">نظام الإدارة المتكامل متعدد الشركات</CardDescription>
+        </CardHeader>
         
-        <section className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
-              <div className="space-y-2">
-                <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">مميزات النظام</div>
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">مصمم لشركتك الهندسية</h2>
-                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  نظام شامل يربط جميع أقسام شركتك، ويوفر أدوات ذكية لتسهيل سير العمل وزيادة الإنتاجية.
-                </p>
-              </div>
-            </div>
-            <div className="mx-auto grid items-start gap-8 sm:max-w-4xl sm:grid-cols-2 md:gap-12 lg:max-w-5xl lg:grid-cols-2">
-              {features.map((feature) => (
-                <Card key={feature.title} className="overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                  <CardContent className="p-0">
-                    {feature.image && (
-                      <div className="aspect-video relative">
-                        <Image
-                          src={feature.image.imageUrl}
-                          alt={feature.image.description}
-                          fill
-                          className="object-cover"
-                          data-ai-hint={feature.image.imageHint}
-                        />
-                      </div>
-                    )}
-                    <div className="p-6">
-                      <div className="flex items-center gap-4 mb-2">
-                        <div className="bg-primary/10 text-primary p-3 rounded-full">{feature.icon}</div>
-                        <h3 className="text-xl font-bold">{feature.title}</h3>
-                      </div>
-                      <p className="text-muted-foreground">{feature.description}</p>
+        <CardContent className="p-8 space-y-6 bg-white">
+            <form onSubmit={handleLogin} className="space-y-6">
+                {!isDevMode && (
+                    <div className="grid gap-2">
+                        <Label className="font-black text-xs pr-1 flex items-center gap-2">
+                            <Building2 className="h-3 w-3" /> اختر الشركة
+                        </Label>
+                        <Select value={formData.companyId} onValueChange={(v) => setFormData(p => ({...p, companyId: v}))}>
+                            <SelectTrigger className="h-12 rounded-2xl border-2 font-bold">
+                                <SelectValue placeholder={loadingCompanies ? "جاري جلب الشركات..." : "اختر شركتك..."} />
+                            </SelectTrigger>
+                            <SelectContent dir="rtl">
+                                {companies.map(c => <SelectItem key={c.id} value={c.id!}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </section>
-      </main>
+                )}
 
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Nova ERP. جميع الحقوق محفوظة.</p>
-        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-xs hover:underline underline-offset-4">
-            شروط الاستخدام
-          </Link>
-          <Link href="#" className="text-xs hover:underline underline-offset-4">
-            سياسة الخصوصية
-          </Link>
-        </nav>
-      </footer>
+                <div className="grid gap-2">
+                    <Label className="font-black text-xs pr-1 flex items-center gap-2">
+                        <User className="h-3 w-3" /> البريد الإلكتروني
+                    </Label>
+                    <Input 
+                        type="email" 
+                        value={formData.email} 
+                        onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
+                        className="h-12 rounded-2xl border-2 dir-ltr font-bold" 
+                        required 
+                    />
+                </div>
+
+                <div className="grid gap-2">
+                    <Label className="font-black text-xs pr-1 flex items-center gap-2">
+                        <Lock className="h-3 w-3" /> كلمة المرور
+                    </Label>
+                    <Input 
+                        type="password" 
+                        value={formData.password} 
+                        onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
+                        className="h-12 rounded-2xl border-2 font-mono" 
+                        required 
+                    />
+                </div>
+
+                <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-2xl font-black text-lg gap-2">
+                    {isLoading ? <Loader2 className="animate-spin" /> : "تسجيل الدخول"}
+                </Button>
+            </form>
+
+            <div className="text-center pt-4">
+                <Button 
+                    variant="link" 
+                    size="sm" 
+                    onClick={() => setIsDevMode(!isDevMode)} 
+                    className="text-muted-foreground text-xs font-bold"
+                >
+                    {isDevMode ? "العودة لدخول الشركات" : "دخول المطورين (Developer Mode)"}
+                </Button>
+            </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

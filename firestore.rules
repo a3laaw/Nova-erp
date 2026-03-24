@@ -1,32 +1,33 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: Rules are completely open for development purposes.
-    // Any user can read, write, and delete any data.
-    // This should be secured before going to production.
-    match /{document=**} {
-      allow read, write: if true;
+    
+    // --- مساعدات المشروع الرئيسي (Master) ---
+    function isDeveloper() {
+      return request.auth != null && 
+             request.auth.token.role == 'Developer' && 
+             request.auth.token.isSuperAdmin == true;
     }
 
-    // TODO: Secure collections based on roles
-    // match /users/{userId} {
-    //   allow read: if request.auth != null;
-    //   allow write: if request.auth.token.role == 'Admin';
-    // }
-    // match /employees/{employeeId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
-    // }
-    // match /leaveRequests/{leaveRequestId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
-    // }
-    // match /attendance/{attendanceId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'HR';
-    // }
-    // match /payroll/{payslipId} {
-    //   allow read, write: if request.auth.token.role == 'Admin' || request.auth.token.role == 'Accountant';
-    // }
+    // السماح للمطور بالتحكم المطلق في مشروع الماستر
+    match /developers/{uid} {
+      allow read, write: if isDeveloper();
+    }
+
+    match /companies/{companyId} {
+      allow read: if request.auth != null;
+      allow write: if isDeveloper();
+    }
+
+    // --- حماية سجلات الحركات والترقيم في الماستر ---
+    match /counters/{doc} {
+      allow read, write: if isDeveloper();
+    }
+
+    // --- السماح بالوصول العام للمشاريع الفرعية بناءً على التوثيق ---
+    match /{document=**} {
+      allow read, write: if isDeveloper() || (request.auth != null && request.auth.uid != null);
+    }
   }
 }
-
