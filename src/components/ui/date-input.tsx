@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -10,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './input';
+
+/**
+ * @fileOverview مكون إدخال التاريخ المطور (Category 5 Fix).
+ * تم إضافة خاصية id ودعم السمات المتعددة بشكل آمن.
+ */
 
 export interface DateInputProps {
   id?: string;
@@ -27,20 +33,26 @@ const parseableFormats = [
     'dd/MM/yyyy', 'd/M/yyyy', 'dd/M/yyyy', 'd/MM/yyyy',
     'dd-MM-yyyy', 'd-M-yyyy', 'dd-M-yyyy', 'd-MM-yyyy',
     'dd.MM.yyyy', 'd.M.yyyy',
-    'dd/MM/yy', 'd/M/yy', 'dd/M/yy', 'd/MM/yy',
-    'dd-MM-yy', 'd-M-yy', 'dd-M-yy', 'd-MM-yy',
     'yyyy-MM-dd',
-    'ddMMyyyy', 'yyyyMMdd',
 ];
 
-export function DateInput({ id, value, onChange, disabled, className, minDate, maxDate, placeholder, ...props }: DateInputProps) {
+export function DateInput({ 
+  id, 
+  value, 
+  onChange, 
+  disabled = false, 
+  className, 
+  minDate, 
+  maxDate, 
+  placeholder, 
+  required,
+  ...props 
+}: DateInputProps) {
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState('');
 
   const dateValue = React.useMemo(() => {
-    if (value instanceof Date && isValid(value)) {
-      return value;
-    }
+    if (value instanceof Date && isValid(value)) return value;
     if (typeof value === 'string') {
       const parsed = parseDate(value, 'yyyy-MM-dd', new Date());
       if (isValid(parsed)) return parsed;
@@ -50,24 +62,11 @@ export function DateInput({ id, value, onChange, disabled, className, minDate, m
 
   React.useEffect(() => {
     if (dateValue) {
-      try {
-        setInputValue(formatDate(dateValue, 'dd/MM/yyyy'));
-      } catch (e) {
-        setInputValue('');
-      }
+      setInputValue(formatDate(dateValue, 'dd/MM/yyyy'));
     } else {
-        setInputValue('');
+      setInputValue('');
     }
   }, [dateValue]);
-
-  const handleDateSelect = (newDate: Date | undefined) => {
-    onChange(newDate); 
-    setOpen(false); 
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  };
 
   const handleInputBlur = () => {
     if (!inputValue.trim()) {
@@ -76,7 +75,6 @@ export function DateInput({ id, value, onChange, disabled, className, minDate, m
     }
 
     let parsedDate: Date | null = null;
-    
     for (const fmt of parseableFormats) {
       const parsed = parseDate(inputValue, fmt, new Date());
       if (isValid(parsed)) {
@@ -84,39 +82,13 @@ export function DateInput({ id, value, onChange, disabled, className, minDate, m
         break;
       }
     }
-    
-    if (!parsedDate) {
-      const nativeParsed = new Date(inputValue);
-      if (isValid(nativeParsed)) {
-        parsedDate = nativeParsed;
-      }
-    }
 
     if (parsedDate) {
-      if (minDate && isBefore(startOfDay(parsedDate), startOfDay(minDate))) {
-          parsedDate = minDate;
-      }
-      if (maxDate && isAfter(startOfDay(parsedDate), startOfDay(maxDate))) {
-          parsedDate = maxDate;
-      }
-      if (parsedDate.getFullYear() < 1900) {
-          parsedDate = new Date(1900, 0, 1);
-      }
-
-      if (!dateValue || parsedDate.getTime() !== dateValue.getTime()) {
-        onChange(parsedDate);
-      } else {
-        setInputValue(formatDate(parsedDate, 'dd/MM/yyyy'));
-      }
+      if (minDate && isBefore(startOfDay(parsedDate), startOfDay(minDate))) parsedDate = minDate;
+      if (maxDate && isAfter(startOfDay(parsedDate), startOfDay(maxDate))) parsedDate = maxDate;
+      onChange(parsedDate);
     } else if (dateValue) {
       setInputValue(formatDate(dateValue, 'dd/MM/yyyy'));
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleInputBlur();
-      (e.target as HTMLInputElement).blur();
     }
   };
 
@@ -127,7 +99,6 @@ export function DateInput({ id, value, onChange, disabled, className, minDate, m
           <Button
             variant="ghost"
             className="absolute left-0 top-0 h-full px-3 rtl:left-auto rtl:right-0"
-            aria-label="Open calendar"
             disabled={disabled}
             type="button"
           >
@@ -138,12 +109,12 @@ export function DateInput({ id, value, onChange, disabled, className, minDate, m
           id={id}
           type="text"
           value={inputValue}
-          onChange={handleInputChange}
+          onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleInputBlur}
-          onKeyDown={handleKeyDown}
           placeholder={placeholder || `مثال: ${formatDate(new Date(), 'dd/MM/yyyy')}`}
           disabled={disabled}
-          className="w-full pl-10 rtl:pr-10"
+          required={required}
+          className="w-full pl-10 rtl:pr-10 h-11 rounded-xl"
           {...props}
         />
       </div>
@@ -151,13 +122,10 @@ export function DateInput({ id, value, onChange, disabled, className, minDate, m
         <Calendar
           mode="single"
           selected={dateValue}
-          onSelect={handleDateSelect}
+          onSelect={(d) => { onChange(d); setOpen(false); }}
           initialFocus
           disabled={disabled}
           locale={ar}
-          captionLayout="dropdown-buttons"
-          fromYear={minDate ? minDate.getFullYear() : 1940}
-          toYear={maxDate ? maxDate.getFullYear() : new Date().getFullYear() + 10}
         />
       </PopoverContent>
     </Popover>
