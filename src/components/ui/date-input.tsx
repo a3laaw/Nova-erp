@@ -13,8 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './input';
 
 /**
- * @fileOverview مكون إدخال التاريخ المطور (Category 5 Fix).
- * تم إضافة خاصية id ودعم السمات المتعددة بشكل آمن.
+ * @fileOverview مكون إدخال التاريخ المطور.
+ * تم دمج خصائص disabled ودعم المعرفات الفريدة (id).
  */
 
 export interface DateInputProps {

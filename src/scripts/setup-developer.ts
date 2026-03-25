@@ -1,24 +1,34 @@
-import { initializeApp, cert } from 'firebase-admin/app';
+
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import * as fs from 'fs';
 
 /**
  * @fileOverview سكربت إعداد حساب المطور الرئيسي (Sovereign Root) في مشروع Master.
+ * تم تحسين السكربت للتحقق من ملف الخدمة وتوفير رسائل واضحة.
  */
 
-// تهيئة Firebase Admin
-// ملاحظة: تأكد من وجود ملف service-account.json في جذر المشروع قبل التشغيل
-const app = initializeApp({
-  credential: cert('./service-account.json'),
-});
-const auth = getAuth(app);
-const db = getFirestore(app);
+const SERVICE_ACCOUNT_PATH = './service-account.json';
 
 async function setupDeveloper() {
   const DEV_EMAIL = 'dev@nova-erp.local';
-  const DEV_PASSWORD = 'Sovereign@2026'; // الكلمة السيادية الثابتة
+  const DEV_PASSWORD = 'Sovereign@2026'; // الكلمة السيادية الموحدة
 
   try {
+    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+        throw new Error(`لم يتم العثور على ملف ${SERVICE_ACCOUNT_PATH}. يرجى تحميله من Firebase Console ووضعه في جذر المشروع.`);
+    }
+
+    if (getApps().length === 0) {
+        initializeApp({
+            credential: cert(SERVICE_ACCOUNT_PATH),
+        });
+    }
+
+    const auth = getAuth();
+    const db = getFirestore();
+
     console.log('⏳ جاري تأسيس الحساب السيادي في مشروع الماستر...');
 
     let userRecord;

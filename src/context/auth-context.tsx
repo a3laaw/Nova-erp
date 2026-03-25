@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview سياق المصادقة الذكي الموحد (The Sovereign Auth Gateway).
- * بوابة دخول واحدة تكتشف المطور والشركات آلياً.
+ * تم تحسين معالجة الأخطاء لتوفير إرشادات واضحة للمطور والشركات.
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -99,49 +100,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             } else {
                 await signOut(masterAuth);
-                throw new Error('تم التعرف على البريد ولكن لم يتم العثور على وثيقة المطور. يرجى تشغيل npm run setup:developer');
+                throw new Error('تم تسجيل الدخول ولكن لم يتم العثور على وثيقة المطور. يرجى تشغيل npm run setup:developer');
             }
         } catch (e: any) {
             console.error(e);
             if (e.code === 'auth/operation-not-allowed') {
-                throw new Error('يجب تفعيل خيار الدخول بالبريد (Email/Password) من لوحة تحكم Firebase.');
+                throw new Error('يجب تفعيل خيار الدخول بالبريد (Email/Password) من لوحة تحكم Firebase لمشروع الماستر.');
             }
-            throw new Error('بيانات الدخول السيادية غير صحيحة.');
+            if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+                throw new Error('بيانات الدخول السيادية غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
+            }
+            throw new Error(e.message || 'فشل الدخول السيادي.');
         }
     }
 
     // --- المسار العام: دخول موظفي الشركات ---
-    const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
-    
-    if (!userIndexSnap.empty) {
-        const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-        const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
+    try {
+        const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
         
-        if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة.');
-        const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
-        
-        if (!company.isActive) throw new Error('حساب الشركة معطل حالياً.');
+        if (!userIndexSnap.empty) {
+            const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
+            const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
+            
+            if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة في السجل العالمي.');
+            const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
+            
+            if (!company.isActive) throw new Error('حساب الشركة معطل بقرار إداري.');
 
-        const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
+            const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
 
-        try {
             await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
             const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', cleanEmail));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             
-            if (tenantUserSnap.empty) throw new Error('فشل الوصول لملف المستخدم في الشركة.');
+            if (tenantUserSnap.empty) throw new Error('تم التحقق ولكن فشل الوصول لملف المستخدم في الشركة.');
             const userData = tenantUserSnap.docs[0].data() as UserProfile;
             
-            if (!userData.isActive) throw new Error('حسابك معطل بقرار إداري.');
+            if (!userData.isActive) throw new Error('حسابك معطل حالياً، راجع مدير النظام.');
 
             setCurrentCompany(company);
             setUser({ ...userData, uid: companyAuth.currentUser!.uid });
             document.cookie = 'nova-user-session=1; path=/; max-age=86400';
             router.push('/dashboard');
             return;
-        } catch (e: any) {
-            throw new Error('البريد أو كلمة المرور غير صحيحة.');
         }
+    } catch (e: any) {
+        throw new Error(e.message || 'البريد أو كلمة المرور غير صحيحة.');
     }
 
     throw new Error('هذا الحساب غير مسجل في أي شركة تابعة للمنصة.');

@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview البوابة السيادية الموحدة لـ Nova ERP.
- * شاشة دخول ذكية تكتشف هوية المستخدم آلياً (مطور أو موظف).
+ * تم تحسين عرض رسائل الخطأ لتكون أكثر دقة وتوجيهاً للمستخدم والمطور.
  */
 
 import { useState } from 'react';
@@ -11,16 +12,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function UnifiedLoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -29,14 +32,16 @@ export default function UnifiedLoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMessage(null);
     try {
         await login(formData.email, formData.password);
         toast({ title: 'تم الدخول بنجاح' });
     } catch (error: any) {
+        setErrorMessage(error.message);
         toast({ 
             variant: 'destructive', 
             title: 'فشل تسجيل الدخول', 
-            description: error.message || 'تأكد من بيانات الاعتماد والاتصال بالإنترنت.' 
+            description: error.message 
         });
     } finally {
         setIsLoading(false);
@@ -64,6 +69,16 @@ export default function UnifiedLoginPage() {
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
+            {errorMessage && (
+                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle className="font-black text-xs">تنبيه بالخطأ</AlertTitle>
+                    <AlertDescription className="text-[10px] font-bold mt-1">
+                        {errorMessage}
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
