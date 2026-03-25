@@ -1,3 +1,4 @@
+
 'use client';
 
 /**
@@ -34,7 +35,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // --- محرك استعادة الجلسة الذكي ---
+  // بريد المطور السيادي الثابت
+  const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
+
   useEffect(() => {
     if (!masterAuth || !masterFirestore) return;
 
@@ -48,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            // 2. إذا لم يكن مطوراً، نبحث عنه في الفهرس العالمي (لربطه بشركته)
+            // 2. إذا لم يكن مطوراً، نبحث عنه في الفهرس العالمي لشركته
             const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
             
             if (!userIndexSnap.empty) {
@@ -65,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (!tenantUserSnap.empty) {
                         const userData = tenantUserSnap.docs[0].data() as UserProfile;
                         setCurrentCompany(company);
-                        setUser({ ...userData, uid: firebaseUser.uid });
+                        setUser({ ...userData, uid: companyAuth.currentUser!.uid });
                     }
                 }
             }
@@ -79,17 +82,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
   const login = async (email: string, password: string) => {
-    if (!masterAuth || !masterFirestore) throw new Error("Connection Error");
+    if (!masterAuth || !masterFirestore) throw new Error("خطأ في الاتصال بالخادم الرئيسي.");
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // --- مرحلة الاكتشاف (Discovery Phase) ---
+    // --- المرحلة 1: اكتشاف نوع الدخول ---
     
-    // 1. فحص الفهرس العالمي (هل هو موظف في شركة؟)
+    // أ) هل هو المطور الرئيسي؟ (أولوية قصوى)
+    if (cleanEmail === MASTER_DEV_EMAIL) {
+        try {
+            const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
+            const devDoc = await getDoc(doc(masterFirestore, 'developers', userCredential.user.uid));
+            
+            if (devDoc.exists()) {
+                const devData = devDoc.data() as UserProfile;
+                setUser({ ...devData, uid: userCredential.user.uid });
+                document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
+                router.push('/developer');
+                return;
+            } else {
+                await signOut(masterAuth);
+                throw new Error('تم التعرف على البريد ولكن حساب المطور غير مؤسس في قاعدة البيانات. يرجى تشغيل npm run setup:developer');
+            }
+        } catch (e: any) {
+            if (e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+                throw new Error('بيانات الدخول السيادية غير صحيحة.');
+            }
+            throw e;
+        }
+    }
+
+    // ب) هل هو موظف في شركة؟
     const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
     
     if (!userIndexSnap.empty) {
-        // حالة: موظف شركة (Tenant User)
         const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
         const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
         
@@ -119,27 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    // 2. فحص الدخول السيادي (هل هو المطور؟)
-    try {
-        await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
-        const devDoc = await getDoc(doc(masterFirestore, 'developers', masterAuth.currentUser!.uid));
-        
-        if (devDoc.exists()) {
-            const devData = devDoc.data() as UserProfile;
-            setUser({ ...devData, uid: masterAuth.currentUser!.uid });
-            document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
-            router.push('/developer');
-        } else {
-            // إذا نجح الـ Auth ولكن لم يجد وثيقة مطور، فليس له مكان هنا
-            await signOut(masterAuth);
-            throw new Error('عذراً، هذا الحساب غير مسجل في النظام.');
-        }
-    } catch (e: any) {
-        if (e.code === 'auth/operation-not-allowed') {
-            throw new Error('⚠️ يجب تفعيل الـ Email/Password في Firebase Console.');
-        }
-        throw new Error('بيانات الدخول غير صحيحة.');
-    }
+    throw new Error('هذا الحساب غير مسجل في أي منشأة تابعة للنظام.');
   };
 
   const logout = async () => {
