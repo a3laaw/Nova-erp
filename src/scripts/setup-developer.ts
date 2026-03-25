@@ -6,14 +6,13 @@ import * as fs from 'fs';
 
 /**
  * @fileOverview سكربت إعداد حساب المطور الرئيسي (Sovereign Root) في مشروع Master.
- * تم تحسين السكربت للتحقق من ملف الخدمة وتوفير رسائل واضحة.
  */
 
 const SERVICE_ACCOUNT_PATH = './service-account.json';
 
 async function setupDeveloper() {
   const DEV_EMAIL = 'dev@nova-erp.local';
-  const DEV_PASSWORD = 'Sovereign@2026'; // الكلمة السيادية الموحدة
+  const DEV_PASSWORD = 'Sovereign@2026';
 
   try {
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
@@ -29,12 +28,12 @@ async function setupDeveloper() {
     const auth = getAuth();
     const db = getFirestore();
 
-    console.log('⏳ جاري تأسيس الحساب السيادي في مشروع الماستر...');
+    console.log('⏳ جاري تأسيس الحساب السيادي...');
 
     let userRecord;
     try {
         userRecord = await auth.getUserByEmail(DEV_EMAIL);
-        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث كلمة المرور والصلاحيات السيادية...');
+        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث الصلاحيات...');
         await auth.updateUser(userRecord.uid, {
             password: DEV_PASSWORD,
         });
@@ -53,17 +52,16 @@ async function setupDeveloper() {
 
     if (!userRecord) throw new Error("فشل في إنشاء أو جلب المستخدم.");
 
-    // 2. تعيين الصلاحيات المخصصة (Custom Claims) للمطور
+    // تعيين الصلاحيات السيادية
     await auth.setCustomUserClaims(userRecord.uid, {
       role: 'Developer',
       isSuperAdmin: true,
     });
 
-    // 3. إنشاء/تحديث وثيقة المطور في Firestore بمشروع Master
+    // إنشاء الوثيقة في مشروع الماستر
     await db.collection('developers').doc(userRecord.uid).set({
       uid: userRecord.uid,
       email: DEV_EMAIL,
-      username: 'developer',
       role: 'Developer',
       fullName: 'Nova Developer',
       isActive: true,
@@ -78,7 +76,7 @@ async function setupDeveloper() {
     console.log(`║  Email:    ${DEV_EMAIL}        ║`);
     console.log(`║  Password: ${DEV_PASSWORD}           ║`);
     console.log('╠══════════════════════════════════════╣');
-    console.log('║  يمكنك الآن الدخول من الصفحة الرئيسية  ║');
+    console.log('║  يمكنك الآن الدخول من الشاشة الرئيسية  ║');
     console.log('╚══════════════════════════════════════╝');
     console.log('');
 

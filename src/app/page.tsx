@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview البوابة السيادية الموحدة لـ Nova ERP.
- * تم تحسين عرض رسائل الخطأ لتكون أكثر دقة وتوجيهاً للمستخدم والمطور.
+ * تم دمج كافة بوابات الدخول في واجهة واحدة ذكية تكتشف هوية المستخدم.
  */
 
 import { useState } from 'react';
@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function UnifiedLoginPage() {
@@ -73,7 +72,7 @@ export default function UnifiedLoginPage() {
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="font-black text-xs">تنبيه بالخطأ</AlertTitle>
-                    <AlertDescription className="text-[10px] font-bold mt-1">
+                    <AlertDescription className="text-[10px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
                 </Alert>

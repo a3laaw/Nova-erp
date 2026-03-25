@@ -100,13 +100,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             } else {
                 await signOut(masterAuth);
-                throw new Error('تم تسجيل الدخول ولكن لم يتم العثور على وثيقة المطور. يرجى تشغيل npm run setup:developer');
+                throw new Error('بيانات الدخول السيادية غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
             }
         } catch (e: any) {
             console.error(e);
-            if (e.code === 'auth/operation-not-allowed') {
-                throw new Error('يجب تفعيل خيار الدخول بالبريد (Email/Password) من لوحة تحكم Firebase لمشروع الماستر.');
-            }
             if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
                 throw new Error('بيانات الدخول السيادية غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
             }
@@ -125,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة في السجل العالمي.');
             const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
             
-            if (!company.isActive) throw new Error('حساب الشركة معطل بقرار إداري.');
+            if (!company.isActive) throw new Error('حساب الشركة معطل حالياً.');
 
             const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
 
@@ -133,10 +130,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', cleanEmail));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             
-            if (tenantUserSnap.empty) throw new Error('تم التحقق ولكن فشل الوصول لملف المستخدم في الشركة.');
+            if (tenantUserSnap.empty) throw new Error('المستخدم غير موجود في سجلات الشركة.');
             const userData = tenantUserSnap.docs[0].data() as UserProfile;
             
-            if (!userData.isActive) throw new Error('حسابك معطل حالياً، راجع مدير النظام.');
+            if (!userData.isActive) throw new Error('حسابك معطل حالياً.');
 
             setCurrentCompany(company);
             setUser({ ...userData, uid: companyAuth.currentUser!.uid });
@@ -148,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(e.message || 'البريد أو كلمة المرور غير صحيحة.');
     }
 
-    throw new Error('هذا الحساب غير مسجل في أي شركة تابعة للمنصة.');
+    throw new Error('بيانات الدخول غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
   };
 
   const logout = async () => {

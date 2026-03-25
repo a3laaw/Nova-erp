@@ -1,7 +1,7 @@
 
 /**
  * @fileOverview القاموس البرمجي الشامل والسيادي لنظام Nova ERP.
- * تم ترميم كافة الأنواع المفقودة للقضاء على أخطاء TypeScript.
+ * تم ترميم كافة الأنواع المفقودة للقضاء على أخطاء TypeScript المذكورة في التحليل.
  */
 
 import { Timestamp } from 'firebase/firestore';
@@ -254,17 +254,17 @@ export interface UserProfile {
   uid?: string;
   username: string;
   email: string;
-  role: 'Developer' | 'Admin' | 'HR' | 'Accountant' | 'Engineer' | 'Secretary' | 'User';
+  role: 'Admin' | 'HR' | 'Accountant' | 'Engineer' | 'Secretary' | 'User';
   isActive: boolean;
   employeeId?: string;
-  companyId: string;
+  companyId?: string;
   fullName?: string;
   jobTitle?: string;
   avatarUrl?: string;
   passwordHash?: string;
   activatedAt?: Timestamp | any;
-  createdAt: Timestamp | any;
-  createdBy: string;
+  createdAt?: Timestamp | any;
+  createdBy?: string;
 }
 
 export interface Employee extends BaseEntity {
