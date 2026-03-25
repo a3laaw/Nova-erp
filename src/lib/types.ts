@@ -1,9 +1,4 @@
 
-/**
- * @fileOverview القاموس البرمجي الشامل والسيادي لنظام Nova ERP.
- * تم ترميم كافة الأنواع المفقودة للقضاء على أخطاء TypeScript المذكورة في التحليل.
- */
-
 import { Timestamp } from 'firebase/firestore';
 
 export interface BaseEntity {
@@ -14,7 +9,24 @@ export interface BaseEntity {
   updatedAt?: Timestamp | any;
 }
 
-// === 1. إدارة الشركات والمنشآت (Tenants) ===
+export interface UserProfile {
+  id?: string;
+  uid?: string;
+  username: string;
+  email: string;
+  role: 'Developer' | 'Admin' | 'HR' | 'Accountant' | 'Engineer' | 'Secretary' | 'User';
+  isActive: boolean;
+  employeeId?: string;
+  companyId?: string;
+  fullName?: string;
+  jobTitle?: string;
+  avatarUrl?: string;
+  passwordHash?: string;
+  activatedAt?: Timestamp | any;
+  createdAt?: Timestamp | any;
+  createdBy?: string;
+}
+
 export interface Company extends BaseEntity {
   name: string;
   nameEn?: string;
@@ -29,10 +41,12 @@ export interface Company extends BaseEntity {
   };
   isActive: boolean;
   adminEmail: string;
-  phone?: string;
+  logoUrl?: string;
   address?: string;
+  phone?: string;
+  email?: string;
   activityType?: string;
-  status: 'pending' | 'active' | 'suspended';
+  status?: 'pending' | 'active' | 'suspended';
 }
 
 export interface GlobalUserIndex {
@@ -41,7 +55,6 @@ export interface GlobalUserIndex {
     role: string;
 }
 
-// === 2. إدارة العملاء والمعاملات ===
 export type ClientStatus = 'prospective' | 'registered' | 'active' | 'completed' | 'archived' | 'contracted' | 'reContracted';
 
 export interface Client extends BaseEntity {
@@ -70,7 +83,6 @@ export interface Client extends BaseEntity {
   transactionCounter?: number;
 }
 
-// === 3. إدارة المواعيد والتقويم ===
 export interface Appointment extends BaseEntity {
   clientId?: string;
   clientName: string;
@@ -82,21 +94,37 @@ export interface Appointment extends BaseEntity {
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled' | 'no-show';
   notes?: string;
   meetingRoom?: string;
-  roomId?: string; 
   color?: string;
   visitCount?: number;
   workStageUpdated?: boolean;
   transactionId?: string;
 }
 
-// === 4. إدارة المشاريع والإنشاءات (WBS/BOQ) ===
+export interface TechnicalSpecifications {
+  totalArea: number;
+  floorsCount: number;
+  basementType: 'none' | 'full' | 'half' | 'vault';
+  hasBasement?: boolean;
+  roofExtension: 'none' | 'quarter' | 'half';
+  workNature: 'labor_only' | 'with_materials';
+  bathroomsCount?: number;
+  kitchensCount?: number;
+  laundryRoomsCount?: number;
+  sanitaryMaterialsIncluded?: boolean;
+  sanitaryExtensionType?: 'ordinary' | 'suspended';
+  toiletType?: 'ordinary' | 'suspended';
+  showerType?: 'ordinary' | 'hidden';
+  electricalPointsCount?: number;
+  planReferenceNumber?: string;
+}
+
 export interface ConstructionProject extends BaseEntity, TechnicalSpecifications {
   projectId: string;
   projectName: string;
   clientId: string;
   clientName?: string;
   projectCategory: 'Private (Subsidized)' | 'Private (Non-Subsidized)' | 'Commercial' | 'Government';
-  status: 'مخطط' | 'قيد التنفيذ' | 'مكتمل' | 'معلق' | 'ملغى' | string;
+  status: string;
   progressPercentage: number;
   boqId?: string;
   linkedTransactionId?: string;
@@ -105,7 +133,7 @@ export interface ConstructionProject extends BaseEntity, TechnicalSpecifications
   contractValue?: number;
   subcontractorId?: string | null;
   subcontractorName?: string | null;
-  subsidyQuotas?: SubsidyQuota[];
+  subsidyQuotas?: any[];
 }
 
 export interface Project extends BaseEntity {
@@ -132,31 +160,6 @@ export interface EngineeringDiscipline {
   }[];
 }
 
-export interface TechnicalSpecifications {
-  totalArea: number;
-  floorsCount: number;
-  basementType: 'none' | 'full' | 'half' | 'vault';
-  hasBasement?: boolean;
-  roofExtension: 'none' | 'quarter' | 'half';
-  workNature: 'labor_only' | 'with_materials';
-  bathroomsCount?: number;
-  kitchensCount?: number;
-  laundryRoomsCount?: number;
-  sanitaryMaterialsIncluded?: boolean;
-  sanitaryExtensionType?: 'ordinary' | 'suspended';
-  toiletType?: 'ordinary' | 'suspended';
-  showerType?: 'ordinary' | 'hidden';
-  electricalPointsCount?: number;
-  planReferenceNumber?: string;
-}
-
-export interface SubsidyQuota {
-  itemId: string;
-  itemName: string;
-  allocatedQuantity: number;
-  receivedQuantity: number;
-}
-
 export interface Boq extends BaseEntity {
   boqNumber: string;
   name: string;
@@ -166,7 +169,7 @@ export interface Boq extends BaseEntity {
   projectId?: string | null;
   totalValue: number;
   itemCount: number;
-  status: 'تقديري' | 'تعاقدي' | 'منفذ' | string;
+  status: string;
 }
 
 export interface BoqItem {
@@ -185,7 +188,6 @@ export interface BoqItem {
   endDate?: Timestamp | any;
 }
 
-// === 5. المحاسبة والمالية ===
 export interface PaymentApplication extends BaseEntity {
   applicationNumber: string;
   projectId: string;
@@ -200,72 +202,41 @@ export interface PaymentApplication extends BaseEntity {
     unitPrice: number;
     currentQuantity: number;
     totalAmount: number;
-    previousQuantity?: number;
   }[];
   totalAmount: number;
-  subsidizedMaterialsValue?: number;
-  netDueAmount?: number;
   status: 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled';
   journalEntryId?: string;
 }
 
-export interface JournalEntry extends BaseEntity {
-  entryNumber: string;
-  date: Timestamp | any;
-  narration: string;
-  totalDebit: number;
-  totalCredit: number;
-  status: 'draft' | 'posted';
-  lines: JournalLine[];
-  reference?: string;
-  clientId?: string;
-  transactionId?: string;
-  linkedReceiptId?: string;
-}
-
-export interface JournalLine {
-  accountId: string;
-  accountName: string;
-  debit: number;
-  credit: number;
+export interface TransactionAssignment extends BaseEntity {
+  transactionId: string;
+  departmentId: string;
+  departmentName: string;
+  engineerId: string;
+  engineerName?: string;
   notes?: string;
-  auto_profit_center?: string;
-  auto_resource_id?: string;
-  auto_dept_id?: string;
-  clientId?: string;
-  transactionId?: string;
+  status?: string;
 }
 
-export interface Account extends BaseEntity {
-  code: string;
+export interface DailySiteReport extends BaseEntity {
+  projectId: string;
+  projectName: string;
+  engineerId: string;
+  engineerName: string;
+  date: Timestamp | any;
+  workDescription?: string;
+  workCompleted?: string;
+  photoUrls?: string[];
+  workersCount?: number;
+}
+
+export interface Job extends BaseEntity {
   name: string;
-  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
-  level: number;
-  parentCode: string | null;
-  isPayable: boolean;
-  statement: 'Balance Sheet' | 'Income Statement';
-  balanceType: 'Debit' | 'Credit';
-  employeeId?: string | null;
+  parentId?: string;
+  order?: number;
 }
 
-// === 6. الموارد البشرية (HR) ===
-export interface UserProfile {
-  id?: string;
-  uid?: string;
-  username: string;
-  email: string;
-  role: 'Admin' | 'HR' | 'Accountant' | 'Engineer' | 'Secretary' | 'User';
-  isActive: boolean;
-  employeeId?: string;
-  companyId?: string;
-  fullName?: string;
-  jobTitle?: string;
-  avatarUrl?: string;
-  passwordHash?: string;
-  activatedAt?: Timestamp | any;
-  createdAt?: Timestamp | any;
-  createdBy?: string;
-}
+export type SubcontractorType = string;
 
 export interface Employee extends BaseEntity {
   employeeNumber: string;
@@ -292,16 +263,60 @@ export interface Employee extends BaseEntity {
   carriedLeaveDays?: number;
   terminationDate?: Timestamp | any;
   terminationReason?: string;
+  iban?: string;
+  bankName?: string;
+  accountNumber?: string;
+  contractPercentage?: number;
+  dailyRate?: number;
 }
 
-export interface AuditLog extends BaseEntity {
-  changeType: 'SalaryChange' | 'JobChange' | 'DataUpdate' | 'ResidencyUpdate';
-  field: string;
-  oldValue: any;
-  newValue: any;
-  effectiveDate: Timestamp | any;
-  changedBy: string;
-  notes?: string;
+export interface Account extends BaseEntity {
+  code: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+  level: number;
+  parentCode: string | null;
+  isPayable: boolean;
+  statement: 'Balance Sheet' | 'Income Statement';
+  balanceType: 'Debit' | 'Credit';
+  employeeId?: string | null;
+}
+
+export interface JournalEntry extends BaseEntity {
+  entryNumber: string;
+  date: Timestamp | any;
+  narration: string;
+  totalDebit: number;
+  totalCredit: number;
+  status: 'draft' | 'posted';
+  lines: any[];
+  reference?: string;
+  clientId?: string;
+  transactionId?: string;
+  linkedReceiptId?: string;
+}
+
+export interface Item extends BaseEntity {
+  name: string;
+  sku: string;
+  categoryId: string;
+  itemType?: 'product' | 'service';
+  inventoryTracked?: boolean;
+  unitOfMeasure: string;
+  costPrice: number;
+  sellingPrice: number;
+  reorderLevel?: number;
+  expiryTracked?: boolean;
+  warrantyYears?: number;
+  description?: string;
+  isSubsidyEligible?: boolean;
+}
+
+export interface ItemCategory extends BaseEntity {
+  name: string;
+  parentCategoryId: string | null;
+  boqReferenceItemIds?: string[];
+  order?: number;
 }
 
 export interface CustodyReconciliation extends BaseEntity {
@@ -309,45 +324,12 @@ export interface CustodyReconciliation extends BaseEntity {
   employeeId: string;
   employeeName: string;
   date: Timestamp | any;
-  items: CustodyItem[];
+  items: any[];
   totalAmount: number;
   status: 'pending' | 'approved' | 'rejected';
   notes?: string;
-  journalEntryId?: string;
 }
 
-export interface CustodyItem {
-  description: string;
-  amount: number;
-  projectId?: string | null;
-  projectName?: string | null;
-  clientId?: string | null;
-  clientName?: string | null;
-  category?: string;
-  categoryName?: string;
-  attachmentUrls?: string[];
-}
-
-// === 7. البيانات المرجعية ===
-export interface Department extends BaseEntity { name: string; order?: number; activityTypes?: string[]; }
-export interface Job extends BaseEntity { name: string; parentId?: string; order?: number; }
-export interface Governorate extends BaseEntity { name: string; order?: number; }
-export interface Area extends BaseEntity { name: string; order?: number; parentId?: string; }
-export interface TransactionType extends BaseEntity { name: string; order?: number; activityType: string; departmentIds?: string[]; }
-export interface WorkStage extends BaseEntity { name: string; order?: number; stageType: 'sequential' | 'parallel'; trackingType: 'duration' | 'occurrence' | 'none'; expectedDurationDays?: number | null; maxOccurrences?: number | null; allowedRoles?: string[]; enableModificationTracking?: boolean; }
-export interface Holiday extends BaseEntity { name: string; date: Timestamp | any; }
-export interface WorkTeam extends BaseEntity { name: string; }
-export interface CompanyActivityType extends BaseEntity { name: string; }
-export interface ItemCategory extends BaseEntity { name: string; parentCategoryId: string | null; boqReferenceItemIds?: string[]; order?: number; activityTypeIds?: string[]; }
-export interface Item extends BaseEntity { name: string; sku: string; categoryId: string; itemType: 'product' | 'service'; inventoryTracked: boolean; unitOfMeasure: string; costPrice: number; sellingPrice: number; reorderLevel?: number; expiryTracked?: boolean; warrantyYears?: number; isSubsidyEligible?: boolean; description?: string; }
-export interface Warehouse extends BaseEntity { name: string; location?: string; isDefault: boolean; projectId?: string | null; }
-export interface Vendor extends BaseEntity { name: string; phone: string; contactPerson?: string; email?: string; address?: string; }
-export interface Subcontractor { id?: string; name: string; type: string; mobile: string; isActive: boolean; blacklisted: boolean; contactPerson?: string; phone?: string; email?: string; address?: string; performanceRating?: number; bankAccount?: { bankName?: string; accountNumber?: string; iban?: string; }; blacklistedReason?: string; }
-export interface SubcontractorCertificate extends BaseEntity { certificateNumber: string; subcontractorId: string; subcontractorName: string; projectId: string; projectName: string; amount: number; date: Timestamp | any; status: 'draft' | 'approved' | 'cancelled'; description?: string; journalEntryId?: string; }
-export interface SubcontractorType extends BaseEntity { name: string; }
-export interface SubcontractorSpecialization extends BaseEntity { name: string; parentId: string; }
-
-// === 8. المعاملات والعمليات الفنية ===
 export interface ClientTransaction extends BaseEntity {
   transactionNumber: string;
   clientId: string;
@@ -356,40 +338,22 @@ export interface ClientTransaction extends BaseEntity {
   description?: string;
   assignedEngineerId?: string | null;
   status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
-  stages: TransactionStage[];
+  stages: any[];
   projectId?: string;
   boqId?: string;
-  contract?: ContractData;
+  contract?: any;
 }
 
-export interface TransactionStage {
-  stageId: string;
-  name: string;
-  status: 'pending' | 'in-progress' | 'completed' | 'skipped' | 'awaiting-review';
-  startDate?: Timestamp | any;
-  endDate?: Timestamp | any;
-  expectedEndDate?: Timestamp | any;
-  allowedRoles?: string[];
-}
-
-export interface ContractData {
-  totalAmount: number;
-  financialsType: 'fixed' | 'percentage';
-  clauses: ContractClause[];
-  specs?: TechnicalSpecifications;
-  signatureInfo?: { clientSignature: string; signedAt: any; signedByIP: string; };
-  scopeOfWork?: any[];
-  termsAndConditions?: any[];
-  openClauses?: any[];
-}
-
-export interface ContractClause {
-  id: string;
-  name: string;
-  amount: number;
-  percentage?: number;
-  condition: string;
-  status: 'غير مستحقة' | 'مستحقة' | 'مدفوعة';
+export interface RequestForQuotation extends BaseEntity {
+  rfqNumber: string;
+  date: Timestamp | any;
+  vendorIds: string[];
+  items: any[];
+  status: 'draft' | 'sent' | 'closed' | 'cancelled';
+  projectId?: string | null;
+  awardedPoIds?: string[];
+  awardedItems?: any;
+  prospectiveVendors?: any[];
 }
 
 export interface PurchaseOrder extends BaseEntity {
@@ -398,32 +362,20 @@ export interface PurchaseOrder extends BaseEntity {
   vendorId: string;
   vendorName: string;
   projectId?: string | null;
-  items: { internalItemId: string; itemName: string; quantity: number; unitPrice: number; total: number; }[];
+  items: any[];
   totalAmount: number;
   status: 'draft' | 'approved' | 'received' | 'partially_received' | 'cancelled';
   rfqId?: string;
-  paymentTerms?: string;
-  notes?: string;
   isBypassed?: boolean;
-}
-
-export interface RequestForQuotation extends BaseEntity {
-  rfqNumber: string;
-  date: Timestamp | any;
-  vendorIds: string[];
-  prospectiveVendors?: { id: string; name: string }[];
-  items: { id: string; internalItemId: string; itemName: string; quantity: number; }[];
-  status: 'draft' | 'sent' | 'closed' | 'cancelled';
-  projectId?: string | null;
-  awardedPoIds?: string[];
-  awardedItems?: Record<string, string>;
+  discountAmount?: number;
+  deliveryFees?: number;
 }
 
 export interface SupplierQuotation extends BaseEntity {
   rfqId: string;
   vendorId: string;
   date: Timestamp | any;
-  items: { rfqItemId: string; unitPrice: number; }[];
+  items: any[];
   deliveryTimeDays?: number;
   paymentTerms?: string;
   discountAmount?: number;
@@ -448,29 +400,131 @@ export interface FieldVisit extends BaseEntity {
   subcontractorName?: string | null;
   phaseEndDate?: any;
   details?: string;
-  confirmationData?: {
-      confirmedAt: any;
-      notes: string;
-      location?: { latitude: number; longitude: number; accuracy: number };
-      progressAchieved: number;
-  };
+  confirmationData?: any;
 }
 
-export interface InventoryAdjustment extends BaseEntity {
-  adjustmentNumber: string;
+export interface PaymentMethod extends BaseEntity {
+  name: string;
+  commissionType?: 'percentage' | 'fixed' | 'both';
+  fixedFee?: number;
+  percentageFee?: number;
+  expenseAccountId: string;
+  expenseAccountName?: string;
+}
+
+export interface Department extends BaseEntity {
+  name: string;
+  order?: number;
+  activityTypes?: string[];
+}
+
+export interface Governorate extends BaseEntity {
+  name: string;
+  order?: number;
+}
+
+export interface Area extends BaseEntity {
+  name: string;
+  order?: number;
+  parentId?: string;
+}
+
+export interface TransactionType extends BaseEntity {
+  name: string;
+  order?: number;
+  activityType: string;
+  departmentIds?: string[];
+}
+
+export interface WorkStage extends BaseEntity {
+  name: string;
+  order?: number;
+  stageType: 'sequential' | 'parallel';
+  trackingType: 'duration' | 'occurrence' | 'none';
+  expectedDurationDays?: number | null;
+  maxOccurrences?: number | null;
+  allowedRoles?: string[];
+  enableModificationTracking?: boolean;
+}
+
+export interface Holiday extends BaseEntity {
+  name: string;
   date: Timestamp | any;
-  type: 'damage' | 'theft' | 'opening_balance' | 'transfer' | 'material_issue' | 'purchase_return' | 'sales_return' | 'other';
-  issueType?: 'project_site' | 'direct_sale';
-  notes: string;
-  items: { itemId: string; itemName: string; quantity: number; unitCost: number; totalCost: number; boqItemId?: string | null; warrantyEndDate?: any; }[];
-  warehouseId?: string;
-  fromWarehouseId?: string;
-  toWarehouseId?: string;
-  projectId?: string;
-  clientId?: string;
-  clientName?: string;
+}
+
+export interface WorkTeam extends BaseEntity {
+  name: string;
+}
+
+export interface CompanyActivityType extends BaseEntity {
+  name: string;
+}
+
+export interface BoqReferenceItem extends BaseEntity {
+  name: string;
+  parentBoqReferenceItemId?: string | null;
+  isHeader?: boolean;
+  unit?: string;
+  activityTypeIds?: string[];
+  subcontractorTypeIds?: string[];
+  transactionTypeIds?: string[];
+}
+
+export interface Warehouse extends BaseEntity {
+  name: string;
+  location?: string;
+  isDefault: boolean;
+  projectId?: string | null;
+}
+
+export interface Vendor extends BaseEntity {
+  name: string;
+  phone: string;
+  contactPerson?: string;
+  email?: string;
+  address?: string;
+}
+
+export interface Subcontractor {
+  id?: string;
+  name: string;
+  type: string;
+  mobile: string;
+  isActive: boolean;
+  blacklisted: boolean;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  performanceRating?: number;
+  bankAccount?: {
+    bankName?: string;
+    accountNumber?: string;
+    iban?: string;
+  };
+  blacklistedReason?: string;
+}
+
+export interface SubcontractorCertificate extends BaseEntity {
+  certificateNumber: string;
+  subcontractorId: string;
+  subcontractorName: string;
+  projectId: string;
+  projectName: string;
+  amount: number;
+  date: Timestamp | any;
+  status: 'draft' | 'approved' | 'cancelled';
+  description?: string;
   journalEntryId?: string;
-  isBypassed?: boolean;
+}
+
+export interface SubcontractorType extends BaseEntity {
+  name: string;
+}
+
+export interface SubcontractorSpecialization extends BaseEntity {
+  name: string;
+  parentId: string;
 }
 
 export interface RecurringObligation extends BaseEntity {
@@ -512,30 +566,78 @@ export interface ContractTemplate extends BaseEntity {
   openClauses?: any[];
 }
 
-export interface TransactionAssignment extends BaseEntity {
-  transactionId: string;
-  departmentId: string;
-  departmentName: string;
-  engineerId: string;
-  engineerName?: string;
+export interface AttendanceRecord {
+  date: Timestamp | any;
+  employeeId: string;
+  checkIn1: string | null;
+  checkOut1: string | null;
+  checkIn2?: string | null;
+  checkOut2?: string | null;
+  allPunches?: string[];
+  status: 'present' | 'absent' | 'late' | 'half_day';
+  anomalyDescription?: string;
+  manualDeductionDays?: number;
+  auditStatus: 'pending' | 'verified' | 'waived';
+  waivedBy?: string | null;
+  waivedAt?: any;
+}
+
+export interface MonthlyAttendance extends BaseEntity {
+  employeeId: string;
+  year: number;
+  month: number;
+  records: AttendanceRecord[];
+  summary: {
+    presentDays: number;
+    absentDays: number;
+    lateDays: number;
+  };
+}
+
+export interface LeaveRequest extends BaseEntity {
+  employeeId: string;
+  employeeName: string;
+  leaveType: 'Annual' | 'Sick' | 'Emergency' | 'Unpaid';
+  startDate: Timestamp | any;
+  endDate: Timestamp | any;
+  days: number;
+  workingDays: number;
+  unpaidDays?: number;
   notes?: string;
-  status?: string;
+  passportReceived?: boolean;
+  status: 'pending' | 'approved' | 'rejected' | 'on-leave' | 'returned';
+  approvedBy?: string;
+  actualStartDate?: Timestamp | any;
+  actualReturnDate?: Timestamp | any;
 }
 
-export interface ConstructionType extends BaseEntity {
-    name: string;
+export interface PermissionRequest extends BaseEntity {
+  employeeId: string;
+  employeeName: string;
+  type: 'late_arrival' | 'early_departure';
+  date: Timestamp | any;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
 }
 
-export interface SubcontractorSpecialization extends BaseEntity {
-    name: string;
-    parentId: string;
-}
-
-export interface WorkTeam extends BaseEntity {
-    name: string;
-}
-
-export interface BoqReferenceItem extends BaseEntity {
-    name: string;
-    parentBoqReferenceItemId?: string | null;
+export interface Payslip extends BaseEntity {
+  employeeId: string;
+  employeeName: string;
+  year: number;
+  month: number;
+  type: 'Monthly' | 'Leave';
+  earnings: {
+    basicSalary: number;
+    housingAllowance: number;
+    transportAllowance: number;
+    commission: number;
+  };
+  deductions: {
+    absenceDeduction: number;
+    lateDeduction: number;
+    otherDeductions: number;
+  };
+  netSalary: number;
+  status: 'draft' | 'processed' | 'paid';
+  paidAt?: Timestamp | any;
 }

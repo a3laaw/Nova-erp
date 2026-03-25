@@ -4,10 +4,6 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 
-/**
- * @fileOverview سكربت إعداد حساب المطور الرئيسي (Sovereign Root) في مشروع Master.
- */
-
 const SERVICE_ACCOUNT_PATH = './service-account.json';
 
 async function setupDeveloper() {
@@ -33,7 +29,7 @@ async function setupDeveloper() {
     let userRecord;
     try {
         userRecord = await auth.getUserByEmail(DEV_EMAIL);
-        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث الصلاحيات...');
+        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث الصلاحيات وكلمة المرور...');
         await auth.updateUser(userRecord.uid, {
             password: DEV_PASSWORD,
         });
@@ -52,13 +48,11 @@ async function setupDeveloper() {
 
     if (!userRecord) throw new Error("فشل في إنشاء أو جلب المستخدم.");
 
-    // تعيين الصلاحيات السيادية
     await auth.setCustomUserClaims(userRecord.uid, {
       role: 'Developer',
       isSuperAdmin: true,
     });
 
-    // إنشاء الوثيقة في مشروع الماستر
     await db.collection('developers').doc(userRecord.uid).set({
       uid: userRecord.uid,
       email: DEV_EMAIL,

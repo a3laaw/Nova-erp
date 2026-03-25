@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -108,7 +109,7 @@ export function MonthlyPayrollReport() {
                             {!loading && reportData.length === 0 && <TableRow><TableCell colSpan={6} className="h-24 text-center">لا توجد بيانات رواتب لهذا الشهر.</TableCell></TableRow>}
                             {!loading && reportData.map(p => (<TableRow key={p.id}><TableCell className="font-medium">{p.employeeName}</TableCell><TableCell><Badge variant="outline" className={payslipTypeColors[p.type || 'Monthly']}>{payslipTypeTranslations[p.type || 'Monthly']}</Badge></TableCell><TableCell>{formatCurrency(p.totalEarnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(p.totalDeductions)}</TableCell><TableCell className="font-bold">{formatCurrency(p.netSalary)}</TableCell><TableCell><Badge variant="outline" className={statusColors[p.status]}>{statusTranslations[p.status]}</Badge></TableCell></TableRow>))}
                         </TableBody>
-                        <TableFooter><TableRow className="font-bold text-base bg-muted"><TableCell colSpan={2}>الإجمالي</TableCell><TableCell>{formatCurrency(totals.earnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(totals.deductions)}</TableCell><TableCell>{formatCurrency(totals.net)}</TableCell><TableCell></TableCell></TableRow></TableFooter>
+                        <TableFooter><TableRow className="font-bold text-base bg-muted"><TableCell colSpan={2}>إجمالي</TableCell><TableCell>{formatCurrency(totals.earnings)}</TableCell><TableCell className="text-destructive">{formatCurrency(totals.deductions)}</TableCell><TableCell>{formatCurrency(totals.net)}</TableCell><TableCell></TableCell></TableRow></TableFooter>
                     </Table>
                 </div>
             </CardContent>

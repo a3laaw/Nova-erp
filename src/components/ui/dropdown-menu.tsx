@@ -7,11 +7,6 @@ import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/**
- * @fileOverview مكون القائمة المنسدلة المطور (Category 4 Fix).
- * تم إضافة دعم خاصية dir لضمان توافق الواجهات العربية.
- */
-
 const DropdownMenu = DropdownMenuPrimitive.Root
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 const DropdownMenuGroup = DropdownMenuPrimitive.Group

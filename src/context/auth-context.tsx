@@ -1,11 +1,6 @@
 
 'use client';
 
-/**
- * @fileOverview سياق المصادقة الذكي الموحد (The Sovereign Auth Gateway).
- * تم تحسين معالجة الأخطاء لتوفير إرشادات واضحة للمطور والشركات.
- */
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
@@ -42,7 +37,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         if (firebaseUser) {
-            // 1. تحقق أولاً إذا كان المطور السيادي في مشروع الماستر
             const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
             if (devDoc.exists()) {
                 setUser({ ...devDoc.data() as UserProfile, uid: firebaseUser.uid });
@@ -50,7 +44,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            // 2. البحث في الفهرس العالمي للموظفين
             const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
             
             if (!userIndexSnap.empty) {
@@ -59,7 +52,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 
                 if (companyDoc.exists()) {
                     const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
-                    // تهيئة محرك الشركة ديناميكياً
                     const { firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
                     
                     const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', firebaseUser.email));
@@ -86,7 +78,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // --- المسار السيادي: دخول المطور ---
     if (cleanEmail === MASTER_DEV_EMAIL) {
         try {
             const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
@@ -100,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             } else {
                 await signOut(masterAuth);
-                throw new Error('بيانات الدخول السيادية غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
+                throw new Error('حساب المطور غير موجود في قاعدة البيانات السيادية. يرجى تشغيل npm run setup:developer');
             }
         } catch (e: any) {
             console.error(e);
@@ -111,7 +102,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    // --- المسار العام: دخول موظفي الشركات ---
     try {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
         
@@ -145,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(e.message || 'البريد أو كلمة المرور غير صحيحة.');
     }
 
-    throw new Error('بيانات الدخول غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
+    throw new Error('بيانات الدخول غير صحيحة. المرجو التأكد من البريد وكلمة المرور.');
   };
 
   const logout = async () => {

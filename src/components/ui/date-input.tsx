@@ -12,11 +12,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './input';
 
-/**
- * @fileOverview مكون إدخال التاريخ المطور.
- * تم دمج خصائص disabled ودعم المعرفات الفريدة (id).
- */
-
 export interface DateInputProps {
   id?: string;
   value?: Date | string;
