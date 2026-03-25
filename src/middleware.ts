@@ -1,16 +1,15 @@
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
  * @fileOverview Middleware لتأمين المسارات السيادية.
- * تم تحديثه للسماح بالوصول لصفحة التسجيل الجديدة /register.
+ * تم توحيد السماح بالوصول للمسار الرئيسي / ليعمل كبوابة موحدة.
  */
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // 1. السماح بالدخول العام لصفحات الدخول والتسجيل فقط
-  if (path === '/' || path === '/register' || path === '/developer/login' || path.startsWith('/api')) {
+  // 1. السماح بالدخول العام لصفحة البداية، صفحة التسجيل، والـ API
+  if (path === '/' || path === '/register' || path.startsWith('/api')) {
     return NextResponse.next();
   }
 
@@ -18,7 +17,7 @@ export function middleware(request: NextRequest) {
   if (path.startsWith('/developer')) {
     const devSession = request.cookies.get('nova-dev-session');
     if (!devSession) {
-      return NextResponse.redirect(new URL('/developer/login', request.url));
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
 

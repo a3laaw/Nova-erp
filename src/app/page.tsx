@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
- * @fileOverview بوابة دخول Nova ERP الموحدة (Zero-Knowledge Entry).
- * تم حذف اختيار الشركة لضمان السلاسة؛ النظام يتعرف على المستخدم من بريده.
+ * @fileOverview البوابة الموحدة والذكية لـ Nova ERP.
+ * تطلب البريد وكلمة المرور فقط، والنظام يكتشف الهوية (مطور أو موظف) آلياً.
  */
 
 import { useState } from 'react';
@@ -17,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-export default function LoginPage() {
+export default function UnifiedLoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
 
@@ -32,9 +31,13 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
         await login(formData.email, formData.password);
-        toast({ title: 'مرحباً بك في Nova ERP' });
+        toast({ title: 'تم الدخول بنجاح' });
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'فشل تسجيل الدخول', description: error.message || 'تأكد من بيانات الاعتماد.' });
+        toast({ 
+            variant: 'destructive', 
+            title: 'فشل تسجيل الدخول', 
+            description: error.message || 'تأكد من بيانات الاعتماد والاتصال بالإنترنت.' 
+        });
     } finally {
         setIsLoading(false);
     }
@@ -56,7 +59,7 @@ export default function LoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.3em]">بوابة الدخول الموحدة</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.3em]">بوابة الدخول الذكية الموحدة</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
@@ -71,7 +74,7 @@ export default function LoginPage() {
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="yourname@company.com"
+                        placeholder="user@company.com"
                     />
                 </div>
 
@@ -107,7 +110,7 @@ export default function LoginPage() {
         </CardContent>
         <div className="bg-white/10 p-4 text-center border-t border-white/10">
             <p className="text-[10px] font-black text-[#1e1b4b]/40 uppercase tracking-widest">
-                Nova ERP — Multi-Tenant Autonomous Environment
+                Nova ERP — Universal Autonomous Gateway
             </p>
         </div>
       </Card>
