@@ -1,27 +1,32 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, updateDoc, collection, addDoc, serverTimestamp, orderBy, query } from 'firebase/firestore';
+import { doc, updateDoc, collection, orderBy, query } from 'firebase/firestore';
 import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, UserCog, Power, PowerOff, LayoutGrid, Search, Loader2, Key, Terminal, Globe } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, LayoutGrid, Search, Loader2, Terminal, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
-import { toFirestoreDate } from '@/services/date-converter';
 import { useToast } from '@/hooks/use-toast';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
+import { useCompany } from '@/context/company-context';
+import { useRouter } from 'next/navigation';
 
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
+  const router = useRouter();
+  const { setCurrentCompany } = useCompany();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
 
   const { data: companies, loading } = useSubscription<Company>(firestore, 'companies', [orderBy('createdAt', 'desc')]);
 
@@ -41,6 +46,12 @@ export default function DeveloperDashboard() {
     } finally {
         setIsProcessing(null);
     }
+  };
+
+  const handleEnterAsCompany = (company: Company) => {
+      setCurrentCompany(company);
+      toast({ title: 'دخول سيادي', description: `تم ربط الجلسة ببيئة عمل ${company.name}` });
+      router.push('/dashboard');
   };
 
   return (
@@ -91,7 +102,7 @@ export default function DeveloperDashboard() {
                                     className="pl-10 h-12 rounded-2xl border-white/10 bg-white/5 text-white font-bold placeholder:text-white/30"
                                 />
                             </div>
-                            <Button className="h-12 px-8 rounded-2xl font-black text-lg gap-2 bg-white text-indigo-900 hover:bg-white/90 shadow-xl">
+                            <Button onClick={() => setIsRegistrationOpen(true)} className="h-12 px-8 rounded-2xl font-black text-lg gap-2 bg-white text-indigo-900 hover:bg-white/90 shadow-xl">
                                 <PlusCircle className="h-5 w-5" /> إضافة شركة جديدة
                             </Button>
                         </div>
@@ -131,7 +142,12 @@ export default function DeveloperDashboard() {
                                             </TableCell>
                                             <TableCell className="text-left px-10">
                                                 <div className="flex justify-end gap-3">
-                                                    <Button variant="outline" size="sm" className="rounded-xl font-bold gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 h-10">
+                                                    <Button 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        className="rounded-xl font-bold gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 h-10"
+                                                        onClick={() => handleEnterAsCompany(company)}
+                                                    >
                                                         <Globe className="h-4 w-4" /> دخول كالمنشأة
                                                     </Button>
                                                     <Button 
@@ -155,6 +171,11 @@ export default function DeveloperDashboard() {
                 </Card>
             </TabsContent>
         </Tabs>
+
+        <CompanyRegistrationForm 
+            isOpen={isRegistrationOpen} 
+            onClose={() => setIsRegistrationOpen(false)} 
+        />
     </div>
   );
 }
