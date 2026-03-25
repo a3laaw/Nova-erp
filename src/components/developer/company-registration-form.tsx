@@ -12,13 +12,13 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Separator } from '../ui/separator';
+import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, doc, runTransaction, serverTimestamp, setDoc, getFirestore } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, signOut, getAuth } from 'firebase/auth';
 import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Building2, Mail, Lock } from 'lucide-react';
+import { Loader2, Save, Building2, Mail, Lock, Info, Database } from 'lucide-react';
 import { cleanFirestoreData } from '@/lib/utils';
 
 interface Props {
@@ -56,12 +56,12 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
     try {
       const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
       const firebaseConfig = {
-        apiKey: formData.apiKey,
-        authDomain: formData.authDomain,
-        projectId: formData.projectId,
-        storageBucket: formData.storageBucket,
-        messagingSenderId: formData.messagingSenderId,
-        appId: formData.appId,
+        apiKey: formData.apiKey.trim(),
+        authDomain: formData.authDomain.trim(),
+        projectId: formData.projectId.trim(),
+        storageBucket: formData.storageBucket.trim(),
+        messagingSenderId: formData.messagingSenderId.trim(),
+        appId: formData.appId.trim(),
       };
 
       await runTransaction(masterFirestore, async (transaction) => {
@@ -73,7 +73,7 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
           firebaseProjectId: formData.projectId,
           firebaseConfig,
           isActive: true,
-          adminEmail: formData.adminEmail,
+          adminEmail: formData.adminEmail.toLowerCase().trim(),
           createdAt: serverTimestamp(),
           createdBy: masterAuth.currentUser?.uid || 'system',
         });
@@ -90,14 +90,14 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
       // 3. إنشاء حساب الأدمن في مشروع المالك (Tenant Project)
       const { auth: tenantAuth, firestore: tenantFirestore } = getCompanyFirebase(firebaseConfig, companyId);
       
-      const userCredential = await createUserWithEmailAndPassword(tenantAuth, formData.adminEmail, formData.adminPassword);
+      const userCredential = await createUserWithEmailAndPassword(tenantAuth, formData.adminEmail.toLowerCase().trim(), formData.adminPassword);
       
       // 4. إنشاء UserProfile في Firestore الخاص بالشركة لربط الصلاحيات
       const userProfileRef = doc(tenantFirestore, 'users', userCredential.user.uid);
       await setDoc(userProfileRef, cleanFirestoreData({
         uid: userCredential.user.uid,
         username: formData.adminEmail.split('@')[0],
-        email: formData.adminEmail,
+        email: formData.adminEmail.toLowerCase().trim(),
         role: 'Admin',
         isActive: true,
         fullName: 'مدير النظام الأول',
@@ -119,76 +119,88 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-[2rem] border-none shadow-2xl" dir="rtl">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader className="p-4 border-b bg-indigo-50/50">
-            <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
-                    <Building2 className="h-6 w-6" />
+      <DialogContent className="max-w-3xl max-h-[95vh] flex flex-col p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          <DialogHeader className="p-8 bg-indigo-50/50 border-b shrink-0">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
+                    <Building2 className="h-8 w-8" />
                 </div>
                 <div>
-                    <DialogTitle className="text-xl font-black text-indigo-950">إضافة شركة مستأجرة جديدة</DialogTitle>
-                    <DialogDescription className="font-bold text-indigo-700/60">أدخل بيانات الربط بـ Firebase Project المستقل للشركة.</DialogDescription>
+                    <DialogTitle className="text-2xl font-black text-indigo-950">إضافة شركة مستأجرة جديدة</DialogTitle>
+                    <DialogDescription className="font-bold text-indigo-700/60 text-base">أدخل بيانات الربط بـ Firebase Project المستقل للشركة.</DialogDescription>
                 </div>
             </div>
           </DialogHeader>
 
-          <div className="grid gap-8 py-8 px-2">
-            <section className="space-y-4">
-                <h3 className="font-black text-sm text-indigo-600 border-r-4 border-indigo-600 pr-2">البيانات الأساسية والحساب الإداري</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="grid gap-2">
-                        <Label htmlFor="name" className="font-black text-gray-700 pr-1">اسم الشركة (بالعربية) *</Label>
-                        <Input id="name" value={formData.name} onChange={handleChange} required className="h-11 rounded-xl border-2" placeholder="شركة الخليج للاستشارات..." />
+          <ScrollArea className="flex-1">
+            <div className="p-8 space-y-10">
+                {/* القسم الأول: الهوية والحساب */}
+                <section className="space-y-6">
+                    <h3 className="font-black text-lg text-indigo-600 border-r-4 border-indigo-600 pr-3 flex items-center gap-2">
+                        <Mail className="h-5 w-5" /> البيانات الأساسية والحساب الإداري
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid gap-2">
+                            <Label htmlFor="name" className="font-black text-gray-700 pr-1">اسم الشركة (بالعربية) *</Label>
+                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-2xl border-2" placeholder="شركة الخليج للاستشارات..." />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="adminEmail" className="font-black text-gray-700 pr-1">بريد الأدمن (حساب الدخول الأول) *</Label>
+                            <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-2xl border-2" placeholder="admin@company.com" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="adminPassword" className="font-black text-gray-700 pr-1">كلمة مرور الأدمن *</Label>
+                            <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-12 rounded-2xl border-2" placeholder="********" />
+                        </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="adminEmail" className="font-black text-gray-700 pr-1">بريد الأدمن (حساب الدخول الأول) *</Label>
-                        <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl border-2" placeholder="admin@company.com" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="adminPassword" className="font-black text-gray-700 pr-1">كلمة مرور الأدمن *</Label>
-                        <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-11 rounded-xl border-2" placeholder="********" />
-                    </div>
-                </div>
-            </section>
+                </section>
 
-            <Separator className="bg-indigo-100" />
+                <Separator className="bg-indigo-100" />
 
-            <section className="space-y-4">
-                <h3 className="font-black text-sm text-indigo-600 border-r-4 border-indigo-600 pr-2">Firebase Config (Client Infrastructure)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/30 p-6 rounded-3xl border-2 border-dashed">
-                    <div className="grid gap-2">
-                        <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-muted-foreground">API Key</Label>
-                        <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-10 rounded-xl bg-white border-none shadow-sm" />
+                {/* القسم الثاني: الربط التقني */}
+                <section className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-black text-lg text-indigo-600 border-r-4 border-indigo-600 pr-3 flex items-center gap-2">
+                            <Database className="h-5 w-5" /> Firebase Config (Client Infrastructure)
+                        </h3>
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">مشروع مستقل</Badge>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-muted-foreground">Project ID</Label>
-                        <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-10 rounded-xl bg-white border-none shadow-sm" />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/30 p-8 rounded-[2rem] border-2 border-dashed">
+                        <div className="grid gap-2">
+                            <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">API Key <Info className="h-3 w-3"/></Label>
+                            <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Project ID <Info className="h-3 w-3"/></Label>
+                            <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Auth Domain <Info className="h-3 w-3"/></Label>
+                            <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="appId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">App ID <Info className="h-3 w-3"/></Label>
+                            <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Storage Bucket <Info className="h-3 w-3"/></Label>
+                            <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Messaging Sender ID <Info className="h-3 w-3"/></Label>
+                            <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                        </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-muted-foreground">Auth Domain</Label>
-                        <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-10 rounded-xl bg-white border-none shadow-sm" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="appId" className="text-[10px] font-black uppercase text-muted-foreground">App ID</Label>
-                        <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-10 rounded-xl bg-white border-none shadow-sm" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-muted-foreground">Storage Bucket</Label>
-                        <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} required dir="ltr" className="h-10 rounded-xl bg-white border-none shadow-sm" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-muted-foreground">Messaging Sender ID</Label>
-                        <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} required dir="ltr" className="h-10 rounded-xl bg-white border-none shadow-sm" />
-                    </div>
-                </div>
-            </section>
-          </div>
+                </section>
+            </div>
+          </ScrollArea>
 
-          <DialogFooter className="p-6 border-t bg-gray-50 flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-200 gap-2">
-                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
+          <DialogFooter className="p-8 border-t bg-gray-50 flex gap-3 shrink-0">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-2xl font-bold h-14 px-10">إلغاء</Button>
+            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-16 bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl shadow-indigo-200 gap-3 text-xl min-w-[300px]">
+                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
                 تأسيس بيئة العمل السيادية
             </Button>
           </DialogFooter>
