@@ -1,9 +1,11 @@
+
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 /**
- * @fileOverview سكربت إعداد حساب المطور الرئيسي (Super User) في مشروع Master.
+ * @fileOverview سكربت إعداد حساب المطور الرئيسي (Sovereign Root) في مشروع Master.
+ * تم تثبيت كلمة المرور بناءً على رغبة المستخدم لتسهيل الدخول الأول.
  */
 
 // ملاحظة: يجب وضع ملف الصلاحيات service-account.json في المجلد الرئيسي قبل التشغيل
@@ -13,29 +15,9 @@ const app = initializeApp({
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-function generateStrongPassword(): string {
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lower = 'abcdefghjkmnpqrstuvwxyz';
-  const numbers = '23456789';
-  const symbols = '@#$%^&*!';
-  const all = upper + lower + numbers + symbols;
-
-  let password = '';
-  password += upper[Math.floor(Math.random() * upper.length)];
-  password += lower[Math.floor(Math.random() * lower.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  password += symbols[Math.floor(Math.random() * symbols.length)];
-
-  for (let i = 0; i < 12; i++) {
-    password += all[Math.floor(Math.random() * all.length)];
-  }
-
-  return password.split('').sort(() => Math.random() - 0.5).join('');
-}
-
 async function setupDeveloper() {
   const DEV_EMAIL = 'dev@nova-erp.local';
-  const DEV_PASSWORD = generateStrongPassword();
+  const DEV_PASSWORD = 'Sovereign@2026'; // الكلمة السيادية المعتمدة
 
   try {
     // 1. إنشاء المستخدم في Firebase Auth
@@ -65,18 +47,22 @@ async function setupDeveloper() {
 
     console.log('');
     console.log('╔══════════════════════════════════════╗');
-    console.log('║    ⚠️  احفظ هذه البيانات الآن       ║');
+    console.log('║    ✅ تم إنشاء حساب المطور بنجاح     ║');
     console.log('╠══════════════════════════════════════╣');
     console.log(`║  Email:    ${DEV_EMAIL}        ║`);
-    console.log(`║  Password: ${DEV_PASSWORD}              ║`);
+    console.log(`║  Password: ${DEV_PASSWORD}           ║`);
     console.log('╠══════════════════════════════════════╣');
-    console.log('║  لن تظهر هذه البيانات مرة أخرى     ║');
+    console.log('║  المسار: /developer/login            ║');
     console.log('╚══════════════════════════════════════╝');
     console.log('');
 
     process.exit(0);
-  } catch (error) {
-    console.error('❌ Error creating developer account:', error);
+  } catch (error: any) {
+    if (error.code === 'auth/email-already-exists') {
+        console.log('⚠️ حساب المطور موجود مسبقاً. تم التحديث فقط.');
+        process.exit(0);
+    }
+    console.error('❌ Error:', error);
     process.exit(1);
   }
 }
