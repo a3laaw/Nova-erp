@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview سياق المصادقة السيادي المطور (Smart Identity Discovery).
- * يقوم النظام بالتعرف آلياً على الشركة التابع لها المستخدم عبر البريد الإلكتروني.
+ * تم تحديثه لمعالجة خطأ (operation-not-allowed) وإرشاد المستخدم لتفعيل الإعدادات.
  */
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -35,7 +34,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // مراقبة حالة الجلسة السيادية
   useEffect(() => {
     if (!masterAuth || !masterFirestore) return;
 
@@ -79,26 +77,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
+  const handleAuthError = (error: any) => {
+    console.error("Auth Error Code:", error.code);
+    if (error.code === 'auth/operation-not-allowed') {
+        throw new Error('⚠️ خطأ إعدادات: يجب تفعيل Email/Password في منصة Firebase لهذا المشروع.');
+    }
+    if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error('خطأ: البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+    }
+    throw new Error(error.message || 'فشل تسجيل الدخول. يرجى المحاولة لاحقاً.');
+  };
+
   const login = async (email: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("Connection Error");
 
-    // 1. الاكتشاف الذكي للهوية (Smart Identity Discovery)
-    // نبحث في الفهرس العالمي بمشروع الماستر لمعرفة لمن ينتمي هذا البريد
-    const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', email.toLowerCase().trim())));
+    const cleanEmail = email.toLowerCase().trim();
+
+    // 1. الاكتشاف الذكي للهوية
+    const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
     
     // A) حالة المطور الرئيسي (Root Access)
-    if (email.toLowerCase().trim() === process.env.NEXT_PUBLIC_DEV_EMAIL) {
-        await signInWithEmailAndPassword(masterAuth, email, password);
-        document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
-        router.push('/developer');
-        return;
+    if (cleanEmail === process.env.NEXT_PUBLIC_DEV_EMAIL || cleanEmail === 'dev@nova-erp.local') {
+        try {
+            await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
+            const devDoc = await getDoc(doc(masterFirestore, 'developers', masterAuth.currentUser!.uid));
+            if (!devDoc.exists()) throw new Error('حساب المطور غير موجود في قاعدة البيانات الرئيسية.');
+            
+            setUser({ ...devDoc.data() as UserProfile, uid: masterAuth.currentUser!.uid });
+            document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
+            router.push('/developer');
+            return;
+        } catch (e) {
+            handleAuthError(e);
+        }
     }
 
     if (userIndexSnap.empty) throw new Error('عذراً، هذا الحساب غير مسجل في أي منشأة تابعة لـ Nova ERP.');
 
     const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
     
-    // 2. جلب بيانات الشركة التابع لها
+    // 2. جلب بيانات الشركة
     const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
     if (!companyDoc.exists()) throw new Error('الشركة التابع لها هذا الحساب غير موجودة.');
     const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
@@ -109,8 +127,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
 
     try {
-        await signInWithEmailAndPassword(companyAuth, email, password);
-        const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', email));
+        await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
+        const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', cleanEmail));
         const tenantUserSnap = await getDocs(tenantUserQuery);
         
         if (tenantUserSnap.empty) throw new Error('فشل الوصول لبيانات الملف الشخصي في قاعدة بيانات الشركة.');
@@ -123,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         document.cookie = 'nova-user-session=1; path=/; max-age=86400';
         router.push('/dashboard');
     } catch (e: any) {
-        throw new Error(e.message || 'فشل تسجيل الدخول للشركة.');
+        handleAuthError(e);
     }
   };
 

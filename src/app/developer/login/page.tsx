@@ -1,9 +1,7 @@
-
 'use client';
 
 /**
  * @fileOverview بوابة دخول المطور السيادي (Master Login).
- * تم تحديث التصميم ليتبع النمط الزجاجي المظلم الفاخر.
  */
 
 import { useState } from 'react';
@@ -12,9 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ShieldCheck, User, Terminal, Activity, Sparkles } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, User, Terminal, Activity } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 export default function DeveloperLoginPage() {
   const { login } = useAuth();
@@ -33,11 +30,20 @@ export default function DeveloperLoginPage() {
         await login(formData.email, formData.password);
         toast({ title: 'مرحباً بك في مركز التحكم السيادي' });
     } catch (error: any) {
-        toast({ 
-            variant: 'destructive', 
-            title: 'فشل الدخول السيادي', 
-            description: error.message || 'تأكد من بيانات الاعتماد في مشروع الماستر.' 
-        });
+        // رسالة تنبيه مخصصة لخطأ الإعدادات
+        if (error.message.includes('تفعيل Email/Password')) {
+            toast({
+                variant: 'destructive',
+                title: 'تنبيه إعدادات Firebase',
+                description: 'يجب تفعيل خاصية Email/Password في قسم Authentication بمشروع الماستر.',
+            });
+        } else {
+            toast({ 
+                variant: 'destructive', 
+                title: 'فشل الدخول السيادي', 
+                description: error.message || 'تأكد من بيانات الاعتماد في مشروع الماستر.' 
+            });
+        }
     } finally {
         setIsLoading(false);
     }
