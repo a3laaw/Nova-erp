@@ -93,7 +93,7 @@ export function DateInput({
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
-            className="absolute left-0 top-0 h-full px-3 rtl:left-auto rtl:right-0"
+            className="absolute left-0 top-0 h-full px-3 rtl:left-auto rtl:right-0 z-10"
             disabled={disabled}
             type="button"
           >
