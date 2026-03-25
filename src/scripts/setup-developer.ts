@@ -1,15 +1,13 @@
-
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 /**
  * @fileOverview سكربت إعداد حساب المطور الرئيسي (Sovereign Root) في مشروع Master.
- * ملاحظة: يجب وضع ملف الصلاحيات service-account.json في المجلد الرئيسي قبل التشغيل.
  */
 
 // تهيئة Firebase Admin
-// تأكد من وجود ملف service-account.json في جذر المشروع
+// ملاحظة: تأكد من وجود ملف service-account.json في جذر المشروع قبل التشغيل
 const app = initializeApp({
   credential: cert('./service-account.json'),
 });
@@ -21,12 +19,12 @@ async function setupDeveloper() {
   const DEV_PASSWORD = 'Sovereign@2026'; // الكلمة السيادية الثابتة
 
   try {
-    console.log('⏳ جاري تأسيس الحساب السيادي...');
+    console.log('⏳ جاري تأسيس الحساب السيادي في مشروع الماستر...');
 
     let userRecord;
     try {
         userRecord = await auth.getUserByEmail(DEV_EMAIL);
-        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث كلمة المرور والصلاحيات...');
+        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث كلمة المرور والصلاحيات السيادية...');
         await auth.updateUser(userRecord.uid, {
             password: DEV_PASSWORD,
         });
@@ -45,8 +43,7 @@ async function setupDeveloper() {
 
     if (!userRecord) throw new Error("فشل في إنشاء أو جلب المستخدم.");
 
-    // 2. تعيين الصلاحيات المخصصة (Custom Claims)
-    // هذه هي المفاتيح التي تفتح أبواب Firestore Rules
+    // 2. تعيين الصلاحيات المخصصة (Custom Claims) للمطور
     await auth.setCustomUserClaims(userRecord.uid, {
       role: 'Developer',
       isSuperAdmin: true,

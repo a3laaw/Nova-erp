@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview البوابة الموحدة والذكية لـ Nova ERP.
- * تطلب البريد وكلمة المرور فقط، والنظام يكتشف الهوية (مطور أو موظف) آلياً.
+ * @fileOverview البوابة السيادية الموحدة لـ Nova ERP.
+ * شاشة دخول ذكية تكتشف هوية المستخدم آلياً (مطور أو موظف).
  */
 
 import { useState } from 'react';
@@ -47,6 +47,7 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
+      {/* المؤثرات الجمالية الخلفية */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 

@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
- * @fileOverview المساعد المحاسبي مع تحسين معالجة الأخطاء.
+ * @fileOverview المساعد المحاسبي مع معالجة ذكية لأخطاء تجاوز الحصة.
  */
 
 const getApiKey = () => process.env.GOOGLE_GENAI_API_KEY || process.env.GEMINI_API_KEY || "";
@@ -25,9 +25,16 @@ export async function runAccountingAssistant(input: { command: string, currentDa
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    return JSON.parse(response.text().replace(/```json|```/g, "").trim());
+    const text = response.text().replace(/```json|```/g, "").trim();
+    return JSON.parse(text);
   } catch (error: any) {
     console.error("Accounting Assistant Error:", error);
+    
+    // التعامل مع خطأ تجاوز الحصة 429
+    if (error.message?.includes('429') || error.message?.includes('Resource has been exhausted')) {
+        throw new Error("عذراً، تم تجاوز حصة الطلبات المجانية للذكاء الاصطناعي حالياً. يرجى المحاولة بعد قليل أو ترقية الحساب.");
+    }
+    
     throw new Error(`خطأ في معالجة الطلب المحاسبي: ${error.message}`);
   }
 }
