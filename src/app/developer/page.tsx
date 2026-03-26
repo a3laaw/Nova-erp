@@ -10,7 +10,7 @@ import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, LayoutGrid, Search, Loader2, Terminal, Globe, Pencil, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, LayoutGrid, Search, Loader2, Terminal, Globe, Pencil, MoreHorizontal, ShieldCheck, DatabaseZap } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -80,116 +80,125 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="space-y-10" dir="rtl">
-        {/* ترويسة المطور السيادية - Glass Pearl Optimized */}
+        {/* ترويسة المطور السيادية - Glass Diamond Style */}
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect">
-            <CardHeader className="p-10 pb-8 bg-indigo-950/20">
+            <CardHeader className="p-10 pb-8 bg-indigo-950/40 border-b border-white/10">
                 <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-6">
-                        <div className="p-4 bg-indigo-600 rounded-[2rem] shadow-[0_0_30px_rgba(79,70,229,0.4)]">
+                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20">
                             <Terminal className="h-10 w-10 text-white" />
                         </div>
                         <div className="space-y-1">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter">لوحة تحكم الماستر</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg">إدارة الشركات المستأجرة والبنية التحتية السحابية لـ Nova ERP.</CardDescription>
+                            <CardTitle className="text-4xl font-black text-white tracking-tighter drop-shadow-lg">غرفة التحكم الكبرى</CardTitle>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80">إدارة البنية التحتية السحابية والشركات المستأجرة لـ Nova ERP.</CardDescription>
                         </div>
                     </div>
                     
-                    <div className="flex gap-3">
-                        <Badge className="bg-green-600 text-white font-black px-6 py-2 rounded-full shadow-lg border-2 border-white/20">LIVE STATUS: ONLINE</Badge>
+                    <div className="flex items-center gap-4">
+                        <div className="flex flex-col items-end">
+                            <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse">SYSTEM STATUS: ONLINE</Badge>
+                            <span className="text-[10px] font-black text-indigo-300 mt-2 uppercase tracking-[0.3em]">Master Core v2.8</span>
+                        </div>
                     </div>
                 </div>
             </CardHeader>
         </Card>
 
         <Tabs defaultValue="companies" className="w-full">
-            <div className="flex justify-start mb-8 px-4">
-                <TabsList className="bg-white/5 p-1.5 rounded-[2rem] border border-white/10 h-auto backdrop-blur-xl">
-                    <TabsTrigger value="companies" className="rounded-[1.5rem] font-black gap-2 px-10 py-3 text-white/60 data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
-                        <Building2 className="h-5 w-5" /> الشركات المستأجرة
+            <div className="flex justify-start mb-10 px-4">
+                <TabsList className="bg-white/5 p-2 rounded-[2.5rem] border border-white/10 h-auto backdrop-blur-3xl shadow-inner">
+                    <TabsTrigger value="companies" className="rounded-[2rem] font-black gap-2 px-12 py-4 text-white/40 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-2xl transition-all text-lg">
+                        <Building2 className="h-6 w-6" /> الشركات المستأجرة
                     </TabsTrigger>
-                    <TabsTrigger value="infra" className="rounded-[1.5rem] font-black gap-2 px-10 py-3 text-white/60 data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
-                        <LayoutGrid className="h-5 w-5" /> البنية التحتية
+                    <TabsTrigger value="infra" className="rounded-[2rem] font-black gap-2 px-12 py-4 text-white/40 data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-2xl transition-all text-lg">
+                        <DatabaseZap className="h-6 w-6" /> البنية التحتية
                     </TabsTrigger>
                 </TabsList>
             </div>
 
-            <TabsContent value="companies" className="space-y-6">
-                <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect">
-                    <CardHeader className="p-8 border-b border-white/10 bg-indigo-950/30">
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                            <div className="relative w-full max-w-md group">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 transition-colors group-focus-within:text-white" />
+            <TabsContent value="companies" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect">
+                    <CardHeader className="p-10 border-b border-white/10 bg-indigo-950/50">
+                        <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
+                            <div className="relative w-full max-w-xl group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-indigo-400 transition-colors group-focus-within:text-white" />
                                 <Input 
-                                    placeholder="بحث باسم الشركة أو البريد..." 
+                                    placeholder="بحث سيادي في قاعدة البيانات العالمية..." 
                                     value={searchQuery} 
                                     onChange={e => setSearchQuery(e.target.value)} 
-                                    className="pl-10 h-12 rounded-2xl border-white/20 bg-white/5 text-white font-bold placeholder:text-white/30"
+                                    className="pl-12 h-14 rounded-3xl border-white/20 bg-white/5 text-white font-black text-lg placeholder:text-white/20 shadow-inner focus:bg-white/10 transition-all border-2"
                                 />
                             </div>
-                            <Button onClick={handleOpenNewCompany} className="h-12 px-8 rounded-2xl font-black text-lg gap-2 bg-white text-indigo-900 hover:bg-white/90 shadow-xl border-b-4 border-indigo-200">
-                                <PlusCircle className="h-5 w-5" /> إضافة شركة جديدة
+                            <Button onClick={handleOpenNewCompany} className="h-14 px-12 rounded-[2rem] font-black text-xl gap-3 bg-white text-indigo-950 hover:bg-indigo-50 shadow-2xl shadow-indigo-500/20 border-b-4 border-indigo-200 active:translate-y-1 active:border-b-0 transition-all">
+                                <PlusCircle className="h-6 w-6" /> إضافة منشأة هندسية
                             </Button>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <Table>
-                                <TableHeader className="bg-white/10 h-16">
-                                    <TableRow className="border-white/10">
-                                        <TableHead className="px-10 font-black text-white">المنشأة الهندسية</TableHead>
-                                        <TableHead className="font-black text-indigo-200">Firebase Project ID</TableHead>
-                                        <TableHead className="font-black text-indigo-200">الحالة التشغيلية</TableHead>
-                                        <TableHead className="text-left px-10 font-black text-indigo-200">الإجراءات السيادية</TableHead>
+                                <TableHeader className="bg-white/5 h-20">
+                                    <TableRow className="border-white/10 border-b-2">
+                                        <TableHead className="px-12 font-black text-white text-lg">المنشأة الهندسية</TableHead>
+                                        <TableHead className="font-black text-indigo-200 text-lg">Firebase Infrastructure</TableHead>
+                                        <TableHead className="font-black text-indigo-200 text-lg">الحالة</TableHead>
+                                        <TableHead className="text-left px-12 font-black text-indigo-200 text-lg">إجراءات التحكم</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {loading ? (
-                                        <TableRow><TableCell colSpan={4} className="text-center p-32"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={4} className="text-center p-40"><Loader2 className="animate-spin h-16 w-16 mx-auto text-indigo-500 opacity-50" /></TableCell></TableRow>
                                     ) : filteredCompanies.length === 0 ? (
-                                        <TableRow><TableCell colSpan={4} className="h-64 text-center text-white/20 italic font-black text-xl">لا توجد منشآت نشطة حالياً.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={4} className="h-80 text-center text-white/10 italic font-black text-3xl tracking-widest uppercase">No Active Tenants Found</TableCell></TableRow>
                                     ) : (
                                         filteredCompanies.map(company => (
-                                            <TableRow key={company.id} className="h-24 hover:bg-white/10 border-white/5 group transition-colors">
-                                                <TableCell className="px-10">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="p-3 bg-white/5 rounded-2xl border border-white/10 group-hover:bg-indigo-600 transition-colors"><Building2 className="h-6 w-6 text-indigo-400 group-hover:text-white" /></div>
-                                                        <div className="flex flex-col">
-                                                            <span className="font-black text-white text-lg">{company.name}</span>
-                                                            <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">{company.adminEmail}</span>
+                                            <TableRow key={company.id} className="h-28 hover:bg-white/10 border-white/5 group transition-all">
+                                                <TableCell className="px-12">
+                                                    <div className="flex items-center gap-6">
+                                                        <div className="p-4 bg-white/5 rounded-3xl border border-white/10 group-hover:bg-indigo-600 transition-all shadow-inner group-hover:shadow-indigo-500/40">
+                                                            <Building2 className="h-8 w-8 text-indigo-400 group-hover:text-white" />
+                                                        </div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <span className="font-black text-white text-2xl tracking-tight">{company.name}</span>
+                                                            <span className="text-xs text-indigo-300 font-bold uppercase tracking-[0.2em] opacity-60">{company.adminEmail}</span>
                                                         </div>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="font-mono text-xs text-white/80 font-bold">{company.firebaseProjectId}</TableCell>
+                                                <TableCell className="font-mono text-sm text-white/70 font-black">
+                                                    <div className="bg-black/20 w-fit px-4 py-1.5 rounded-xl border border-white/5">
+                                                        {company.firebaseProjectId}
+                                                    </div>
+                                                </TableCell>
                                                 <TableCell>
-                                                    <Badge className={cn("px-4 py-1 rounded-full font-black text-[10px]", company.isActive ? 'bg-green-600/20 text-green-400 border border-green-500/30' : 'bg-red-600/20 text-red-400 border border-red-500/30')}>
-                                                        {company.isActive ? 'ONLINE / ACTIVE' : 'OFFLINE / SUSPENDED'}
+                                                    <Badge className={cn("px-6 py-1.5 rounded-full font-black text-xs tracking-widest", company.isActive ? 'bg-green-500/20 text-green-400 border border-green-500/40' : 'bg-red-500/20 text-red-400 border border-red-500/40 shadow-inner')}>
+                                                        {company.isActive ? 'ACTIVE' : 'SUSPENDED'}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-left px-10">
-                                                    <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <TableCell className="text-left px-12">
+                                                    <div className="flex justify-end gap-4 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                                                         <Button 
                                                             variant="outline" 
-                                                            size="sm" 
-                                                            className="rounded-xl font-bold gap-2 border-white/20 bg-white/10 text-white hover:bg-indigo-600 h-10 shadow-lg"
+                                                            className="rounded-2xl font-black gap-3 border-white/20 bg-white/5 text-white hover:bg-indigo-600 h-12 shadow-xl px-6 border-2"
                                                             onClick={() => handleEnterAsCompany(company)}
                                                         >
-                                                            <Globe className="h-4 w-4" /> دخول كالمنشأة
+                                                            <Globe className="h-5 w-5" /> الدخول للنظام
                                                         </Button>
                                                         
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/20">
-                                                                    <MoreHorizontal className="h-5 w-5" />
+                                                                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/20">
+                                                                    <MoreHorizontal className="h-6 w-6" />
                                                                 </Button>
                                                             </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl p-2 bg-slate-900 border-white/10 text-white">
-                                                                <DropdownMenuLabel className="font-black px-3 py-2 text-indigo-300">التحكم السيادي</DropdownMenuLabel>
-                                                                <DropdownMenuItem onClick={() => handleEditCompany(company)} className="gap-2 rounded-xl py-3 font-bold cursor-pointer">
-                                                                    <Pencil className="h-4 w-4 text-indigo-400" /> تعديل بيانات الربط
+                                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.5)] p-3 bg-slate-950 border-white/10 text-white w-72 animate-in zoom-in-95">
+                                                                <DropdownMenuLabel className="font-black px-4 py-3 text-indigo-400 uppercase tracking-widest text-xs">Sovereign Commands</DropdownMenuLabel>
+                                                                <DropdownMenuSeparator className="bg-white/10" />
+                                                                <DropdownMenuItem onClick={() => handleEditCompany(company)} className="gap-3 rounded-xl py-4 px-4 font-black text-base cursor-pointer hover:bg-indigo-600 transition-colors">
+                                                                    <Pencil className="h-5 w-5 text-indigo-400" /> تعديل بيانات المنشأة
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleToggleActive(company)} disabled={isProcessing === company.id} className={cn("gap-2 rounded-xl py-3 font-bold cursor-pointer", company.isActive ? "text-red-400" : "text-green-400")}>
-                                                                    {company.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
-                                                                    {company.isActive ? 'تعطيل المنشأة' : 'تفعيل المنشأة'}
+                                                                <DropdownMenuItem onClick={() => handleToggleActive(company)} disabled={isProcessing === company.id} className={cn("gap-3 rounded-xl py-4 px-4 font-black text-base cursor-pointer transition-colors", company.isActive ? "text-red-400 hover:bg-red-600/20" : "text-green-400 hover:bg-green-600/20")}>
+                                                                    {company.isActive ? <PowerOff className="h-5 w-5" /> : <Power className="h-5 w-5" />}
+                                                                    {company.isActive ? 'تعطيل الجلسات' : 'تفعيل الجلسات'}
                                                                 </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>

@@ -242,6 +242,7 @@ export interface Warehouse extends BaseEntity {
   location?: string;
   isDefault: boolean;
   projectId?: string | null;
+  companyId?: string | null;
 }
 
 export interface Vendor extends BaseEntity {
