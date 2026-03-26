@@ -9,7 +9,7 @@ const SERVICE_ACCOUNT_PATH = './service-account.json';
 
 /**
  * @fileOverview API سيادي لتبديل الشركة للمطور (Super Admin Switcher).
- * يقوم بتحديث الـ Custom Claims للمستخدم ليتمكن من الدخول لأي منشأة.
+ * يقوم بتحديث الـ Custom Claims للمستخدم ليتمكن من الدخول لأي منشأة معزولة.
  */
 
 if (getApps().length === 0 && fs.existsSync(SERVICE_ACCOUNT_PATH)) {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. تعيين الختم السيادي (Custom Claims)
-    // سيتم استهلاك هذه المطالبات في الـ AuthContext لتوجيه كافة طلبات الـ Firestore للمسار الصحيح
+    // سيتم استهلاك هذه المطالبات في الـ AuthContext والـ Hooks لتوجيه الطلبات للمسار الصحيح
     await auth.setCustomUserClaims(uid, {
       role: 'Developer',
       isSuperAdmin: true,

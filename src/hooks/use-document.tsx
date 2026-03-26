@@ -1,17 +1,16 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   type Firestore,
   doc,
   onSnapshot,
-  type DocumentData,
 } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 
 /**
  * خطاف استماع لوثيقة واحدة:
- * يدعم التبديل السيادي وتوجيه المسار آلياً لمشروع الشركة المختارة.
+ * يدعم التبديل السيادي وتوجيه المسار آلياً لمسار الشركة المختارة.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -35,7 +34,11 @@ export function useDocument<T extends { id?: string }>(
     let finalPath = docPath;
     const tenantId = user?.currentCompanyId;
     
-    if (tenantId && !docPath.startsWith('companies/') && !docPath.startsWith('developers') && !docPath.startsWith('global_')) {
+    // استثناء مسارات مشروع الماستر
+    const masterPaths = ['companies/', 'developers/', 'global_', 'company_settings/'];
+    const isMasterPath = masterPaths.some(mp => docPath.startsWith(mc));
+
+    if (tenantId && !isMasterPath) {
         finalPath = `companies/${tenantId}/${docPath}`;
     }
 
