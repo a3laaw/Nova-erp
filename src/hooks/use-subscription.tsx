@@ -47,7 +47,6 @@ export function useSubscription<T extends { id?: string }>(
         setLoading(true);
         
         // --- 🛡️ منطق العزل السيادي (Tenant Path Resolution) ---
-        // إذا كان المطور داخل وضع "Switch Company"، يتم توجيه كافة الطلبات للمنشأة المختارة
         let finalPath = collectionPath;
         const tenantId = user?.currentCompanyId;
         

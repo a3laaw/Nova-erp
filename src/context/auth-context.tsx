@@ -33,26 +33,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         if (firebaseUser) {
-            // استرداد الـ Custom Claims للتحقق من وضع الـ Super Admin
+            // استرداد الـ Custom Claims للتحقق من وضع الـ Super Admin والشركة الحالية
             const idTokenResult = await firebaseUser.getIdTokenResult();
             const claims = idTokenResult.claims as any;
 
-            // 1. حالة المطور (Developer) - التحقق من مشروع الماستر
+            // 1. حالة المطور (Developer)
             if (firebaseUser.email === MASTER_DEV_EMAIL) {
                 const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
                 if (devDoc.exists()) {
                     const devData = devDoc.data();
+                    const activeCompanyId = claims.currentCompanyId || null;
+                    
                     setUser({ 
                         ...devData as UserProfile, 
                         uid: firebaseUser.uid,
                         id: firebaseUser.uid,
                         isSuperAdmin: true,
-                        currentCompanyId: claims.currentCompanyId || null 
+                        currentCompanyId: activeCompanyId,
+                        companyName: claims.companyName || null
                     });
                     
-                    // إذا كان هناك شركة مختارة في الـ Claims، قم بتحديث سياق الشركة فوراً
-                    if (claims.currentCompanyId) {
-                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', claims.currentCompanyId));
+                    // تحديث سياق الشركة إذا كان المطور في وضع التبديل
+                    if (activeCompanyId) {
+                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
                         if (companyDoc.exists()) {
                             setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
                         }
@@ -98,7 +101,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // دخول المطور للمشروع الماستر
     if (cleanEmail === MASTER_DEV_EMAIL) {
         try {
             const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
@@ -110,14 +112,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             } else {
                 await signOut(masterAuth);
-                throw new Error('حساب المطور غير مفعل في قاعدة البيانات السيادية.');
+                throw new Error('حساب المطور غير مفعل سيادياً.');
             }
         } catch (e: any) {
             throw new Error(e.message || 'بيانات الدخول السيادية غير صحيحة.');
         }
     }
 
-    // دخول المستخدمين للمشاريع الفرعية عبر الفهرس العالمي
     try {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
         
@@ -137,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             router.push('/dashboard');
             return;
         } else {
-            throw new Error('هذا البريد غير مسجل في أي منشأة تابعة للمنصة.');
+            throw new Error('هذا البريد غير مسجل في أي منشأة.');
         }
     } catch (e: any) {
         throw new Error(e.message || 'بيانات الدخول غير صحيحة.');

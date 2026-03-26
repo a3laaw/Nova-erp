@@ -9,7 +9,7 @@ import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -64,8 +64,8 @@ export default function DeveloperDashboard() {
   };
 
   /**
-   * دالة التبديل السيادي:
-   * تطلب من السيرفر تعيين الـ Custom Claims، ثم تطلب من المتصفح تحديث الـ Token.
+   * التبديل السيادي (Switch Company):
+   * يستدعي الـ API لتعيين الـ Claims ثم يحدث الهوية رقمياً.
    */
   const handleSwitchToCompany = async (company: Company) => {
       if (!clientAuth?.currentUser || isProcessing) return;
@@ -83,15 +83,16 @@ export default function DeveloperDashboard() {
 
           const result = await response.json();
           if (result.success) {
-              // 🔄 الخطوة الحيوية: إجبار المتصفح على استرداد الـ Token الجديد الحامل للـ Claim
+              // 🔄 إجبار المتصفح على تحديث الـ Token لقراءة الـ Claims الجديدة
               await clientAuth.currentUser.getIdToken(true);
               
               setCurrentCompany(company);
               toast({ 
-                  title: 'تم التبديل السيادي', 
-                  description: `أنت الآن تتصفح النظام بصلاحيات Super Admin لمنشأة ${company.name}.` 
+                  title: 'تم تفعيل التقمص السيادي', 
+                  description: `أنت الآن في وضع التحكم بـ ${company.name}.` 
               });
               
+              // توجيه للوحة التحكم العامة (والتي ستعرض بيانات الشركة بفضل الـ Hooks)
               router.push('/dashboard');
           } else {
               throw new Error(result.error);
@@ -114,16 +115,13 @@ export default function DeveloperDashboard() {
                             <Terminal className="h-10 w-10 text-white" />
                         </div>
                         <div className="text-right">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter drop-shadow-lg">غرفة التحكم الكبرى</CardTitle>
+                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الكبرى</CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية والولوج السيادي للمنشآت الهندسية.</CardDescription>
                         </div>
                     </div>
                     
                     <div className="flex items-center gap-4">
-                        <div className="flex flex-col items-end">
-                            <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Active</Badge>
-                            <span className="text-[10px] font-black text-indigo-300 mt-2 uppercase tracking-[0.3em]">Version 3.0 Core</span>
-                        </div>
+                        <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Active</Badge>
                     </div>
                 </div>
             </CardHeader>
@@ -142,7 +140,7 @@ export default function DeveloperDashboard() {
                                 className="pl-14 h-14 rounded-3xl border-2 border-slate-200 bg-white text-black font-black text-xl placeholder:text-slate-400 shadow-inner focus:ring-4 focus:ring-indigo-100 transition-all"
                             />
                         </div>
-                        <Button onClick={() => { setSelectedCompanyForEdit(null); setIsRegistrationOpen(true); }} className="h-14 px-12 rounded-[2rem] font-black text-xl gap-3 bg-[#1e1b4b] text-white hover:bg-black shadow-2xl active:translate-y-1 transition-all">
+                        <Button onClick={() => { setSelectedCompanyForEdit(null); setIsRegistrationOpen(true); }} className="h-14 px-12 rounded-[2rem] font-black text-xl gap-3 bg-[#1e1b4b] text-white hover:bg-black shadow-2xl transition-all">
                             <PlusCircle className="h-6 w-6" /> إضافة منشأة جديدة
                         </Button>
                     </div>
@@ -153,9 +151,9 @@ export default function DeveloperDashboard() {
                             <TableHeader className="bg-[#1e1b4b] h-16">
                                 <TableRow className="border-none hover:bg-transparent">
                                     <TableHead className="px-12 font-black text-white text-base text-right">المنشأة الهندسية</TableHead>
-                                    <TableHead className="font-black text-indigo-100 text-base text-center">FIREBASE INFRA</TableHead>
+                                    <TableHead className="font-black text-indigo-100 text-base text-center">ID المشروع</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">حالة الخدمة</TableHead>
-                                    <TableHead className="text-left px-12 font-black text-indigo-100 text-base">تحكم سيادي</TableHead>
+                                    <TableHead className="text-left px-12 font-black text-indigo-100 text-base">التحكم والتقمص</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -168,7 +166,7 @@ export default function DeveloperDashboard() {
                                         <TableRow key={company.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all">
                                             <TableCell className="px-12">
                                                 <div className="flex items-center gap-6">
-                                                    <div className="p-4 bg-indigo-100 rounded-3xl border-2 border-indigo-200 group-hover:bg-[#1e1b4b] transition-all shadow-inner group-hover:shadow-indigo-500/20">
+                                                    <div className="p-4 bg-indigo-100 rounded-3xl border-2 border-indigo-200 group-hover:bg-[#1e1b4b] transition-all shadow-inner">
                                                         <Building2 className="h-10 w-10 text-indigo-600 group-hover:text-white" />
                                                     </div>
                                                     <div className="flex flex-col gap-1">
@@ -206,8 +204,6 @@ export default function DeveloperDashboard() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" dir="rtl" className="rounded-[2rem] shadow-2xl p-3 bg-white border-none w-72">
-                                                            <DropdownMenuLabel className="font-black px-4 py-3 text-indigo-600 uppercase tracking-widest text-[10px]">Master Command</DropdownMenuLabel>
-                                                            <DropdownMenuSeparator className="bg-slate-100" />
                                                             <DropdownMenuItem onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }} className="gap-3 rounded-xl py-4 px-4 font-black text-base cursor-pointer hover:bg-indigo-50">
                                                                 <Pencil className="h-5 w-5 text-indigo-600" /> تعديل بيانات الربط
                                                             </DropdownMenuItem>

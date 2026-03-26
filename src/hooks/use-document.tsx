@@ -36,7 +36,7 @@ export function useDocument<T extends { id?: string }>(
     
     // استثناء مسارات مشروع الماستر
     const masterPaths = ['companies/', 'developers/', 'global_', 'company_settings/'];
-    const isMasterPath = masterPaths.some(mp => docPath.startsWith(mc));
+    const isMasterPath = masterPaths.some(mp => docPath.startsWith(mp));
 
     if (tenantId && !isMasterPath) {
         finalPath = `companies/${tenantId}/${docPath}`;
