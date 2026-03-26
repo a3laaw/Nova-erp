@@ -1,9 +1,10 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Languages, Calendar, LogOut, Palette, Sparkles } from 'lucide-react';
+import { Languages, Calendar, LogOut, Palette, Sparkles, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -24,7 +25,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-
+import { useFirebase } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 interface HeaderProps {
     currentUser: AuthenticatedUser;
@@ -36,21 +38,29 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
     const { toggleLanguage } = useLanguage();
     const { branding, loading: brandingLoading } = useBranding();
     const { theme, toggleTheme } = useAppTheme();
+    const { auth } = useFirebase();
+    const { toast } = useToast();
     const isGlass = theme === 'glass';
+
+    const handleExitImpersonation = async () => {
+        if (!auth?.currentUser) return;
+        try {
+            await fetch('/api/switch-company', {
+                method: 'POST',
+                body: JSON.stringify({ uid: auth.currentUser.uid, companyId: null })
+            });
+            await auth.currentUser.getIdToken(true);
+            toast({ title: 'تم إنهاء التقمص', description: 'عدت الآن بوضع المطور العام.' });
+            window.location.href = '/developer';
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ في التراجع' });
+        }
+    };
 
     return (
         <header className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-card/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6", className)}>
             <div className="flex items-center gap-4">
                 <SidebarTrigger className={cn(isGlass && "text-slate-900 opacity-80")} />
-                {/* Mobile-only Logo */}
-                <div className="md:hidden">
-                    {brandingLoading ? (
-                        <Skeleton className="h-8 w-8" />
-                    ) : (
-                        <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="h-8 w-8 !p-1.5" />
-                    )}
-                </div>
-                {/* Desktop-only Breadcrumbs and Update Indicator */}
                 <div className="hidden md:flex items-center gap-4">
                     <Breadcrumbs />
                     <UpdateIndicator />
@@ -58,6 +68,24 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
             </div>
 
             <div className="ml-auto flex items-center gap-2">
+                {/* 🛡️ تنبيه وضع التقمص للمطور 🛡️ */}
+                {currentUser.isSuperAdmin && currentUser.currentCompanyId && (
+                    <div className="flex items-center gap-2 px-4 h-9 bg-orange-600 text-white rounded-full shadow-lg animate-in slide-in-from-top-2">
+                        <ShieldAlert className="h-4 w-4 animate-pulse" />
+                        <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">
+                            Acting as: {currentUser.companyName || 'Tenant'}
+                        </span>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={handleExitImpersonation}
+                            className="h-6 px-3 bg-white/20 hover:bg-white/40 text-white rounded-full font-black text-[9px] gap-1"
+                        >
+                            إنهاء <ArrowRight className="h-2 w-2" />
+                        </Button>
+                    </div>
+                )}
+
                 <Button 
                     variant="outline" 
                     size="sm" 
@@ -103,6 +131,11 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
+                        {currentUser.isSuperAdmin && (
+                            <DropdownMenuItem asChild>
+                                <Link href="/developer" className="font-black text-indigo-600">لوحة المطور الرئيسي</Link>
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem asChild>
                             <Link href="/dashboard/settings">الإعدادات</Link>
                         </DropdownMenuItem>

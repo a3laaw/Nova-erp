@@ -24,6 +24,7 @@ export interface UserProfile extends BaseEntity {
   // Claims
   isSuperAdmin?: boolean;
   currentCompanyId?: string;
+  companyName?: string;
 }
 
 export interface Company extends BaseEntity {
@@ -53,6 +54,10 @@ export interface GlobalUserIndex {
     email: string;
     companyId: string;
     role: string;
+}
+
+export interface AuthenticatedUser extends UserProfile {
+    id: string;
 }
 
 export type ClientStatus = 'prospective' | 'registered' | 'active' | 'completed' | 'archived' | 'contracted' | 'reContracted';
