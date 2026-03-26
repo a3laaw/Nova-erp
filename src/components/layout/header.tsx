@@ -1,4 +1,3 @@
-
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -49,6 +48,10 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                 method: 'POST',
                 body: JSON.stringify({ uid: auth.currentUser.uid, companyId: null })
             });
+            
+            // تنظيف الكوكيز السيادية
+            document.cookie = 'nova-user-session=; max-age=0; path=/';
+            
             await auth.currentUser.getIdToken(true);
             toast({ title: 'تم إنهاء التقمص', description: 'عدت الآن بوضع المطور العام.' });
             window.location.href = '/developer';

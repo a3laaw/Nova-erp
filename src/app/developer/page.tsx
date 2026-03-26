@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -83,8 +82,11 @@ export default function DeveloperDashboard() {
 
           const result = await response.json();
           if (result.success) {
-              // 🔄 إجبار المتصفح على تحديث الـ Token لقراءة الـ Claims الجديدة
+              // 🔄 تحديث الـ Token لقراءة الـ Claims الجديدة
               await clientAuth.currentUser.getIdToken(true);
+              
+              // 🔑 تفعيل كوكي الجلسة لعبور الـ Middleware
+              document.cookie = 'nova-user-session=1; path=/; max-age=86400';
               
               setCurrentCompany(company);
               toast({ 
@@ -92,8 +94,8 @@ export default function DeveloperDashboard() {
                   description: `أنت الآن في وضع التحكم بـ ${company.name}.` 
               });
               
-              // توجيه للوحة التحكم العامة (والتي ستعرض بيانات الشركة بفضل الـ Hooks)
-              router.push('/dashboard');
+              // التوجه الفوري للوحة التحكم الخاصة بالشركة
+              window.location.href = '/dashboard';
           } else {
               throw new Error(result.error);
           }

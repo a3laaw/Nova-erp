@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,11 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function UnifiedLoginPage() {
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -22,6 +23,18 @@ export default function UnifiedLoginPage() {
     email: '',
     password: '',
   });
+
+  // 🔄 محرك التوجيه التلقائي للمستخدمين المسجلين مسبقاً
+  useEffect(() => {
+    if (!authLoading && user) {
+        if (user.role === 'Developer') {
+            // إذا كان المطور في وضع التقمص، نوجهه للـ Dashboard، وإلا للـ Developer Console
+            router.replace(user.currentCompanyId ? '/dashboard' : '/developer');
+        } else {
+            router.replace('/dashboard');
+        }
+    }
+  }, [user, authLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +55,14 @@ export default function UnifiedLoginPage() {
         setIsLoading(false); 
     }
   };
+
+  if (authLoading || user) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#1e1b4b]">
+            <Loader2 className="h-12 w-12 animate-spin text-white opacity-20" />
+        </div>
+      );
+  }
 
   const vibrantGlassBackground = "linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%)";
 

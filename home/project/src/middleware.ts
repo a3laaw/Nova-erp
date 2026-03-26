@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/ someServer';
+import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 /**
