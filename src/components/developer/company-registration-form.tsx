@@ -24,7 +24,6 @@ import {
   Building2, 
   Mail, 
   Lock, 
-  Info, 
   Database, 
   DatabaseZap, 
   X, 
@@ -35,7 +34,6 @@ import {
   LayoutGrid 
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import type { Company } from '@/lib/types';
 
@@ -183,118 +181,127 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[95vh] flex flex-col p-0 rounded-[3rem] border-none shadow-[0_50px_100px_rgba(0,0,0,0.6)] overflow-hidden glass-effect" dir="rtl">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <DialogHeader className="p-10 bg-indigo-950/60 border-b border-white/10 shrink-0 relative overflow-hidden text-right">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+      <DialogContent className="max-w-4xl p-0 rounded-[2.5rem] border-none shadow-[0_50px_100px_rgba(0,0,0,0.4)] overflow-hidden bg-white" dir="rtl">
+        <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
+          {/* Header */}
+          <DialogHeader className="p-8 bg-[#1e1b4b] text-white shrink-0 relative overflow-hidden text-right">
             <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-6">
-                    <div className="p-4 bg-indigo-600 rounded-[2rem] text-white shadow-2xl shadow-indigo-500/40 border-2 border-white/20">
-                        <DatabaseZap className="h-10 w-10" />
+                    <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl border border-white/20">
+                        <DatabaseZap className="h-8 w-8" />
                     </div>
                     <div className="text-right">
-                        <DialogTitle className="text-3xl font-black text-white tracking-tight">{isEditing ? 'تعديل سيادة المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
-                        <DialogDescription className="font-black text-indigo-300/80 text-base mt-1">إدارة الربط السحابي ومفاتيح الوصول الحيوية.</DialogDescription>
+                        <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل سيادة المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
+                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي ومفاتيح الوصول الحيوية.</DialogDescription>
                     </div>
                 </div>
-                <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-white/40 hover:text-white rounded-full bg-white/5 hover:bg-white/10 h-12 w-12"><X className="h-6 w-6"/></Button>
+                <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10"><X className="h-5 w-5"/></Button>
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1">
-            <div className="p-10 space-y-12">
-                <section className="space-y-8">
-                    <h3 className="font-black text-xl text-indigo-400 border-r-8 border-indigo-500 pr-4 flex items-center gap-3">
-                        <Building2 className="h-6 w-6" /> هويـة المنشأة والحسـاب الإداري
+          {/* Scrollable Body */}
+          <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white scrollbar-thin scrollbar-thumb-slate-200">
+                {/* Section 1 */}
+                <section className="space-y-6">
+                    <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
+                        <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-white/5 p-8 rounded-[2.5rem] border border-white/10 shadow-inner">
-                        <div className="grid gap-3">
-                            <Label htmlFor="name" className="font-black text-white text-sm pr-1">اسم المنشأة (بالعربية) *</Label>
-                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-2xl border-white/20 bg-white/5 text-white font-black text-lg placeholder:text-white/10" placeholder="مثال: شركة آفاق للهندسة" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 shadow-inner">
+                        <div className="grid gap-2">
+                            <Label htmlFor="name" className="font-black text-[#1e1b4b] text-sm pr-1">اسم المنشأة (بالعربية) *</Label>
+                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg focus:border-indigo-600 focus:ring-0 transition-all" placeholder="مثال: شركة آفاق للهندسة" />
                         </div>
-                        <div className="grid gap-3">
-                            <Label htmlFor="nameEn" className="font-black text-white text-sm pr-1">اسم المنشأة (بالإنجليزية)</Label>
-                            <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-12 rounded-2xl border-white/20 bg-white/5 text-white font-black text-lg placeholder:text-white/10" placeholder="Afaq Engineering" />
+                        <div className="grid gap-2">
+                            <Label htmlFor="nameEn" className="font-black text-[#1e1b4b] text-sm pr-1">اسم المنشأة (بالإنجليزية)</Label>
+                            <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg focus:border-indigo-600 focus:ring-0 transition-all" placeholder="Afaq Engineering" />
                         </div>
                         {!isEditing && (
                             <>
-                                <div className="grid gap-3">
-                                    <Label htmlFor="adminEmail" className="font-black text-white text-sm pr-1 flex items-center gap-2"><Mail className="h-3 w-3 text-indigo-400"/> بريد المدير العام *</Label>
-                                    <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-2xl border-white/20 bg-white/5 text-white font-black text-lg" placeholder="admin@company.com" />
+                                <div className="grid gap-2">
+                                    <Label htmlFor="adminEmail" className="font-black text-[#1e1b4b] text-sm pr-1 flex items-center gap-2"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام *</Label>
+                                    <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.com" />
                                 </div>
-                                <div className="grid gap-3">
-                                    <Label htmlFor="adminPassword" className="font-black text-white text-sm pr-1 flex items-center gap-2"><Lock className="h-3 w-3 text-indigo-400"/> كلمة المرور التأسيسية *</Label>
-                                    <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-12 rounded-2xl border-white/20 bg-white/5 text-white font-black text-lg" placeholder="********" />
+                                <div className="grid gap-2">
+                                    <Label htmlFor="adminPassword" className="font-black text-[#1e1b4b] text-sm pr-1 flex items-center gap-2"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور التأسيسية *</Label>
+                                    <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="********" />
                                 </div>
                             </>
                         )}
                     </div>
                 </section>
 
-                <Separator className="bg-white/5 h-0.5" />
+                <Separator className="bg-slate-100 h-0.5" />
 
-                <section className="space-y-8">
+                {/* Section 2 - Firebase Config */}
+                <section className="space-y-6">
                     <div className="flex items-center justify-between">
-                        <h3 className="font-black text-xl text-indigo-400 border-r-8 border-indigo-500 pr-4 flex items-center gap-3">
-                            <Cloud className="h-6 w-6" /> مصفوفة الربط السحابي (Firebase Config)
+                        <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
+                            <Cloud className="h-6 w-6 text-indigo-600" /> مصفوفة الربط السحابي (Firebase Config)
                         </h3>
-                        <Badge variant="outline" className="bg-indigo-500/10 text-indigo-300 border-indigo-500/40 font-black px-4 py-1 rounded-full uppercase tracking-widest text-[10px]">Isolated Core</Badge>
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-black px-4 py-1 rounded-full uppercase tracking-widest text-[10px]">Isolated Infrastructure</Badge>
                     </div>
                     
-                    <div className="bg-indigo-950/40 p-10 rounded-[3rem] border-2 border-dashed border-white/10 shadow-2xl relative group/config">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10 text-right">
-                            <div className="grid gap-3 md:col-span-2">
-                                <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Key className="h-3 w-3" /> API Key *
+                    <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30 shadow-inner">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
+                            {/* Ordered according to user request */}
+                            <div className="grid gap-2 md:col-span-2">
+                                <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <Key className="h-3 w-3" /> API KEY *
                                 </Label>
-                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs shadow-inner focus:bg-white/10 transition-all" placeholder="AIzaSy..." />
+                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="AIzaSy..." />
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Globe className="h-3 w-3" /> Auth Domain *
+                            
+                            <div className="grid gap-2">
+                                <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <Globe className="h-3 w-3" /> AUTH DOMAIN *
                                 </Label>
-                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs focus:bg-white/10 transition-all" placeholder="...firebaseapp.com" />
+                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="...firebaseapp.com" />
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Database className="h-3 w-3" /> Project ID *
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <Database className="h-3 w-3" /> PROJECT ID *
                                 </Label>
-                                <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs focus:bg-white/10 transition-all" placeholder="company-prj-123" />
+                                <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="company-prj-123" />
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Cloud className="h-3 w-3" /> Storage Bucket
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <Cloud className="h-3 w-3" /> STORAGE BUCKET
                                 </Label>
-                                <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs focus:bg-white/10 transition-all" placeholder="...firebasestorage.app" />
+                                <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="...firebasestorage.app" />
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <ShieldCheck className="h-3 w-3" /> Messaging Sender ID
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <ShieldCheck className="h-3 w-3" /> MESSAGING SENDER ID
                                 </Label>
-                                <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs focus:bg-white/10 transition-all" placeholder="828494..." />
+                                <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="828494..." />
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="appId" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <LayoutGrid className="h-3 w-3" /> App ID *
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="appId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <LayoutGrid className="h-3 w-3" /> APP ID *
                                 </Label>
-                                <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs focus:bg-white/10 transition-all" placeholder="1:828494:web:..." />
+                                <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="1:828494:web:..." />
                             </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="measurementId" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Info className="h-3 w-3" /> Measurement ID
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="measurementId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
+                                    <Target className="h-3 w-3" /> MEASUREMENT ID
                                 </Label>
-                                <Input id="measurementId" value={formData.measurementId} onChange={handleChange} dir="ltr" className="h-12 rounded-2xl bg-white/5 border-white/10 text-white font-mono text-xs focus:bg-white/10 transition-all" placeholder="G-XXXXXX" />
+                                <Input id="measurementId" value={formData.measurementId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="G-XXXXXX" />
                             </div>
                         </div>
                     </div>
                 </section>
-            </div>
-          </ScrollArea>
+          </div>
 
-          <DialogFooter className="p-10 border-t border-white/10 bg-indigo-950/60 shrink-0 flex gap-4">
-            <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black h-16 px-12 text-white/40 hover:text-white hover:bg-white/5 text-lg">إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-16 px-20 bg-white text-indigo-950 hover:bg-indigo-50 shadow-[0_20px_50px_rgba(255,255,255,0.2)] gap-4 text-2xl min-w-[380px] border-b-8 border-indigo-200 active:translate-y-1 active:border-b-0 transition-all">
-                {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <ShieldCheck className="h-8 w-8" />}
+          {/* Footer */}
+          <DialogFooter className="p-8 border-t bg-slate-50 shrink-0 flex gap-4">
+            <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
+            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
+                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
                 {isEditing ? 'حفظ التحديثات السيادية' : 'تأسيس بيئة العمل السحابية'}
             </Button>
           </DialogFooter>
