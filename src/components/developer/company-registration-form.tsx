@@ -166,27 +166,27 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/30 p-8 rounded-[2rem] border-2 border-dashed">
                         <div className="grid gap-2">
-                            <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">API Key <Info className="h-3 w-3"/></Label>
+                            <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">API Key (مثال: AIzaSyCX4Zms...)</Label>
                             <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="AIzaSy..." />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Project ID <Info className="h-3 w-3"/></Label>
+                            <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Project ID (مثال: studio-803938...)</Label>
                             <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="nova-project-123" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Auth Domain <Info className="h-3 w-3"/></Label>
+                            <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Auth Domain</Label>
                             <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="...firebaseapp.com" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="appId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">App ID <Info className="h-3 w-3"/></Label>
+                            <Label htmlFor="appId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">App ID</Label>
                             <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="1:828494..." />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Storage Bucket <Info className="h-3 w-3"/></Label>
+                            <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Storage Bucket</Label>
                             <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="...firebasestorage.app" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Messaging Sender ID <Info className="h-3 w-3"/></Label>
+                            <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Messaging Sender ID</Label>
                             <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="828494..." />
                         </div>
                     </div>
