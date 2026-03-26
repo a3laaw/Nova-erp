@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -14,10 +13,8 @@ import {
 import { useAuth } from '@/context/auth-context';
 
 /**
- * خطاف اشتراك لحظي مطور:
- * تم تحديثه ليدعم التبديل السيادي (Super Admin Switcher)؛ 
- * يعالج مشكلة collectionGroup عبر منع تمرير المسارات المائلة (slashes) 
- * وتطبيق فلتر الـ companyId آلياً لضمان العزل المنطقي.
+ * خطاف اشتراك لحظي مطور ومعزز:
+ * تم إصلاح مشكلة التكرار اللانهائي وتأمين استجابة حالة التحميل.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -30,14 +27,12 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
+    // نستخدم useRef للحفاظ على مرجع ثابت للقيود وتجنب الحلقات اللانهائية
     const constraintsRef = useRef(constraints);
     
-    // استخدام JSON.stringify لضمان تتبع التغييرات في المصفوفة
-    const constraintsKey = JSON.stringify(constraints.map(c => c.toString()));
-
     useEffect(() => {
         constraintsRef.current = constraints;
-    }, [constraintsKey]);
+    }, [constraints]);
 
     useEffect(() => {
         if (!firestore || !collectionPath) {
@@ -53,18 +48,14 @@ export function useSubscription<T extends { id?: string }>(
         let finalConstraints = [...constraintsRef.current];
         const tenantId = user?.currentCompanyId;
         
-        // استثناء المجموعات "الكونية" التي تخص مشروع الماستر من التحويل
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'company_settings'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
 
         if (tenantId && !isMasterCollection) {
             if (isGroup) {
-                // دالة collectionGroup تتطلب اسم المجموعة فقط (بدون /)
-                // نعتمد هنا على الفلترة بـ companyId لضمان العزل
                 finalPath = collectionPath.split('/').pop() || collectionPath;
                 finalConstraints.push(where('companyId', '==', tenantId));
             } else {
-                // الاستعلامات العادية تستخدم المسار الهيكلي الكامل
                 finalPath = `companies/${tenantId}/${collectionPath}`;
             }
         }
@@ -105,7 +96,7 @@ export function useSubscription<T extends { id?: string }>(
             setError(err);
             setLoading(false);
         }
-    }, [firestore, collectionPath, isGroup, constraintsKey, user?.currentCompanyId]);
+    }, [firestore, collectionPath, isGroup, user?.currentCompanyId]);
 
     return { data, loading, error };
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -29,68 +28,75 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
   useEffect(() => {
-    if (!masterAuth || !masterFirestore) return;
+    if (!masterAuth || !masterFirestore) {
+        setLoading(false);
+        return;
+    }
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
-        if (firebaseUser) {
-            // استرداد الـ Custom Claims للتحقق من وضع الـ Super Admin والشركة الحالية
-            const idTokenResult = await firebaseUser.getIdTokenResult();
-            const claims = idTokenResult.claims as any;
+        setLoading(true);
+        try {
+            if (firebaseUser) {
+                const idTokenResult = await firebaseUser.getIdTokenResult();
+                const claims = idTokenResult.claims as any;
 
-            // 1. حالة المطور (Developer)
-            if (firebaseUser.email === MASTER_DEV_EMAIL) {
-                const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
-                if (devDoc.exists()) {
-                    const devData = devDoc.data();
-                    const activeCompanyId = claims.currentCompanyId || null;
+                // 1. حالة المطور السيادي
+                if (firebaseUser.email === MASTER_DEV_EMAIL) {
+                    const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
+                    if (devDoc.exists()) {
+                        const devData = devDoc.data();
+                        const activeCompanyId = claims.currentCompanyId || null;
+                        
+                        setUser({ 
+                            ...devData as UserProfile, 
+                            uid: firebaseUser.uid,
+                            id: firebaseUser.uid,
+                            isSuperAdmin: true,
+                            currentCompanyId: activeCompanyId,
+                            companyName: claims.companyName || null
+                        });
+                        
+                        if (activeCompanyId) {
+                            const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
+                            if (companyDoc.exists()) {
+                                setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                            }
+                        }
+                        return;
+                    }
+                }
+
+                // 2. حالة المستخدم العادي (Tenant)
+                const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
+                
+                if (!userIndexSnap.empty) {
+                    const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
+                    const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
                     
-                    setUser({ 
-                        ...devData as UserProfile, 
-                        uid: firebaseUser.uid,
-                        id: firebaseUser.uid,
-                        isSuperAdmin: true,
-                        currentCompanyId: activeCompanyId,
-                        companyName: claims.companyName || null
-                    });
-                    
-                    // تحديث سياق الشركة إذا كان المطور في وضع التبديل
-                    if (activeCompanyId) {
-                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
-                        if (companyDoc.exists()) {
-                            setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                    if (companyDoc.exists()) {
+                        const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
+                        const { firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
+                        
+                        const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', firebaseUser.email));
+                        const tenantUserSnap = await getDocs(tenantUserQuery);
+                        
+                        if (!tenantUserSnap.empty) {
+                            const userData = tenantUserSnap.docs[0].data() as UserProfile;
+                            setCurrentCompany(company);
+                            setUser({ ...userData, uid: firebaseUser.uid, id: tenantUserSnap.docs[0].id });
                         }
                     }
-                    
-                    setLoading(false);
-                    return;
                 }
+            } else {
+                setUser(null);
+                setCurrentCompany(null);
             }
-
-            // 2. حالة المستخدم العادي (Tenant User)
-            const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
-            
-            if (!userIndexSnap.empty) {
-                const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-                const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
-                
-                if (companyDoc.exists()) {
-                    const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
-                    const { firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
-                    
-                    const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', firebaseUser.email));
-                    const tenantUserSnap = await getDocs(tenantUserQuery);
-                    
-                    if (!tenantUserSnap.empty) {
-                        const userData = tenantUserSnap.docs[0].data() as UserProfile;
-                        setCurrentCompany(company);
-                        setUser({ ...userData, uid: firebaseUser.uid, id: tenantUserSnap.docs[0].id });
-                    }
-                }
-            }
-        } else {
+        } catch (error) {
+            console.error("Auth Resolve Critical Error:", error);
             setUser(null);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     });
 
     return () => unsubscribe();
@@ -108,7 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             if (devDoc.exists()) {
                 document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
-                router.push('/developer');
                 return;
             } else {
                 await signOut(masterAuth);
@@ -135,8 +140,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
 
             document.cookie = 'nova-user-session=1; path=/; max-age=86400';
-            router.push('/dashboard');
-            return;
         } else {
             throw new Error('هذا البريد غير مسجل في أي منشأة.');
         }
