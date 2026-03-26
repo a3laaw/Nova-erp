@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -148,7 +147,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             });
           });
 
-          // محاولة إنشاء الحساب في المشروع المستهدف (إذا لم يكن موجوداً)
           try {
             const { auth: tenantAuth, firestore: tenantFirestore } = getCompanyFirebase(firebaseConfig, companyId);
             const userCredential = await createUserWithEmailAndPassword(tenantAuth, formData.adminEmail.toLowerCase().trim(), formData.adminPassword);
@@ -187,7 +185,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
       <DialogContent className="max-w-4xl max-h-[95vh] flex flex-col p-0 rounded-[3rem] border-none shadow-[0_50px_100px_rgba(0,0,0,0.6)] overflow-hidden glass-effect" dir="rtl">
         <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <DialogHeader className="p-10 bg-indigo-950/60 border-b border-white/10 shrink-0 relative overflow-hidden">
+          <DialogHeader className="p-10 bg-indigo-950/60 border-b border-white/10 shrink-0 relative overflow-hidden text-right">
             <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-6">
@@ -205,7 +203,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
           <ScrollArea className="flex-1">
             <div className="p-10 space-y-12">
-                {/* القسم الأول: الهوية */}
                 <section className="space-y-8">
                     <h3 className="font-black text-xl text-indigo-400 border-r-8 border-indigo-500 pr-4 flex items-center gap-3">
                         <Building2 className="h-6 w-6" /> هويـة المنشأة والحسـاب الإداري
@@ -236,7 +233,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
                 <Separator className="bg-white/5 h-0.5" />
 
-                {/* القسم الثاني: الربط التقني - الترتيب المعتمد */}
                 <section className="space-y-8">
                     <div className="flex items-center justify-between">
                         <h3 className="font-black text-xl text-indigo-400 border-r-8 border-indigo-500 pr-4 flex items-center gap-3">
@@ -246,7 +242,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     </div>
                     
                     <div className="bg-indigo-950/40 p-10 rounded-[3rem] border-2 border-dashed border-white/10 shadow-2xl relative group/config">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10 text-right">
                             <div className="grid gap-3 md:col-span-2">
                                 <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Key className="h-3 w-3" /> API Key *
