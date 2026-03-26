@@ -3,14 +3,13 @@
 
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, collection, orderBy, query } from 'firebase/firestore';
 import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Globe, Pencil, MoreHorizontal, DatabaseZap, ShieldCheck, ArrowRightLeft } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -46,7 +45,7 @@ export default function DeveloperDashboard() {
     const lower = searchQuery.toLowerCase();
     return companies.filter(c => 
         c.name.toLowerCase().includes(lower) || 
-        c.adminEmail.toLowerCase().includes(lower) ||
+        c.adminEmail?.toLowerCase().includes(lower) ||
         c.firebaseProjectId.toLowerCase().includes(lower)
     );
   }, [companies, searchQuery]);

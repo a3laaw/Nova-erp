@@ -51,7 +51,11 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = collectionPath;
         const tenantId = user?.currentCompanyId;
         
-        if (tenantId && !collectionPath.startsWith('companies/') && !collectionPath.startsWith('developers') && !collectionPath.startsWith('global_')) {
+        // استثناء المجموعات "الكونية" التي تخص مشروع الماستر من التحويل
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+        const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
+
+        if (tenantId && !isMasterCollection) {
             finalPath = `companies/${tenantId}/${collectionPath}`;
         }
         

@@ -37,18 +37,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const idTokenResult = await firebaseUser.getIdTokenResult();
             const claims = idTokenResult.claims as any;
 
-            // 1. حالة المطور (Developer)
+            // 1. حالة المطور (Developer) - التحقق من مشروع الماستر
             if (firebaseUser.email === MASTER_DEV_EMAIL) {
                 const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
                 if (devDoc.exists()) {
+                    const devData = devDoc.data();
                     setUser({ 
-                        ...devDoc.data() as UserProfile, 
+                        ...devData as UserProfile, 
                         uid: firebaseUser.uid,
+                        id: firebaseUser.uid,
                         isSuperAdmin: true,
                         currentCompanyId: claims.currentCompanyId || null 
                     });
                     
-                    // إذا كان هناك شركة مختارة في الـ Claims، قم بتحديث السياق
+                    // إذا كان هناك شركة مختارة في الـ Claims، قم بتحديث سياق الشركة فوراً
                     if (claims.currentCompanyId) {
                         const companyDoc = await getDoc(doc(masterFirestore, 'companies', claims.currentCompanyId));
                         if (companyDoc.exists()) {
@@ -78,7 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (!tenantUserSnap.empty) {
                         const userData = tenantUserSnap.docs[0].data() as UserProfile;
                         setCurrentCompany(company);
-                        setUser({ ...userData, uid: firebaseUser.uid });
+                        setUser({ ...userData, uid: firebaseUser.uid, id: tenantUserSnap.docs[0].id });
                     }
                 }
             }
@@ -96,6 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
+    // دخول المطور للمشروع الماستر
     if (cleanEmail === MASTER_DEV_EMAIL) {
         try {
             const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
@@ -114,6 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
+    // دخول المستخدمين للمشاريع الفرعية عبر الفهرس العالمي
     try {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
         
@@ -136,7 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error('هذا البريد غير مسجل في أي منشأة تابعة للمنصة.');
         }
     } catch (e: any) {
-        throw new Error(e.message || 'حدث خطأ غير متوقع أثناء الدخول.');
+        throw new Error(e.message || 'بيانات الدخول غير صحيحة.');
     }
   };
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -27,14 +28,12 @@ import {
   Database, 
   DatabaseZap, 
   X, 
-  ShieldCheck, 
   Key, 
   Globe, 
   Cloud,
   LayoutGrid,
   Target,
-  Send,
-  Cpu
+  Send
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -148,25 +147,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             });
           });
 
-          try {
-            const { auth: tenantAuth, firestore: tenantFirestore } = getCompanyFirebase(firebaseConfig, companyId);
-            const userCredential = await createUserWithEmailAndPassword(tenantAuth, formData.adminEmail.toLowerCase().trim(), formData.adminPassword);
-            
-            const userProfileRef = doc(tenantFirestore, 'users', userCredential.user.uid);
-            await setDoc(userProfileRef, cleanFirestoreData({
-                uid: userCredential.user.uid,
-                username: formData.adminEmail.split('@')[0],
-                email: formData.adminEmail.toLowerCase().trim(),
-                role: 'Admin',
-                isActive: true,
-                fullName: 'المدير العام (الأدمن)',
-                createdAt: serverTimestamp(),
-            }));
-            await signOut(tenantAuth);
-          } catch (tenantErr: any) {
-              console.log("Tenant creation notice:", tenantErr.message);
-          }
-
           toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتأسيس بيئة العمل بنجاح.' });
       }
 
@@ -184,7 +164,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
       <DialogContent className="max-w-4xl p-0 rounded-[2.5rem] border-none shadow-[0_50px_100px_rgba(0,0,0,0.4)] overflow-hidden bg-white" dir="rtl">
         <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
-          {/* Header Section */}
           <DialogHeader className="p-8 bg-[#1e1b4b] text-white shrink-0 relative overflow-hidden text-right">
             <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-6">
@@ -200,31 +179,28 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             </div>
           </DialogHeader>
 
-          {/* Scrollable Body - Pure Pearl Contrast */}
-          <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white scrollbar-thin scrollbar-thumb-slate-200">
-                
-                {/* Section 1: Identity */}
+          <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white">
                 <section className="space-y-6">
                     <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
                         <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 shadow-inner">
                         <div className="grid gap-2">
-                            <Label htmlFor="name" className="font-black text-black text-xs pr-1">اسم المنشأة (بالعربية) *</Label>
-                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg focus:border-indigo-600 focus:ring-0 transition-all" placeholder="مثال: شركة آفاق للهندسة" />
+                            <Label htmlFor="name" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالعربية) *</Label>
+                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="أدخل اسم الشركة..." />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="nameEn" className="font-black text-black text-xs pr-1">اسم المنشأة (بالإنجليزية)</Label>
-                            <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg focus:border-indigo-600 focus:ring-0 transition-all" placeholder="Afaq Engineering" />
+                            <Label htmlFor="nameEn" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالإنجليزية)</Label>
+                            <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="English Name..." />
                         </div>
                         {!isEditing && (
                             <>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="adminEmail" className="font-black text-black text-xs pr-1 flex items-center gap-2"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام *</Label>
+                                    <Label htmlFor="adminEmail" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام *</Label>
                                     <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.com" />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور التأسيسية *</Label>
+                                    <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور التأسيسية *</Label>
                                     <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="********" />
                                 </div>
                             </>
@@ -234,7 +210,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
                 <Separator className="bg-slate-100" />
 
-                {/* Section 2: Firebase Config - Order Corrected */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
                         <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
@@ -245,68 +220,53 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     
                     <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30 shadow-inner">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
-                            
-                            {/* 1. API KEY */}
                             <div className="grid gap-3 md:col-span-2">
                                 <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Key className="h-3 w-3" /> API KEY *
                                 </Label>
-                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="AIzaSy..." />
+                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="AIzaSy..." />
                             </div>
-                            
-                            {/* 2. AUTH DOMAIN */}
                             <div className="grid gap-3">
                                 <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Globe className="h-3 w-3" /> AUTH DOMAIN *
                                 </Label>
-                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="...firebaseapp.com" />
+                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="...firebaseapp.com" />
                             </div>
-
-                            {/* 3. PROJECT ID */}
                             <div className="grid gap-3">
                                 <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Database className="h-3 w-3" /> PROJECT ID *
                                 </Label>
-                                <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="company-prj-123" />
+                                <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="company-prj-123" />
                             </div>
-
-                            {/* 4. STORAGE BUCKET */}
                             <div className="grid gap-3">
                                 <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Cloud className="h-3 w-3" /> STORAGE BUCKET
                                 </Label>
-                                <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="...firebasestorage.app" />
+                                <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="...firebasestorage.app" />
                             </div>
-
-                            {/* 5. MESSAGING SENDER ID */}
                             <div className="grid gap-3">
                                 <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Send className="h-3 w-3" /> MESSAGING SENDER ID
                                 </Label>
-                                <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="828494..." />
+                                <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="828494..." />
                             </div>
-
-                            {/* 6. APP ID */}
                             <div className="grid gap-3">
                                 <Label htmlFor="appId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <LayoutGrid className="h-3 w-3" /> APP ID *
                                 </Label>
-                                <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="1:828494:web:..." />
+                                <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="1:828494:web:..." />
                             </div>
-
-                            {/* 7. MEASUREMENT ID */}
                             <div className="grid gap-3">
                                 <Label htmlFor="measurementId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Target className="h-3 w-3" /> MEASUREMENT ID
                                 </Label>
-                                <Input id="measurementId" value={formData.measurementId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="G-XXXXXX" />
+                                <Input id="measurementId" value={formData.measurementId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="G-XXXXXX" />
                             </div>
                         </div>
                     </div>
                 </section>
           </div>
 
-          {/* Footer Section */}
           <DialogFooter className="p-8 border-t bg-slate-50 shrink-0 flex gap-4">
             <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
