@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,11 +10,12 @@ import {
   onSnapshot,
   type QueryConstraint,
 } from 'firebase/firestore';
+import { useAuth } from '@/context/auth-context';
 
 /**
  * خطاف اشتراك لحظي مطور:
- * تم تحديثه ليدعم مراقبة التغيرات في فلاتر الاستعلام (Constraints) بشكل لحظي،
- * مع الحفاظ على ميزة إلحاق معرف الأب (parentId) تلقائياً.
+ * تم تحديثه ليدعم التبديل السيادي (Super Admin Switcher)؛ حيث يقوم آلياً بتوجيه 
+ * المسارات للمسار المعزول للشركة `/companies/{companyId}/...` عند التبديل.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -24,11 +26,11 @@ export function useSubscription<T extends { id?: string }>(
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+    const { user } = useAuth();
 
     const constraintsRef = useRef(constraints);
     const lastPathRef = useRef<string | null>(null);
 
-    // توليد مفتاح فريد للقيود لضمان تفعيل useEffect عند تغيير قيم الفلتر (مثل السنة والشهر)
     const constraintsKey = JSON.stringify(constraints.map(c => c.toString()));
 
     useEffect(() => {
@@ -42,13 +44,22 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        // إظهار حالة التحميل عند تغيير المسار أو الفلاتر
         setLoading(true);
-        lastPathRef.current = collectionPath;
+        
+        // --- 🛡️ منطق العزل السيادي (Tenant Path Resolution) ---
+        // إذا كان المطور داخل وضع "Switch Company"، يتم توجيه كافة الطلبات للمنشأة المختارة
+        let finalPath = collectionPath;
+        const tenantId = user?.currentCompanyId;
+        
+        if (tenantId && !collectionPath.startsWith('companies/') && !collectionPath.startsWith('developers') && !collectionPath.startsWith('global_')) {
+            finalPath = `companies/${tenantId}/${collectionPath}`;
+        }
+        
+        lastPathRef.current = finalPath;
 
         const baseRef = isGroup
-            ? collectionGroup(firestore, collectionPath)
-            : collection(firestore, collectionPath);
+            ? collectionGroup(firestore, finalPath)
+            : collection(firestore, finalPath);
 
         const q = query(baseRef, ...constraintsRef.current);
 
@@ -57,8 +68,6 @@ export function useSubscription<T extends { id?: string }>(
             (snapshot) => {
                 const newData = snapshot.docs.map(doc => {
                     const docData = doc.data() as any;
-                    // استخراج معرف الأب في حال كانت المجموعة فرعية (مثل الوظائف تحت الأقسام)
-                    // هذا الجزء جوهري لعمل شجرة البيانات المرجعية في النظام
                     const parentId = doc.ref.parent.parent?.id || null;
                     return { 
                         id: doc.id, 
@@ -71,14 +80,14 @@ export function useSubscription<T extends { id?: string }>(
                 setError(null);
             },
             (err) => {
-                console.error(`Firestore Subscription Error [${collectionPath}]:`, err);
+                console.error(`Firestore Subscription Error [${finalPath}]:`, err);
                 setError(err);
                 setLoading(false);
             }
         );
 
         return () => unsubscribe();
-    }, [firestore, collectionPath, isGroup, constraintsKey]);
+    }, [firestore, collectionPath, isGroup, constraintsKey, user?.currentCompanyId]);
 
     return { data, loading, error };
 }

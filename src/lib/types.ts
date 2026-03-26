@@ -21,6 +21,9 @@ export interface UserProfile extends BaseEntity {
   avatarUrl?: string;
   passwordHash?: string;
   activatedAt?: Timestamp | any;
+  // Claims
+  isSuperAdmin?: boolean;
+  currentCompanyId?: string;
 }
 
 export interface Company extends BaseEntity {
