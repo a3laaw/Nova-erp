@@ -1,9 +1,5 @@
-'use client';
 
-/**
- * @fileOverview البوابة السيادية الموحدة لـ Nova ERP.
- * تم تحديثها بنظام "قفل البوابة" (Loading Lock) لمنع النقر المتكرر أثناء التوجيه.
- */
+'use client';
 
 import { useState } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -29,14 +25,12 @@ export default function UnifiedLoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return; // حماية إضافية ضد النقر المتعدد
+    if (isLoading) return;
 
     setIsLoading(true);
     setErrorMessage(null);
     try {
         await login(formData.email, formData.password);
-        // في حالة النجاح، لا نقوم بإرجاع isLoading إلى false
-        // ليبقى الزر معطلاً والحقول مقفلة أثناء عملية التوجيه (Redirection)
         toast({ title: 'تم الدخول بنجاح' });
     } catch (error: any) {
         setErrorMessage(error.message);
@@ -45,7 +39,7 @@ export default function UnifiedLoginPage() {
             title: 'فشل تسجيل الدخول', 
             description: error.message 
         });
-        setIsLoading(false); // نعيد التفعيل فقط في حالة الخطأ ليتمكن من التصحيح
+        setIsLoading(false); 
     }
   };
 
@@ -53,11 +47,10 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* المؤثرات الجمالية الخلفية */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
-      <Card className="w-full max-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
+      <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
         <CardHeader className="py-12 px-8 text-center relative border-b border-white/20">
             <div className="bg-white/40 p-5 rounded-[2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl transition-transform hover:scale-110 duration-500">
                 <ShieldCheck className="h-12 w-12 text-[#1e1b4b]" />

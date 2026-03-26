@@ -489,3 +489,141 @@ export interface AuditLog extends BaseEntity {
   effectiveDate: Timestamp | any;
   changedBy: string;
 }
+
+export interface CashReceipt extends BaseEntity {
+    voucherNumber: string;
+    voucherSequence: number;
+    voucherYear: number;
+    clientId?: string;
+    clientNameAr: string;
+    projectId?: string;
+    projectNameAr?: string;
+    amount: number;
+    amountInWords: string;
+    receiptDate: Timestamp | any;
+    paymentMethod: string;
+    description: string;
+    reference?: string;
+    journalEntryId?: string;
+    commissionAmount?: number;
+}
+
+export interface PaymentVoucher extends BaseEntity {
+    voucherNumber: string;
+    voucherSequence: number;
+    voucherYear: number;
+    payeeName: string;
+    payeeType: string;
+    amount: number;
+    amountInWords: string;
+    paymentDate: Timestamp | any;
+    paymentMethod: string;
+    description: string;
+    reference?: string;
+    debitAccountId: string;
+    debitAccountName: string;
+    creditAccountId: string;
+    creditAccountName: string;
+    status: 'draft' | 'paid' | 'cancelled';
+    journalEntryId?: string;
+    employeeId?: string;
+    renewalExpiryDate?: any;
+}
+
+export interface MultilingualString {
+    ar: string;
+    en: string;
+}
+
+export interface ClientTransaction extends BaseEntity {
+    transactionNumber: string;
+    clientId: string;
+    transactionType: string;
+    description?: string;
+    status: 'new' | 'in-progress' | 'completed' | 'submitted' | 'on-hold';
+    assignedEngineerId?: string | null;
+    transactionTypeId?: string;
+    departmentId?: string;
+    stages?: any[];
+    contract?: any;
+    boqId?: string;
+    projectId?: string;
+}
+
+export interface TransactionAssignment extends BaseEntity {
+    transactionId: string;
+    clientId: string;
+    departmentId: string;
+    departmentName: string;
+    engineerId: string;
+    notes?: string;
+    status: string;
+}
+
+export interface TechnicalSpecifications {
+    totalArea: number;
+    floorsCount: number;
+    hasBasement: boolean;
+    basementType: 'none' | 'full' | 'half' | 'vault';
+    roofExtension: 'none' | 'quarter' | 'half';
+    workNature: 'labor_only' | 'with_materials';
+    bathroomsCount?: number;
+    kitchensCount?: number;
+    laundryRoomsCount?: number;
+    electricalPointsCount?: number;
+    planReferenceNumber?: string;
+    sanitaryExtensionType?: 'ordinary' | 'suspended';
+    toiletType?: 'ordinary' | 'suspended';
+    showerType?: 'ordinary' | 'hidden';
+    sanitaryMaterialsIncluded?: boolean;
+    suspendedExtensionCount?: number;
+    ordinaryExtensionCount?: number;
+    suspendedToiletCount?: number;
+    ordinaryToiletCount?: number;
+    hiddenShowerCount?: number;
+    ordinaryShowerCount?: number;
+}
+
+export interface GoodsReceiptNote extends BaseEntity {
+    grnNumber: string;
+    purchaseOrderId?: string;
+    projectId?: string;
+    warehouseId: string;
+    date: Timestamp | any;
+    itemsReceived: any[];
+    totalValue: number;
+    isSubsidy?: boolean;
+    possession?: string;
+    vendorName?: string;
+    journalEntryId?: string;
+    isBypassed?: boolean;
+}
+
+export interface InventoryItem extends BaseEntity {
+    name: MultilingualString;
+    quantity: number;
+    unit: MultilingualString;
+    lowStockThreshold: number;
+    supplier: MultilingualString;
+}
+
+export interface ConstructionType extends BaseEntity {
+    name: string;
+}
+
+export interface ConstructionWorkStage extends BaseEntity {
+    name: string;
+    order: number;
+}
+
+export interface LetterOfCredit extends BaseEntity {
+    lcNumber: string;
+    issuingBank: string;
+    vendorId: string;
+    vendorName: string;
+    amount: number;
+    currency: string;
+    expiryDate: Timestamp | any;
+    notes?: string;
+    status: 'open' | 'closed' | 'expired';
+}

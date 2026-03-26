@@ -37,6 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         if (firebaseUser) {
+            // 1. Check if it's the Master Developer
             const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
             if (devDoc.exists()) {
                 setUser({ ...devDoc.data() as UserProfile, uid: firebaseUser.uid });
@@ -44,6 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
+            // 2. Check if it's a Tenant User via Global Index
             const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
             
             if (!userIndexSnap.empty) {
@@ -78,6 +80,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
+    // --- High Priority Path: Master Developer ---
     if (cleanEmail === MASTER_DEV_EMAIL) {
         try {
             const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
@@ -91,17 +94,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             } else {
                 await signOut(masterAuth);
-                throw new Error('حساب المطور غير موجود في قاعدة البيانات السيادية. يرجى تشغيل npm run setup:developer');
+                throw new Error('حساب المطور غير مفعل في قاعدة البيانات السيادية. يرجى تشغيل npm run setup:developer');
             }
         } catch (e: any) {
-            console.error(e);
-            if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-                throw new Error('بيانات الدخول السيادية غير صحيحة. هل قمت بتشغيل npm run setup:developer؟');
+            console.error("Master Login Error:", e);
+            if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
+                throw new Error('بيانات الدخول السيادية غير صحيحة. يرجى التأكد من تشغيل أمر التأسيس.');
             }
             throw new Error(e.message || 'فشل الدخول السيادي.');
         }
     }
 
+    // --- Standard Path: Tenant Users ---
     try {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
         
@@ -112,30 +116,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة في السجل العالمي.');
             const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
             
-            if (!company.isActive) throw new Error('حساب الشركة معطل حالياً.');
+            if (!company.isActive) throw new Error('حساب الشركة معطل حالياً من قبل الإدارة.');
 
             const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
 
-            await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
+            try {
+                await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
+            } catch (authErr: any) {
+                if (authErr.code === 'auth/invalid-credential') {
+                    throw new Error('البريد أو كلمة المرور غير صحيحة لمشروع هذه الشركة.');
+                }
+                throw authErr;
+            }
+
             const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', cleanEmail));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             
-            if (tenantUserSnap.empty) throw new Error('المستخدم غير موجود في سجلات الشركة.');
+            if (tenantUserSnap.empty) throw new Error('المستخدم غير موجود في سجلات الشركة (Firestore).');
             const userData = tenantUserSnap.docs[0].data() as UserProfile;
             
-            if (!userData.isActive) throw new Error('حسابك معطل حالياً.');
+            if (!userData.isActive) throw new Error('حساب الموظف معطل حالياً.');
 
             setCurrentCompany(company);
             setUser({ ...userData, uid: companyAuth.currentUser!.uid });
             document.cookie = 'nova-user-session=1; path=/; max-age=86400';
             router.push('/dashboard');
             return;
+        } else {
+            throw new Error('هذا البريد غير مسجل في أي منشأة تابعة للمنصة.');
         }
     } catch (e: any) {
-        throw new Error(e.message || 'البريد أو كلمة المرور غير صحيحة.');
+        throw new Error(e.message || 'حدث خطأ غير متوقع أثناء الدخول.');
     }
-
-    throw new Error('بيانات الدخول غير صحيحة. المرجو التأكد من البريد وكلمة المرور.');
   };
 
   const logout = async () => {
