@@ -5,7 +5,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { Loader, AlertCircle } from 'lucide-react';
+import { Loader, AlertCircle, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 import { useAppTheme } from '@/context/theme-context';
 
 /**
- * @fileOverview Dashboard layout with enhanced mount protection to avoid ChunkLoadErrors.
+ * @fileOverview Dashboard layout with enhanced mount protection.
  */
 export default function DashboardLayout({
   children,
@@ -39,26 +39,39 @@ export default function DashboardLayout({
     router.push('/');
   };
 
+  // شاشة التحميل المعززة
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-4">
-        <Loader className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground font-bold">جاري تحميل لوحة التحكم...</p>
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-[#1e1b4b]">
+        <div className="relative">
+            <div className="h-20 w-20 rounded-full border-4 border-white/10 border-t-white animate-spin" />
+            <Loader className="h-8 w-8 text-white absolute inset-0 m-auto animate-pulse" />
+        </div>
+        <div className="text-center space-y-2">
+            <p className="text-white font-black text-xl tracking-tight">جاري تهيئة بيئة العمل...</p>
+            <p className="text-indigo-200/60 text-xs font-bold uppercase tracking-widest">Nova ERP Sovereign Engine</p>
+        </div>
       </div>
     );
   }
 
+  // في حال فشل تحميل المستخدم
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <h2 className="text-xl font-bold">فشل تحميل بيانات المستخدم</h2>
-        <p className="text-muted-foreground max-w-sm">
-            لا يمكن المتابعة بدون معلومات المستخدم النشطة. يرجى إعادة الدخول للنظام.
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-slate-50">
+        <AlertCircle className="h-16 w-16 text-red-600 mb-2" />
+        <h2 className="text-2xl font-black text-slate-900">انتهت صلاحية الجلسة</h2>
+        <p className="text-muted-foreground max-w-sm font-bold">
+            لم نتمكن من العثور على بيانات مستخدم نشطة. يرجى تسجيل الدخول مجدداً.
         </p>
-        <Button onClick={() => window.location.reload()} className="mt-4 rounded-xl px-8">
-            إعادة تحميل الصفحة
-        </Button>
+        <div className="flex gap-3 mt-4">
+            <Button onClick={() => window.location.reload()} variant="outline" className="rounded-xl px-8 font-bold">
+                إعادة المحاولة
+            </Button>
+            <Button onClick={handleLogout} className="rounded-xl px-8 font-black bg-red-600 hover:bg-red-700">
+                تسجيل الخروج
+            </Button>
+        </div>
       </div>
     )
   }
