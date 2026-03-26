@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type { Company } from '@/lib/types';
 import { getCompanyFirebase, type CompanyFirebaseInstances } from '@/firebase/multi-tenant';
 import type { Firestore } from 'firebase/firestore';
@@ -21,11 +21,17 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [instances, setInstances] = useState<CompanyFirebaseInstances | null>(null);
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
 
-  const setCurrentCompany = (company: Company | null) => {
+  /**
+   * ✨ حفظ دالة التبديل برمجياً (Memoization) ✨
+   * ضروري جداً لكسر حلقة التكرار اللانهائي مع AuthContext.
+   */
+  const setCurrentCompany = useCallback((company: Company | null) => {
     if (!company) {
       setCompany(null);
       setInstances(null);
-      localStorage.removeItem('nova_current_company');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('nova_current_company');
+      }
       return;
     }
 
@@ -34,15 +40,17 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
       const firebaseInstances = getCompanyFirebase(company.firebaseConfig, company.id!);
       setCompany(company);
       setInstances(firebaseInstances);
-      localStorage.setItem('nova_current_company', JSON.stringify(company));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nova_current_company', JSON.stringify(company));
+      }
     } catch (error) {
       console.error("Failed to initialize tenant Firebase:", error);
     } finally {
       setIsLoadingCompany(false);
     }
-  };
+  }, []);
 
-  // محاولة استعادة الشركة من التخزين المحلي عند إعادة التحميل
+  // محاولة استعادة الشركة من التخزين المحلي عند إعادة التحميل (مرة واحدة فقط)
   useEffect(() => {
     const saved = localStorage.getItem('nova_current_company');
     if (saved) {
@@ -53,7 +61,7 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem('nova_current_company');
       }
     }
-  }, []);
+  }, [setCurrentCompany]);
 
   return (
     <CompanyContext.Provider value={{ 
