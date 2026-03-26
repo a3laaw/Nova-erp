@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -24,8 +24,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setCurrentCompany } = useCompany();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
-
+  
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
+
+  // استخدام Ref لمتابعة الاستقرار ومنع Loops
+  const isInitialized = useRef(false);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -34,6 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
+        // نضبط التحميل على True عند استشعار تغيير، لكن نضمن إغلاقه في النهاية
         setLoading(true);
         try {
             if (firebaseUser) {
@@ -62,6 +66,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
                             }
                         }
+                        // إغلاق التحميل بعد نجاح معالجة المطور
+                        setLoading(false);
                         return;
                     }
                 }
@@ -92,17 +98,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setCurrentCompany(null);
             }
         } catch (error) {
-            console.error("Auth Resolve Critical Error:", error);
+            console.error("Auth Critical Error:", error);
             setUser(null);
         } finally {
+            // ✨ الصمام السيادي: نضمن إغلاق حالة التحميل دائماً ✨
             setLoading(false);
+            isInitialized.current = true;
         }
     });
 
     return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("فشل الاتصال بالخادم الرئيسي.");
 
     const cleanEmail = email.toLowerCase().trim();
@@ -146,16 +154,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (e: any) {
         throw new Error(e.message || 'بيانات الدخول غير صحيحة.');
     }
-  };
+  }, [masterAuth, masterFirestore]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     if (masterAuth) await signOut(masterAuth);
     document.cookie = 'nova-dev-session=; max-age=0; path=/';
     document.cookie = 'nova-user-session=; max-age=0; path=/';
     setUser(null);
     setCurrentCompany(null);
     router.push('/');
-  };
+  }, [masterAuth, setCurrentCompany, router]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>

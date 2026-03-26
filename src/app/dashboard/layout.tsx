@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { Loader, AlertCircle, LogOut } from 'lucide-react';
+import { Loader, AlertCircle, LogOut, RefreshCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 import { useAppTheme } from '@/context/theme-context';
 
 /**
- * @fileOverview Dashboard layout with enhanced mount protection.
+ * @fileOverview Dashboard layout with enhanced mount protection and auto-recovery.
  */
 export default function DashboardLayout({
   children,
@@ -30,9 +30,21 @@ export default function DashboardLayout({
   const { theme } = useAppTheme();
   
   const [mounted, setMounted] = useState(false);
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showRetry, setShowRetry] = useState(false);
+
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // ✨ صمام أمان: إذا استمر التحميل لأكثر من 10 ثوانٍ، نظهر زر إعادة المحاولة ✨
+    loadingTimeoutRef.current = setTimeout(() => {
+        if (loading) setShowRetry(true);
+    }, 10000);
+
+    return () => {
+        if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+    };
+  }, [loading]);
 
   const handleLogout = () => {
     logout();
@@ -47,22 +59,36 @@ export default function DashboardLayout({
             <div className="h-20 w-20 rounded-full border-4 border-white/10 border-t-white animate-spin" />
             <Loader className="h-8 w-8 text-white absolute inset-0 m-auto animate-pulse" />
         </div>
-        <div className="text-center space-y-2">
-            <p className="text-white font-black text-xl tracking-tight">جاري تهيئة بيئة العمل...</p>
-            <p className="text-indigo-200/60 text-xs font-bold uppercase tracking-widest">Nova ERP Sovereign Engine</p>
+        <div className="text-center space-y-4">
+            <div className="space-y-1">
+                <p className="text-white font-black text-xl tracking-tight">جاري تهيئة بيئة العمل...</p>
+                <p className="text-indigo-200/60 text-[10px] font-bold uppercase tracking-widest">Nova ERP Sovereign Engine</p>
+            </div>
+            
+            {showRetry && (
+                <div className="animate-in fade-in zoom-in duration-500 pt-4">
+                    <Button 
+                        onClick={() => window.location.reload()} 
+                        variant="outline" 
+                        className="rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 font-bold gap-2"
+                    >
+                        <RefreshCcw className="h-4 w-4" /> إعادة محاولة التحميل
+                    </Button>
+                </div>
+            )}
         </div>
       </div>
     );
   }
 
-  // في حال فشل تحميل المستخدم
+  // في حال فشل تحميل المستخدم بعد انتهاء التحميل
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-slate-50">
         <AlertCircle className="h-16 w-16 text-red-600 mb-2" />
-        <h2 className="text-2xl font-black text-slate-900">انتهت صلاحية الجلسة</h2>
+        <h2 className="text-2xl font-black text-slate-900">انتهت صلاحية الجلسة أو حدث خطأ</h2>
         <p className="text-muted-foreground max-w-sm font-bold">
-            لم نتمكن من العثور على بيانات مستخدم نشطة. يرجى تسجيل الدخول مجدداً.
+            لم نتمكن من العثور على بيانات مستخدم نشطة أو أن الربط بالمنشأة قد تعثر.
         </p>
         <div className="flex gap-3 mt-4">
             <Button onClick={() => window.location.reload()} variant="outline" className="rounded-xl px-8 font-bold">
