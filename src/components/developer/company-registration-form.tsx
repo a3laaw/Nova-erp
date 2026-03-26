@@ -14,12 +14,14 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, setDoc, getFirestore } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signOut, getAuth } from 'firebase/auth';
+import { collection, doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, Building2, Mail, Lock, Info, Database } from 'lucide-react';
 import { cleanFirestoreData } from '@/lib/utils';
+import { ScrollArea } from '../ui/scroll-area';
+import { Badge } from '../ui/badge';
 
 interface Props {
   isOpen: boolean;
@@ -78,7 +80,7 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
           createdBy: masterAuth.currentUser?.uid || 'system',
         });
 
-        // 2. إنشاء الفهرس العالمي للمستخدم ليتمكن من الدخول من البوابة الموحدة
+        // 2. إنشاء الفهرس العالمي للمستخدم
         const globalUserRef = doc(collection(masterFirestore, 'global_users'));
         transaction.set(globalUserRef, {
           email: formData.adminEmail.toLowerCase().trim(),
@@ -87,12 +89,10 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
         });
       });
 
-      // 3. إنشاء حساب الأدمن في مشروع المالك (Tenant Project)
+      // 3. إنشاء حساب الأدمن في مشروع المالك
       const { auth: tenantAuth, firestore: tenantFirestore } = getCompanyFirebase(firebaseConfig, companyId);
-      
       const userCredential = await createUserWithEmailAndPassword(tenantAuth, formData.adminEmail.toLowerCase().trim(), formData.adminPassword);
       
-      // 4. إنشاء UserProfile في Firestore الخاص بالشركة لربط الصلاحيات
       const userProfileRef = doc(tenantFirestore, 'users', userCredential.user.uid);
       await setDoc(userProfileRef, cleanFirestoreData({
         uid: userCredential.user.uid,
@@ -104,7 +104,6 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
         createdAt: serverTimestamp(),
       }));
 
-      // تسجيل الخروج من تطبيق الشركة المؤقت للعودة لجلسة المطور (حماية السيادة)
       await signOut(tenantAuth);
 
       toast({ title: 'نجاح التأسيس', description: 'تم إنشاء بيئة العمل وحساب الأدمن بنجاح.' });
@@ -135,7 +134,6 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
 
           <ScrollArea className="flex-1">
             <div className="p-8 space-y-10">
-                {/* القسم الأول: الهوية والحساب */}
                 <section className="space-y-6">
                     <h3 className="font-black text-lg text-indigo-600 border-r-4 border-indigo-600 pr-3 flex items-center gap-2">
                         <Mail className="h-5 w-5" /> البيانات الأساسية والحساب الإداري
@@ -158,39 +156,38 @@ export function CompanyRegistrationForm({ isOpen, onClose }: Props) {
 
                 <Separator className="bg-indigo-100" />
 
-                {/* القسم الثاني: الربط التقني */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
                         <h3 className="font-black text-lg text-indigo-600 border-r-4 border-indigo-600 pr-3 flex items-center gap-2">
-                            <Database className="h-5 w-5" /> Firebase Config (Client Infrastructure)
+                            <Database className="h-5 w-5" /> Firebase Config (Tenant Metadata)
                         </h3>
-                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">مشروع مستقل</Badge>
+                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">الربط السحابي</Badge>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/30 p-8 rounded-[2rem] border-2 border-dashed">
                         <div className="grid gap-2">
                             <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">API Key <Info className="h-3 w-3"/></Label>
-                            <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                            <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="AIzaSy..." />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Project ID <Info className="h-3 w-3"/></Label>
-                            <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                            <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="nova-project-123" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Auth Domain <Info className="h-3 w-3"/></Label>
-                            <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                            <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="...firebaseapp.com" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="appId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">App ID <Info className="h-3 w-3"/></Label>
-                            <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                            <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="1:828494..." />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Storage Bucket <Info className="h-3 w-3"/></Label>
-                            <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                            <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="...firebasestorage.app" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">Messaging Sender ID <Info className="h-3 w-3"/></Label>
-                            <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" />
+                            <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} required dir="ltr" className="h-11 rounded-xl bg-white border-none shadow-inner" placeholder="828494..." />
                         </div>
                     </div>
                 </section>
