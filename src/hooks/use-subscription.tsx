@@ -8,14 +8,16 @@ import {
   collection,
   collectionGroup,
   onSnapshot,
+  where,
   type QueryConstraint,
 } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 
 /**
  * خطاف اشتراك لحظي مطور:
- * تم تحديثه ليدعم التبديل السيادي (Super Admin Switcher)؛ حيث يقوم آلياً بتوجيه 
- * المسارات للمسار المعزول للشركة `/companies/{companyId}/...` عند التبديل.
+ * تم تحديثه ليدعم التبديل السيادي (Super Admin Switcher)؛ 
+ * يعالج مشكلة collectionGroup عبر منع تمرير المسارات المائلة (slashes) 
+ * وتطبيق فلتر الـ companyId آلياً لضمان العزل المنطقي.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -29,13 +31,13 @@ export function useSubscription<T extends { id?: string }>(
     const { user } = useAuth();
 
     const constraintsRef = useRef(constraints);
-    const lastPathRef = useRef<string | null>(null);
-
+    
+    // استخدام JSON.stringify لضمان تتبع التغييرات في المصفوفة
     const constraintsKey = JSON.stringify(constraints.map(c => c.toString()));
 
     useEffect(() => {
         constraintsRef.current = constraints;
-    });
+    }, [constraintsKey]);
 
     useEffect(() => {
         if (!firestore || !collectionPath) {
@@ -46,8 +48,9 @@ export function useSubscription<T extends { id?: string }>(
 
         setLoading(true);
         
-        // --- 🛡️ منطق العزل السيادي (Tenant Path Resolution) ---
+        // --- 🛡️ منطق العزل السيادي (Tenant Path & Group Resolution) ---
         let finalPath = collectionPath;
+        let finalConstraints = [...constraintsRef.current];
         const tenantId = user?.currentCompanyId;
         
         // استثناء المجموعات "الكونية" التي تخص مشروع الماستر من التحويل
@@ -55,41 +58,53 @@ export function useSubscription<T extends { id?: string }>(
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
 
         if (tenantId && !isMasterCollection) {
-            finalPath = `companies/${tenantId}/${collectionPath}`;
-        }
-        
-        lastPathRef.current = finalPath;
-
-        const baseRef = isGroup
-            ? collectionGroup(firestore, finalPath)
-            : collection(firestore, finalPath);
-
-        const q = query(baseRef, ...constraintsRef.current);
-
-        const unsubscribe = onSnapshot(
-            q,
-            (snapshot) => {
-                const newData = snapshot.docs.map(doc => {
-                    const docData = doc.data() as any;
-                    const parentId = doc.ref.parent.parent?.id || null;
-                    return { 
-                        id: doc.id, 
-                        parentId, 
-                        ...docData 
-                    } as T;
-                });
-                setData(newData);
-                setLoading(false);
-                setError(null);
-            },
-            (err) => {
-                console.error(`Firestore Subscription Error [${finalPath}]:`, err);
-                setError(err);
-                setLoading(false);
+            if (isGroup) {
+                // دالة collectionGroup تتطلب اسم المجموعة فقط (بدون /)
+                // نعتمد هنا على الفلترة بـ companyId لضمان العزل
+                finalPath = collectionPath.split('/').pop() || collectionPath;
+                finalConstraints.push(where('companyId', '==', tenantId));
+            } else {
+                // الاستعلامات العادية تستخدم المسار الهيكلي الكامل
+                finalPath = `companies/${tenantId}/${collectionPath}`;
             }
-        );
+        }
 
-        return () => unsubscribe();
+        try {
+            const baseRef = isGroup
+                ? collectionGroup(firestore, finalPath)
+                : collection(firestore, finalPath);
+
+            const q = query(baseRef, ...finalConstraints);
+
+            const unsubscribe = onSnapshot(
+                q,
+                (snapshot) => {
+                    const newData = snapshot.docs.map(doc => {
+                        const docData = doc.data() as any;
+                        const parentId = doc.ref.parent.parent?.id || null;
+                        return { 
+                            id: doc.id, 
+                            parentId, 
+                            ...docData 
+                        } as T;
+                    });
+                    setData(newData);
+                    setLoading(false);
+                    setError(null);
+                },
+                (err) => {
+                    console.error(`Firestore Subscription Error [${finalPath}]:`, err);
+                    setError(err);
+                    setLoading(false);
+                }
+            );
+
+            return () => unsubscribe();
+        } catch (err: any) {
+            console.error("Critical hook execution error:", err);
+            setError(err);
+            setLoading(false);
+        }
     }, [firestore, collectionPath, isGroup, constraintsKey, user?.currentCompanyId]);
 
     return { data, loading, error };

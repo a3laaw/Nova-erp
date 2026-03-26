@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -21,12 +22,14 @@ const EMPTY_CONSTRAINTS: any[] = [];
 
 /**
  * محرك البيانات التحليلية اللحظي (The Real-time Analytical Engine):
- * يقوم بربط كافة جداول النظام ببعضها البعض وتوفير لقطة حية ومحدثة للوحة التحكم.
+ * تم تحديثه ليدعم الـ Multi-Tenancy عبر تمرير أسماء المجموعات المجردة 
+ * والاعتماد على عزل useSubscription الذكي.
  */
 export function useAnalyticalData() {
   const { firestore } = useFirebase();
 
   // جلب كافة المجموعات المطلوبة بشكل متزامن ولحظي
+  // ملاحظة: معاملات العملاء تُجلب كـ collectionGroup بفلترة الشركة
   const { data: journalEntries, loading: jesLoading } = useSubscription<JournalEntry>(firestore, 'journalEntries');
   const { data: clients, loading: clientsLoading } = useSubscription<Client>(firestore, 'clients');
   const { data: rawTransactions, loading: txsLoading } = useSubscription<ClientTransaction>(firestore, 'transactions', EMPTY_CONSTRAINTS, true);
@@ -38,7 +41,7 @@ export function useAnalyticalData() {
   const { data: rfqs, loading: rfqsLoading } = useSubscription<RequestForQuotation>(firestore, 'rfqs');
   const { data: purchaseOrders, loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders');
 
-  // معالجة المعاملات لاستخراج معرف العميل من مسار المستند
+  // معالجة المعاملات لضمان وجود المعرفات الصحيحة
   const processedTransactions = useMemo(() => {
     if (!rawTransactions) return [];
     return rawTransactions.map(tx => {

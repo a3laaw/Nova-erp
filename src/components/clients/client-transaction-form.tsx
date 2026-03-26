@@ -16,9 +16,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, orderBy, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, serverTimestamp, doc, writeBatch, getDoc, collectionGroup, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import type { Employee, Client, ClientTransaction, TransactionType, WorkStage, TransactionStage } from '@/lib/types';
+import type { Employee, Client, ClientTransaction, TransactionType, WorkStage } from '@/lib/types';
 import { useAuth } from '@/context/auth-context';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData } from '@/lib/utils';
@@ -34,7 +34,7 @@ interface ClientTransactionFormProps {
 
 /**
  * نموذج إضافة معاملة جديدة:
- * تم تحديثه بنظام الحماية ضد الحفظ المزدوج والتفاعل اللحظي.
+ * تم تحديثه لضمان حفظ الـ companyId لتمكين العزل في الـ collectionGroup.
  */
 export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, fromAppointmentId }: ClientTransactionFormProps) {
     const { firestore } = useFirebase();
@@ -52,7 +52,6 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
     const [description, setDescription] = useState('');
     const [assignedEngineerId, setAssignedEngineerId] = useState('');
     
-    // نظام الحماية
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
 
@@ -63,10 +62,14 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             setEngineersLoading(true);
             setTypesLoading(true);
             try {
+                // جلب المراجع بفلترة الشركة الحالية (عبر useSubscription لاحقاً ولكن هنا جلب يدوي سريع)
+                const tenantId = currentUser?.currentCompanyId;
+                const basePrefix = tenantId ? `companies/${tenantId}/` : '';
+
                 const [engSnap, transTypesSnap, stagesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
-                    getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name'))),
-                    getDocs(query(collectionGroup(firestore, 'workStages')))
+                    getDocs(query(collection(firestore, `${basePrefix}employees`), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, `${basePrefix}transactionTypes`), orderBy('name'))),
+                    getDocs(query(collectionGroup(firestore, 'workStages'))) // هذه تبقى مجمعة لأنها ضمن هيكل الـ WBS
                 ]);
 
                 setEngineers(engSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
@@ -82,7 +85,7 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         };
 
         fetchReferenceData();
-    }, [firestore, isOpen]);
+    }, [firestore, isOpen, currentUser?.currentCompanyId]);
 
     const transactionTypeOptions = useMemo(() => transactionTypes.map(t => ({ value: t.name, label: t.name })), [transactionTypes]);
     const engineerOptions = useMemo(() => engineers.map(e => ({ value: e.id!, label: e.fullName })), [engineers]);
@@ -91,13 +94,15 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
         e.preventDefault();
         if (!firestore || !currentUser || !transactionTypeName) return;
 
-        // منع الحفظ المزدوج
         if (savingRef.current) return;
         savingRef.current = true;
         setIsSaving(true);
 
         try {
-            const clientRef = doc(firestore, 'clients', clientId);
+            const tenantId = currentUser.currentCompanyId;
+            const clientPath = tenantId ? `companies/${tenantId}/clients/${clientId}` : `clients/${clientId}`;
+            
+            const clientRef = doc(firestore, clientPath);
             const clientSnap = await getDoc(clientRef);
             if (!clientSnap.exists()) throw new Error("Client not found");
             const clientData = clientSnap.data() as Client;
@@ -106,13 +111,12 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const departmentIds = selectedType?.departmentIds || [];
 
             const initialStages = workStages
-                .filter(stage => departmentIds.includes((stage as any).parent?.path.split('/')[1]))
+                .filter(stage => departmentIds.includes((stage as any).parent?.path.split('/').slice(-2, -1)[0]))
                 .map(stageData => ({
                     stageId: stageData.id,
                     name: stageData.name,
                     status: 'pending' as const,
                     order: stageData.order,
-                    stageType: stageData.stageType,
                     allowedRoles: stageData.allowedRoles || [],
                 }));
 
@@ -120,27 +124,39 @@ export function ClientTransactionForm({ isOpen, onClose, clientId, clientName, f
             const newCounter = (clientData.transactionCounter || 0) + 1;
             const transactionNumber = `CL${clientData.fileNumber}-TX${String(newCounter).padStart(2, '0')}`;
             
-            const newTransactionRef = doc(collection(firestore, `clients/${clientId}/transactions`));
+            const transactionsCollectionPath = tenantId ? `companies/${tenantId}/clients/${clientId}/transactions` : `clients/${clientId}/transactions`;
+            const newTransactionRef = doc(collection(firestore, transactionsCollectionPath));
             
             batch.update(clientRef, { transactionCounter: newCounter });
 
             const newTransactionData = {
-                transactionNumber, clientId, transactionType: transactionTypeName,
-                description, status: 'new', createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp(), stages: initialStages,
+                transactionNumber, 
+                clientId, 
+                transactionType: transactionTypeName,
+                description, 
+                status: 'new', 
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(), 
+                stages: initialStages,
                 assignedEngineerId: assignedEngineerId || null,
                 transactionTypeId: selectedType?.id || null,
+                companyId: tenantId || null // 🛡️ ضروري جداً للعزل في collectionGroup
             };
             batch.set(newTransactionRef, cleanFirestoreData(newTransactionData));
 
             if (fromAppointmentId) {
-                batch.update(doc(firestore, 'appointments', fromAppointmentId), { transactionId: newTransactionRef.id });
+                const apptPath = tenantId ? `companies/${tenantId}/appointments/${fromAppointmentId}` : `appointments/${fromAppointmentId}`;
+                batch.update(doc(firestore, apptPath), { transactionId: newTransactionRef.id });
             }
 
             const timelineRef = doc(collection(newTransactionRef, 'timelineEvents'));
             batch.set(timelineRef, {
-                type: 'log', content: `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`,
-                userId: currentUser.id, userName: currentUser.fullName, createdAt: serverTimestamp(),
+                type: 'log', 
+                content: `أنشأ المعاملة "${transactionTypeName}" برقم ${transactionNumber}.`,
+                userId: currentUser.id, 
+                userName: currentUser.fullName, 
+                createdAt: serverTimestamp(),
+                companyId: tenantId || null
             });
 
             await batch.commit();
