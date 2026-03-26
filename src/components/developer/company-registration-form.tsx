@@ -31,7 +31,8 @@ import {
   Key, 
   Globe, 
   Cloud,
-  LayoutGrid 
+  LayoutGrid,
+  Target 
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -183,7 +184,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
       <DialogContent className="max-w-4xl p-0 rounded-[2.5rem] border-none shadow-[0_50px_100px_rgba(0,0,0,0.4)] overflow-hidden bg-white" dir="rtl">
         <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
-          {/* Header */}
+          {/* Header Section - Fixed */}
           <DialogHeader className="p-8 bg-[#1e1b4b] text-white shrink-0 relative overflow-hidden text-right">
             <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-6">
@@ -199,9 +200,9 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             </div>
           </DialogHeader>
 
-          {/* Scrollable Body */}
+          {/* Scrollable Body - Optimized for mouse wheel */}
           <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white scrollbar-thin scrollbar-thumb-slate-200">
-                {/* Section 1 */}
+                {/* Section 1: Identity & Admin */}
                 <section className="space-y-6">
                     <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
                         <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
@@ -232,7 +233,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
                 <Separator className="bg-slate-100 h-0.5" />
 
-                {/* Section 2 - Firebase Config */}
+                {/* Section 2: Firebase Configuration - Exact Requested Order */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
                         <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
@@ -243,7 +244,8 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     
                     <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30 shadow-inner">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
-                            {/* Ordered according to user request */}
+                            
+                            {/* 1. API KEY */}
                             <div className="grid gap-2 md:col-span-2">
                                 <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Key className="h-3 w-3" /> API KEY *
@@ -251,6 +253,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="AIzaSy..." />
                             </div>
                             
+                            {/* 2. AUTH DOMAIN */}
                             <div className="grid gap-2">
                                 <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Globe className="h-3 w-3" /> AUTH DOMAIN *
@@ -258,6 +261,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="...firebaseapp.com" />
                             </div>
 
+                            {/* 3. PROJECT ID */}
                             <div className="grid gap-2">
                                 <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Database className="h-3 w-3" /> PROJECT ID *
@@ -265,6 +269,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="company-prj-123" />
                             </div>
 
+                            {/* 4. STORAGE BUCKET */}
                             <div className="grid gap-2">
                                 <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Cloud className="h-3 w-3" /> STORAGE BUCKET
@@ -272,6 +277,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="...firebasestorage.app" />
                             </div>
 
+                            {/* 5. MESSAGING SENDER ID */}
                             <div className="grid gap-2">
                                 <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <ShieldCheck className="h-3 w-3" /> MESSAGING SENDER ID
@@ -279,6 +285,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="828494..." />
                             </div>
 
+                            {/* 6. APP ID */}
                             <div className="grid gap-2">
                                 <Label htmlFor="appId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <LayoutGrid className="h-3 w-3" /> APP ID *
@@ -286,6 +293,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs focus:border-indigo-600 transition-all shadow-sm" placeholder="1:828494:web:..." />
                             </div>
 
+                            {/* 7. MEASUREMENT ID */}
                             <div className="grid gap-2">
                                 <Label htmlFor="measurementId" className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Target className="h-3 w-3" /> MEASUREMENT ID
@@ -297,7 +305,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 </section>
           </div>
 
-          {/* Footer */}
+          {/* Footer Section - Fixed */}
           <DialogFooter className="p-8 border-t bg-slate-50 shrink-0 flex gap-4">
             <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
