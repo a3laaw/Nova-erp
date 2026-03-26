@@ -19,7 +19,22 @@ import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, ge
 import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, Building2, Mail, Lock, Info, Database, DatabaseZap, X, ShieldCheck, Key, Globe, Cloud } from 'lucide-react';
+import { 
+  Loader2, 
+  Save, 
+  Building2, 
+  Mail, 
+  Lock, 
+  Info, 
+  Database, 
+  DatabaseZap, 
+  X, 
+  ShieldCheck, 
+  Key, 
+  Globe, 
+  Cloud,
+  LayoutGrid 
+} from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
