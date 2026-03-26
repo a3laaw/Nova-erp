@@ -10,13 +10,21 @@ import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, LayoutGrid, Search, Loader2, Terminal, Globe } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, LayoutGrid, Search, Loader2, Terminal, Globe, Pencil, MoreHorizontal } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { useCompany } from '@/context/company-context';
 import { useRouter } from 'next/navigation';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -27,12 +35,18 @@ export default function DeveloperDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [selectedCompanyForEdit, setSelectedCompanyForEdit] = useState<Company | null>(null);
 
   const { data: companies, loading } = useSubscription<Company>(firestore, 'companies', [orderBy('createdAt', 'desc')]);
 
   const filteredCompanies = useMemo(() => {
     if (!searchQuery) return companies;
-    return companies.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const lower = searchQuery.toLowerCase();
+    return companies.filter(c => 
+        c.name.toLowerCase().includes(lower) || 
+        c.adminEmail.toLowerCase().includes(lower) ||
+        c.firebaseProjectId.toLowerCase().includes(lower)
+    );
   }, [companies, searchQuery]);
 
   const handleToggleActive = async (company: Company) => {
@@ -54,11 +68,21 @@ export default function DeveloperDashboard() {
       router.push('/dashboard');
   };
 
+  const handleEditCompany = (company: Company) => {
+      setSelectedCompanyForEdit(company);
+      setIsRegistrationOpen(true);
+  };
+
+  const handleOpenNewCompany = () => {
+      setSelectedCompanyForEdit(null);
+      setIsRegistrationOpen(true);
+  };
+
   return (
     <div className="space-y-10" dir="rtl">
-        {/* ترويسة المطور السيادية */}
-        <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/10 backdrop-blur-3xl border border-white/20">
-            <CardHeader className="p-10 pb-8">
+        {/* ترويسة المطور السيادية - Glass Pearl Optimized */}
+        <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect">
+            <CardHeader className="p-10 pb-8 bg-indigo-950/20">
                 <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-[2rem] shadow-[0_0_30px_rgba(79,70,229,0.4)]">
@@ -71,7 +95,7 @@ export default function DeveloperDashboard() {
                     </div>
                     
                     <div className="flex gap-3">
-                        <Badge className="bg-green-600 text-white font-black px-6 py-2 rounded-full shadow-lg">LIVE STATUS: ONLINE</Badge>
+                        <Badge className="bg-green-600 text-white font-black px-6 py-2 rounded-full shadow-lg border-2 border-white/20">LIVE STATUS: ONLINE</Badge>
                     </div>
                 </div>
             </CardHeader>
@@ -90,83 +114,93 @@ export default function DeveloperDashboard() {
             </div>
 
             <TabsContent value="companies" className="space-y-6">
-                <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white/5 backdrop-blur-2xl border border-white/10">
-                    <CardHeader className="p-8 border-b border-white/5">
+                <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect">
+                    <CardHeader className="p-8 border-b border-white/10 bg-indigo-950/30">
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                             <div className="relative w-full max-w-md group">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-400 transition-colors group-focus-within:text-white" />
                                 <Input 
-                                    placeholder="بحث باسم الشركة المستأجرة..." 
+                                    placeholder="بحث باسم الشركة أو البريد..." 
                                     value={searchQuery} 
                                     onChange={e => setSearchQuery(e.target.value)} 
-                                    className="pl-10 h-12 rounded-2xl border-white/10 bg-white/5 text-white font-bold placeholder:text-white/30"
+                                    className="pl-10 h-12 rounded-2xl border-white/20 bg-white/5 text-white font-bold placeholder:text-white/30"
                                 />
                             </div>
-                            <Button onClick={() => setIsRegistrationOpen(true)} className="h-12 px-8 rounded-2xl font-black text-lg gap-2 bg-white text-indigo-900 hover:bg-white/90 shadow-xl">
+                            <Button onClick={handleOpenNewCompany} className="h-12 px-8 rounded-2xl font-black text-lg gap-2 bg-white text-indigo-900 hover:bg-white/90 shadow-xl border-b-4 border-indigo-200">
                                 <PlusCircle className="h-5 w-5" /> إضافة شركة جديدة
                             </Button>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-white/5 h-16">
-                                <TableRow className="border-white/5">
-                                    <TableHead className="px-10 font-black text-indigo-200">المنشأة</TableHead>
-                                    <TableHead className="font-black text-indigo-200">Firebase Project</TableHead>
-                                    <TableHead className="font-black text-indigo-200">الحالة التشغيلية</TableHead>
-                                    <TableHead className="text-left px-10 font-black text-indigo-200">التحكم السيادي</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center p-32"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>
-                                ) : filteredCompanies.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="h-64 text-center text-white/20 italic font-black text-xl">لا توجد منشآت نشطة حالياً.</TableCell></TableRow>
-                                ) : (
-                                    filteredCompanies.map(company => (
-                                        <TableRow key={company.id} className="h-24 hover:bg-white/5 border-white/5 group transition-colors">
-                                            <TableCell className="px-10">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="p-3 bg-white/5 rounded-2xl border border-white/10 group-hover:bg-indigo-600 transition-colors"><Building2 className="h-6 w-6 text-indigo-400 group-hover:text-white" /></div>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-black text-white text-lg">{company.name}</span>
-                                                        <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">{company.adminEmail}</span>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader className="bg-white/10 h-16">
+                                    <TableRow className="border-white/10">
+                                        <TableHead className="px-10 font-black text-white">المنشأة الهندسية</TableHead>
+                                        <TableHead className="font-black text-indigo-200">Firebase Project ID</TableHead>
+                                        <TableHead className="font-black text-indigo-200">الحالة التشغيلية</TableHead>
+                                        <TableHead className="text-left px-10 font-black text-indigo-200">الإجراءات السيادية</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {loading ? (
+                                        <TableRow><TableCell colSpan={4} className="text-center p-32"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>
+                                    ) : filteredCompanies.length === 0 ? (
+                                        <TableRow><TableCell colSpan={4} className="h-64 text-center text-white/20 italic font-black text-xl">لا توجد منشآت نشطة حالياً.</TableCell></TableRow>
+                                    ) : (
+                                        filteredCompanies.map(company => (
+                                            <TableRow key={company.id} className="h-24 hover:bg-white/10 border-white/5 group transition-colors">
+                                                <TableCell className="px-10">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="p-3 bg-white/5 rounded-2xl border border-white/10 group-hover:bg-indigo-600 transition-colors"><Building2 className="h-6 w-6 text-indigo-400 group-hover:text-white" /></div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-black text-white text-lg">{company.name}</span>
+                                                            <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-widest">{company.adminEmail}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="font-mono text-[10px] text-white/40">{company.firebaseProjectId}</TableCell>
-                                            <TableCell>
-                                                <Badge className={cn("px-4 py-1 rounded-full font-black text-[10px]", company.isActive ? 'bg-green-600/20 text-green-400 border border-green-500/30' : 'bg-red-600/20 text-red-400 border border-red-500/30')}>
-                                                    {company.isActive ? 'ONLINE / ACTIVE' : 'OFFLINE / SUSPENDED'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-left px-10">
-                                                <div className="flex justify-end gap-3">
-                                                    <Button 
-                                                        variant="outline" 
-                                                        size="sm" 
-                                                        className="rounded-xl font-bold gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 h-10"
-                                                        onClick={() => handleEnterAsCompany(company)}
-                                                    >
-                                                        <Globe className="h-4 w-4" /> دخول كالمنشأة
-                                                    </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        onClick={() => handleToggleActive(company)}
-                                                        disabled={isProcessing === company.id}
-                                                        className={cn("h-10 w-10 rounded-xl transition-all shadow-xl", company.isActive ? "text-red-400 bg-red-500/10 hover:bg-red-500 hover:text-white" : "text-green-400 bg-green-500/10 hover:bg-green-500 hover:text-white")}
-                                                    >
-                                                        {isProcessing === company.id ? <Loader2 className="h-5 w-5 animate-spin" /> : 
-                                                         company.isActive ? <PowerOff className="h-5 w-5" /> : <Power className="h-5 w-5" />}
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs text-white/80 font-bold">{company.firebaseProjectId}</TableCell>
+                                                <TableCell>
+                                                    <Badge className={cn("px-4 py-1 rounded-full font-black text-[10px]", company.isActive ? 'bg-green-600/20 text-green-400 border border-green-500/30' : 'bg-red-600/20 text-red-400 border border-red-500/30')}>
+                                                        {company.isActive ? 'ONLINE / ACTIVE' : 'OFFLINE / SUSPENDED'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-left px-10">
+                                                    <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button 
+                                                            variant="outline" 
+                                                            size="sm" 
+                                                            className="rounded-xl font-bold gap-2 border-white/20 bg-white/10 text-white hover:bg-indigo-600 h-10 shadow-lg"
+                                                            onClick={() => handleEnterAsCompany(company)}
+                                                        >
+                                                            <Globe className="h-4 w-4" /> دخول كالمنشأة
+                                                        </Button>
+                                                        
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/20">
+                                                                    <MoreHorizontal className="h-5 w-5" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl p-2 bg-slate-900 border-white/10 text-white">
+                                                                <DropdownMenuLabel className="font-black px-3 py-2 text-indigo-300">التحكم السيادي</DropdownMenuLabel>
+                                                                <DropdownMenuItem onClick={() => handleEditCompany(company)} className="gap-2 rounded-xl py-3 font-bold cursor-pointer">
+                                                                    <Pencil className="h-4 w-4 text-indigo-400" /> تعديل بيانات الربط
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleToggleActive(company)} disabled={isProcessing === company.id} className={cn("gap-2 rounded-xl py-3 font-bold cursor-pointer", company.isActive ? "text-red-400" : "text-green-400")}>
+                                                                    {company.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                                                                    {company.isActive ? 'تعطيل المنشأة' : 'تفعيل المنشأة'}
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -175,6 +209,7 @@ export default function DeveloperDashboard() {
         <CompanyRegistrationForm 
             isOpen={isRegistrationOpen} 
             onClose={() => setIsRegistrationOpen(false)} 
+            company={selectedCompanyForEdit}
         />
     </div>
   );

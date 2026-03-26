@@ -34,6 +34,7 @@ export interface Company extends BaseEntity {
     storageBucket: string;
     messagingSenderId: string;
     appId: string;
+    measurementId?: string;
   };
   isActive: boolean;
   adminEmail: string;
