@@ -6,13 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import type { UserProfile, Company, GlobalUserIndex } from '@/lib/types';
+import type { UserProfile, Company, GlobalUserIndex, AuthenticatedUser } from '@/lib/types';
 import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useCompany } from './company-context';
-
-export interface AuthenticatedUser extends UserProfile {
-  uid: string;
-}
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -37,15 +33,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         if (firebaseUser) {
-            // 1. Check if it's the Master Developer
-            const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
-            if (devDoc.exists()) {
-                setUser({ ...devDoc.data() as UserProfile, uid: firebaseUser.uid });
-                setLoading(false);
-                return;
+            // استرداد الـ Custom Claims للتحقق من وضع الـ Super Admin
+            const idTokenResult = await firebaseUser.getIdTokenResult();
+            const claims = idTokenResult.claims as any;
+
+            // 1. حالة المطور (Developer)
+            if (firebaseUser.email === MASTER_DEV_EMAIL) {
+                const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
+                if (devDoc.exists()) {
+                    setUser({ 
+                        ...devDoc.data() as UserProfile, 
+                        uid: firebaseUser.uid,
+                        isSuperAdmin: true,
+                        currentCompanyId: claims.currentCompanyId || null 
+                    });
+                    
+                    // إذا كان هناك شركة مختارة في الـ Claims، قم بتحديث السياق
+                    if (claims.currentCompanyId) {
+                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', claims.currentCompanyId));
+                        if (companyDoc.exists()) {
+                            setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                        }
+                    }
+                    
+                    setLoading(false);
+                    return;
+                }
             }
 
-            // 2. Check if it's a Tenant User via Global Index
+            // 2. حالة المستخدم العادي (Tenant User)
             const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
             
             if (!userIndexSnap.empty) {
@@ -80,32 +96,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // --- High Priority Path: Master Developer ---
     if (cleanEmail === MASTER_DEV_EMAIL) {
         try {
             const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
             const devDoc = await getDoc(doc(masterFirestore, 'developers', userCredential.user.uid));
             
             if (devDoc.exists()) {
-                const devData = devDoc.data() as UserProfile;
-                setUser({ ...devData, uid: userCredential.user.uid });
                 document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
                 router.push('/developer');
                 return;
             } else {
                 await signOut(masterAuth);
-                throw new Error('حساب المطور غير مفعل في قاعدة البيانات السيادية. يرجى تشغيل npm run setup:developer');
+                throw new Error('حساب المطور غير مفعل في قاعدة البيانات السيادية.');
             }
         } catch (e: any) {
-            console.error("Master Login Error:", e);
-            if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
-                throw new Error('بيانات الدخول السيادية غير صحيحة. يرجى التأكد من تشغيل أمر التأسيس.');
-            }
-            throw new Error(e.message || 'فشل الدخول السيادي.');
+            throw new Error(e.message || 'بيانات الدخول السيادية غير صحيحة.');
         }
     }
 
-    // --- Standard Path: Tenant Users ---
     try {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
         
@@ -113,32 +121,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
             const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
             
-            if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة في السجل العالمي.');
+            if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة.');
             const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
             
-            if (!company.isActive) throw new Error('حساب الشركة معطل حالياً من قبل الإدارة.');
+            if (!company.isActive) throw new Error('حساب الشركة معطل حالياً.');
 
-            const { auth: companyAuth, firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
+            const { auth: companyAuth } = getCompanyFirebase(company.firebaseConfig, company.id!);
+            await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
 
-            try {
-                await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
-            } catch (authErr: any) {
-                if (authErr.code === 'auth/invalid-credential') {
-                    throw new Error('البريد أو كلمة المرور غير صحيحة لمشروع هذه الشركة.');
-                }
-                throw authErr;
-            }
-
-            const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', cleanEmail));
-            const tenantUserSnap = await getDocs(tenantUserQuery);
-            
-            if (tenantUserSnap.empty) throw new Error('المستخدم غير موجود في سجلات الشركة (Firestore).');
-            const userData = tenantUserSnap.docs[0].data() as UserProfile;
-            
-            if (!userData.isActive) throw new Error('حساب الموظف معطل حالياً.');
-
-            setCurrentCompany(company);
-            setUser({ ...userData, uid: companyAuth.currentUser!.uid });
             document.cookie = 'nova-user-session=1; path=/; max-age=86400';
             router.push('/dashboard');
             return;
