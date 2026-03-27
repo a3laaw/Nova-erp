@@ -13,7 +13,7 @@
     --card-foreground: 224 71% 4%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 71% 4%;
-    --primary: 221 83% 53%;
+    --primary: 262 83% 58%; /* أرجواني سيادي */
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -25,7 +25,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221 83% 53%;
+    --ring: 262 83% 58%;
     --radius: 1.5rem;
   }
 }
@@ -41,19 +41,15 @@
 
 @layer components {
   .glass-effect {
-    @apply bg-white/40 backdrop-blur-xl border border-white/60 shadow-xl;
+    @apply bg-white/40 backdrop-blur-2xl border border-white/60 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
   }
   
   .glass-input {
-    @apply bg-white/30 backdrop-blur-md border-white/40 focus:bg-white/60 transition-all;
-  }
-
-  .header-icon-glass {
-    @apply bg-white/20 backdrop-blur-md border-white/30 hover:bg-white/40 text-[#1e1b4b];
+    @apply bg-white/30 backdrop-blur-md border-white/40 focus:bg-white/60 transition-all shadow-inner;
   }
 
   .tabs-frame-primary {
-    @apply bg-white/20 backdrop-blur-lg p-2 rounded-[2rem] border border-white/40 shadow-inner;
+    @apply bg-white/20 backdrop-blur-lg p-1.5 rounded-[2rem] border border-white/40 shadow-inner;
   }
 
   .tabs-frame-secondary {
@@ -71,22 +67,18 @@
   .tab-icon-box {
     @apply p-2 rounded-xl bg-muted/50 group-data-[state=active]:bg-primary/10 group-data-[state=active]:text-primary transition-colors;
   }
-
-  .active-glow {
-    @apply relative after:absolute after:inset-0 after:rounded-[inherit] after:shadow-[0_0_20px_rgba(79,70,229,0.2)] after:opacity-0 hover:after:opacity-100 after:transition-opacity;
-  }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
 [data-theme="glass"] body {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+  background: linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%);
   background-attachment: fixed;
 }
 
 [data-theme="glass"] .sidebar-glass {
-  @apply bg-white/60 backdrop-blur-2xl border-l border-white/40 shadow-2xl;
+  @apply bg-[#E0E7FF]/60 backdrop-blur-3xl border-l border-white/40 shadow-2xl;
 }
 
 .hover-lift {
@@ -95,4 +87,9 @@
 
 .soft-shadow-input {
   box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Specific Purple Suite Gradients */
+.bg-purple-suite {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
 }

@@ -83,8 +83,7 @@ import {
   History,
   Sparkles,
   RotateCcw,
-  ListTree,
-  Key
+  ListTree
 } from 'lucide-react';
 import { Logo } from './logo';
 import { cn } from '@/lib/utils';
@@ -95,10 +94,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 const navItems = {
   ar: [
-    { href: '/dashboard', label: 'الرئيسية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     
     { 
-      label: 'علاقات العملاء', 
+      label: 'علاقات العملاء (CRM)', 
       icon: LineChart, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
@@ -202,7 +201,7 @@ const navItems = {
     },
 
     { 
-      label: 'شؤون الموظفين (HR)', 
+      label: 'الموارد البشرية', 
       icon: Handshake, 
       roles: ['Developer', 'Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
@@ -225,7 +224,6 @@ const navItems = {
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: Users },
-        { href: '/dashboard/settings/roles', label: 'الأدوار والصلاحيات', icon: Key },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
         { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
@@ -257,7 +255,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           tooltip={item.label}
           className={cn(
             "my-0.5 rounded-xl font-bold transition-all duration-300",
-            isActive ? "bg-white text-primary shadow-lg scale-[1.02] border-r-4 border-primary" : "hover:bg-white/40 text-slate-700"
+            isActive ? "bg-[#7209B7] text-white shadow-lg scale-[1.02] border-r-4 border-white/20" : "hover:bg-white/40 text-[#1e1b4b]"
           )}
         >
           <Link 
@@ -289,7 +287,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 tooltip={item.label}
                 className={cn(
                     "my-0.5 rounded-xl transition-all duration-300",
-                    isActive ? "bg-white text-primary shadow-lg border-r-4 border-primary" : "hover:bg-white/40 text-slate-700"
+                    isActive ? "bg-[#7209B7] text-white shadow-lg" : "hover:bg-white/40 text-[#1e1b4b]"
                 )}
               >
                 {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
@@ -325,14 +323,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               tooltip={item.label} 
               className={cn(
                 "my-0.5 rounded-xl font-bold transition-all duration-300",
-                isActive ? "bg-white text-primary shadow-lg border-r-4 border-primary" : "hover:bg-white/40 text-slate-700"
+                isActive ? "bg-white/60 text-[#7209B7] shadow-sm" : "hover:bg-white/40 text-[#1e1b4b]"
               )}
             >
               {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
               <span className="truncate text-sm flex-1">{item.label}</span>
               <ChevronDown className={cn(
                 "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50",
-                isActive ? "text-primary" : ""
+                isActive ? "text-[#7209B7]" : ""
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -345,7 +343,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-xl my-0.5 transition-all duration-200",
-                        isChildActive ? "bg-primary/5 text-primary font-bold" : "hover:bg-white/60 text-slate-600"
+                        isChildActive ? "bg-[#7209B7] text-white font-bold shadow-md" : "hover:bg-white/60 text-slate-600"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
                         {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
@@ -379,7 +377,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
             <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-lg border-2 border-white bg-white/80" />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
               <span className="text-xl font-black tracking-tight leading-tight text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</span>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary opacity-70">Business Suite</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#7209B7] opacity-70">Purple Suite</span>
             </div>
         </div>
       </SidebarHeader>
@@ -404,7 +402,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
                     <p className="text-sm font-black truncate text-[#1e1b4b]">{currentUser.fullName}</p>
-                    <p className="text-[9px] truncate font-black uppercase tracking-wider text-primary">{currentUser.role}</p>
+                    <p className="text-[9px] truncate font-black uppercase tracking-wider text-[#7209B7]">{currentUser.role}</p>
                 </div>
             </div>
         </div>
