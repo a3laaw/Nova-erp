@@ -42,7 +42,6 @@ export default function DashboardPage() {
   const { theme } = useAppTheme();
   const isGlass = theme === 'glass';
 
-  // ✨ رادار السيولة: التحقق من القدرة على تغطية الالتزامات القادمة
   const liquidityAlert = useMemo(() => {
     if (loading || !obligations) return null;
 
@@ -87,25 +86,24 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10" dir="rtl">
-        {/* الترويسة الرئيسية للنظام */}
         <Card className={cn(
             "rounded-[2.5rem] overflow-hidden border-none",
             isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-sky-50 shadow-sm"
         )}>
-            <CardHeader className="pb-8 px-8">
+            <CardHeader className="pb-8 px-8 border-b border-white/20">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
                     <div className="space-y-1 text-center lg:text-right">
                         <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3">
                             <LayoutGrid className="text-primary h-8 w-8" />
                             لوحة التحكم المركزية
                         </CardTitle>
-                        <CardDescription className={cn("text-base font-medium", isGlass && "text-slate-800")}>
+                        <CardDescription className={cn("text-base font-medium", isGlass && "text-[#1e1b4b]/70")}>
                             مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
                         </CardDescription>
                     </div>
                     
                     <div className="flex flex-wrap items-center justify-center gap-3">
-                        <Button asChild variant="outline" className={cn("h-11 px-6 rounded-xl font-bold gap-2", isGlass && "bg-white/40")}>
+                        <Button asChild variant="outline" className={cn("h-11 px-6 rounded-xl font-bold gap-2", isGlass && "bg-white/40 border-white/60 text-[#1e1b4b]")}>
                             <Link href="/dashboard/notifications">
                                 <BellRing className="h-5 w-5" />
                                 سجل التنبيهات
@@ -122,7 +120,6 @@ export default function DashboardPage() {
             </CardHeader>
         </Card>
 
-        {/* نظام التنبيه الاستباقي لعجز السيولة */}
         {liquidityAlert && (
             <Card className="border-none shadow-2xl bg-gradient-to-br from-red-600 to-red-800 text-white rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-500">
                 <CardHeader className="pb-2">
@@ -160,7 +157,6 @@ export default function DashboardPage() {
             </Card>
         )}
 
-        {/* نظام تنبيهات الخلل وسلامة البيانات */}
         <DataAnomalyAlert />
 
         <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
@@ -177,7 +173,7 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         {loading ? <Skeleton className="h-8 w-32" /> : (
-                            <div className="text-3xl font-black font-mono text-primary">
+                            <div className="text-3xl font-black font-mono text-[#7209B7]">
                                 {formatCurrency(stats?.totalRevenue || 0)}
                             </div>
                         )}
@@ -215,7 +211,7 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                         {loading ? <Skeleton className="h-8 w-16" /> : (
-                            <div className="text-3xl font-black font-mono">
+                            <div className="text-3xl font-black font-mono text-[#1e1b4b]">
                                 {stats?.totalClientsCount}
                             </div>
                         )}
@@ -231,7 +227,7 @@ export default function DashboardPage() {
                         <CardTitle className={cn("text-sm font-bold opacity-80", !isGlass && "text-white")}>كشف يوميات المواقع</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className={cn("text-sm font-bold leading-relaxed mb-4", !isGlass && "text-white/90")}>
+                        <div className={cn("text-sm font-bold leading-relaxed mb-4", !isGlass && "text-white/90", isGlass && "text-[#1e1b4b]")}>
                             تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.
                         </div>
                         <Button asChild variant={isGlass ? "default" : "secondary"} className="w-full font-black rounded-xl h-10">

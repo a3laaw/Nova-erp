@@ -256,8 +256,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           asChild 
           tooltip={item.label}
           className={cn(
-            "my-0.5 rounded-xl font-bold transition-all duration-200",
-            isActive ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-muted"
+            "my-0.5 rounded-xl font-bold transition-all duration-300",
+            isActive ? "bg-white text-primary shadow-lg scale-[1.02] border-r-4 border-primary" : "hover:bg-white/40 text-slate-700"
           )}
         >
           <Link 
@@ -288,14 +288,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 isActive={isActive} 
                 tooltip={item.label}
                 className={cn(
-                    "my-0.5 rounded-xl transition-all duration-200",
-                    isActive ? "bg-primary/10 text-primary border-r-4 border-primary" : "hover:bg-muted"
+                    "my-0.5 rounded-xl transition-all duration-300",
+                    isActive ? "bg-white text-primary shadow-lg border-r-4 border-primary" : "hover:bg-white/40 text-slate-700"
                 )}
               >
                 {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-2xl shadow-xl p-2 bg-card/95 border-primary/10 backdrop-blur-md">
+            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-2xl shadow-xl p-2 bg-white/95 backdrop-blur-2xl border-white/40">
               <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any) => {
@@ -324,8 +324,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               isActive={isActive} 
               tooltip={item.label} 
               className={cn(
-                "my-0.5 rounded-xl font-bold transition-all duration-200",
-                isActive ? "bg-primary/10 text-primary border-r-4 border-primary" : "hover:bg-muted"
+                "my-0.5 rounded-xl font-bold transition-all duration-300",
+                isActive ? "bg-white text-primary shadow-lg border-r-4 border-primary" : "hover:bg-white/40 text-slate-700"
               )}
             >
               {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
@@ -344,8 +344,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl my-0.5 transition-all",
-                        isChildActive ? "bg-primary/5 text-primary font-bold" : "hover:bg-muted/50"
+                        "rounded-xl my-0.5 transition-all duration-200",
+                        isChildActive ? "bg-primary/5 text-primary font-bold" : "hover:bg-white/60 text-slate-600"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
                         {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
@@ -376,9 +376,9 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-6 mb-4">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-sm border border-slate-100 bg-white" />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-lg border-2 border-white bg-white/80" />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
-              <span className="text-xl font-black tracking-tight leading-tight text-foreground">{branding?.company_name || 'Nova ERP'}</span>
+              <span className="text-xl font-black tracking-tight leading-tight text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</span>
               <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary opacity-70">Business Suite</span>
             </div>
         </div>
@@ -397,14 +397,14 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
       <SidebarFooter className="p-6 mt-4">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 transition-all shadow-sm bg-slate-50 border border-slate-100 hover:bg-muted">
-                <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+            <div className="flex h-auto w-full items-center justify-start rounded-3xl p-3 transition-all shadow-lg bg-white/60 border border-white/80 backdrop-blur-md hover:bg-white">
+                <Avatar className="h-10 w-10 border-2 border-primary/20 shadow-inner">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
-                    <AvatarFallback className="bg-white text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/5 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className="text-sm font-black truncate text-foreground">{currentUser.fullName}</p>
-                    <p className="text-[9px] truncate font-bold uppercase tracking-wider text-muted-foreground">{currentUser.role}</p>
+                    <p className="text-sm font-black truncate text-[#1e1b4b]">{currentUser.fullName}</p>
+                    <p className="text-[9px] truncate font-black uppercase tracking-wider text-primary">{currentUser.role}</p>
                 </div>
             </div>
         </div>

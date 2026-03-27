@@ -1,4 +1,3 @@
-
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -21,7 +20,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("bg-[#F3E8FF]/40 border-b border-primary/10 table-header theme-glass:bg-slate-950/10 theme-glass:border-slate-950/20", className)} {...props} />
+  <thead ref={ref} className={cn("bg-[#F3E8FF]/40 border-b border-primary/10 table-header theme-glass:bg-slate-950/5 theme-glass:border-slate-950/10", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 

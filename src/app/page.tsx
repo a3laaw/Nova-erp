@@ -24,11 +24,9 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // 🔄 محرك التوجيه التلقائي للمستخدمين المسجلين مسبقاً
   useEffect(() => {
     if (!authLoading && user) {
         if (user.role === 'Developer') {
-            // إذا كان المطور في وضع التقمص، نوجهه للـ Dashboard، وإلا للـ Developer Console
             router.replace(user.currentCompanyId ? '/dashboard' : '/developer');
         } else {
             router.replace('/dashboard');
@@ -73,7 +71,7 @@ export default function UnifiedLoginPage() {
 
       <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
         <CardHeader className="py-12 px-8 text-center relative border-b border-white/20">
-            <div className="bg-white/40 p-5 rounded-[2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl transition-transform hover:scale-110 duration-500">
+            <div className="bg-white/40 p-5 rounded-[2.2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl transition-transform hover:scale-110 duration-500">
                 <ShieldCheck className="h-12 w-12 text-[#1e1b4b]" />
             </div>
             <CardTitle className="text-4xl font-black tracking-tighter text-[#1e1b4b] flex items-center justify-center gap-2">
