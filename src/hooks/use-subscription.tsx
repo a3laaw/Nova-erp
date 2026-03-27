@@ -11,10 +11,11 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
+import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف اشتراك لحظي مطور ومعزز:
- * تم تحسين الأداء عبر منع إعادة الرندرة غير الضرورية وتثبيت حالة التحميل.
+ * تم تحديثه لاستخدام محرك getTenantPath لضمان العزل التام للمنشآت.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -27,7 +28,6 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
-    // نستخدم useRef للحفاظ على استقرار الفلاتر ومنع الحلقات اللانهائية
     const constraintsRef = useRef(constraints);
     const prevPathRef = useRef<string | null>(null);
     const prevTenantRef = useRef<string | null>(null);
@@ -39,7 +39,6 @@ export function useSubscription<T extends { id?: string }>(
     useEffect(() => {
         const tenantId = user?.currentCompanyId || null;
         
-        // منع إعادة التشغيل إذا لم يتغير المسار أو المنشأة
         if (!firestore || !collectionPath) {
             setLoading(false);
             setData([]);
@@ -47,7 +46,7 @@ export function useSubscription<T extends { id?: string }>(
         }
 
         if (prevPathRef.current === collectionPath && prevTenantRef.current === tenantId) {
-            return; // لم يتغير شيء جوهري
+            return; 
         }
 
         prevPathRef.current = collectionPath;
@@ -55,19 +54,13 @@ export function useSubscription<T extends { id?: string }>(
         setLoading(true);
         
         // --- 🛡️ منطق العزل السيادي (Tenant Path & Group Resolution) ---
-        let finalPath = collectionPath;
+        let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'company_settings'];
-        const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
-
-        if (tenantId && !isMasterCollection) {
-            if (isGroup) {
-                finalPath = collectionPath.split('/').pop() || collectionPath;
-                finalConstraints.push(where('companyId', '==', tenantId));
-            } else {
-                finalPath = `companies/${tenantId}/${collectionPath}`;
-            }
+        // إذا كان الاستعلام مجمعاً (collectionGroup)، نقوم بالعزل عبر حقل companyId
+        if (isGroup && tenantId) {
+            finalPath = collectionPath.split('/').pop() || collectionPath;
+            finalConstraints.push(where('companyId', '==', tenantId));
         }
 
         try {
