@@ -1,6 +1,398 @@
 'use client';
-import { BrandingManager } from '@/components/settings/branding-manager';
+
+import { useState, useEffect, useRef } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useFirebase, useStorage } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
+import { 
+    Loader2, Save, ImageIcon, Palette, 
+    FileText, Smartphone, LayoutGrid, 
+    Printer, ShieldCheck, Sparkles, Building2,
+    Plus, Trash2, Globe, Mail, MapPin, Hash
+} from 'lucide-react';
+import { PrintLayout } from '@/components/print/print-layout';
+import { cn } from '@/lib/utils';
+
+// مخطط التحقق Zod
+const brandingSchema = z.object({
+  useCustomImage: z.boolean().default(false),
+  headerImageUrl: z.string().optional(),
+  footerImageUrl: z.string().optional(),
+  logoUrl: z.string().optional(),
+  headerColor: z.string().default('#1e40af'),
+  companyName: z.string().min(3, 'اسم الشركة مطلوب'),
+  footerData: z.object({
+    address: z.string().optional(),
+    phones: z.array(z.string()).default([]),
+    email: z.string().email('بريد غير صالح').optional().or(z.literal('')),
+    taxNumber: z.string().optional(),
+    crNumber: z.string().optional(),
+    extraText: z.string().optional(),
+  })
+});
+
+type BrandingFormValues = z.infer<typeof brandingSchema>;
 
 export default function BrandingSettingsPage() {
-    return <BrandingManager />;
+  const { firestore } = useFirebase();
+  const storage = useStorage();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const footerInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  const form = useForm<BrandingFormValues>({
+    resolver: zodResolver(brandingSchema),
+    defaultValues: {
+      useCustomImage: false,
+      headerColor: '#1e40af',
+      companyName: '',
+      footerData: { phones: [''] }
+    }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "footerData.phones" as any
+  });
+
+  // جلب الإعدادات الحالية
+  useEffect(() => {
+    if (!firestore || !user?.currentCompanyId) return;
+
+    const fetchSettings = async () => {
+      setLoading(true);
+      try {
+        const brandingRef = doc(firestore, `companies/${user.currentCompanyId}/settings/branding`);
+        const snap = await getDoc(brandingRef);
+        if (snap.exists()) {
+          form.reset(snap.data() as BrandingFormValues);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, [firestore, user?.currentCompanyId, form]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: keyof BrandingFormValues) => {
+    const file = e.target.files?.[0];
+    if (!file || !storage || !user?.currentCompanyId) return;
+
+    setIsSaving(true);
+    try {
+      const storageRef = ref(storage, `companies/${user.currentCompanyId}/print-templates/${fieldName}_${Date.now()}`);
+      const uploadResult = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(uploadResult.ref);
+      
+      form.setValue(fieldName, url as any, { shouldDirty: true });
+      toast({ title: 'تم الرفع بنجاح', description: 'تم تحديث الصورة في المعاينة.' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'خطأ في الرفع' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const onSubmit = async (data: BrandingFormValues) => {
+    if (!firestore || !user?.currentCompanyId) return;
+
+    setIsSaving(true);
+    try {
+      const brandingRef = doc(firestore, `companies/${user.currentCompanyId}/settings/branding`);
+      await setDoc(brandingRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      toast({ title: 'تم حفظ الهوية', description: 'تم تحديث بيانات العلامة التجارية بنجاح.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8 space-y-6" dir="rtl">
+        <Skeleton className="h-20 w-full rounded-2xl" />
+        <Skeleton className="h-[500px] w-full rounded-3xl" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 sm:p-8 space-y-8 max-w-6xl mx-auto pb-24" dir="rtl">
+      {/* Header Section */}
+      <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-primary/5 overflow-hidden">
+        <CardHeader className="pb-8 px-8 border-b">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                <Palette className="h-8 w-8" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl font-black">إدارة العلامة التجارية</CardTitle>
+                <CardDescription className="text-base font-medium">تخصيص الهوية البصرية للتقارير والمراسلات الرسمية.</CardDescription>
+              </div>
+            </div>
+            <div className="flex gap-2">
+                <Button 
+                    variant="outline" 
+                    className="rounded-xl font-bold h-11"
+                    onClick={() => setPreviewOpen(!previewOpen)}
+                >
+                    <Printer className="ml-2 h-4 w-4" /> 
+                    {previewOpen ? 'إخفاء المعاينة' : 'معاينة الطباعة'}
+                </Button>
+                <Button 
+                    onClick={form.handleSubmit(onSubmit)} 
+                    disabled={isSaving}
+                    className="h-11 px-8 rounded-xl font-black gap-2 shadow-lg shadow-primary/20"
+                >
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    حفظ كافة الإعدادات
+                </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Settings Column */}
+        <div className={cn("space-y-8", previewOpen ? "lg:col-span-6" : "lg:col-span-12")}>
+          <Tabs defaultValue="image-mode" onValueChange={(val) => form.setValue('useCustomImage', val === 'image-mode')}>
+            <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-muted p-1 h-14">
+              <TabsTrigger value="image-mode" className="rounded-xl font-bold gap-2 data-[state=active]:shadow-md">
+                <ImageIcon className="h-4 w-4" /> صورة قالب جاهز
+              </TabsTrigger>
+              <TabsTrigger value="custom-mode" className="rounded-xl font-bold gap-2 data-[state=active]:shadow-md">
+                <Sparkles className="h-4 w-4" /> تصميم يدوي
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Tab 1: Image Ready Mode */}
+            <TabsContent value="image-mode" className="mt-6 space-y-6">
+              <Card className="rounded-3xl border-2 border-dashed">
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-4">
+                        <Label className="font-black text-primary">صورة الترويسة (Header)</Label>
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="aspect-[4/1] w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-muted/20 relative"
+                        >
+                            {form.watch('headerImageUrl') ? (
+                                <img src={form.watch('headerImageUrl')} className="w-full h-full object-contain" alt="Header Preview" />
+                            ) : (
+                                <>
+                                    <UploadCloud className="h-10 w-10 text-muted-foreground opacity-30 mb-2" />
+                                    <span className="text-xs font-bold text-muted-foreground">اضغط لرفع الهيدر (210mm x 45mm)</span>
+                                </>
+                            )}
+                        </div>
+                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'headerImageUrl')} />
+                    </div>
+
+                    <div className="space-y-4">
+                        <Label className="font-black text-primary">صورة التذييل (Footer)</Label>
+                        <div 
+                            onClick={() => footerInputRef.current?.click()}
+                            className="aspect-[4/1] w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-muted/20 relative"
+                        >
+                            {form.watch('footerImageUrl') ? (
+                                <img src={form.watch('footerImageUrl')} className="w-full h-full object-contain" alt="Footer Preview" />
+                            ) : (
+                                <>
+                                    <UploadCloud className="h-10 w-10 text-muted-foreground opacity-30 mb-2" />
+                                    <span className="text-xs font-bold text-muted-foreground">اضغط لرفع الفوتر (210mm x 30mm)</span>
+                                </>
+                            )}
+                        </div>
+                        <input type="file" ref={footerInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'footerImageUrl')} />
+                    </div>
+                  </div>
+                  
+                  <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle className="font-black text-primary">نصيحة المطور</AlertTitle>
+                    <AlertDescription className="text-sm font-medium">
+                        استخدام صور جاهزة يعطي نتائج مطابقة 100% لتصميمك في Illustrator أو Photoshop. تأكد أن العرض هو 210mm (عرض ورقة A4).
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab 2: Custom Design Mode */}
+            <TabsContent value="custom-mode" className="mt-6 space-y-6">
+              <Card className="rounded-3xl border-none shadow-md overflow-hidden">
+                <CardHeader className="bg-muted/30 border-b">
+                    <CardTitle className="text-lg font-black flex items-center gap-2">
+                        <LayoutGrid className="h-5 w-5 text-primary" /> مكونات الترويسة
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-8 space-y-8">
+                    <div className="grid md:grid-cols-3 gap-8 items-start">
+                        <div className="space-y-4">
+                            <Label className="font-black">شعار الشركة (Logo)</Label>
+                            <div 
+                                onClick={() => logoInputRef.current?.click()}
+                                className="w-32 h-32 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-white shadow-inner relative"
+                            >
+                                {form.watch('logoUrl') ? (
+                                    <img src={form.watch('logoUrl')} className="w-full h-full object-contain p-2" alt="Logo" />
+                                ) : <Plus className="h-8 w-8 text-muted-foreground opacity-20" />}
+                            </div>
+                            <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
+                        </div>
+
+                        <div className="md:col-span-2 space-y-6">
+                            <div className="grid gap-2">
+                                <Label className="font-bold">اسم الشركة الرسمي (بالعربية) *</Label>
+                                <Input {...form.register('companyName')} placeholder="أدخل اسم المنشأة..." className="h-12 rounded-xl text-lg font-black" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-bold">لون الهوية البصرية (Header Color)</Label>
+                                <div className="flex gap-4 items-center">
+                                    <Input 
+                                        type="color" 
+                                        {...form.register('headerColor')} 
+                                        className="w-20 h-12 p-1 rounded-xl cursor-pointer" 
+                                    />
+                                    <Input 
+                                        {...form.register('headerColor')} 
+                                        className="h-12 rounded-xl font-mono text-center w-32" 
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-6">
+                        <Label className="text-lg font-black flex items-center gap-2">
+                            <Smartphone className="h-5 w-5 text-primary" /> بيانات تذييل الصفحة (Footer)
+                        </Label>
+                        
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="flex items-center gap-2 font-bold"><MapPin className="h-3 w-3" /> العنوان</Label>
+                                <Input {...form.register('footerData.address')} placeholder="الكويت - حولي - شارع..." className="h-11 rounded-xl" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="flex items-center gap-2 font-bold"><Mail className="h-3 w-3" /> البريد الإلكتروني</Label>
+                                <Input {...form.register('footerData.email')} placeholder="info@company.com" className="h-11 rounded-xl dir-ltr text-right" />
+                            </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="flex items-center gap-2 font-bold"><Hash className="h-3 w-3" /> السجل التجاري (C.R)</Label>
+                                <Input {...form.register('footerData.crNumber')} className="h-11 rounded-xl" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="flex items-center gap-2 font-bold"><ShieldCheck className="h-3 w-3" /> الرقم الضريبي</Label>
+                                <Input {...form.register('footerData.taxNumber')} className="h-11 rounded-xl" />
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label className="flex items-center gap-2 font-bold">أرقام الهواتف</Label>
+                            <div className="space-y-2">
+                                {fields.map((field, index) => (
+                                    <div key={field.id} className="flex gap-2 animate-in slide-in-from-right-2">
+                                        <Input {...form.register(`footerData.phones.${index}` as any)} className="h-10 rounded-lg font-mono" dir="ltr" />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-red-500 hover:bg-red-50">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))}
+                                <Button type="button" variant="outline" size="sm" onClick={() => append('')} className="rounded-lg h-8 gap-1">
+                                    <Plus className="h-3 w-3" /> إضافة هاتف
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label className="font-bold">نص إضافي في الأسفل (الشروط أو الترحيب)</Label>
+                            <Textarea {...form.register('footerData.extraText')} rows={2} placeholder="شكراً لثقتكم بنا..." className="rounded-2xl resize-none" />
+                        </div>
+                    </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Preview Column (Sticky) */}
+        {previewOpen && (
+            <div className="lg:col-span-6 sticky top-24 h-fit animate-in fade-in slide-in-from-left-4 duration-500">
+                <div className="flex items-center justify-between px-4 mb-4">
+                    <Label className="font-black text-lg flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-primary" /> معاينة الورق الرسمي (A4)
+                    </Label>
+                    <Badge variant="secondary" className="bg-primary/5 text-primary font-black uppercase tracking-tighter">Preview Only</Badge>
+                </div>
+                
+                <div className="border-4 border-slate-300 rounded-[2.5rem] shadow-2xl overflow-hidden bg-slate-200 scale-[0.85] origin-top">
+                    <div className="shadow-inner p-4 flex justify-center overflow-auto max-h-[800px]">
+                        <PrintLayout>
+                            <div className="py-20 space-y-8 opacity-40">
+                                <div className="h-8 w-1/3 bg-slate-200 rounded-full" />
+                                <div className="space-y-3">
+                                    <div className="h-4 w-full bg-slate-100 rounded-full" />
+                                    <div className="h-4 w-full bg-slate-100 rounded-full" />
+                                    <div className="h-4 w-3/4 bg-slate-100 rounded-full" />
+                                </div>
+                                <div className="h-48 w-full border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center">
+                                    <p className="font-black text-slate-300 text-3xl italic">SAMPLE INVOICE CONTENT</p>
+                                </div>
+                                <div className="flex justify-end pt-10">
+                                    <div className="h-20 w-40 bg-slate-100 rounded-xl border border-dashed" />
+                                </div>
+                            </div>
+                        </PrintLayout>
+                    </div>
+                </div>
+            </div>
+        )}
+      </div>
+
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 lg:hidden px-4 w-full max-w-md">
+        <Button 
+            onClick={form.handleSubmit(onSubmit)} 
+            disabled={isSaving}
+            className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl"
+        >
+            {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />}
+            حفظ إعدادات الهوية
+        </Button>
+      </div>
+    </div>
+  );
 }
+
+import { UploadCloud, Ban } from 'lucide-react';
+import { Skeleton as SkeletonUI } from '@/components/ui/skeleton';
