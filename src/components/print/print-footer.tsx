@@ -37,13 +37,13 @@ export function PrintFooter({ branding }: PrintFooterProps) {
         <div className="space-y-2">
           {footer.address && (
             <p className="flex items-center gap-2">
-              <MapPin className="h-3 w-3 text-primary shrink-0" />
+              <MapPin className="h-3 w-3 text-[#7209B7] shrink-0" />
               <span>{footer.address}</span>
             </p>
           )}
           {footer.email && (
             <p className="flex items-center gap-2">
-              <Mail className="h-3 w-3 text-primary shrink-0" />
+              <Mail className="h-3 w-3 text-[#7209B7] shrink-0" />
               <span className="font-mono">{footer.email}</span>
             </p>
           )}
@@ -52,7 +52,7 @@ export function PrintFooter({ branding }: PrintFooterProps) {
         <div className="space-y-2 text-center">
           {footer.phones && footer.phones.length > 0 && (
             <p className="flex items-center justify-center gap-2">
-              <Phone className="h-3 w-3 text-primary shrink-0" />
+              <Phone className="h-3 w-3 text-[#7209B7] shrink-0" />
               <span className="font-mono" dir="ltr">
                 {footer.phones.filter(Boolean).join(' / ')}
               </span>
@@ -60,7 +60,7 @@ export function PrintFooter({ branding }: PrintFooterProps) {
           )}
           {footer.crNumber && (
             <p className="flex items-center justify-center gap-2">
-              <Hash className="h-3 w-3 text-primary shrink-0" />
+              <Hash className="h-3 w-3 text-[#7209B7] shrink-0" />
               <span>س.ت: {footer.crNumber}</span>
             </p>
           )}
@@ -74,7 +74,6 @@ export function PrintFooter({ branding }: PrintFooterProps) {
         </div>
       </div>
       
-      {/* ترقيم الصفحات (المتصفح يضيفه تلقائياً عند الطباعة، لكن هنا نضع علامة سيادية) */}
       <div className="text-center mt-4 text-[8px] font-bold text-slate-300 tracking-[0.5em] uppercase">
         Nova ERP Sovereign Document System v2.5
       </div>

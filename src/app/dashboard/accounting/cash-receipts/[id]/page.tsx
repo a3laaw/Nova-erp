@@ -14,6 +14,8 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { PrintLayout } from '@/components/print/print-layout';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 
 const InfoRow = ({ label, value }: { label: string, value: any }) => (
