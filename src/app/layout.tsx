@@ -6,7 +6,7 @@ import './globals.css';
 
 /**
  * @fileOverview Root layout for Nova ERP.
- * TRIGGER REBUILD: 2026-03-07 - Resolved Toaster import path error.
+ * تم التأكد من مسارات الاستيراد لضمان استقرار التحميل.
  */
 
 const tajawal = Tajawal({ 

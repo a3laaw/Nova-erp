@@ -17,6 +17,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // جلب الثيم المحفوظ بأمان بعد تحميل المتصفح
     const savedTheme = localStorage.getItem('app-theme') as Theme;
     if (savedTheme && (savedTheme === 'default' || savedTheme === 'glass')) {
       setThemeState(savedTheme);
@@ -36,8 +37,11 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     setTheme(nextTheme);
   };
 
-  // يجب دائماً إرجاع الـ Provider لضمان عدم تعطل الخطاف useAppTheme في المكونات التابعة
-  // حتى لو لم يكتمل الـ hydration بعد
+  /**
+   * 🛡️ صمام الأمان السيادي:
+   * لا نعيد null أبداً لكي لا نحجب شجرة المكونات (Auth, Sync, etc) عن العمل.
+   * نقوم فقط بإرجاع الـ Provider بالمحتوى الافتراضي حتى اكتمال الـ Hydration.
+   */
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
