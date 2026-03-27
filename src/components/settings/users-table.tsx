@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, orderBy, where, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '../ui/skeleton';
@@ -83,17 +83,24 @@ export function UsersTable() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
+    // ✨ محرك تحديد المسار السيادي ✨
+    const basePrefix = useMemo(() => {
+        const tenantId = currentUser?.currentCompanyId;
+        return tenantId ? `companies/${tenantId}/` : '';
+    }, [currentUser?.currentCompanyId]);
+
     const fetchEmployees = useCallback(async () => {
         if (!firestore) return [];
         try {
-            const employeesSnapshot = await getDocs(query(collection(firestore, 'employees'), orderBy('fullName')));
+            const employeesSnapshot = await getDocs(query(collection(firestore, `${basePrefix}employees`), orderBy('fullName')));
             const employeesList = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
             setEmployees(employeesList);
             return employeesList;
         } catch (error) {
+            console.error("Error fetching employees:", error);
             return [];
         }
-    }, [firestore]);
+    }, [firestore, basePrefix]);
     
 
     const fetchUsersAndEmployees = useCallback(async () => {
@@ -101,7 +108,7 @@ export function UsersTable() {
         setLoading(true);
         try {
             const fetchedEmployees = await fetchEmployees();
-            const usersSnapshot = await getDocs(query(collection(firestore, 'users'), orderBy('createdAt', 'desc')));
+            const usersSnapshot = await getDocs(query(collection(firestore, `${basePrefix}users`), orderBy('createdAt', 'desc')));
             const usersList = usersSnapshot.docs.map(doc => {
                 const userData = { id: doc.id, ...doc.data() } as UserProfile;
                 const employee = fetchedEmployees.find(e => e.id === userData.employeeId);
@@ -113,11 +120,12 @@ export function UsersTable() {
             });
             setUsers(usersList);
         } catch (error) {
+            console.error("Error fetching users:", error);
             toast({ variant: 'destructive', title: 'خطأ في جلب المستخدمين' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, toast, fetchEmployees]);
+    }, [firestore, toast, fetchEmployees, basePrefix]);
 
     useEffect(() => {
         if (firestore && (currentUser?.role === 'Admin' || currentUser?.role === 'Developer')) {
@@ -139,20 +147,30 @@ export function UsersTable() {
     const handleSaveUser = async (userData: Partial<UserProfile>) => {
         if (!firestore || !currentUser) return;
         try {
-            const usernameQuery = query(collection(firestore, 'users'), where('username', '==', userData.username));
+            const usersCollectionRef = collection(firestore, `${basePrefix}users`);
+            
+            // 🛡️ منع تكرار اسم المستخدم في نفس المنشأة
+            const usernameQuery = query(usersCollectionRef, where('username', '==', userData.username));
             const querySnapshot = await getDocs(usernameQuery);
             if (!querySnapshot.empty && (!selectedUser || querySnapshot.docs[0].id !== selectedUser.id)) {
-                 toast({ variant: 'destructive', title: 'خطأ', description: 'اسم المستخدم مكرر.' });
+                 toast({ variant: 'destructive', title: 'خطأ', description: 'اسم المستخدم مكرر في هذه المنشأة.' });
                  return;
             }
 
-            if (selectedUser) { 
-                await updateDoc(doc(firestore, 'users', selectedUser.id!), userData);
+            const cleanData = cleanFirestoreData({
+                ...userData,
+                email: `${userData.username}@scoop.local`,
+                updatedAt: serverTimestamp(),
+                companyId: currentUser.currentCompanyId || null
+            });
+
+            if (selectedUser?.id) { 
+                await updateDoc(doc(firestore, `${basePrefix}users`, selectedUser.id), cleanData);
                 toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات الحساب.' });
             } else { 
-                await addDoc(collection(firestore, 'users'), {
-                    ...userData,
-                    email: `${userData.username}@scoop.local`,
+                const newDocRef = doc(usersCollectionRef);
+                await setDoc(newDocRef, {
+                    ...cleanData,
                     isActive: false, 
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
@@ -162,6 +180,7 @@ export function UsersTable() {
             setIsFormOpen(false);
             fetchUsersAndEmployees();
         } catch (error) {
+            console.error("Save user error:", error);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         }
     };
@@ -170,7 +189,7 @@ export function UsersTable() {
         if (!userToToggle || !firestore) return;
         const newStatus = !userToToggle.isActive;
         try {
-            await updateDoc(doc(firestore, 'users', userToToggle.id!), { 
+            await updateDoc(doc(firestore, `${basePrefix}users`, userToToggle.id!), { 
                 isActive: newStatus,
                 ...(newStatus && !userToToggle.activatedAt && { activatedAt: serverTimestamp() })
             });
@@ -182,14 +201,16 @@ export function UsersTable() {
         }
     };
 
-    const handleEditUser = (user: UserProfile) => {
-        setSelectedUser(user);
-        setIsFormOpen(true);
-    };
-
-    const handleToggleActivationClick = (user: UserWithEmployee) => {
-        setUserToToggle(user);
-        setIsAlertOpen(true);
+    const handleDeleteRole = async (userId: string) => {
+        if (!firestore) return;
+        if (!confirm('سيتم حذف حساب الدخول فقط، لن يتأثر ملف الموظف. هل تود المتابعة؟')) return;
+        try {
+            await deleteDoc(doc(firestore, `${basePrefix}users`, userId));
+            toast({ title: 'تم الحذف', description: 'تم حذف حساب المستخدم بنجاح.' });
+            fetchUsersAndEmployees();
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+        }
     };
 
     return (
@@ -247,7 +268,7 @@ export function UsersTable() {
                                 <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl" /></TableCell></TableRow>
                             ))
                         ) : filteredUsers.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-muted-foreground italic font-bold">لا يوجد مستخدمون مطابقون حالياً.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-muted-foreground italic font-bold">لا يوجد مستخدمون مطابقون حالياً لهذه المنشأة.</TableCell></TableRow>
                         ) : (
                             filteredUsers.map((user) => (
                                 <TableRow key={user.id} className="hover:bg-primary/5 transition-colors h-24 border-b last:border-0 group">
@@ -292,8 +313,8 @@ export function UsersTable() {
                                                     {user.isActive ? 'إيقاف الحساب مؤقتاً' : 'تفعيل الحساب الآن'}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-destructive gap-2 rounded-xl py-3 font-bold focus:bg-red-50">
-                                                    <Lock className="h-4 w-4" /> إعادة تعيين كلمة المرور
+                                                <DropdownMenuItem className="text-destructive gap-2 rounded-xl py-3 font-bold focus:bg-red-50" onClick={() => handleDeleteRole(user.id!)}>
+                                                    <Trash2 className="h-4 w-4" /> حذف الحساب نهائياً
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
