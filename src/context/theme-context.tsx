@@ -14,21 +14,15 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setThemeState] = useState<Theme>('default');
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // جلب الثيم المحفوظ بأمان بعد تحميل المتصفح
-    const savedTheme = localStorage.getItem('app-theme') as Theme;
-    if (savedTheme && (savedTheme === 'default' || savedTheme === 'glass')) {
-      setThemeState(savedTheme);
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    }
-    setMounted(true);
+    // We force 'default' theme for now to respect user's color preferences
+    document.documentElement.setAttribute('data-theme', 'default');
+    setThemeState('default');
   }, []);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem('app-theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
@@ -37,11 +31,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     setTheme(nextTheme);
   };
 
-  /**
-   * 🛡️ صمام الأمان السيادي:
-   * لا نعيد null أبداً لكي لا نحجب شجرة المكونات (Auth, Sync, etc) عن العمل.
-   * نقوم فقط بإرجاع الـ Provider بالمحتوى الافتراضي حتى اكتمال الـ Hydration.
-   */
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}

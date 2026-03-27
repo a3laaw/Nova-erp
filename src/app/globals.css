@@ -7,52 +7,35 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 244 47% 15%;
+    --background: 189 71% 93%; /* #E0F7FA - Very light cyan */
+    --foreground: 200 50% 15%; /* Deep navy for contrast */
     --card: 0 0% 100%;
-    --card-foreground: 244 47% 15%;
+    --card-foreground: 200 50% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 244 47% 15%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 262 83% 96%;
-    --secondary-foreground: 262 70% 30%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 5% 45%;
-    --accent: 262 83% 94%;
-    --accent-foreground: 262 70% 30%;
+    --popover-foreground: 200 50% 15%;
+    --primary: 198 93% 64%; /* #4FC3F7 - Sky Blue */
+    --primary-foreground: 200 50% 10%;
+    --secondary: 187 75% 90%; /* Light Teal accent */
+    --secondary-foreground: 187 100% 20%;
+    --muted: 189 30% 90%;
+    --muted-foreground: 200 20% 45%;
+    --accent: 187 75% 85%;
+    --accent-foreground: 187 100% 20%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 262 83% 58%;
-    --radius: 1.25rem;
+    --border: 198 30% 85%;
+    --input: 198 30% 85%;
+    --ring: 198 93% 64%;
+    --radius: 1rem;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body {
-    @apply bg-background text-foreground transition-colors duration-500;
+    @apply bg-background text-foreground transition-colors duration-300;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
-  }
-}
-
-/* Print Specific Optimizations */
-@media print {
-  .no-print { display: none !important; }
-  body { background: white !important; }
-  .printable-wrapper {
-    width: 210mm;
-    height: 297mm;
-    margin: 0;
-    padding: 0;
-    background: white !important;
-  }
-  @page {
-    size: A4;
-    margin: 0;
   }
 }
 
@@ -63,4 +46,9 @@
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Clean Professional look for cards */
+.card-shadow {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
