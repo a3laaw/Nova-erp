@@ -92,14 +92,13 @@ import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { useBranding } from '@/context/branding-context';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { useAppTheme } from '@/context/theme-context';
 
 const navItems = {
   ar: [
-    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'الرئيسية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     
     { 
-      label: 'علاقات العملاء (CRM)', 
+      label: 'علاقات العملاء', 
       icon: LineChart, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
@@ -239,7 +238,7 @@ const navItems = {
   ]
 };
 
-function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole: string, currentPath: string, isGlass: boolean }) {
+function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile, state } = useSidebar();
   const Icon = item.icon;
 
@@ -257,9 +256,8 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
           asChild 
           tooltip={item.label}
           className={cn(
-            "my-1",
-            isGlass && "glass-nav-button", 
-            isGlass && isActive && "glass-nav-button-active"
+            "my-0.5 rounded-xl font-bold transition-all duration-200",
+            isActive ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-muted"
           )}
         >
           <Link 
@@ -269,19 +267,11 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
           >
             {Icon && (
               <Icon 
-                className={cn(
-                  "size-6 shrink-0 transition-colors", 
-                  isGlass ? "sidebar-icon-deep" : ""
-                )} 
+                className="size-5 shrink-0" 
                 strokeWidth={isActive ? 3 : 2} 
               />
             )}
-            <span className={cn(
-              "font-bold transition-colors text-sm flex-1 text-center",
-              isGlass && "text-[#1e1b4b]"
-            )}>
-              {item.label}
-            </span>
+            <span className="truncate text-sm flex-1">{item.label}</span>
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -298,33 +288,24 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                 isActive={isActive} 
                 tooltip={item.label}
                 className={cn(
-                    "my-1",
-                    isGlass && "glass-nav-button", 
-                    isGlass && isActive && "glass-nav-button-active"
+                    "my-0.5 rounded-xl transition-all duration-200",
+                    isActive ? "bg-primary/10 text-primary border-r-4 border-primary" : "hover:bg-muted"
                 )}
               >
-                {Icon && (
-                  <Icon 
-                    className={cn(
-                        "size-6 shrink-0 transition-colors", 
-                        isGlass ? "sidebar-icon-deep" : ""
-                    )} 
-                    strokeWidth={isActive ? 3 : 2} 
-                  />
-                )}
+                {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="start" dir="rtl" className={cn("w-64 rounded-2xl shadow-2xl p-2", isGlass ? "backdrop-blur-xl bg-white/90 border-white/20" : "bg-card/95 border-primary/10")}>
-              <DropdownMenuLabel className="font-black text-[#1e1b4b] px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
+            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-2xl shadow-xl p-2 bg-card/95 border-primary/10 backdrop-blur-md">
+              <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
-                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/10 text-[#1e1b4b] font-bold")}>
+                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/10 text-primary font-bold")}>
                     <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                      {ChildIcon && <ChildIcon className="size-5 shrink-0 text-[#1e1b4b]" />}
-                      <span className="text-sm text-[#1e1b4b]">{child.label}</span>
+                      {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
+                      <span className="text-sm mr-2">{child.label}</span>
                     </Link>
                   </DropdownMenuItem>
                 );
@@ -343,34 +324,20 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
               isActive={isActive} 
               tooltip={item.label} 
               className={cn(
-                "my-1",
-                isGlass && "glass-nav-button", 
-                isGlass && isActive && "glass-nav-button-active"
+                "my-0.5 rounded-xl font-bold transition-all duration-200",
+                isActive ? "bg-primary/10 text-primary border-r-4 border-primary" : "hover:bg-muted"
               )}
             >
-              {Icon && (
-                <Icon 
-                  className={cn(
-                    "size-6 shrink-0 transition-colors", 
-                    isGlass ? "sidebar-icon-deep" : ""
-                  )} 
-                  strokeWidth={isActive ? 3 : 2} 
-                />
-              )}
-              <span className={cn(
-                "font-bold transition-colors text-sm flex-1 text-center",
-                isGlass && "text-[#1e1b4b]"
-              )}>
-                {item.label}
-              </span>
+              {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
+              <span className="truncate text-sm flex-1">{item.label}</span>
               <ChevronDown className={cn(
                 "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50",
-                isGlass ? "text-[#1e1b4b]" : "text-primary"
+                isActive ? "text-primary" : ""
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className={cn("mt-1 mb-2 pr-4 border-r-2 border-primary/10")}>
+            <SidebarMenuSub className="mt-1 mb-2 pr-4 border-r-2 border-primary/10">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
@@ -378,12 +345,11 @@ function NavItem({ item, userRole, currentPath, isGlass }: { item: any, userRole
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-xl my-0.5 transition-all",
-                        isGlass && "glass-nav-button hover:translate-x-[-4px]",
-                        isGlass && isChildActive && "glass-nav-button-active"
+                        isChildActive ? "bg-primary/5 text-primary font-bold" : "hover:bg-muted/50"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
-                        {ChildIcon && <ChildIcon className={cn("size-4 shrink-0", isGlass ? "sidebar-icon-deep" : "")} />}
-                        <span className={cn("font-bold text-xs flex-1 text-center", isGlass && "text-[#1e1b4b]")}>{child.label}</span>
+                        {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
+                        <span className="text-xs truncate">{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
@@ -403,8 +369,6 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
   const pathname = usePathname();
   const { language } = useLanguage();
   const { branding } = useBranding();
-  const { theme } = useAppTheme();
-  const isGlass = theme === 'glass';
   
   const currentNavItems = navItems[language] || navItems.ar;
 
@@ -412,10 +376,10 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-6 mb-4">
         <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className={cn("shadow-sm border", isGlass ? "bg-white/40 border-white/40" : "border-slate-100 bg-white")} />
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-sm border border-slate-100 bg-white" />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
-              <span className={cn("text-xl font-black tracking-tight leading-tight", isGlass ? "text-[#1e1b4b]" : "text-foreground")}>{branding?.company_name || 'Nova ERP'}</span>
-              <span className={cn("text-[9px] font-black uppercase tracking-[0.2em] opacity-70", isGlass ? "text-[#1e1b4b]/60" : "text-primary")}>Purple Suite</span>
+              <span className="text-xl font-black tracking-tight leading-tight text-foreground">{branding?.company_name || 'Nova ERP'}</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary opacity-70">Business Suite</span>
             </div>
         </div>
       </SidebarHeader>
@@ -427,24 +391,20 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
                 item={item} 
                 userRole={currentUser.role} 
                 currentPath={pathname}
-                isGlass={isGlass}
             />
           ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-6 mt-4">
         <div className="p-1">
-            <div className={cn(
-                "flex h-auto w-full items-center justify-start rounded-2xl p-2 transition-all shadow-sm",
-                isGlass ? "bg-white/30 border border-white/40 hover:bg-white/50" : "bg-slate-50 border border-slate-100 hover:bg-muted"
-            )}>
+            <div className="flex h-auto w-full items-center justify-start rounded-2xl p-2 transition-all shadow-sm bg-slate-50 border border-slate-100 hover:bg-muted">
                 <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-white text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                    <p className={cn("text-sm font-black truncate", isGlass ? "text-[#1e1b4b]" : "text-foreground")}>{currentUser.fullName}</p>
-                    <p className={cn("text-[9px] truncate font-bold uppercase tracking-wider", isGlass ? "text-[#1e1b4b]/60" : "text-muted-foreground")}>{currentUser.role}</p>
+                    <p className="text-sm font-black truncate text-foreground">{currentUser.fullName}</p>
+                    <p className="text-[9px] truncate font-bold uppercase tracking-wider text-muted-foreground">{currentUser.role}</p>
                 </div>
             </div>
         </div>
