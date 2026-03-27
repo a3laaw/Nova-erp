@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import {
@@ -7,6 +6,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
+import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف استماع لوثيقة واحدة:
@@ -31,16 +31,8 @@ export function useDocument<T extends { id?: string }>(
     setLoading(true);
 
     // --- 🛡️ Tenant Path Resolution ---
-    let finalPath = docPath;
-    const tenantId = user?.currentCompanyId;
-    
-    // استثناء مسارات مشروع الماستر
-    const masterPaths = ['companies/', 'developers/', 'global_', 'company_settings/'];
-    const isMasterPath = masterPaths.some(mp => docPath.startsWith(mp));
-
-    if (tenantId && !isMasterPath) {
-        finalPath = `companies/${tenantId}/${docPath}`;
-    }
+    const tenantId = user?.currentCompanyId || null;
+    const finalPath = getTenantPath(docPath, tenantId);
 
     const unsubscribe = onSnapshot(
       doc(firestore, finalPath),

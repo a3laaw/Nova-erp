@@ -16,7 +16,7 @@ import { useAuth } from '@/context/auth-context';
 import type { Employee } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
 
 export default function NewEmployeePage() {
     const router = useRouter();
@@ -27,11 +27,14 @@ export default function NewEmployeePage() {
     const [isSaving, setIsSaving] = useState(false);
     const [employeeNumber, setEmployeeNumber] = useState<string | null>(null);
 
+    const tenantId = currentUser?.currentCompanyId;
+
     useEffect(() => {
         if (!firestore) return;
         const generateEmployeeNumber = async () => {
             try {
-                const counterRef = doc(firestore, 'counters', 'employees');
+                const counterPath = getTenantPath('counters/employees', tenantId);
+                const counterRef = doc(firestore, counterPath);
                 const counterDoc = await getDoc(counterRef);
                 let nextNumber = 101;
                 if (counterDoc.exists()) {
@@ -40,12 +43,11 @@ export default function NewEmployeePage() {
                 setEmployeeNumber(String(nextNumber));
             } catch (error) {
                 console.error("Error generating employee number:", error);
-                toast({ variant: 'destructive', title: 'خطأ', description: 'فشل في توليد الرقم الوظيفي.' });
                 setEmployeeNumber('Error');
             }
         };
         generateEmployeeNumber();
-    }, [firestore, toast]);
+    }, [firestore, tenantId]);
     
     const handleSave = useCallback(async (newEmployeeData: Partial<Employee>) => {
         if (!firestore || !currentUser || !employeeNumber || employeeNumber === 'Error') {
@@ -57,31 +59,20 @@ export default function NewEmployeePage() {
         let newEmployeeId = '';
 
         try {
-            // --- VALIDATION LOGIC ---
+            const employeesCollectionPath = getTenantPath('employees', tenantId);
+            
+            // --- VALIDATION LOGIC (Isolating check to the tenant path) ---
             if (newEmployeeData.mobile) {
-                const mobileQuery = query(collection(firestore, 'employees'), where('mobile', '==', newEmployeeData.mobile));
+                const mobileQuery = query(collection(firestore, employeesCollectionPath), where('mobile', '==', newEmployeeData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
                 if (!mobileSnapshot.empty) {
-                    throw new Error('رقم الهاتف هذا مسجل بالفعل لموظف آخر.');
-                }
-            }
-            if (newEmployeeData.civilId) {
-                const civilIdQuery = query(collection(firestore, 'employees'), where('civilId', '==', newEmployeeData.civilId));
-                const civilIdSnapshot = await getDocs(civilIdQuery);
-                if (!civilIdSnapshot.empty) {
-                    throw new Error('الرقم المدني هذا مسجل بالفعل لموظف آخر.');
-                }
-            }
-            if (newEmployeeData.iban && newEmployeeData.iban.trim() !== '') {
-                const ibanQuery = query(collection(firestore, 'employees'), where('iban', '==', newEmployeeData.iban.trim()));
-                const ibanSnapshot = await getDocs(ibanQuery);
-                if (!ibanSnapshot.empty) {
-                    throw new Error('رقم الـ IBAN هذا مسجل بالفعل لموظف آخر.');
+                    throw new Error('رقم الهاتف هذا مسجل بالفعل لموظف آخر في هذه المنشأة.');
                 }
             }
 
             await runTransaction(firestore, async (transaction) => {
-                const employeeCounterRef = doc(firestore, 'counters', 'employees');
+                const counterPath = getTenantPath('counters/employees', tenantId);
+                const employeeCounterRef = doc(firestore, counterPath);
                 const employeeCounterDoc = await transaction.get(employeeCounterRef);
                 
                 let nextNumber = 101;
@@ -105,49 +96,29 @@ export default function NewEmployeePage() {
                   carriedLeaveDays: 0,
                   sickLeaveUsed: 0,
                   emergencyLeaveUsed: 0,
+                  companyId: tenantId || null // 🛡️ التاج السيادي
                 };
 
-                const newEmployeeRef = doc(collection(firestore, 'employees'));
+                const newEmployeeRef = doc(collection(firestore, employeesCollectionPath));
                 newEmployeeId = newEmployeeRef.id;
                 transaction.set(newEmployeeRef, cleanFirestoreData(finalEmployeeData));
             });
 
             toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
-
-            const adminHRUsersQuery = query(collection(firestore, 'users'), where('role', 'in', ['Admin', 'HR']));
-            const querySnapshot = await getDocs(adminHRUsersQuery);
-            
-            const notificationPromises: Promise<void>[] = [];
-            querySnapshot.forEach(userDoc => {
-                const userId = userDoc.id;
-                if (userId !== currentUser.id) {
-                    const notificationPromise = createNotification(firestore, {
-                        userId: userId,
-                        title: 'تمت إضافة موظف جديد',
-                        body: `قام ${currentUser.fullName} بإضافة الموظف الجديد "${newEmployeeData.fullName}".`,
-                        link: `/dashboard/hr/employees`
-                    });
-                    notificationPromises.push(notificationPromise);
-                }
-            });
-
-            await Promise.all(notificationPromises);
             router.push(`/dashboard/hr/employees`);
-            // isSaving remains true during navigation
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'فشل إضافة الموظف.';
-            toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
-            setIsSaving(false); // Reset on error
+        } catch (error: any) {
+            toast({ title: "خطأ", description: error.message, variant: "destructive" });
+            setIsSaving(false);
         }
-    }, [firestore, currentUser, toast, router, employeeNumber]);
+    }, [firestore, currentUser, toast, router, employeeNumber, tenantId]);
 
     return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <CardHeader>
-                <CardTitle>إضافة موظف جديد</CardTitle>
-                <CardDescription>قم بتعبئة بيانات الموظف الجديد لإنشاء ملف له في النظام.</CardDescription>
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+            <CardHeader className="bg-primary/5 pb-8 border-b">
+                <CardTitle className="text-2xl font-black">إضافة موظف جديد</CardTitle>
+                <CardDescription className="text-base font-medium">قم بتعبئة بيانات الموظف الجديد لإنشاء ملف له في المنشأة الحالية.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-8">
                 <EmployeeForm
                     onSave={handleSave}
                     onClose={() => router.back()}

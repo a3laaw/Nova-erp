@@ -10,12 +10,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useFirebase } from '@/firebase';
-import { doc, runTransaction, collection, serverTimestamp, updateDoc, query, where, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, runTransaction, collection, serverTimestamp, query, where, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import type { Client } from '@/lib/types';
 import { ClientForm } from '@/components/clients/client-form';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
+import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
 
 export default function NewClientPage() {
     const router = useRouter();
@@ -33,7 +34,8 @@ export default function NewClientPage() {
     };
     
     const fromAppointmentId = searchParams.get('fromAppointmentId');
-    
+    const tenantId = currentUser?.currentCompanyId;
+
     const handleSave = useCallback(async (newClientData: Partial<Client>) => {
         if (!firestore || !currentUser) return;
         
@@ -41,19 +43,21 @@ export default function NewClientPage() {
         let newClientId = '';
 
         try {
-            // --- VALIDATION LOGIC ---
+            const clientsCollectionPath = getTenantPath('clients', tenantId);
+            
+            // --- VALIDATION (Isolated to the current tenant) ---
             if (newClientData.mobile) {
-                const mobileQuery = query(collection(firestore, 'clients'), where('mobile', '==', newClientData.mobile));
+                const mobileQuery = query(collection(firestore, clientsCollectionPath), where('mobile', '==', newClientData.mobile));
                 const mobileSnapshot = await getDocs(mobileQuery);
                 if (!mobileSnapshot.empty) {
-                    throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر.');
+                    throw new Error('رقم الهاتف هذا مسجل بالفعل لعميل آخر في هذه المنشأة.');
                 }
             }
-            // --- END VALIDATION ---
 
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = String(new Date().getFullYear());
-                const clientFileCounterRef = doc(firestore, 'counters', 'clientFiles');
+                const counterPath = getTenantPath('counters/clientFiles', tenantId);
+                const clientFileCounterRef = doc(firestore, counterPath);
                 const clientFileCounterDoc = await transaction.get(clientFileCounterRef);
                 
                 let nextFileNumber = 1;
@@ -65,26 +69,25 @@ export default function NewClientPage() {
                 transaction.set(clientFileCounterRef, { counts: { [currentYear]: nextFileNumber } }, { merge: true });
                 const newFileId = `${nextFileNumber}/${currentYear}`;
 
-                const finalClientData: Omit<Client, 'id'> = {
-                  ...(newClientData as Omit<Client, 'id' | 'fileId' | 'fileNumber' | 'fileYear' | 'status' | 'createdAt' | 'isActive'>),
+                const finalClientData = {
+                  ...newClientData,
                   fileId: newFileId,
                   fileNumber: nextFileNumber,
                   fileYear: parseInt(currentYear, 10),
-                  status: 'new',
+                  status: 'new' as const,
                   transactionCounter: 0,
                   createdAt: serverTimestamp(),
                   isActive: true,
+                  companyId: tenantId || null // 🛡️ التاج السيادي
                 };
 
-                const newClientRef = doc(collection(firestore, 'clients'));
+                const newClientRef = doc(collection(firestore, clientsCollectionPath));
                 newClientId = newClientRef.id;
-                transaction.set(newClientRef, finalClientData);
+                transaction.set(newClientRef, cleanFirestoreData(finalClientData));
 
-                // This logic is now superseded by the global appointment update below,
-                // but we leave it inside the transaction for the `fromAppointmentId` case.
                 if(fromAppointmentId) {
-                    const apptRef = doc(firestore, 'appointments', fromAppointmentId);
-                    transaction.update(apptRef, {
+                    const apptPath = getTenantPath(`appointments/${fromAppointmentId}`, tenantId);
+                    transaction.update(doc(firestore, apptPath), {
                         clientId: newClientId,
                         clientName: deleteField(),
                         clientMobile: deleteField(),
@@ -92,59 +95,22 @@ export default function NewClientPage() {
                 }
             });
 
-            toast({ title: 'نجاح', description: 'تمت إضافة العميل بنجاح.' });
-
-            // After successful client creation, find and update all prospective appointments
-            if (newClientData.mobile && newClientId) {
-                const appointmentsRef = collection(firestore, 'appointments');
-                const q = query(appointmentsRef, where('clientMobile', '==', newClientData.mobile));
-                const appointmentsToUpdateSnap = await getDocs(q);
-
-                if (!appointmentsToUpdateSnap.empty) {
-                    const updateBatch = writeBatch(firestore);
-                    appointmentsToUpdateSnap.forEach(apptDoc => {
-                        const apptRef = doc(firestore, 'appointments', apptDoc.id);
-                        updateBatch.update(apptRef, {
-                            clientId: newClientId,
-                            clientName: deleteField(),
-                            clientMobile: deleteField()
-                        });
-                    });
-                    await updateBatch.commit();
-                    toast({ title: 'تحديث تلقائي', description: `تم ربط ${appointmentsToUpdateSnap.size} مواعيد محتملة بملف العميل الجديد.` });
-                }
-            }
-            
-            // Notification logic
-            if (newClientData.assignedEngineer) {
-                const targetUserId = await findUserIdByEmployeeId(firestore, newClientData.assignedEngineer);
-                if (targetUserId && targetUserId !== currentUser.id) {
-                    await createNotification(firestore, {
-                        userId: targetUserId,
-                        title: 'تم إسناد عميل جديد لك',
-                        body: `قام ${currentUser.fullName} بإسناد العميل "${newClientData.nameAr}" إليك.`,
-                        link: `/dashboard/clients/${newClientId}`
-                    });
-                }
-            }
-
+            toast({ title: 'نجاح التأسيس', description: 'تم إنشاء ملف العميل وحفظه في سجلات المنشأة.' });
             router.push(`/dashboard/clients/${newClientId}`);
 
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'فشل إضافة العميل.';
-            toast({ title: "خطأ", description: errorMessage, variant: "destructive" });
-        } finally {
+        } catch (error: any) {
+            toast({ title: "خطأ", description: error.message, variant: "destructive" });
             setIsSaving(false);
         }
-    }, [firestore, currentUser, toast, router, fromAppointmentId]);
+    }, [firestore, currentUser, toast, router, fromAppointmentId, tenantId]);
 
     return (
-        <Card className="max-w-2xl mx-auto" dir="rtl">
-            <CardHeader>
-                <CardTitle>إضافة عميل جديد</CardTitle>
-                <CardDescription>قم بتعبئة بيانات العميل الجديد لإنشاء ملف له في النظام.</CardDescription>
+        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+            <CardHeader className="bg-primary/5 pb-8 border-b">
+                <CardTitle className="text-2xl font-black">إضافة عميل جديد</CardTitle>
+                <CardDescription className="text-base font-medium">إنشاء ملف فني ومالي معزول للعميل في المنشأة الحالية.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-8">
                 <ClientForm
                     initialData={initialData}
                     onSave={handleSave}

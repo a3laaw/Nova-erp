@@ -1,6 +1,6 @@
 /**
  * @fileOverview المحرك البرمجي للأدوات المساعدة (Utils).
- * يحتوي على الدوال الجوهرية التي تضمن دقة العمليات المالية وتنسيق البيانات وتوليد الأرقام.
+ * تم تحديثه ليشمل محرك التوجيه السيادي (getTenantPath) لضمان العزل التام للبيانات.
  */
 
 import { clsx, type ClassValue } from "clsx"
@@ -38,7 +38,6 @@ export function numberToArabicWords(inputNumber: number | string): string {
     const dinars = Math.floor(num); 
     const fils = Math.round((num - dinars) * 1000); 
 
-    // خوارزمية بسيطة للتحويل (يمكن توسيعها بمكتبات خارجية للتعقيدات اللغوية)
     let result = `${dinars} دينار كويتي`;
     if (fils > 0) result += ` و ${fils} فلس`;
     
@@ -46,15 +45,31 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
+ * محرك توجيه المسارات السيادي (getTenantPath):
+ * 🛡️ الضابط الأكبر لعزل البيانات في نظام الـ Multi-Tenancy.
+ * يقوم بتحويل أي مسار مجرد (مثل 'projects') إلى مسار معزول للمنشأة.
+ */
+export function getTenantPath(path: string, tenantId: string | null | undefined): string {
+  if (!tenantId) return path;
+  
+  // استثناء مجموعات "مشروع الماستر" التي يجب أن تظل عالمية للمطور
+  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'company_settings/master'];
+  const isMaster = masterCollections.some(mc => path.startsWith(mc));
+  
+  if (isMaster) return path;
+
+  // توجيه كافة البيانات التشغيلية والمرجعية والعدادات لمجلد الشركة
+  return `companies/${tenantId}/${path}`;
+}
+
+/**
  * منظف بيانات Firebase (cleanFirestoreData):
- * يقوم بحذف أي قيم "undefined" من الكائنات قبل حفظها لمنع أخطاء Firebase الشهيرة.
- * كما يقوم بمعالجة الكائنات المتداخلة والمصفوفات.
+ * يقوم بحذف أي قيم "undefined" من الكائنات قبل حفظها لمنع أخطاء Firebase.
  */
 export function cleanFirestoreData(data: any): any {
   if (data === undefined) return null;
   if (Array.isArray(data)) return data.map(item => cleanFirestoreData(item));
   if (data && typeof data === 'object') {
-    // لا تنظف كائنات الـ Date أو Timestamp الخاصة بـ Firebase
     if (typeof data.toDate === 'function' || data instanceof Date) return data;
     
     const cleanedData: { [key: string]: any } = {};
@@ -73,7 +88,6 @@ export function cleanFirestoreData(data: any): any {
 
 /**
  * مولد المعرفات الثابتة (generateStableId):
- * يولد ID عشوائي بطول 20 خانة لربط العناصر في الواجهة الأمامية (مثل بنود العقد) قبل الحفظ.
  */
 export const generateStableId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
