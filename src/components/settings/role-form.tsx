@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Shield, LayoutDashboard, Calculator, Users, ShoppingCart, HardHat, Settings, Search } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import type { Role, RolePermission } from './roles-table';
