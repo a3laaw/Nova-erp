@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Eye, EyeOff, Lock, UserX, UserCheck } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useFirebase } from '@/firebase';
-import { collection, doc, addDoc, updateDoc, serverTimestamp, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '../ui/skeleton';
@@ -48,6 +48,8 @@ const roleTranslations: Record<UserProfile['role'], string> = {
     Accountant: 'محاسب مالي',
     Secretary: 'سكرتارية',
     HR: 'موارد بشرية',
+    Developer: 'مطور سيادي',
+    User: 'مستخدم'
 };
 
 const roleColors: Record<UserProfile['role'], string> = {
@@ -56,6 +58,8 @@ const roleColors: Record<UserProfile['role'], string> = {
     Accountant: 'bg-emerald-50 text-emerald-700 border-emerald-100',
     Secretary: 'bg-purple-50 text-purple-700 border-purple-100',
     HR: 'bg-pink-50 text-pink-700 border-pink-100',
+    Developer: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+    User: 'bg-slate-50 text-slate-700 border-slate-100',
 };
 
 interface UserWithEmployee extends UserProfile {
@@ -116,7 +120,7 @@ export function UsersTable() {
     }, [firestore, toast, fetchEmployees]);
 
     useEffect(() => {
-        if (firestore && currentUser?.role === 'Admin') {
+        if (firestore && (currentUser?.role === 'Admin' || currentUser?.role === 'Developer')) {
             fetchUsersAndEmployees();
         } else {
             setLoading(false);
@@ -176,6 +180,16 @@ export function UsersTable() {
             setIsAlertOpen(false);
             setUserToToggle(null);
         }
+    };
+
+    const handleEditUser = (user: UserProfile) => {
+        setSelectedUser(user);
+        setIsFormOpen(true);
+    };
+
+    const handleToggleActivationClick = (user: UserWithEmployee) => {
+        setUserToToggle(user);
+        setIsAlertOpen(true);
     };
 
     return (
