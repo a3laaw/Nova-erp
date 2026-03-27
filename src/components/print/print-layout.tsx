@@ -36,7 +36,7 @@ export function PrintLayout({
       const html2pdf = (await import('html2pdf.js')).default;
       
       const opt = {
-        margin: [5, 5, 5, 5], // الهوامش بالـ mm
+        margin: [5, 5, 5, 5], 
         filename: `${documentName}_${new Date().getTime()}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -44,7 +44,7 @@ export function PrintLayout({
           useCORS: true, 
           letterRendering: true,
           scrollY: 0,
-          windowWidth: 800 // عرض ثابت لضمان تناسق الخطوط العربية
+          windowWidth: 800 
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
@@ -78,7 +78,7 @@ export function PrintLayout({
                 <Printer className="h-5 w-5" />
             </div>
             <div>
-                <p className="font-black text-sm">مركز الوثائق الرسمي</p>
+                <p className="font-black text-sm text-[#1e1b4b]">مركز الوثائق الرسمي</p>
                 <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Print & PDF Engine</p>
             </div>
         </div>

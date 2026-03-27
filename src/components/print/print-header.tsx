@@ -33,7 +33,7 @@ export function PrintHeader({ branding }: PrintHeaderProps) {
     <div className="w-full mb-8" dir="rtl">
       <div 
         className="flex justify-between items-center pb-4" 
-        style={{ borderBottom: `4px solid ${branding.headerColor || '#1e40af'}` }}
+        style={{ borderBottom: `4px solid ${branding.headerColor || '#7209B7'}` }}
       >
         <div className="flex items-center gap-4">
           {branding.logoUrl && (
