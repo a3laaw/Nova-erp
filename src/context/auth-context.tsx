@@ -26,19 +26,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
-
-  // استخدام Ref لمتابعة الاستقرار ومنع Loops
   const isInitialized = useRef(false);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
+        console.warn("Firebase Auth or Firestore not available yet.");
         setLoading(false);
         return;
     }
 
+    // 🛡️ صمام أمان زمني لضمان عدم بقاء شاشة التحميل عالقة للأبد
+    const fallbackTimer = setTimeout(() => {
+        if (loading && !isInitialized.current) {
+            console.warn("Auth initialization timed out. Forcing load completion.");
+            setLoading(false);
+        }
+    }, 8000);
+
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
-        // نضبط التحميل على True عند استشعار تغيير، لكن نضمن إغلاقه في النهاية
-        setLoading(true);
         try {
             if (firebaseUser) {
                 const idTokenResult = await firebaseUser.getIdTokenResult();
@@ -66,7 +71,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
                             }
                         }
-                        // إغلاق التحميل بعد نجاح معالجة المطور
                         setLoading(false);
                         return;
                     }
@@ -101,13 +105,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error("Auth Critical Error:", error);
             setUser(null);
         } finally {
-            // ✨ الصمام السيادي: نضمن إغلاق حالة التحميل دائماً ✨
             setLoading(false);
             isInitialized.current = true;
+            clearTimeout(fallbackTimer);
         }
     });
 
-    return () => unsubscribe();
+    return () => {
+        unsubscribe();
+        clearTimeout(fallbackTimer);
+    };
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
   const login = useCallback(async (email: string, password: string) => {
