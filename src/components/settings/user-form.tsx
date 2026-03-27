@@ -16,8 +16,6 @@ import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Info } from 'lucide-react';
-import { useFirebase } from '@/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 
 
@@ -54,6 +52,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   const [usernameError, setUsernameError] = useState<string | null>(null);
 
   const availableEmployees = useMemo(() => {
+    // 🛡️ التصفية السيادية: إظهار الموظفين غير المرتبطين بحسابات في هذه المنشأة فقط
     const linkedEmployeeIds = new Set(allUsers.map(u => u.employeeId));
     if (isEditing && user?.employeeId) {
         linkedEmployeeIds.delete(user.employeeId);
@@ -95,7 +94,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
     }
     const isTaken = allUsers.some(u => u.username === username && u.id !== user?.id);
     if (isTaken) {
-        setUsernameError('اسم المستخدم هذا مستخدم بالفعل.');
+        setUsernameError('اسم المستخدم هذا مستخدم بالفعل في هذه المنشأة.');
     } else {
         setUsernameError(null);
     }
@@ -121,10 +120,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
           toast({ variant: 'destructive', title: 'خطأ', description: 'كلمة المرور مطلوبة ويجب أن لا تقل عن 8 أحرف.' });
           return;
       }
-       if (isEditing && password && password.length < 8) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'كلمة المرور الجديدة يجب أن لا تقل عن 8 أحرف.' });
-          return;
-      }
       
       const dataToSave = { ...formData };
       if (password) {
@@ -148,15 +143,9 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="sm:max-w-md" 
+        className="sm:max-w-md rounded-3xl" 
         dir="rtl"
         onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                e.preventDefault();
-            }
-        }}
-        onInteractOutside={(e) => {
             const target = e.target as HTMLElement;
             if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
                 e.preventDefault();
@@ -165,17 +154,17 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       >
         <form onSubmit={handleSubmit}>
             <DialogHeader>
-                <DialogTitle>{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="font-black text-xl">{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>
+                <DialogDescription className="font-bold">
                     {isEditing 
-                        ? `تعديل حساب المستخدم المرتبط بالموظف.`
-                        : 'سيتم إنشاء حساب دخول جديد للموظف المختار. سيكون الحساب غير مفعل افتراضيًا.'
+                        ? `تعديل حساب المستخدم المرتبط بالموظف في هذه المنشأة.`
+                        : 'سيتم إنشاء حساب دخول جديد للموظف المختار ضمن هذه الشركة.'
                     }
                 </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-6">
                 <div className="grid gap-2">
-                    <Label>اختيار الموظف <span className="text-destructive">*</span></Label>
+                    <Label className="font-black text-gray-700">اختيار الموظف من قائمة المنشأة <span className="text-destructive">*</span></Label>
                     <InlineSearchList
                         value={formData.employeeId || ''}
                         onSelect={(v) => handleSelectChange('employeeId', v)}
@@ -185,7 +174,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     />
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="username">اسم المستخدم <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="username" className="font-black text-gray-700">اسم المستخدم <span className="text-destructive">*</span></Label>
                     <Input 
                         id="username" 
                         value={formData.username} 
@@ -193,14 +182,15 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                         placeholder="english.letters.only" 
                         dir="ltr" 
                         required 
+                        className="h-11 rounded-xl font-bold border-2"
                     />
-                    {usernameError && <p className="text-xs text-destructive">{usernameError}</p>}
-                     <p className="text-xs text-muted-foreground">
-                        سيتم إنشاء بريد إلكتروني داخلي: <span dir='ltr' className='font-mono'>{formData.username || '...'}@scoop.local</span>
+                    {usernameError && <p className="text-xs text-destructive font-bold">{usernameError}</p>}
+                     <p className="text-[10px] text-muted-foreground font-bold">
+                        سيتم إنشاء بريد إلكتروني داخلي: <span dir='ltr' className='font-mono text-primary'>{formData.username || '...'}@scoop.local</span>
                      </p>
                 </div>
                  <div className="grid gap-2">
-                    <Label htmlFor="password">
+                    <Label htmlFor="password" className="font-black text-gray-700">
                         {isEditing ? 'كلمة المرور الجديدة (اختياري)' : 'كلمة المرور المؤقتة'} <span className={!isEditing ? "text-destructive" : ""}>*</span>
                     </Label>
                     <Input 
@@ -208,12 +198,13 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                         type="password" 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder={isEditing ? 'اتركه فارغًا لعدم التغيير' : '8 أحرف على الأقل'}
+                        placeholder={isEditing ? 'اتركه فارغاً لعدم التغيير' : '8 أحرف على الأقل'}
                         required={!isEditing} 
+                        className="h-11 rounded-xl font-mono border-2"
                     />
                 </div>
                 <div className="grid gap-2">
-                    <Label>الدور <span className="text-destructive">*</span></Label>
+                    <Label className="font-black text-gray-700">الدور والمسؤولية *</Label>
                      <InlineSearchList
                         value={formData.role || ''}
                         onSelect={(v) => handleSelectChange('role', v as UserProfile['role'])}
@@ -222,18 +213,20 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     />
                 </div>
                  {!isEditing && (
-                    <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>ملاحظة هامة</AlertTitle>
-                        <AlertDescription>
-                            سيتم إنشاء الحساب في حالة "غير مفعل". يجب عليك تفعيله يدويًا من قائمة الإجراءات بعد الحفظ ليتمكن المستخدم من تسجيل الدخول.
+                    <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
+                        <Info className="h-4 w-4 text-primary" />
+                        <AlertTitle className="text-xs font-black text-primary">ملاحظة هامة</AlertTitle>
+                        <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1">
+                            سيتم إنشاء الحساب في حالة "غير مفعل". يجب عليك تفعيله يدوياً من قائمة الإجراءات بعد الحفظ ليتمكن المستخدم من تسجيل الدخول.
                         </AlertDescription>
                     </Alert>
                 )}
             </div>
-            <DialogFooter>
-                <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-                <Button type="submit" disabled={!!usernameError}>{isEditing ? 'حفظ التغييرات' : 'إنشاء مستخدم'}</Button>
+            <DialogFooter className="gap-2 border-t pt-6">
+                <Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold">إلغاء</Button>
+                <Button type="submit" disabled={!!usernameError} className="rounded-xl font-black px-10 shadow-lg">
+                    {isEditing ? 'حفظ التعديلات' : 'إنشاء المستخدم الآن'}
+                </Button>
             </DialogFooter>
         </form>
       </DialogContent>
