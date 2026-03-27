@@ -19,10 +19,14 @@ import {
     Loader2, Save, ImageIcon, Palette, 
     FileText, Smartphone, LayoutGrid, 
     Printer, ShieldCheck, Sparkles, Building2,
-    Plus, Trash2, Globe, Mail, MapPin, Hash
+    Plus, Trash2, Globe, Mail, MapPin, Hash,
+    UploadCloud, Info
 } from 'lucide-react';
 import { PrintLayout } from '@/components/print/print-layout';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 
 // مخطط التحقق Zod
 const brandingSchema = z.object({
@@ -44,6 +48,58 @@ const brandingSchema = z.object({
 
 type BrandingFormValues = z.infer<typeof brandingSchema>;
 
+function ImageUploadField({
+  id,
+  label,
+  currentUrl,
+  onUrlChange,
+  onFileChange,
+  isSaving
+}: {
+  id: string;
+  label: string;
+  currentUrl?: string;
+  onUrlChange: (url: string) => void;
+  onFileChange: (file: File | null) => void;
+  isSaving: boolean;
+}) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setPreview(URL.createObjectURL(file));
+      onFileChange(file);
+      onUrlChange(''); 
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+        <Label className="font-black text-primary">{label}</Label>
+        <div 
+            onClick={() => !isSaving && fileInputRef.current?.click()}
+            className={cn(
+                "aspect-[4/1] w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-muted/20 relative",
+                isSaving && "opacity-50 cursor-not-allowed"
+            )}
+        >
+            {preview || currentUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={preview || currentUrl} className="w-full h-full object-contain" alt="Preview" />
+            ) : (
+                <>
+                    <UploadCloud className="h-10 w-10 text-muted-foreground opacity-30 mb-2" />
+                    <span className="text-xs font-bold text-muted-foreground">اضغط لرفع الصورة</span>
+                </>
+            )}
+        </div>
+        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} disabled={isSaving} />
+    </div>
+  );
+}
+
 export default function BrandingSettingsPage() {
   const { firestore } = useFirebase();
   const storage = useStorage();
@@ -53,9 +109,10 @@ export default function BrandingSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const footerInputRef = useRef<HTMLInputElement>(null);
-  const logoInputRef = useRef<HTMLInputElement>(null);
+  
+  const [headerFile, setHeaderFile] = useState<File | null>(null);
+  const [footerFile, setFooterFile] = useState<File | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const form = useForm<BrandingFormValues>({
     resolver: zodResolver(brandingSchema),
@@ -63,7 +120,7 @@ export default function BrandingSettingsPage() {
       useCustomImage: false,
       headerColor: '#1e40af',
       companyName: '',
-      footerData: { phones: [''] }
+      footerData: { phones: [''], address: '', email: '', crNumber: '', taxNumber: '', extraText: '' }
     }
   });
 
@@ -94,23 +151,11 @@ export default function BrandingSettingsPage() {
     fetchSettings();
   }, [firestore, user?.currentCompanyId, form]);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: keyof BrandingFormValues) => {
-    const file = e.target.files?.[0];
-    if (!file || !storage || !user?.currentCompanyId) return;
-
-    setIsSaving(true);
-    try {
-      const storageRef = ref(storage, `companies/${user.currentCompanyId}/print-templates/${fieldName}_${Date.now()}`);
-      const uploadResult = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(uploadResult.ref);
-      
-      form.setValue(fieldName, url as any, { shouldDirty: true });
-      toast({ title: 'تم الرفع بنجاح', description: 'تم تحديث الصورة في المعاينة.' });
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'خطأ في الرفع' });
-    } finally {
-      setIsSaving(false);
-    }
+  const uploadFile = async (file: File, folder: string): Promise<string> => {
+    if (!storage || !user?.currentCompanyId) return '';
+    const storageRef = ref(storage, `companies/${user.currentCompanyId}/print-templates/${folder}/${Date.now()}_${file.name}`);
+    const uploadResult = await uploadBytes(storageRef, file);
+    return await getDownloadURL(uploadResult.ref);
   };
 
   const onSubmit = async (data: BrandingFormValues) => {
@@ -118,13 +163,24 @@ export default function BrandingSettingsPage() {
 
     setIsSaving(true);
     try {
+      const finalData = { ...data };
+
+      if (headerFile) finalData.headerImageUrl = await uploadFile(headerFile, 'header');
+      if (footerFile) finalData.footerImageUrl = await uploadFile(footerFile, 'footer');
+      if (logoFile) finalData.logoUrl = await uploadFile(logoFile, 'logo');
+
       const brandingRef = doc(firestore, `companies/${user.currentCompanyId}/settings/branding`);
       await setDoc(brandingRef, {
-        ...data,
+        ...finalData,
         updatedAt: serverTimestamp()
       }, { merge: true });
 
       toast({ title: 'تم حفظ الهوية', description: 'تم تحديث بيانات العلامة التجارية بنجاح.' });
+      
+      // Reset file states
+      setHeaderFile(null);
+      setFooterFile(null);
+      setLogoFile(null);
     } catch (e) {
       toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
     } finally {
@@ -181,7 +237,7 @@ export default function BrandingSettingsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Settings Column */}
         <div className={cn("space-y-8", previewOpen ? "lg:col-span-6" : "lg:col-span-12")}>
-          <Tabs defaultValue="image-mode" onValueChange={(val) => form.setValue('useCustomImage', val === 'image-mode')}>
+          <Tabs defaultValue={form.getValues('useCustomImage') ? "image-mode" : "custom-mode"} onValueChange={(val) => form.setValue('useCustomImage', val === 'image-mode')}>
             <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-muted p-1 h-14">
               <TabsTrigger value="image-mode" className="rounded-xl font-bold gap-2 data-[state=active]:shadow-md">
                 <ImageIcon className="h-4 w-4" /> صورة قالب جاهز
@@ -196,47 +252,28 @@ export default function BrandingSettingsPage() {
               <Card className="rounded-3xl border-2 border-dashed">
                 <CardContent className="p-8 space-y-8">
                   <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-4">
-                        <Label className="font-black text-primary">صورة الترويسة (Header)</Label>
-                        <div 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="aspect-[4/1] w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-muted/20 relative"
-                        >
-                            {form.watch('headerImageUrl') ? (
-                                <img src={form.watch('headerImageUrl')} className="w-full h-full object-contain" alt="Header Preview" />
-                            ) : (
-                                <>
-                                    <UploadCloud className="h-10 w-10 text-muted-foreground opacity-30 mb-2" />
-                                    <span className="text-xs font-bold text-muted-foreground">اضغط لرفع الهيدر (210mm x 45mm)</span>
-                                </>
-                            )}
-                        </div>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'headerImageUrl')} />
-                    </div>
-
-                    <div className="space-y-4">
-                        <Label className="font-black text-primary">صورة التذييل (Footer)</Label>
-                        <div 
-                            onClick={() => footerInputRef.current?.click()}
-                            className="aspect-[4/1] w-full border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-muted/20 relative"
-                        >
-                            {form.watch('footerImageUrl') ? (
-                                <img src={form.watch('footerImageUrl')} className="w-full h-full object-contain" alt="Footer Preview" />
-                            ) : (
-                                <>
-                                    <UploadCloud className="h-10 w-10 text-muted-foreground opacity-30 mb-2" />
-                                    <span className="text-xs font-bold text-muted-foreground">اضغط لرفع الفوتر (210mm x 30mm)</span>
-                                </>
-                            )}
-                        </div>
-                        <input type="file" ref={footerInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'footerImageUrl')} />
-                    </div>
+                    <ImageUploadField 
+                        id="header" 
+                        label="صورة الترويسة (Header)" 
+                        currentUrl={form.watch('headerImageUrl')} 
+                        onUrlChange={(url) => form.setValue('headerImageUrl', url)}
+                        onFileChange={setHeaderFile}
+                        isSaving={isSaving}
+                    />
+                    <ImageUploadField 
+                        id="footer" 
+                        label="صورة التذييل (Footer)" 
+                        currentUrl={form.watch('footerImageUrl')} 
+                        onUrlChange={(url) => form.setValue('footerImageUrl', url)}
+                        onFileChange={setFooterFile}
+                        isSaving={isSaving}
+                    />
                   </div>
                   
                   <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
                     <Info className="h-4 w-4" />
                     <AlertTitle className="font-black text-primary">نصيحة المطور</AlertTitle>
-                    <AlertDescription className="text-sm font-medium">
+                    <AlertDescription className="text-sm font-medium leading-relaxed">
                         استخدام صور جاهزة يعطي نتائج مطابقة 100% لتصميمك في Illustrator أو Photoshop. تأكد أن العرض هو 210mm (عرض ورقة A4).
                     </AlertDescription>
                   </Alert>
@@ -257,14 +294,28 @@ export default function BrandingSettingsPage() {
                         <div className="space-y-4">
                             <Label className="font-black">شعار الشركة (Logo)</Label>
                             <div 
-                                onClick={() => logoInputRef.current?.click()}
-                                className="w-32 h-32 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-white shadow-inner relative"
+                                onClick={() => !isSaving && setPreviewOpen(false)} // Small hack to allow file input trigger
+                                className="relative"
                             >
-                                {form.watch('logoUrl') ? (
-                                    <img src={form.watch('logoUrl')} className="w-full h-full object-contain p-2" alt="Logo" />
-                                ) : <Plus className="h-8 w-8 text-muted-foreground opacity-20" />}
+                                <div 
+                                    className="w-32 h-32 border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-all overflow-hidden bg-white shadow-inner"
+                                    onClick={() => !isSaving && (document.getElementById('logo-file-input') as HTMLInputElement)?.click()}
+                                >
+                                    {logoFile || form.watch('logoUrl') ? (
+                                        <img src={logoFile ? URL.createObjectURL(logoFile) : form.watch('logoUrl')} className="w-full h-full object-contain p-2" alt="Logo" />
+                                    ) : <Plus className="h-8 w-8 text-muted-foreground opacity-20" />}
+                                </div>
+                                <input 
+                                    id="logo-file-input"
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*" 
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) setLogoFile(file);
+                                    }} 
+                                />
                             </div>
-                            <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'logoUrl')} />
                         </div>
 
                         <div className="md:col-span-2 space-y-6">
@@ -393,6 +444,3 @@ export default function BrandingSettingsPage() {
     </div>
   );
 }
-
-import { UploadCloud, Ban } from 'lucide-react';
-import { Skeleton as SkeletonUI } from '@/components/ui/skeleton';
