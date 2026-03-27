@@ -96,12 +96,12 @@ import { useAppTheme } from '@/context/theme-context';
 
 const navItems = {
   ar: [
-    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     
     { 
       label: 'علاقات العملاء (CRM)', 
       icon: LineChart, 
-      roles: ['Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
@@ -114,7 +114,7 @@ const navItems = {
     { 
       label: 'المقاولات والقياسات',
       icon: Construction,
-      roles: ['Admin', 'Engineer', 'Accountant'],
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: FileSignature },
@@ -131,7 +131,7 @@ const navItems = {
     { 
       label: 'مقاولين الباطن',
       icon: HardHat,
-      roles: ['Admin', 'Engineer', 'Accountant'],
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction/subcontractors',
       children: [
         { href: '/dashboard/construction/subcontractors', label: 'سجل المقاولين', icon: Users },
@@ -142,7 +142,7 @@ const navItems = {
     { 
       label: 'المطالبات المالية',
       icon: Coins,
-      roles: ['Admin', 'Accountant'],
+      roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/construction/payment-applications',
       children: [
         { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال', icon: Coins },
@@ -153,7 +153,7 @@ const navItems = {
     { 
       label: 'إدارة المشتريات',
       icon: ShoppingCart,
-      roles: ['Admin', 'Accountant', 'Engineer'],
+      roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
         { href: '/dashboard/purchasing/direct-invoice', label: 'فاتورة مشتريات مباشرة', icon: ShoppingBag },
@@ -169,7 +169,7 @@ const navItems = {
     { 
       label: 'المخازن والمستودعات',
       icon: Warehouse,
-      roles: ['Admin', 'Accountant', 'Engineer'],
+      roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/grns', label: 'أذونات استلام البضاعة', icon: FileCheck },
@@ -184,7 +184,7 @@ const navItems = {
     { 
       label: 'المحاسبة والمالية', 
       icon: Wallet, 
-      roles: ['Admin', 'Accountant'],
+      roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Network },
@@ -205,7 +205,7 @@ const navItems = {
     { 
       label: 'شؤون الموظفين (HR)', 
       icon: Handshake, 
-      roles: ['Admin', 'HR'],
+      roles: ['Developer', 'Admin', 'HR'],
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
@@ -221,7 +221,7 @@ const navItems = {
     { 
       label: 'الإعدادات', 
       icon: Settings, 
-      roles: ['Admin'],
+      roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
@@ -235,7 +235,7 @@ const navItems = {
     },
   ],
   en: [
-    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
   ]
 };
 

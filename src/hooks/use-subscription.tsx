@@ -14,7 +14,7 @@ import { useAuth } from '@/context/auth-context';
 
 /**
  * خطاف اشتراك لحظي مطور ومعزز:
- * تم إصلاح مشكلة التكرار اللانهائي وتأمين استجابة حالة التحميل.
+ * تم تحسين الأداء عبر منع إعادة الرندرة غير الضرورية وتثبيت حالة التحميل.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -27,26 +27,36 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
-    // نستخدم useRef للحفاظ على مرجع ثابت للقيود وتجنب الحلقات اللانهائية
+    // نستخدم useRef للحفاظ على استقرار الفلاتر ومنع الحلقات اللانهائية
     const constraintsRef = useRef(constraints);
+    const prevPathRef = useRef<string | null>(null);
+    const prevTenantRef = useRef<string | null>(null);
     
     useEffect(() => {
         constraintsRef.current = constraints;
     }, [constraints]);
 
     useEffect(() => {
+        const tenantId = user?.currentCompanyId || null;
+        
+        // منع إعادة التشغيل إذا لم يتغير المسار أو المنشأة
         if (!firestore || !collectionPath) {
             setLoading(false);
             setData([]);
             return;
         }
 
+        if (prevPathRef.current === collectionPath && prevTenantRef.current === tenantId) {
+            return; // لم يتغير شيء جوهري
+        }
+
+        prevPathRef.current = collectionPath;
+        prevTenantRef.current = tenantId;
         setLoading(true);
         
         // --- 🛡️ منطق العزل السيادي (Tenant Path & Group Resolution) ---
         let finalPath = collectionPath;
         let finalConstraints = [...constraintsRef.current];
-        const tenantId = user?.currentCompanyId;
         
         const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'company_settings'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
