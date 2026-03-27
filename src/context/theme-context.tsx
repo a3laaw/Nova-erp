@@ -13,17 +13,19 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  const [theme, setThemeState] = useState<Theme>('default');
+  const [theme, setThemeState] = useState<Theme>('glass');
 
   useEffect(() => {
-    // We force 'default' theme for now to respect user's color preferences
-    document.documentElement.setAttribute('data-theme', 'default');
-    setThemeState('default');
+    const saved = localStorage.getItem('nova_theme') as Theme;
+    const initialTheme = saved || 'glass';
+    document.documentElement.setAttribute('data-theme', initialTheme);
+    setThemeState(initialTheme);
   }, []);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('nova_theme', newTheme);
   };
 
   const toggleTheme = () => {
