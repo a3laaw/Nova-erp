@@ -3,11 +3,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- مساعدات المشروع الرئيسي (Master) ---
+    // --- مساعدات النظام السيادي ---
     function isDeveloper() {
       return request.auth != null && 
              request.auth.token.role == 'Developer' && 
              request.auth.token.isSuperAdmin == true;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return request.auth != null && 
+             (request.auth.token.role == 'Admin' || request.auth.token.role == 'Developer') &&
+             (request.auth.token.currentCompanyId == companyId || request.auth.token.companyId == companyId);
     }
 
     // السماح للمطور بالتحكم المطلق في مشروع الماستر
@@ -16,8 +22,19 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
+      // المطور يكتب في بيانات الربط، والادمن يقرأ فقط
       allow read: if request.auth != null;
       allow write: if isDeveloper();
+      
+      // السماح لمدير الشركة بتعديل الإعدادات والعلامة التجارية داخل مجلد شركته
+      match /settings/{settingId} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
+      
+      // السماح لمدير الموظفين بالتحكم في المجلدات الفرعية
+      match /{allSubcollections=**} {
+        allow read, write: if isCompanyAdmin(companyId);
+      }
     }
 
     // --- حماية سجلات الحركات والترقيم في الماستر ---
@@ -25,7 +42,7 @@ service cloud.firestore {
       allow read, write: if isDeveloper();
     }
 
-    // --- السماح بالوصول العام للمشاريع الفرعية بناءً على التوثيق ---
+    // --- القاعدة العامة للوصول المعزول ---
     match /{document=**} {
       allow read, write: if isDeveloper() || (request.auth != null && request.auth.uid != null);
     }
