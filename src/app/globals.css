@@ -7,13 +7,14 @@
 
 @layer base {
   :root {
-    --background: 230 25% 97%;
+    /* مصفوفة الألوان السيادية - PURPLE SUITE */
+    --background: 260 100% 98%;
     --foreground: 224 71% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
+    --card: 0 0% 100% / 0.4;
+    --card-foreground: 240 50% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 71% 4%;
-    --primary: 262 83% 58%; /* أرجواني سيادي */
+    --primary: 270 70% 40%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -23,7 +24,7 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
+    --border: 0 0% 100% / 0.2;
     --input: 214.3 31.8% 91.4%;
     --ring: 262 83% 58%;
     --radius: 1.5rem;
@@ -33,7 +34,10 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background: linear-gradient(135deg, #f3e8ff 0%, #e0e7ff 50%, #f3e8ff 100%);
+    /* الخلفية الأساسية: تدرج لوني ناعم وعميق (Ambient Gradient) */
+    background: radial-gradient(circle at top right, rgba(165, 243, 252, 0.4), transparent 40%),
+                radial-gradient(circle at bottom left, rgba(244, 114, 182, 0.2), transparent 40%),
+                linear-gradient(135deg, #f3e8ff 0%, #e0e7ff 50%, #fce7f3 100%);
     background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
@@ -42,24 +46,24 @@
 }
 
 @layer components {
+  /* تأثير Glassmorphism المتطور */
   .glass-effect {
-    @apply bg-white/40 backdrop-blur-2xl border border-white/60 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+    @apply bg-white/20 backdrop-blur-[20px] border border-white/30 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
   }
   
   .glass-input {
-    @apply bg-white/30 backdrop-blur-md border-white/40 focus:bg-white/60 transition-all shadow-inner;
+    @apply bg-white/10 backdrop-blur-md border-white/20 focus:bg-white/30 transition-all shadow-inner;
   }
 
   .sidebar-glass {
-    @apply bg-purple-100/15 backdrop-blur-[25px] border-l border-white/20 shadow-2xl;
+    @apply bg-white/10 backdrop-blur-[40px] border-l border-white/20 shadow-2xl;
   }
 
-  .inner-glow-border {
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
-  }
-
-  .active-glow {
-    box-shadow: 0 0 20px rgba(114, 9, 183, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  .active-item-glow {
+    background: rgba(114, 9, 183, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(114, 9, 183, 0.2),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+    @apply border-white/30;
   }
 }
 

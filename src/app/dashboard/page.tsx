@@ -18,7 +18,8 @@ import {
     LayoutGrid,
     PlusCircle,
     ShieldAlert,
-    BellRing
+    BellRing,
+    BarChart3
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { useSubscription, useFirebase } from '@/firebase';
@@ -33,44 +34,24 @@ import { Badge } from '@/components/ui/badge';
 import type { RecurringObligation } from '@/lib/types';
 import { addDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
-import { useAppTheme } from '@/context/theme-context';
+
+const StatCard = ({ title, value, icon, description, loading, colorClass }: any) => (
+    <Card className="hover-lift border-white/40">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-black text-[#1e1b4b]/60 uppercase tracking-widest">{title}</CardTitle>
+            <div className={cn("p-2 rounded-xl bg-white/30 border border-white/40", colorClass)}>{icon}</div>
+        </CardHeader>
+        <CardContent>
+            {loading ? <Skeleton className="h-8 w-24 mt-1" /> : <div className="text-3xl font-black font-mono tracking-tighter text-[#1e1b4b]">{value}</div>}
+            <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">{description}</p>
+        </CardContent>
+    </Card>
+);
 
 export default function DashboardPage() {
   const { firestore } = useFirebase();
   const { journalEntries, projects, clients, accounts, loading } = useAnalyticalData();
   const { data: obligations } = useSubscription<RecurringObligation>(firestore, 'recurring_obligations');
-  const { theme } = useAppTheme();
-  const isGlass = theme === 'glass';
-
-  const liquidityAlert = useMemo(() => {
-    if (loading || !obligations) return null;
-
-    const bankAccountIds = accounts.filter(a => a.code.startsWith('110103')).map(a => a.id);
-    const bankBalance = journalEntries
-        .filter(e => e.status === 'posted')
-        .flatMap(e => e.lines)
-        .filter(l => bankAccountIds.includes(l.accountId))
-        .reduce((sum, l) => sum + (l.debit || 0) - (l.credit || 0), 0);
-
-    const horizon = addDays(new Date(), 2);
-    const upcomingObs = obligations.filter(ob => {
-        const dueDate = toFirestoreDate(ob.dueDate);
-        return ob.status === 'active' && dueDate && dueDate <= horizon;
-    });
-
-    const totalUpcoming = upcomingObs.reduce((sum, ob) => sum + ob.amount, 0);
-    const isShortfall = bankBalance < totalUpcoming;
-
-    if (upcomingObs.length > 0 && isShortfall) {
-        return {
-            bankBalance,
-            totalUpcoming,
-            shortfall: totalUpcoming - bankBalance,
-            count: upcomingObs.length
-        };
-    }
-    return null;
-  }, [journalEntries, accounts, obligations, loading]);
 
   const stats = useMemo(() => {
     if (loading) return null;
@@ -85,157 +66,75 @@ export default function DashboardPage() {
   }, [journalEntries, projects, clients, loading]);
 
   return (
-    <div className="space-y-10" dir="rtl">
-        <Card className={cn(
-            "rounded-[2.5rem] overflow-hidden border-none glass-effect",
-            !isGlass && "bg-gradient-to-l from-white to-sky-50 shadow-sm"
-        )}>
-            <CardHeader className="pb-8 px-8 border-b border-white/20">
-                <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-                    <div className="space-y-1 text-center lg:text-right">
-                        <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3 text-[#1e1b4b]">
-                            <LayoutGrid className="text-primary h-8 w-8" />
-                            لوحة التحكم المركزية
-                        </CardTitle>
-                        <CardDescription className="text-base font-medium text-[#1e1b4b]/70">
-                            مرحباً بك مجدداً. إليك نظرة شاملة على أداء المنشأة والمشاريع القائمة.
-                        </CardDescription>
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                        <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2 bg-white/40 border-white/60 text-[#1e1b4b]">
-                            <Link href="/dashboard/notifications">
-                                <BellRing className="h-5 w-5" />
-                                سجل التنبيهات
-                            </Link>
-                        </Button>
-                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-primary/20 bg-[#7209B7] text-white">
-                            <Link href="/dashboard/clients/new">
-                                <PlusCircle className="h-5 w-5" />
-                                إضافة عميل جديد
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-            </CardHeader>
-        </Card>
-
-        {liquidityAlert && (
-            <Card className="border-none shadow-2xl bg-gradient-to-br from-red-600 to-red-800 text-white rounded-[2.5rem] overflow-hidden animate-in zoom-in-95 duration-500">
-                <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-white/20 rounded-2xl">
-                                <ShieldAlert className="h-8 w-8 text-white" />
-                            </div>
-                            <div>
-                                <CardTitle className="text-2xl font-black tracking-tight">تنبيه عجز سيولة وشيك!</CardTitle>
-                                <CardDescription className="text-white/80 font-bold">لديك {liquidityAlert.count} التزامات مستحقة خلال 48 ساعة.</CardDescription>
-                            </div>
-                        </div>
-                        <Badge variant="outline" className="text-white border-white/40 font-black">إدارة المخاطر</Badge>
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-4 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-right">
-                    <div className="space-y-1">
-                        <p className="text-xs uppercase font-bold opacity-70">رصيد البنك الحالي</p>
-                        <p className="text-3xl font-black font-mono">{formatCurrency(liquidityAlert.bankBalance)}</p>
-                    </div>
-                    <div className="h-12 w-px bg-white/20 hidden md:block" />
-                    <div className="space-y-1">
-                        <p className="text-xs uppercase font-bold opacity-70">المطلوب سداده</p>
-                        <p className="text-3xl font-black font-mono">{formatCurrency(liquidityAlert.totalUpcoming)}</p>
-                    </div>
-                    <div className="bg-white/10 p-4 rounded-3xl border border-white/20">
-                        <p className="text-xs font-bold mb-1">العجز المتوقع</p>
-                        <p className="text-2xl font-black text-yellow-300 font-mono">{formatCurrency(liquidityAlert.shortfall)}</p>
-                    </div>
-                    <Button asChild variant="secondary" className="h-12 px-8 rounded-xl font-black text-red-700 hover:bg-white transition-all">
-                        <Link href="/dashboard/accounting/recurring">تغطية العجز فوراً</Link>
-                    </Button>
-                </CardContent>
-            </Card>
-        )}
+    <div className="space-y-10 p-2 lg:p-6" dir="rtl">
+        {/* Header Header */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="space-y-1 text-center lg:text-right">
+                <h1 className="text-4xl font-black flex items-center justify-center lg:justify-start gap-3 text-[#1e1b4b] tracking-tighter">
+                    <LayoutGrid className="text-primary h-9 w-9" />
+                    لوحة التحكم المركزية
+                </h1>
+                <p className="text-base font-bold text-[#1e1b4b]/60">مرحباً بك مجدداً. إليك نظرة شاملة على أداء المنشأة.</p>
+            </div>
+            
+            <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button asChild variant="outline" className="h-12 px-8 rounded-2xl font-black gap-2 bg-white/40 border-white/60 text-[#1e1b4b]">
+                    <Link href="/dashboard/notifications"><BellRing className="h-5 w-5" /> التنبيهات</Link>
+                </Button>
+                <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 shadow-2xl bg-primary text-white">
+                    <Link href="/dashboard/clients/new"><PlusCircle className="h-5 w-5" /> إضافة عميل جديد</Link>
+                </Button>
+            </div>
+        </div>
 
         <DataAnomalyAlert />
 
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <StatCard 
+                title="إجمالي التدفقات" 
+                value={formatCurrency(stats?.totalRevenue || 0)} 
+                icon={<CircleDollarSign className="h-5 w-5" />} 
+                description="إيرادات العقود المرحلة"
+                loading={loading}
+                colorClass="text-green-600"
+            />
+            <StatCard 
+                title="المواقع النشطة" 
+                value={stats?.activeProjectsCount || 0} 
+                icon={<Briefcase className="h-5 w-5" />} 
+                description="مشاريع قيد التنفيذ الميداني"
+                loading={loading}
+                colorClass="text-blue-600"
+            />
+            <StatCard 
+                title="قاعدة العملاء" 
+                value={stats?.totalClientsCount || 0} 
+                icon={<Users className="h-5 w-5" />} 
+                description="إجمالي الملفات المسجلة"
+                loading={loading}
+                colorClass="text-purple-600"
+            />
+        </div>
+
         <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
-            <div className="grid gap-6 md:grid-cols-2 xl:col-span-3">
-                <Card className="border-none shadow-sm rounded-3xl hover-lift transition-all glass-effect">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-bold text-[#1e1b4b]/60 uppercase tracking-wider">
-                            إجمالي التدفقات الداخلة
-                        </CardTitle>
-                        <CircleDollarSign className="h-5 w-5 text-primary opacity-50" />
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? <Skeleton className="h-8 w-32" /> : (
-                            <div className="text-3xl font-black font-mono text-[#7209B7]">
-                                {formatCurrency(stats?.totalRevenue || 0)}
-                            </div>
-                        )}
-                        <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">بناءً على القيود المرحلة</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm rounded-3xl hover-lift transition-all glass-effect">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-bold text-[#1e1b4b]/60 uppercase tracking-wider">
-                            المواقع النشطة
-                        </CardTitle>
-                        <Briefcase className="h-5 w-5 text-orange-600 opacity-50" />
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? <Skeleton className="h-8 w-16" /> : (
-                            <div className="text-3xl font-black font-mono text-orange-700">
-                                {stats?.activeProjectsCount}
-                            </div>
-                        )}
-                        <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">مواقع تخضع للإشراف حالياً</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm rounded-3xl hover-lift transition-all glass-effect">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-bold text-[#1e1b4b]/60 uppercase tracking-wider">قاعدة بيانات العملاء</CardTitle>
-                        <Users className="h-5 w-5 text-muted-foreground opacity-50" />
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? <Skeleton className="h-8 w-16" /> : (
-                            <div className="text-3xl font-black font-mono text-[#1e1b4b]">
-                                {stats?.totalClientsCount}
-                            </div>
-                        )}
-                        <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">إجمالي الملفات المسجلة</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-none shadow-sm rounded-3xl glass-effect border-primary/20">
+            <div className="grid gap-8 xl:col-span-2">
+                <RecentActivity />
+                <UpcomingAppointments />
+            </div>
+            <div className="grid gap-8">
+                <Card className="border-none shadow-xl bg-primary text-white rounded-[2.5rem] overflow-hidden group">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-bold text-[#1e1b4b]">كشف يوميات المواقع</CardTitle>
+                        <CardTitle className="text-lg font-black text-white/90">يوميات المواقع</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-sm font-bold leading-relaxed mb-4 text-[#1e1b4b]/80">
-                            تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.
-                        </div>
-                        <Button asChild variant="default" className="w-full font-black rounded-xl h-10 bg-[#7209B7] text-white">
-                            <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
+                        <p className="text-sm font-bold text-white/70 mb-6 leading-relaxed">تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات في المواقع النشطة.</p>
+                        <Button asChild variant="secondary" className="w-full h-12 rounded-2xl font-black bg-white/20 hover:bg-white/30 text-white border border-white/30">
+                            <Link href="/dashboard/construction/field-visits" className="gap-2">فتح العرض الهندسي <ArrowUpRight className="h-4 w-4"/></Link>
                         </Button>
                     </CardContent>
                 </Card>
-            </div>
-            
-            <div className="grid gap-6">
                 <PendingVisits />
                 <TaskPrioritization />
-            </div>
-
-            <div className="grid gap-6 xl:col-span-2">
-                <RecentActivity />
-            </div>
-            
-            <div className="grid gap-6 xl:col-span-3">
-                <UpcomingAppointments />
             </div>
         </div>
     </div>
