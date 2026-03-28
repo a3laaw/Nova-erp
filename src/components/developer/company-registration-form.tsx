@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -16,8 +15,6 @@ import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
 import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -122,7 +119,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               firebaseConfig,
               updatedAt: serverTimestamp()
           }));
-          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات الربط بالمنشأة.' });
+          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات ربط المنشأة.' });
       } else {
           const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
           
@@ -187,7 +184,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 shadow-inner">
                         <div className="grid gap-2">
                             <Label htmlFor="name" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالعربية) *</Label>
-                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="أدخل اسم الشركة..." />
+                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="أدخل اسم المنشأة..." />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="nameEn" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالإنجليزية)</Label>

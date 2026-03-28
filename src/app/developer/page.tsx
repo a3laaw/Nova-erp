@@ -26,6 +26,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+/**
+ * @fileOverview غرفة التحكم الكبرى (Developer Console).
+ * تم تحديثها لضمان العزل التام للمنظمات وسرعة تحميل البيانات.
+ */
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -38,21 +42,21 @@ export default function DeveloperDashboard() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = useState<Company | null>(null);
 
-  // 🛡️ تم إزالة orderBy من الاستعلام المباشر لتجنب مشكلة الفهارس (Indexes) التي تسبب التحميل اللانهائي
+  // 🛡️ جلب كافة المنشآت من المجلد الرئيسي مباشرة (Sovereign Fetch)
   const { data: rawCompanies, loading, error } = useSubscription<Company>(firestore, 'companies', []);
 
-  // 🔄 الترتيب والفلترة برمجياً لضمان السرعة المطلقة
+  // 🔄 معالجة البيانات برمجياً لضمان السرعة (Client-side Processing)
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
     
-    // 1. الترتيب حسب تاريخ الإنشاء (الأحدث أولاً)
+    // 1. الترتيب: الأحدث أولاً
     let processed = [...rawCompanies].sort((a, b) => {
         const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
         const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
         return timeB - timeA;
     });
 
-    // 2. الفلترة حسب البحث
+    // 2. الفلترة حسب البحث السيادي
     if (searchQuery) {
         const lower = searchQuery.toLowerCase();
         processed = processed.filter(c => 
@@ -70,9 +74,9 @@ export default function DeveloperDashboard() {
     setIsProcessing(company.id!);
     try {
         await updateDoc(doc(firestore, 'companies', company.id!), { isActive: !company.isActive });
-        toast({ title: 'نجاح التغيير', description: `تم ${!company.isActive ? 'تفعيل' : 'تعطيل'} الشركة بنجاح.` });
+        toast({ title: 'نجاح التغيير', description: `تم ${!company.isActive ? 'تفعيل' : 'تعطيل'} المنشأة بنجاح.` });
     } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ' });
+        toast({ variant: 'destructive', title: 'خطأ في التحديث' });
     } finally {
         setIsProcessing(null);
     }
@@ -124,12 +128,12 @@ export default function DeveloperDashboard() {
                         </div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الكبرى</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية والولوج السيادي للمنشآت الهندسية.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية والولوج السيادي لكافة المنشآت.</CardDescription>
                         </div>
                     </div>
                     
                     <div className="flex items-center gap-4">
-                        <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Active</Badge>
+                        <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Connected</Badge>
                     </div>
                 </div>
             </CardHeader>
@@ -140,7 +144,7 @@ export default function DeveloperDashboard() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle className="font-black">خطأ في جلب البيانات السيادية</AlertTitle>
                 <AlertDescription className="font-medium">
-                    {error.message || "حدثت مشكلة أثناء محاولة الاتصال بقاعدة بيانات الشركات."}
+                    {error.message || "حدثت مشكلة أثناء محاولة الاتصال بقاعدة بيانات المنشآت."}
                 </AlertDescription>
             </Alert>
         )}
@@ -152,7 +156,7 @@ export default function DeveloperDashboard() {
                         <div className="relative w-full max-w-xl group">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-indigo-600" />
                             <Input 
-                                placeholder="بحث سيادي في قاعدة البيانات..." 
+                                placeholder="بحث سيادي في قائمة المنشآت..." 
                                 value={searchQuery} 
                                 onChange={e => setSearchQuery(e.target.value)} 
                                 className="pl-14 h-14 rounded-3xl border-2 border-slate-200 bg-white text-black font-black text-xl placeholder:text-slate-400 shadow-inner focus:ring-4 focus:ring-indigo-100 transition-all"
@@ -168,7 +172,7 @@ export default function DeveloperDashboard() {
                         <Table>
                             <TableHeader className="bg-[#1e1b4b] h-16">
                                 <TableRow className="border-none hover:bg-transparent">
-                                    <TableHead className="px-12 font-black text-white text-base text-right">المنشأة الهندسية</TableHead>
+                                    <TableHead className="px-12 font-black text-white text-base text-right">المنشأة</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">ID المشروع</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">حالة الخدمة</TableHead>
                                     <TableHead className="text-left px-12 font-black text-indigo-100 text-base">التحكم والتقمص</TableHead>
@@ -180,12 +184,12 @@ export default function DeveloperDashboard() {
                                         <TableCell colSpan={4} className="text-center p-40">
                                             <div className="flex flex-col items-center gap-4">
                                                 <Loader2 className="animate-spin h-16 w-16 text-indigo-500" />
-                                                <p className="font-black text-indigo-600 animate-pulse">جاري فحص مصفوفة المنشآت...</p>
+                                                <p className="font-black text-indigo-600 animate-pulse">جاري جلب قائمة المنشآت من السحابة...</p>
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : filteredCompanies.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="h-80 text-center text-slate-300 italic font-black text-2xl tracking-widest uppercase">No Active Tenants Found</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="h-80 text-center text-slate-300 italic font-black text-2xl tracking-widest uppercase">No Active Entities Found</TableCell></TableRow>
                                 ) : (
                                     filteredCompanies.map(company => (
                                         <TableRow key={company.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all">

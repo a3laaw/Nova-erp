@@ -36,7 +36,7 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                 <Terminal className="h-6 w-6 text-white" />
             </div>
             <div className="flex flex-col">
-                <span className="font-black text-xl text-white tracking-tighter leading-none">Developer Console</span>
+                <span className="font-black text-xl text-white tracking-tighter leading-none">غرفة التحكم السيادية</span>
                 <div className="flex items-center gap-2 mt-1">
                     <div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
                     <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sovereign Admin Environment</span>
