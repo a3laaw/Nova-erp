@@ -34,11 +34,11 @@ const brandingSchema = z.object({
   footerImageUrl: z.string().optional().nullable(),
   logoUrl: z.string().optional().nullable(),
   headerColor: z.string().default('#7209B7'),
-  companyName: z.string().min(3, 'اسم الشركة يجب أن لا يقل عن 3 أحرف'),
+  companyName: z.string().min(3, 'اسم المنشأة يجب أن لا يقل عن 3 أحرف'),
   footerData: z.object({
     address: z.string().optional().nullable(),
-    phones: z.array(z.string()).default([]),
-    email: z.string().email('بريد إلكتروني غير صالح').optional().or(z.literal('')).nullable(),
+    phones: z.array(z.string()).default(['']),
+    email: z.string().optional().nullable(), // Removed .email() strictness for empty values
     taxNumber: z.string().optional().nullable(),
     crNumber: z.string().optional().nullable(),
     extraText: z.string().optional().nullable(),
@@ -71,8 +71,8 @@ function ImageUploadField({
 
   return (
     <div className="space-y-4">
-        <Label className="font-black text-primary flex items-center gap-2">
-            <ImageIcon className="h-4 w-4" /> {label}
+        <Label className="font-black text-[#1e1b4b] flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-primary" /> {label}
         </Label>
         <div 
             onClick={() => !isSaving && fileInputRef.current?.click()}
@@ -155,13 +155,16 @@ export default function BrandingSettingsPage() {
 
   const uploadFile = async (file: File, folder: string): Promise<string> => {
     if (!storage || !user?.currentCompanyId) return '';
-    const storageRef = ref(storage, `companies/${user.currentCompanyId}/print-templates/${folder}/${Date.now()}_${file.name}`);
+    const storageRef = ref(storage, `companies/${user.currentCompanyId}/branding/${folder}/${Date.now()}_${file.name}`);
     const uploadResult = await uploadBytes(storageRef, file);
     return await getDownloadURL(uploadResult.ref);
   };
 
   const onSubmit = async (data: BrandingFormValues) => {
-    if (!firestore || !user?.currentCompanyId) return;
+    if (!firestore || !user?.currentCompanyId) {
+        toast({ variant: 'destructive', title: 'خطأ سيادي', description: 'لم يتم التعرف على هوية المنشأة الحالية.' });
+        return;
+    }
 
     setIsSaving(true);
     try {
@@ -177,26 +180,25 @@ export default function BrandingSettingsPage() {
         updatedAt: serverTimestamp()
       }), { merge: true });
 
-      toast({ title: 'نجاح الحفظ', description: 'تم تحديث هوية المنشأة والورق الرسمي بنجاح.' });
+      toast({ title: 'نجاح الحفظ اللحظي', description: 'تم تحديث هوية المنشأة والورق الرسمي بنجاح.' });
       
       setHeaderFile(null);
       setFooterFile(null);
       setLogoFile(null);
     } catch (e: any) {
       console.error("Save Error:", e);
-      toast({ variant: 'destructive', title: 'فشل الحفظ', description: e.message || "حدث خطأ غير متوقع." });
+      toast({ variant: 'destructive', title: 'فشل الحفظ', description: e.message || "حدث خطأ غير متوقع أثناء الرفع أو الحفظ." });
     } finally {
       setIsSaving(false);
     }
   };
 
   const onError = (errors: any) => {
-      console.error("Form Errors:", errors);
-      const firstErrorKey = Object.keys(errors)[0];
+      console.error("Form Validation Errors:", errors);
       toast({
           variant: 'destructive',
-          title: 'خطأ في التحقق',
-          description: `يرجى مراجعة حقل ${firstErrorKey} والتأكد من صحة البيانات.`
+          title: 'بيانات غير مكتملة',
+          description: 'يرجى مراجعة الحقول الحمراء والتأكد من إدخال اسم المنشأة بشكل صحيح.'
       });
   };
 
@@ -219,8 +221,8 @@ export default function BrandingSettingsPage() {
                 <Palette className="h-8 w-8" />
               </div>
               <div>
-                <CardTitle className="text-3xl font-black text-[#1e1b4b]">إدارة العلامة التجارية</CardTitle>
-                <CardDescription className="text-base font-medium text-[#1e1b4b]/70">تخصيص الهوية البصرية للتقارير والمراسلات الرسمية.</CardDescription>
+                <CardTitle className="text-3xl font-black text-[#1e1b4b]">إدارة الهوية والورق الرسمي</CardTitle>
+                <CardDescription className="text-base font-medium text-[#1e1b4b]/70">تخصيص الهوية البصرية والمراسلات الرسمية للمنظومة.</CardDescription>
               </div>
             </div>
             <div className="flex gap-2">
@@ -239,7 +241,7 @@ export default function BrandingSettingsPage() {
                     className="h-11 px-8 rounded-xl font-black gap-2 shadow-lg shadow-primary/20 bg-primary text-white"
                 >
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    حفظ كافة الإعدادات
+                    اعتماد وحفظ الهوية
                 </Button>
             </div>
           </div>
@@ -250,13 +252,16 @@ export default function BrandingSettingsPage() {
           <CardContent className="p-8">
               <div className="grid gap-3 max-w-xl">
                   <Label className="font-black text-[#1e1b4b] text-lg flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-primary" /> اسم المنشأة الرسمي (بالعربية) *
+                      <Building2 className="h-5 w-5 text-primary" /> اسم المنشأة الرسمي المعمد *
                   </Label>
                   <Input 
                     {...form.register('companyName')} 
-                    placeholder="أدخل اسم المنشأة الذي سيظهر في العقود والسندات..." 
+                    placeholder="سيظهر هذا الاسم في ترويسة كافة المستندات..." 
                     className="h-12 rounded-xl text-xl font-black border-white/40 bg-white/30 shadow-inner focus:bg-white/60 transition-all" 
                   />
+                  {form.formState.errors.companyName && (
+                      <p className="text-xs text-red-600 font-bold pr-1">{form.formState.errors.companyName.message}</p>
+                  )}
               </div>
           </CardContent>
       </Card>
@@ -266,17 +271,17 @@ export default function BrandingSettingsPage() {
           <Tabs defaultValue={form.getValues('useCustomImage') ? "image-mode" : "custom-mode"} onValueChange={(val) => form.setValue('useCustomImage', val === 'image-mode')}>
             <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-white/40 backdrop-blur-md p-1 h-14 border border-white/60">
               <TabsTrigger value="image-mode" className="rounded-xl font-bold gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <ImageIcon className="h-4 w-4" /> صورة قالب جاهز
+                <ImageIcon className="h-4 w-4" /> قالب مصمم جاهز
               </TabsTrigger>
               <TabsTrigger value="custom-mode" className="rounded-xl font-bold gap-2 data-[state=active]:bg-white data-[state=active]:shadow-md">
-                <Sparkles className="h-4 w-4" /> تصميم يدوي
+                <Sparkles className="h-4 w-4" /> بناء تصميم يدوي
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="image-mode" className="mt-6 space-y-6">
-              <Card className="rounded-3xl border-2 border-dashed glass-effect">
+              <Card className="rounded-3xl border-2 border-dashed glass-effect shadow-inner">
                 <CardContent className="p-8 space-y-8">
-                  <div className="grid gap-6 md:grid-cols-2">
+                  <div className="grid gap-8 md:grid-cols-2">
                     <ImageUploadField 
                         label="صورة الترويسة (Header)" 
                         currentUrl={form.watch('headerImageUrl')} 
@@ -290,39 +295,46 @@ export default function BrandingSettingsPage() {
                         isSaving={isSaving}
                     />
                   </div>
+                  <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
+                      <Info className="h-4 w-4 text-primary" />
+                      <AlertTitle className="text-xs font-black text-primary">نصيحة فنية</AlertTitle>
+                      <AlertDescription className="text-[10px] font-bold text-slate-600">
+                          يفضل أن تكون الصور بأبعاد 210mm عرضاً (قياس A4) وبدقة لا تقل عن 300dpi لضمان وضوح الطباعة.
+                      </AlertDescription>
+                  </Alert>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="custom-mode" className="mt-6 space-y-6">
-              <Card className="rounded-3xl border-none shadow-md overflow-hidden glass-effect">
+              <Card className="rounded-3xl border-none shadow-md overflow-hidden glass-effect border-2 border-white/40">
                 <CardHeader className="bg-white/20 border-b border-white/20">
                     <CardTitle className="text-lg font-black flex items-center gap-2 text-[#1e1b4b]">
-                        <LayoutGrid className="h-5 w-5 text-primary" /> مكونات الترويسة
+                        <LayoutGrid className="h-5 w-5 text-primary" /> مكونات الترويسة المخصصة
                     </CardTitle>
                 </CardHeader>
-                <CardContent className="p-8 space-y-8">
+                <CardContent className="p-8 space-y-10">
                     <div className="grid md:grid-cols-3 gap-8 items-start">
                         <div className="space-y-4">
-                            <Label className="font-black text-[#1e1b4b]">شعار الشركة (Logo)</Label>
+                            <Label className="font-black text-[#1e1b4b] pr-1 uppercase text-xs tracking-widest">شعار المنشأة (Logo)</Label>
                             <div 
-                                className="w-32 h-32 border-2 border-dashed rounded-3xl flex items-center justify-center cursor-pointer hover:bg-white/50 bg-white/30 shadow-inner overflow-hidden border-white/60 group"
+                                className="w-32 h-32 border-2 border-dashed rounded-3xl flex items-center justify-center cursor-pointer hover:bg-white/50 bg-white/30 shadow-inner overflow-hidden border-white/60 group transition-all"
                                 onClick={() => !isSaving && (document.getElementById('logo-file-input') as HTMLInputElement)?.click()}
                             >
                                 {logoFile || form.watch('logoUrl') ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={logoFile ? URL.createObjectURL(logoFile) : form.watch('logoUrl') || ''} className="w-full h-full object-contain p-2" alt="Logo" />
-                                ) : <Plus className="h-8 w-8 text-[#1e1b4b] opacity-20" />}
+                                ) : <Plus className="h-8 w-8 text-[#1e1b4b] opacity-20 group-hover:scale-110 transition-transform" />}
                             </div>
                             <input id="logo-file-input" type="file" className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && setLogoFile(e.target.files[0])} />
                         </div>
 
                         <div className="md:col-span-2 space-y-6">
                             <div className="grid gap-2">
-                                <Label className="font-bold text-[#1e1b4b]">لون الهوية البصرية</Label>
-                                <div className="flex gap-4 items-center">
-                                    <Input type="color" {...form.register('headerColor')} className="w-20 h-12 p-1 rounded-xl cursor-pointer bg-white/30 border-white/40" />
-                                    <Input {...form.register('headerColor')} className="h-12 rounded-xl font-mono text-center w-32 bg-white/30 border-white/40" />
+                                <Label className="font-bold text-[#1e1b4b] pr-1">لون السمة الرسمي</Label>
+                                <div className="flex gap-4 items-center bg-white/20 p-2 rounded-2xl border border-white/40 shadow-inner">
+                                    <Input type="color" {...form.register('headerColor')} className="w-20 h-12 p-1 rounded-xl cursor-pointer bg-white/30 border-none" />
+                                    <Input {...form.register('headerColor')} className="h-12 rounded-xl font-mono font-black text-center w-32 bg-white/30 border-white/40 text-primary" />
                                 </div>
                             </div>
                         </div>
@@ -330,25 +342,35 @@ export default function BrandingSettingsPage() {
 
                     <Separator className="bg-white/20" />
 
-                    <div className="space-y-6">
-                        <Label className="text-lg font-black text-[#1e1b4b]">بيانات تذييل الصفحة (Footer)</Label>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div className="grid gap-2"><Label className="font-bold">العنوان</Label><Input {...form.register('footerData.address')} className="rounded-xl bg-white/30 border-white/40" /></div>
-                            <div className="grid gap-2"><Label className="font-bold">البريد الإلكتروني</Label><Input {...form.register('footerData.email')} className="rounded-xl bg-white/30 border-white/40" /></div>
+                    <div className="space-y-8">
+                        <Label className="text-xl font-black text-[#1e1b4b] flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-primary" /> بيانات التذييل (Footer Details)
+                        </Label>
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <div className="grid gap-2"><Label className="font-bold pr-1">عنوان المقر</Label><Input {...form.register('footerData.address')} className="rounded-xl bg-white/30 border-white/40 h-11" /></div>
+                            <div className="grid gap-2"><Label className="font-bold pr-1">البريد الإلكتروني الرسمي</Label><Input {...form.register('footerData.email')} dir="ltr" className="rounded-xl bg-white/30 border-white/40 h-11" /></div>
                         </div>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div className="grid gap-2"><Label className="font-bold">السجل التجاري</Label><Input {...form.register('footerData.crNumber')} className="rounded-xl bg-white/30 border-white/40" /></div>
-                            <div className="grid gap-2"><Label className="font-bold">الرقم الضريبي</Label><Input {...form.register('footerData.taxNumber')} className="rounded-xl bg-white/30 border-white/40" /></div>
+                        <div className="grid md:grid-cols-2 gap-8">
+                            <div className="grid gap-2"><Label className="font-bold pr-1">رقم السجل التجاري</Label><Input {...form.register('footerData.crNumber')} className="rounded-xl bg-white/30 border-white/40 h-11 font-mono" /></div>
+                            <div className="grid gap-2"><Label className="font-bold pr-1">الرقم الضريبي</Label><Input {...form.register('footerData.taxNumber')} className="rounded-xl bg-white/30 border-white/40 h-11 font-mono" /></div>
                         </div>
-                        <div className="space-y-3">
-                            <Label className="font-bold">أرقام الهواتف</Label>
-                            {fields.map((field, index) => (
-                                <div key={field.id} className="flex gap-2">
-                                    <Input {...form.register(`footerData.phones.${index}` as any)} className="rounded-lg bg-white/30 border-white/40" />
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                            ))}
-                            <Button type="button" variant="outline" size="sm" onClick={() => append('')} className="rounded-lg bg-white/20"><Plus className="h-3 w-3 ml-1" /> إضافة هاتف</Button>
+                        
+                        <div className="space-y-4">
+                            <Label className="font-bold pr-1">أرقام هواتف التواصل</Label>
+                            <div className="grid gap-3">
+                                {fields.map((field, index) => (
+                                    <div key={field.id} className="flex gap-2 animate-in slide-in-from-right-2">
+                                        <Input {...form.register(`footerData.phones.${index}` as any)} placeholder="965XXXXXXXX" className="rounded-xl bg-white/30 border-white/40 h-11 font-mono" dir="ltr" />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-red-500 hover:bg-red-50 rounded-xl h-11 w-11"><Trash2 className="h-5 w-5" /></Button>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={() => append('')} className="rounded-xl bg-white/20 border-primary/20 text-primary font-black"><Plus className="h-4 w-4 ml-2" /> إضافة خط هاتف جديد</Button>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label className="font-bold pr-1">نص ختامي قانوني (اختياري)</Label>
+                            <Textarea {...form.register('footerData.extraText')} placeholder="مثال: يرجى العلم أن هذا المستند معتمد وصادر آلياً..." className="rounded-2xl bg-white/30 border-white/40 p-4" rows={2} />
                         </div>
                     </div>
                 </CardContent>
@@ -359,13 +381,18 @@ export default function BrandingSettingsPage() {
 
         {previewOpen && (
             <div className="lg:col-span-6 sticky top-24 h-fit animate-in fade-in slide-in-from-left-4 duration-500">
-                <div className="border-4 border-white/60 rounded-[2.5rem] shadow-2xl overflow-hidden glass-effect scale-[0.85] origin-top">
+                <div className="border-4 border-white rounded-[2.5rem] shadow-2xl overflow-hidden glass-effect scale-[0.85] origin-top">
                     <div className="p-4 flex justify-center overflow-auto max-h-[800px] scrollbar-none">
-                        <PrintLayout>
-                            <div className="py-20 space-y-8 opacity-40">
-                                <div className="h-8 w-1/3 bg-slate-200 rounded-full" />
-                                <div className="h-48 w-full border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center">
-                                    <p className="font-black text-slate-300 text-3xl italic uppercase">معاينة الورق الرسمي</p>
+                        <PrintLayout documentName="Preview_Branding">
+                            <div className="py-20 space-y-10 opacity-40">
+                                <div className="h-10 w-1/2 bg-slate-200 rounded-2xl" />
+                                <div className="h-64 w-full border-4 border-dashed border-slate-200 rounded-[3rem] flex items-center justify-center">
+                                    <p className="font-black text-slate-300 text-4xl italic uppercase tracking-tighter">معاينة الورق الرسمي</p>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="h-4 w-full bg-slate-100 rounded-full" />
+                                    <div className="h-4 w-5/6 bg-slate-100 rounded-full" />
+                                    <div className="h-4 w-2/3 bg-slate-100 rounded-full" />
                                 </div>
                             </div>
                         </PrintLayout>
