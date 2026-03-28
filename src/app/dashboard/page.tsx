@@ -19,7 +19,8 @@ import {
     PlusCircle,
     ShieldAlert,
     BellRing,
-    BarChart3
+    BarChart3,
+    ArrowUpRight
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { useSubscription, useFirebase } from '@/firebase';
