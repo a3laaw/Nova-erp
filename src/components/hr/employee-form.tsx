@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -10,7 +11,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import type { Employee, Department, Job, Account } from '@/lib/types';
+import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -161,6 +162,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         await onSave(formData);
     };
 
+    const isFoodOrDelivery = branding?.activityType === 'food_delivery';
     const showResidencyExpiry = formData.nationality && formData.nationality.trim() !== 'كويتي';
 
     return (
@@ -237,6 +239,40 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                         </div>
                     </div>
                 </section>
+
+                {/* 🛡️ حقول تخصصية بناءً على نشاط المنشأة 🛡️ */}
+                {isFoodOrDelivery && (
+                    <section className="space-y-6 p-6 border-2 border-primary/20 rounded-[2rem] bg-primary/[0.02] animate-in slide-in-from-bottom-4 duration-500">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                                <ShieldCheck className="h-5 w-5" />
+                            </div>
+                            <h3 className="font-black text-lg text-primary">وثائق التوصيل والأغذية</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2 p-4 bg-white rounded-2xl border shadow-sm group hover:border-primary/40 transition-all">
+                                <Label className="font-black text-xs text-gray-700 flex items-center gap-2">
+                                    <Landmark className="h-3.5 w-3.5 text-primary" /> انتهاء رخصة القيادة
+                                </Label>
+                                <DateInput 
+                                    value={formData.drivingLicenseExpiry} 
+                                    onChange={d => handleSelectChange('drivingLicenseExpiry', d)} 
+                                    className="h-10"
+                                />
+                            </div>
+                            <div className="grid gap-2 p-4 bg-white rounded-2xl border shadow-sm group hover:border-primary/40 transition-all">
+                                <Label className="font-black text-xs text-gray-700 flex items-center gap-2">
+                                    <FileCheck className="h-3.5 w-3.5 text-primary" /> انتهاء كرت الصحة
+                                </Label>
+                                <DateInput 
+                                    value={formData.healthCardExpiry} 
+                                    onChange={d => handleSelectChange('healthCardExpiry', d)} 
+                                    className="h-10"
+                                />
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2">
@@ -330,7 +366,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
 
                         <Separator className="my-2" />
 
-                        {/* ✨ القسم المستعاد: طريقة الدفع والبيانات البنكية المترابطة ✨ */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="salaryPaymentType" className="font-bold text-emerald-900">طريقة استلام الراتب</Label>
@@ -374,7 +409,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي
                 </Button>
-            </DialogFooter>
+            </div>
         </form>
     );
 }
