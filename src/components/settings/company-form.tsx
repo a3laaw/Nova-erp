@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import type { Company, CompanyActivityType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
@@ -13,8 +14,7 @@ import { collection, query, orderBy } from 'firebase/firestore';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
-import { Calendar, FileText } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { Calendar, FileText, Save } from 'lucide-react';
 
 interface CompanyFormProps {
   isOpen: boolean;
@@ -124,7 +124,7 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                     </div>
                 </div>
 
-                <Separator className="bg-muted" />
+                <Separator />
 
                 <div className="space-y-4 bg-muted/20 p-4 rounded-2xl border-2 border-dashed">
                     <h4 className="text-sm font-black text-primary flex items-center gap-2">

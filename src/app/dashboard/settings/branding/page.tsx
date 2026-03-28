@@ -26,6 +26,13 @@ import { cn, cleanFirestoreData } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { 
+    Select, 
+    SelectContent, 
+    SelectItem, 
+    SelectTrigger, 
+    SelectValue 
+} from '@/components/ui/select';
 
 const brandingSchema = z.object({
   useCustomImage: z.boolean().default(false),
@@ -208,15 +215,6 @@ export default function BrandingSettingsPage() {
     }
   };
 
-  const onValidationError = (errors: any) => {
-      const firstError = Object.values(errors)[0] as any;
-      toast({
-          variant: 'destructive',
-          title: 'بيانات ناقصة',
-          description: firstError?.message || 'يرجى مراجعة الحقول المطلوبة والتأكد من إدخال اسم المنشأة.'
-      });
-  };
-
   if (loading) {
     return (
       <div className="p-8 space-y-6" dir="rtl">
@@ -251,7 +249,7 @@ export default function BrandingSettingsPage() {
                     {previewOpen ? 'إخفاء المعاينة' : 'معاينة الطباعة'}
                 </Button>
                 <Button 
-                    onClick={form.handleSubmit(onSubmit, onValidationError)} 
+                    onClick={form.handleSubmit(onSubmit)} 
                     disabled={isSaving}
                     className="h-11 px-10 rounded-xl font-black gap-2 shadow-lg shadow-primary/20 bg-primary text-white"
                 >
@@ -289,7 +287,7 @@ export default function BrandingSettingsPage() {
                                   <SelectItem value="general">نشاط عام</SelectItem>
                                   <SelectItem value="food_delivery">توصيل ومواد غذائية</SelectItem>
                                   <SelectItem value="construction">مقاولات وإنشاءات</SelectItem>
-                                  <SelectItem value="consulting">استشارات فنية</SelectItem>
+                                  <SelectItem value="consulting">استشارات هندسية</SelectItem>
                               </SelectContent>
                           </Select>
                       </div>

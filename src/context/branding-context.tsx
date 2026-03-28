@@ -84,7 +84,7 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.currentCompanyId, user?.companyName]);
+  }, [firestore, user?.currentCompanyId ?? null, user?.companyName ?? null]);
   
 
   const value = useMemo(() => ({ branding, loading }), [branding, loading]);
