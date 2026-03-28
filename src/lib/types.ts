@@ -46,7 +46,7 @@ export interface Company extends BaseEntity {
   address?: string;
   phone?: string;
   email?: string;
-  activityType?: string;
+  activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
   status?: 'pending' | 'active' | 'suspended';
 }
 
@@ -198,6 +198,9 @@ export interface Employee extends BaseEntity {
   transportAllowance?: number;
   status: 'active' | 'on-leave' | 'terminated';
   residencyExpiry?: Timestamp | any;
+  passportExpiry?: Timestamp | any;
+  drivingLicenseExpiry?: Timestamp | any;
+  healthCardExpiry?: Timestamp | any;
   workStartTime?: string | null;
   workEndTime?: string | null;
   annualLeaveUsed?: number;
