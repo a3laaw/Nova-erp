@@ -14,6 +14,7 @@ import { InlineSearchList } from '../ui/inline-search-list';
 import { DateInput } from '../ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Calendar, FileText } from 'lucide-react';
+import { Separator } from '../ui/separator';
 
 interface CompanyFormProps {
   isOpen: boolean;
