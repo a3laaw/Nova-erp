@@ -38,19 +38,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAppTheme } from '@/context/theme-context';
 
-const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
-    let total = 0;
-    if (!projectId || !db) return total;
-    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
-    const receiptsSnap = await getDocs(receiptsQuery);
-    receiptsSnap.forEach(doc => {
-        if (doc.id !== excludeReceiptId) {
-            total += doc.data().amount || 0;
-        }
-    });
-    return total;
-};
-
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
@@ -349,8 +336,8 @@ export default function NewCashReceiptPage() {
   }, [accounts, paymentMethod]);
 
   return (
-    <Card className={cn("max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden", isGlass && "glass-effect")} dir="rtl">
-        <CardHeader className={cn("pb-8 rounded-t-[2.5rem] border-b", isGlass ? "bg-white/10" : "bg-primary/5")}>
+    <Card className={cn("max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden glass-effect")} dir="rtl">
+        <CardHeader className={cn("pb-8 rounded-t-[2.5rem] border-b bg-white/10")}>
             <div className="flex justify-between items-start">
                 <div>
                     <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
@@ -427,7 +414,7 @@ export default function NewCashReceiptPage() {
         </CardContent>
       <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
         <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg text-[#1e1b4b]/60">إلغاء</Button>
-        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px]">
+        <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px] bg-[#7209B7] text-white">
             {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} اعتماد وإصدار السند
         </Button>
       </CardFooter>

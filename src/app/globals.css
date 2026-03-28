@@ -33,7 +33,9 @@
 @layer base {
   * { @apply border-border; }
   body {
-    @apply bg-background text-foreground;
+    background: linear-gradient(135deg, #f3e8ff 0%, #e0e7ff 50%, #f3e8ff 100%);
+    background-attachment: fixed;
+    color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -48,38 +50,21 @@
     @apply bg-white/30 backdrop-blur-md border-white/40 focus:bg-white/60 transition-all shadow-inner;
   }
 
-  .tabs-frame-primary {
-    @apply bg-white/20 backdrop-blur-lg p-1.5 rounded-[2rem] border border-white/40 shadow-inner;
+  .sidebar-glass {
+    @apply bg-purple-100/15 backdrop-blur-[25px] border-l border-white/20 shadow-2xl;
   }
 
-  .tabs-frame-secondary {
-    @apply bg-slate-900/5 backdrop-blur-md p-1.5 rounded-2xl border border-slate-950/5;
+  .inner-glow-border {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
   }
 
-  .tabs-trigger-card {
-    @apply flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 gap-2 border-2 border-transparent text-slate-600;
-  }
-
-  .tabs-trigger-card[data-state="active"] {
-    @apply bg-white/80 text-primary border-primary/20 shadow-xl scale-[1.02] -translate-y-1;
-  }
-
-  .tab-icon-box {
-    @apply p-2 rounded-xl bg-muted/50 group-data-[state=active]:bg-primary/10 group-data-[state=active]:text-primary transition-colors;
+  .active-glow {
+    box-shadow: 0 0 20px rgba(114, 9, 183, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
-
-[data-theme="glass"] body {
-  background: linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%);
-  background-attachment: fixed;
-}
-
-[data-theme="glass"] .sidebar-glass {
-  @apply bg-[#E0E7FF]/60 backdrop-blur-3xl border-l border-white/40 shadow-2xl;
-}
 
 .hover-lift {
   @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
@@ -87,9 +72,4 @@
 
 .soft-shadow-input {
   box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
-}
-
-/* Specific Purple Suite Gradients */
-.bg-purple-suite {
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
 }

@@ -35,7 +35,6 @@ import {
   Search,
   LineChart,
   FileSignature,
-  FileText,
   ClipboardList,
   Construction,
   MapPin,
@@ -70,18 +69,14 @@ import {
   FileBarChart,
   Settings,
   Settings2,
-  Building,
   Tags,
   ShieldCheck,
   ChevronDown,
-  LogOut,
   UserX,
   ShoppingBag,
   FileStack,
   Wallet,
   Calculator,
-  History,
-  Sparkles,
   RotateCcw,
   ListTree
 } from 'lucide-react';
@@ -158,7 +153,6 @@ const navItems = {
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileStack },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: SearchCode },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: ShoppingCart },
-        { href: '/dashboard/purchasing/reports/price-history', label: 'تاريخ أسعار الأصناف', icon: History },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: Truck },
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: Landmark },
       ]
@@ -247,14 +241,16 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   if (!item.children && item.href) {
     return (
-      <SidebarMenuItem className="px-2">
+      <SidebarMenuItem className="px-3">
         <SidebarMenuButton 
           isActive={isActive} 
           asChild 
           tooltip={item.label}
           className={cn(
-            "my-0.5 rounded-xl font-bold transition-all duration-300",
-            isActive ? "bg-[#7209B7] text-white shadow-lg scale-[1.02] border-r-4 border-white/20" : "hover:bg-white/40 text-[#1e1b4b]"
+            "my-1 rounded-2xl font-black transition-all duration-500 inner-glow-border",
+            isActive 
+              ? "bg-gradient-to-r from-[#7209B7] to-purple-500/20 text-white shadow-xl active-glow scale-[1.02]" 
+              : "hover:bg-white/30 text-[#1e1b4b]"
           )}
         >
           <Link 
@@ -264,8 +260,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           >
             {Icon && (
               <Icon 
-                className="size-5 shrink-0" 
-                strokeWidth={isActive ? 3 : 2} 
+                className={cn("size-5 shrink-0", isActive ? "text-white" : "text-[#7209B7]")} 
+                strokeWidth={3} 
               />
             )}
             <span className="truncate text-sm flex-1">{item.label}</span>
@@ -278,30 +274,30 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (item.children) {
     if (state === "collapsed") {
       return (
-        <SidebarMenuItem className="px-2">
+        <SidebarMenuItem className="px-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <SidebarMenuButton 
                 isActive={isActive} 
                 tooltip={item.label}
                 className={cn(
-                    "my-0.5 rounded-xl transition-all duration-300",
-                    isActive ? "bg-[#7209B7] text-white shadow-lg" : "hover:bg-white/40 text-[#1e1b4b]"
+                    "my-1 rounded-2xl transition-all duration-500 inner-glow-border",
+                    isActive ? "bg-[#7209B7] text-white shadow-xl active-glow" : "hover:bg-white/30 text-[#1e1b4b]"
                 )}
               >
-                {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
+                {Icon && <Icon className={cn("size-5 shrink-0", isActive ? "text-white" : "text-[#7209B7]")} strokeWidth={3} />}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-2xl shadow-xl p-2 bg-white/95 backdrop-blur-2xl border-white/40">
-              <DropdownMenuLabel className="font-black text-primary px-3 py-2 text-base">{item.label}</DropdownMenuLabel>
+            <DropdownMenuContent side="left" align="start" dir="rtl" className="w-64 rounded-[2rem] shadow-2xl p-2 bg-white/90 backdrop-blur-3xl border-white/40">
+              <DropdownMenuLabel className="font-black text-[#1e1b4b] px-4 py-3 text-base">{item.label}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
-                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-0.5 cursor-pointer", isChildActive && "bg-primary/10 text-primary font-bold")}>
+                  <DropdownMenuItem key={child.href} asChild className={cn("rounded-xl my-1 cursor-pointer py-3", isChildActive && "bg-primary/10 text-[#7209B7] font-black")}>
                     <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                      {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
+                      {ChildIcon && <ChildIcon className="size-4 shrink-0 text-[#7209B7]" />}
                       <span className="text-sm mr-2">{child.label}</span>
                     </Link>
                   </DropdownMenuItem>
@@ -314,38 +310,40 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     }
 
     return (
-      <Collapsible defaultOpen={isActive} className="group/collapsible px-2">
+      <Collapsible defaultOpen={isActive} className="group/collapsible px-3">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton 
               isActive={isActive} 
               tooltip={item.label} 
               className={cn(
-                "my-0.5 rounded-xl font-bold transition-all duration-300",
-                isActive ? "bg-white/60 text-[#7209B7] shadow-sm" : "hover:bg-white/40 text-[#1e1b4b]"
+                "my-1 rounded-2xl font-black transition-all duration-500 inner-glow-border",
+                isActive 
+                  ? "bg-gradient-to-r from-[#7209B7] to-purple-500/10 text-white shadow-xl active-glow" 
+                  : "hover:bg-white/30 text-[#1e1b4b]"
               )}
             >
-              {Icon && <Icon className="size-5 shrink-0" strokeWidth={isActive ? 3 : 2} />}
+              {Icon && <Icon className={cn("size-5 shrink-0", isActive ? "text-white" : "text-[#7209B7]")} strokeWidth={3} />}
               <span className="truncate text-sm flex-1">{item.label}</span>
               <ChevronDown className={cn(
                 "h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50",
-                isActive ? "text-[#7209B7]" : ""
+                isActive ? "text-white" : "text-[#1e1b4b]"
               )} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 pr-4 border-r-2 border-primary/10">
+            <SidebarMenuSub className="mt-1 mb-2 pr-4 border-r-2 border-primary/10 bg-transparent">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 const ChildIcon = child.icon;
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl my-0.5 transition-all duration-200",
-                        isChildActive ? "bg-[#7209B7] text-white font-bold shadow-md" : "hover:bg-white/60 text-slate-600"
+                        "rounded-xl my-1 transition-all duration-300 font-bold bg-transparent",
+                        isChildActive ? "bg-white/60 text-[#7209B7] font-black shadow-sm" : "hover:bg-white/40 text-[#1e1b4b]/80"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
-                        {ChildIcon && <ChildIcon className="size-4 shrink-0" />}
+                        {ChildIcon && <ChildIcon className="size-4 shrink-0 text-[#7209B7]" />}
                         <span className="text-xs truncate">{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
@@ -371,12 +369,12 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
 
   return (
     <>
-      <SidebarHeader className="p-6 mb-4">
-        <div className="flex items-center gap-3">
-            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-lg border-2 border-white bg-white/80" />
+      <SidebarHeader className="p-8 mb-4">
+        <div className="flex items-center gap-4">
+            <Logo logoUrl={branding?.logo_url} companyName={branding?.company_name} className="shadow-2xl border-2 border-white bg-white/80 rounded-2xl p-2 h-14 w-14" />
             <div className="flex flex-col group-data-[state=collapsed]:hidden">
               <span className="text-xl font-black tracking-tight leading-tight text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</span>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#7209B7] opacity-70">Purple Suite</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#7209B7] opacity-70">Sovereign Suite</span>
             </div>
         </div>
       </SidebarHeader>
@@ -392,16 +390,16 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-6 mt-4">
+      <SidebarFooter className="p-8 mt-4">
         <div className="p-1">
-            <div className="flex h-auto w-full items-center justify-start rounded-3xl p-3 transition-all shadow-lg bg-white/60 border border-white/80 backdrop-blur-md hover:bg-white">
-                <Avatar className="h-10 w-10 border-2 border-primary/20 shadow-inner">
+            <div className="flex h-auto w-full items-center justify-start rounded-[2rem] p-4 transition-all shadow-2xl bg-white/40 border border-white/60 backdrop-blur-3xl hover:bg-white/60">
+                <Avatar className="h-12 w-12 border-2 border-[#7209B7]/20 shadow-inner">
                     <AvatarImage src={currentUser.avatarUrl} alt={currentUser.fullName} />
                     <AvatarFallback className="bg-primary/5 text-primary font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div className="ml-2 mr-3 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
+                <div className="ml-2 mr-4 flex-grow text-right overflow-hidden group-data-[state=collapsed]:hidden">
                     <p className="text-sm font-black truncate text-[#1e1b4b]">{currentUser.fullName}</p>
-                    <p className="text-[9px] truncate font-black uppercase tracking-wider text-[#7209B7]">{currentUser.role}</p>
+                    <p className="text-[10px] truncate font-black uppercase tracking-widest text-[#7209B7] opacity-70">{currentUser.role}</p>
                 </div>
             </div>
         </div>

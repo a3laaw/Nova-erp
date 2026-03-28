@@ -87,29 +87,29 @@ export default function DashboardPage() {
   return (
     <div className="space-y-10" dir="rtl">
         <Card className={cn(
-            "rounded-[2.5rem] overflow-hidden border-none",
-            isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-sky-50 shadow-sm"
+            "rounded-[2.5rem] overflow-hidden border-none glass-effect",
+            !isGlass && "bg-gradient-to-l from-white to-sky-50 shadow-sm"
         )}>
             <CardHeader className="pb-8 px-8 border-b border-white/20">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
                     <div className="space-y-1 text-center lg:text-right">
-                        <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3">
+                        <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3 text-[#1e1b4b]">
                             <LayoutGrid className="text-primary h-8 w-8" />
                             لوحة التحكم المركزية
                         </CardTitle>
-                        <CardDescription className={cn("text-base font-medium", isGlass && "text-[#1e1b4b]/70")}>
-                            مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
+                        <CardDescription className="text-base font-medium text-[#1e1b4b]/70">
+                            مرحباً بك مجدداً. إليك نظرة شاملة على أداء المنشأة والمشاريع القائمة.
                         </CardDescription>
                     </div>
                     
                     <div className="flex flex-wrap items-center justify-center gap-3">
-                        <Button asChild variant="outline" className={cn("h-11 px-6 rounded-xl font-bold gap-2", isGlass && "bg-white/40 border-white/60 text-[#1e1b4b]")}>
+                        <Button asChild variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2 bg-white/40 border-white/60 text-[#1e1b4b]">
                             <Link href="/dashboard/notifications">
                                 <BellRing className="h-5 w-5" />
                                 سجل التنبيهات
                             </Link>
                         </Button>
-                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-primary/20">
+                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-primary/20 bg-[#7209B7] text-white">
                             <Link href="/dashboard/clients/new">
                                 <PlusCircle className="h-5 w-5" />
                                 إضافة عميل جديد
@@ -161,12 +161,9 @@ export default function DashboardPage() {
 
         <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
             <div className="grid gap-6 md:grid-cols-2 xl:col-span-3">
-                <Card className={cn(
-                    "border-none shadow-sm rounded-3xl hover-lift transition-all",
-                    isGlass ? "glass-effect" : "bg-white"
-                )}>
+                <Card className="border-none shadow-sm rounded-3xl hover-lift transition-all glass-effect">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                        <CardTitle className="text-sm font-bold text-[#1e1b4b]/60 uppercase tracking-wider">
                             إجمالي التدفقات الداخلة
                         </CardTitle>
                         <CircleDollarSign className="h-5 w-5 text-primary opacity-50" />
@@ -177,16 +174,13 @@ export default function DashboardPage() {
                                 {formatCurrency(stats?.totalRevenue || 0)}
                             </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">بناءً على القيود المرحلة</p>
+                        <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">بناءً على القيود المرحلة</p>
                     </CardContent>
                 </Card>
 
-                <Card className={cn(
-                    "border-none shadow-sm rounded-3xl hover-lift transition-all",
-                    isGlass ? "glass-effect" : "bg-white"
-                )}>
+                <Card className="border-none shadow-sm rounded-3xl hover-lift transition-all glass-effect">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                        <CardTitle className="text-sm font-bold text-[#1e1b4b]/60 uppercase tracking-wider">
                             المواقع النشطة
                         </CardTitle>
                         <Briefcase className="h-5 w-5 text-orange-600 opacity-50" />
@@ -197,16 +191,13 @@ export default function DashboardPage() {
                                 {stats?.activeProjectsCount}
                             </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">مواقع تخضع للإشراف حالياً</p>
+                        <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">مواقع تخضع للإشراف حالياً</p>
                     </CardContent>
                 </Card>
 
-                <Card className={cn(
-                    "border-none shadow-sm rounded-3xl hover-lift transition-all",
-                    isGlass ? "glass-effect" : "bg-white"
-                )}>
+                <Card className="border-none shadow-sm rounded-3xl hover-lift transition-all glass-effect">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">قاعدة بيانات العملاء</CardTitle>
+                        <CardTitle className="text-sm font-bold text-[#1e1b4b]/60 uppercase tracking-wider">قاعدة بيانات العملاء</CardTitle>
                         <Users className="h-5 w-5 text-muted-foreground opacity-50" />
                     </CardHeader>
                     <CardContent>
@@ -215,22 +206,19 @@ export default function DashboardPage() {
                                 {stats?.totalClientsCount}
                             </div>
                         )}
-                        <p className="text-[10px] text-muted-foreground mt-1 font-bold">إجمالي الملفات المسجلة</p>
+                        <p className="text-[10px] text-[#1e1b4b]/50 mt-1 font-bold">إجمالي الملفات المسجلة</p>
                     </CardContent>
                 </Card>
 
-                <Card className={cn(
-                    "border-none shadow-sm rounded-3xl",
-                    isGlass ? "glass-effect border-primary/20" : "bg-primary text-primary-foreground"
-                )}>
+                <Card className="border-none shadow-sm rounded-3xl glass-effect border-primary/20">
                     <CardHeader className="pb-2">
-                        <CardTitle className={cn("text-sm font-bold opacity-80", !isGlass && "text-white")}>كشف يوميات المواقع</CardTitle>
+                        <CardTitle className="text-sm font-bold text-[#1e1b4b]">كشف يوميات المواقع</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className={cn("text-sm font-bold leading-relaxed mb-4", !isGlass && "text-white/90", isGlass && "text-[#1e1b4b]")}>
+                        <div className="text-sm font-bold leading-relaxed mb-4 text-[#1e1b4b]/80">
                             تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.
                         </div>
-                        <Button asChild variant={isGlass ? "default" : "secondary"} className="w-full font-black rounded-xl h-10">
+                        <Button asChild variant="default" className="w-full font-black rounded-xl h-10 bg-[#7209B7] text-white">
                             <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
                         </Button>
                     </CardContent>
