@@ -213,6 +213,9 @@ export interface Employee extends BaseEntity {
   accountNumber?: string;
   dailyRate?: number;
   contractPercentage?: number;
+  pieceRateMode?: 'salary_with_target' | 'per_piece';
+  targetDescription?: number;
+  pieceRate?: number;
 }
 
 export interface Account extends BaseEntity {

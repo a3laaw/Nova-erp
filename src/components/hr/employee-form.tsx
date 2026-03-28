@@ -5,11 +5,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Clock, Calendar, FileCheck, Landmark, FileText } from 'lucide-react';
+import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Landmark, FileCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { orderBy, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import type { Employee, Department, Job } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
@@ -46,8 +45,8 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const aiFileInputRef = useRef<HTMLInputElement>(null);
     
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
-    const { data: jobs, loading: jobsLoading } = useSubscription<Job>(firestore, 'jobs', [], true);
+    const { data: departments } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
+    const { data: jobs } = useSubscription<Job>(firestore, 'jobs', [], true);
 
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
@@ -153,7 +152,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         return jobs.filter(j => (j as any).parentId === selectedDept.id).map(j => ({ value: j.name, label: j.name }));
     }, [departments, jobs, formData.department]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmitInternal = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.fullName || !formData.mobile) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة الاسم والجوال.' });
@@ -166,7 +165,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const showResidencyExpiry = formData.nationality && formData.nationality.trim() !== 'كويتي';
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmitInternal}>
             <div className="space-y-8 py-4 px-1 max-h-[75vh] overflow-y-auto scrollbar-none">
                 
                 <div className="px-4">
@@ -240,7 +239,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {/* 🛡️ حقول تخصصية بناءً على نشاط المنشأة 🛡️ */}
                 {isFoodOrDelivery && (
                     <section className="space-y-6 p-6 border-2 border-primary/20 rounded-[2rem] bg-primary/[0.02] animate-in slide-in-from-bottom-4 duration-500">
                         <div className="flex items-center gap-3">
@@ -409,7 +407,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                     حفظ الملف الوظيفي
                 </Button>
-            </div>
+            </DialogFooter>
         </form>
     );
 }
