@@ -224,7 +224,6 @@ const navItems = {
       children: [
         { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: Users },
-        { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building },
         { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
         { href: '/dashboard/settings/data-integrity', label: 'سلامة البيانات', icon: ShieldCheck },
