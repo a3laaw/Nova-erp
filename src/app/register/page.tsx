@@ -1,8 +1,7 @@
-
 'use client';
 
 /**
- * @fileOverview بوابة تسجيل الشركات الجديدة (External Registration).
+ * @fileOverview بوابة تسجيل المنشآت الجديدة (External Registration).
  * تتيح لأصحاب المكاتب تقديم طلبات الانضمام بنظام الـ SaaS.
  */
 
@@ -53,7 +52,7 @@ export default function RegisterPage() {
 
     setIsSaving(true);
     try {
-        // تسجيل طلب الشركة في مشروع الماستر (كـ Lead أو Pending Company)
+        // تسجيل طلب المنشأة في مشروع الماستر
         await addDoc(collection(firestore, 'company_requests'), {
             ...formData,
             status: 'pending',
@@ -105,7 +104,7 @@ export default function RegisterPage() {
                             انضم لمستقبل الإدارة
                             <Sparkles className="h-5 w-5 text-yellow-300" />
                         </CardTitle>
-                        <CardDescription className="text-white/70 font-bold">تسجيل منشأة هندسية جديدة في منصة Nova ERP</CardDescription>
+                        <CardDescription className="text-white/70 font-bold">تسجيل منشأة جديدة في منصة Nova ERP</CardDescription>
                     </div>
                 </div>
                 <Button asChild variant="ghost" className="text-white hover:bg-white/10 rounded-xl gap-2 font-bold">
@@ -131,7 +130,7 @@ export default function RegisterPage() {
                                         value={formData.companyName} 
                                         onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
                                         className="pr-10 h-11 rounded-xl bg-white/10 border-white/20 text-white placeholder:text-white/30 font-bold" 
-                                        placeholder="مثال: شركة الخليج للاستشارات"
+                                        placeholder="مثال: مكتب الخليج للاستشارات"
                                         required 
                                     />
                                 </div>

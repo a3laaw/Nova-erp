@@ -14,8 +14,8 @@ import { useAuth } from '@/context/auth-context';
 import { getTenantPath } from '@/lib/utils';
 
 /**
- * خطاف اشتراك لحظي مطور ومعزز:
- * تم تحديثه لاستخدام محرك getTenantPath لضمان العزل التام للمنشآت.
+ * خطاف اشتراك لحظي مطور (Sovereign Real-time Hook):
+ * تم تحصينه لمنع التحميل اللانهائي عبر معالجة دقيقة لمسارات المنشآت (Tenant Pathing).
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -28,16 +28,19 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
+    // نستخدم useRef للحفاظ على مرجع القيود ومنع إعادة التشغيل اللانهائي بسبب مصفوفات القيود
     const constraintsRef = useRef(constraints);
-    const prevPathRef = useRef<string | null>(null);
-    const prevTenantRef = useRef<string | null>(null);
     
     useEffect(() => {
         constraintsRef.current = constraints;
     }, [constraints]);
 
     useEffect(() => {
-        const tenantId = user?.currentCompanyId || null;
+        // التأكد من أن المنشأة المتقمصة لا تؤثر على قراءة الجداول السيادية (مثل قائمة المنشآت)
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+        const isMasterCollection = collectionPath && masterCollections.includes(collectionPath);
+        
+        const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
         if (!firestore || !collectionPath) {
             setLoading(false);
@@ -45,19 +48,14 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        if (prevPathRef.current === collectionPath && prevTenantRef.current === tenantId) {
-            return; 
-        }
-
-        prevPathRef.current = collectionPath;
-        prevTenantRef.current = tenantId;
         setLoading(true);
+        setError(null);
         
-        // --- 🛡️ منطق العزل السيادي (Tenant Path & Group Resolution) ---
+        // --- 🛡️ محرك التوجيه السيادي (Tenant Routing) ---
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        // إذا كان الاستعلام مجمعاً (collectionGroup)، نقوم بالعزل عبر حقل companyId
+        // إذا كان الاستعلام مجمعاً (collectionGroup) ومعزولاً بـ tenantId
         if (isGroup && tenantId) {
             finalPath = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
