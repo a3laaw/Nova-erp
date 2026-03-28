@@ -18,7 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { 
     Loader2, Save, ImageIcon, Palette, 
     Building2, UploadCloud, Info, AlertCircle,
-    Plus, Trash2, MapPin, Mail, Printer, Sparkles
+    Plus, Trash2, MapPin, Mail, Printer, Sparkles,
+    LayoutGrid
 } from 'lucide-react';
 import { PrintLayout } from '@/components/print/print-layout';
 import { cn, cleanFirestoreData } from '@/lib/utils';
@@ -26,7 +27,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 
-// مخطط التحقق المبسط (أقل قيود لضمان نجاح الحفظ)
 const brandingSchema = z.object({
   useCustomImage: z.boolean().default(false),
   headerImageUrl: z.string().optional().nullable(),
@@ -170,8 +170,6 @@ export default function BrandingSettingsPage() {
   };
 
   const onSubmit = async (data: BrandingFormValues) => {
-    console.log("🚀 Starting Save Process with data:", data);
-    
     if (!firestore || !user?.currentCompanyId) {
         toast({ variant: 'destructive', title: 'خطأ في الهوية', description: 'لم يتم التعرف على منشأتك.' });
         return;
@@ -181,19 +179,9 @@ export default function BrandingSettingsPage() {
     try {
       const finalData = { ...data };
 
-      // رفع الصور إذا تم اختيار ملفات جديدة
-      if (headerFile) {
-          console.log("Uploading Header...");
-          finalData.headerImageUrl = await uploadFile(headerFile, 'header');
-      }
-      if (footerFile) {
-          console.log("Uploading Footer...");
-          finalData.footerImageUrl = await uploadFile(footerFile, 'footer');
-      }
-      if (logoFile) {
-          console.log("Uploading Logo...");
-          finalData.logoUrl = await uploadFile(logoFile, 'logo');
-      }
+      if (headerFile) finalData.headerImageUrl = await uploadFile(headerFile, 'header');
+      if (footerFile) finalData.footerImageUrl = await uploadFile(footerFile, 'footer');
+      if (logoFile) finalData.logoUrl = await uploadFile(logoFile, 'logo');
 
       const brandingRef = doc(firestore, `companies/${user.currentCompanyId}/settings/branding`);
       const payload = cleanFirestoreData({
@@ -201,16 +189,13 @@ export default function BrandingSettingsPage() {
         updatedAt: serverTimestamp()
       });
 
-      console.log("Saving payload to Firestore:", payload);
       await setDoc(brandingRef, payload, { merge: true });
-
       toast({ title: 'نجاح الحفظ اللحظي', description: 'تم تحديث هوية المنشأة والورق الرسمي بنجاح.' });
       
       setHeaderFile(null);
       setFooterFile(null);
       setLogoFile(null);
     } catch (e: any) {
-      console.error("Save Error Details:", e);
       toast({ 
         variant: 'destructive', 
         title: 'فشل الحفظ', 
@@ -222,7 +207,6 @@ export default function BrandingSettingsPage() {
   };
 
   const onValidationError = (errors: any) => {
-      console.error("Form Validation Errors:", errors);
       const firstError = Object.values(errors)[0] as any;
       toast({
           variant: 'destructive',
