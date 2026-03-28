@@ -30,11 +30,13 @@ import {
   Cloud,
   LayoutGrid,
   Target,
-  Send
+  Send,
+  Activity
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import type { Company } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
   isOpen: boolean;
@@ -52,6 +54,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
   const [formData, setFormData] = useState({
     name: '',
     nameEn: '',
+    activityType: 'general',
     adminEmail: '',
     adminPassword: '',
     apiKey: '',
@@ -69,6 +72,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             setFormData({
                 name: company.name || '',
                 nameEn: company.nameEn || '',
+                activityType: company.activityType || 'general',
                 adminEmail: company.adminEmail || '',
                 adminPassword: '', 
                 apiKey: company.firebaseConfig.apiKey || '',
@@ -81,7 +85,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             });
         } else {
             setFormData({
-                name: '', nameEn: '', adminEmail: '', adminPassword: '',
+                name: '', nameEn: '', activityType: 'general', adminEmail: '', adminPassword: '',
                 apiKey: '', authDomain: '', projectId: '', storageBucket: '',
                 messagingSenderId: '', appId: '', measurementId: '',
             });
@@ -115,6 +119,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           await updateDoc(companyRef, cleanFirestoreData({
               name: formData.name,
               nameEn: formData.nameEn,
+              activityType: formData.activityType,
               firebaseProjectId: formData.projectId,
               firebaseConfig,
               updatedAt: serverTimestamp()
@@ -128,6 +133,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             transaction.set(companyRef, {
               name: formData.name,
               nameEn: formData.nameEn,
+              activityType: formData.activityType,
               firebaseProjectId: formData.projectId,
               firebaseConfig,
               isActive: true,
@@ -190,6 +196,25 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             <Label htmlFor="nameEn" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالإنجليزية)</Label>
                             <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="English Name..." />
                         </div>
+                        
+                        <div className="grid gap-2 md:col-span-2">
+                            <Label className="font-black text-black text-xs pr-1 uppercase flex items-center gap-2">
+                                <Activity className="h-3 w-3 text-indigo-600" /> نشاط المنشأة الرئيسي *
+                            </Label>
+                            <Select value={formData.activityType} onValueChange={(v) => setFormData(p => ({...p, activityType: v}))}>
+                                <SelectTrigger className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black">
+                                    <SelectValue placeholder="اختر نوع النشاط..." />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="general">نشاط عام (تجاري/مكتب)</SelectItem>
+                                    <SelectItem value="food_delivery">مطاعم وتوصيل أغذية</SelectItem>
+                                    <SelectItem value="construction">مقاولات وبناء</SelectItem>
+                                    <SelectItem value="consulting">استشارات هندسية</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground font-bold pr-1">هذا الاختيار سيحدد طبيعة الدورة المستندية والقوانين المطبقة (مثل كروت الصحة للمطاعم).</p>
+                        </div>
+
                         {!isEditing && (
                             <>
                                 <div className="grid gap-2">

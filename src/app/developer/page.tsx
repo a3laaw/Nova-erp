@@ -8,7 +8,7 @@ import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, AlertCircle } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, AlertCircle, Activity } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+const activityTranslations: Record<string, string> = {
+    general: 'تجاري عام',
+    food_delivery: 'مطاعم وأغذية',
+    construction: 'مقاولات وبناء',
+    consulting: 'استشارات هندسية',
+};
 
 /**
  * @fileOverview غرفة التحكم الكبرى (Developer Console).
@@ -172,7 +179,7 @@ export default function DeveloperDashboard() {
                         <Table>
                             <TableHeader className="bg-[#1e1b4b] h-16">
                                 <TableRow className="border-none hover:bg-transparent">
-                                    <TableHead className="px-12 font-black text-white text-base text-right">المنشأة</TableHead>
+                                    <TableHead className="px-12 font-black text-white text-base text-right">المنشأة والنشاط</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">ID المشروع</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">حالة الخدمة</TableHead>
                                     <TableHead className="text-left px-12 font-black text-indigo-100 text-base">التحكم والتقمص</TableHead>
@@ -198,9 +205,15 @@ export default function DeveloperDashboard() {
                                                     <div className="p-4 bg-indigo-100 rounded-3xl border-2 border-indigo-200 group-hover:bg-[#1e1b4b] transition-all shadow-inner">
                                                         <Building2 className="h-10 w-10 text-indigo-600 group-hover:text-white" />
                                                     </div>
-                                                    <div className="flex flex-col gap-1">
+                                                    <div className="flex flex-col gap-1.5">
                                                         <span className="font-black text-black text-2xl tracking-tight leading-none">{company.name}</span>
-                                                        <span className="text-[10px] text-indigo-600 font-black uppercase tracking-widest opacity-60">{company.adminEmail}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant="outline" className="bg-white text-indigo-700 border-indigo-100 font-bold px-3 flex items-center gap-1.5 h-6">
+                                                                <Activity className="h-3 w-3" />
+                                                                {activityTranslations[company.activityType || 'general']}
+                                                            </Badge>
+                                                            <span className="text-[10px] text-indigo-600 font-black uppercase tracking-widest opacity-60">{company.adminEmail}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </TableCell>
