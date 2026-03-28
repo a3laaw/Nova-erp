@@ -60,13 +60,6 @@ const settingsFeatures = [
         color: 'bg-slate-100 text-slate-600'
     },
      {
-        title: 'إدارة الشركات',
-        description: 'إدارة الشركات والفروع المختلفة داخل النظام.',
-        href: '/dashboard/settings/companies',
-        icon: Building,
-        color: 'bg-cyan-100 text-cyan-600'
-    },
-     {
         title: 'نماذج العقود',
         description: 'إنشاء وإدارة قوالب العقود الموحدة للشركة.',
         href: '/dashboard/settings/contract-templates',
