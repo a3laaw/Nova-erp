@@ -18,8 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { 
     Loader2, Save, ImageIcon, Palette, 
     Building2, UploadCloud, Info, AlertCircle,
-    Plus, Trash2, MapPin, Mail, Printer, Sparkles,
-    LayoutGrid
+    Plus, Trash2, MapPin, Mail, Phone, Printer, Sparkles,
+    LayoutGrid, CheckCircle2, Activity
 } from 'lucide-react';
 import { PrintLayout } from '@/components/print/print-layout';
 import { cn, cleanFirestoreData } from '@/lib/utils';
@@ -34,12 +34,13 @@ const brandingSchema = z.object({
   logoUrl: z.string().optional().nullable(),
   headerColor: z.string().default('#7209B7'),
   companyName: z.string().min(1, 'اسم المنشأة مطلوب'),
+  activityType: z.string().optional().nullable(),
   footerData: z.object({
     address: z.string().optional().nullable(),
     phones: z.array(z.string()).default(['']),
     email: z.string().optional().nullable(),
-    taxNumber: z.string().optional().nullable(),
     crNumber: z.string().optional().nullable(),
+    taxNumber: z.string().optional().nullable(),
     extraText: z.string().optional().nullable(),
   }).optional()
 });
@@ -125,6 +126,7 @@ export default function BrandingSettingsPage() {
       useCustomImage: false,
       headerColor: '#7209B7',
       companyName: '',
+      activityType: 'general',
       footerData: { phones: [''], address: '', email: '', crNumber: '', taxNumber: '', extraText: '' }
     }
   });
@@ -264,15 +266,33 @@ export default function BrandingSettingsPage() {
       <form className="space-y-8">
           <Card className="rounded-[2rem] border-none shadow-md glass-effect overflow-hidden border-2 border-primary/10">
               <CardContent className="p-8">
-                  <div className="grid gap-3 max-w-xl">
-                      <Label className="font-black text-[#1e1b4b] text-lg flex items-center gap-2">
-                          <Building2 className="h-5 w-5 text-primary" /> اسم المنشأة الرسمي المعمد *
-                      </Label>
-                      <Input 
-                        {...form.register('companyName')} 
-                        placeholder="سيظهر هذا الاسم في ترويسة كافة المستندات..." 
-                        className="h-12 rounded-xl text-xl font-black border-white/40 bg-white/30 shadow-inner focus:bg-white/60 transition-all" 
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="grid gap-3">
+                          <Label className="font-black text-[#1e1b4b] text-lg flex items-center gap-2">
+                              <Building2 className="h-5 w-5 text-primary" /> اسم المنشأة الرسمي *
+                          </Label>
+                          <Input 
+                            {...form.register('companyName')} 
+                            placeholder="سيظهر هذا الاسم في ترويسة كافة المستندات..." 
+                            className="h-12 rounded-xl text-xl font-black border-white/40 bg-white/30 shadow-inner focus:bg-white/60 transition-all" 
+                          />
+                      </div>
+                      <div className="grid gap-3">
+                          <Label className="font-black text-[#1e1b4b] text-lg flex items-center gap-2">
+                              <Activity className="h-5 w-5 text-primary" /> نشاط المنشأة
+                          </Label>
+                          <Select value={form.watch('activityType') || 'general'} onValueChange={(v) => form.setValue('activityType', v)}>
+                              <SelectTrigger className="h-12 rounded-xl border-white/40 bg-white/30 font-bold">
+                                  <SelectValue placeholder="اختر النشاط..." />
+                              </SelectTrigger>
+                              <SelectContent dir="rtl">
+                                  <SelectItem value="general">نشاط عام</SelectItem>
+                                  <SelectItem value="food_delivery">توصيل ومواد غذائية</SelectItem>
+                                  <SelectItem value="construction">مقاولات وإنشاءات</SelectItem>
+                                  <SelectItem value="consulting">استشارات فنية</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
                   </div>
               </CardContent>
           </Card>
