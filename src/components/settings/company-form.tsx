@@ -176,7 +176,7 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                 </div>
             </div>
             <DialogFooter className="gap-2 border-t p-6 bg-muted/10">
-                <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                <Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                 <Button type="submit" className="rounded-xl font-black px-10 h-12 shadow-xl shadow-primary/20">
                     <Save className="ml-2 h-4 w-4" />
                     {isEditing ? 'حفظ التعديلات' : 'إضافة المنشأة'}
