@@ -1,59 +1,34 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
-import { useFirebase, useCollection } from '@/firebase';
-import { collection, query, limit, onSnapshot, type DocumentData } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { useAuth } from './auth-context';
 import type { PaymentMethod } from '@/lib/types';
 
 export interface BrandingSettings {
   id: string;
-  company_name: string;
-  activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting'; // حقل النشاط الجديد
-  logo_url?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  tax_number?: string;
-  letterhead_text?: string;
-  letterhead_image_url?: string;
-  footer_image_url?: string;
-  watermark_image_url?: string;
-  system_background_url?: string;
-  financial_statement_notes?: string;
-  payment_methods?: PaymentMethod[];
-  work_hours?: {
-    general: {
-      morning_start_time: string;
-      morning_end_time: string;
-      evening_start_time: string;
-      evening_end_time: string;
-      appointment_slot_duration: number;
-      appointment_buffer_time?: number;
-    };
-    architectural: {
-      morning_start_time: string;
-      morning_end_time: string;
-      evening_start_time: string;
-      evening_end_time: string;
-      appointment_slot_duration: number;
-      appointment_buffer_time?: number;
-    };
-    ramadan?: {
-        is_enabled?: boolean;
-        start_date?: any;
-        end_date?: any;
-        start_time?: string;
-        end_time?: string;
-        appointment_slot_duration?: number;
-        appointment_buffer_time?: number;
-    },
-    holidays?: string[];
-    half_day?: {
-      day: string;
-      type: 'morning_only' | 'custom_end_time';
-      end_time: string;
-    }
-  }
+  companyName: string;
+  activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
+  logoUrl?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  taxNumber?: string | null;
+  headerImageUrl?: string | null;
+  footerImageUrl?: string | null;
+  watermarkImageUrl?: string | null;
+  headerColor?: string;
+  useCustomImage?: boolean;
+  footerData?: {
+      address?: string;
+      phones?: string[];
+      email?: string;
+      crNumber?: string;
+      taxNumber?: string;
+      extraText?: string;
+  };
+  work_hours?: any;
 }
 
 interface BrandingContextType {
@@ -63,7 +38,7 @@ interface BrandingContextType {
 
 const defaultBranding: BrandingSettings = {
     id: 'default',
-    company_name: 'Nova ERP',
+    companyName: 'Nova ERP',
     activityType: 'general'
 };
 
@@ -74,32 +49,32 @@ const BrandingContext = createContext<BrandingContextType>({
 
 export const BrandingProvider = ({ children }: { children: ReactNode }) => {
   const { firestore } = useFirebase();
+  const { user } = useAuth();
   const [branding, setBranding] = useState<BrandingSettings | null>(defaultBranding);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!firestore) {
+    if (!firestore || !user?.currentCompanyId) {
       setLoading(false);
       return;
     }
 
-    const brandingQuery = query(collection(firestore, 'company_settings'), limit(1));
-    const unsubscribe = onSnapshot(brandingQuery, (snapshot) => {
-        if (!snapshot.empty) {
-            const doc = snapshot.docs[0];
-            setBranding({ id: doc.id, ...doc.data() } as BrandingSettings);
+    const brandingRef = doc(firestore, `companies/${user.currentCompanyId}/settings/branding`);
+    
+    const unsubscribe = onSnapshot(brandingRef, (snapshot) => {
+        if (snapshot.exists()) {
+            setBranding({ id: snapshot.id, ...snapshot.data() } as BrandingSettings);
         } else {
             setBranding(defaultBranding); 
         }
         setLoading(false);
     }, (error) => {
-        console.error("Error fetching branding settings:", error);
-        setBranding(defaultBranding); 
+        console.error("Error listening to branding:", error);
         setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [firestore]);
+  }, [firestore, user?.currentCompanyId]);
   
 
   const value = useMemo(() => ({ branding, loading }), [branding, loading]);
