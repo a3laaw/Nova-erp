@@ -24,7 +24,7 @@ service cloud.firestore {
     match /companies/{companyId} {
       // المطور يكتب في بيانات الربط، والادمن يقرأ فقط
       allow read: if request.auth != null;
-      allow write: if isDeveloper();
+      allow write: if isDeveloper() || isCompanyAdmin(companyId);
       
       // السماح لمدير الشركة بتعديل الإعدادات والعلامة التجارية داخل مجلد شركته
       match /settings/{settingId} {
@@ -39,7 +39,7 @@ service cloud.firestore {
 
     // --- حماية سجلات الحركات والترقيم في الماستر ---
     match /counters/{doc} {
-      allow read, write: if isDeveloper();
+      allow read, write: if isDeveloper() || request.auth != null;
     }
 
     // --- القاعدة العامة للوصول المعزول ---
