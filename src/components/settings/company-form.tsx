@@ -88,27 +88,27 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-xl" dir="rtl">
+      <DialogContent className="sm:max-w-xl rounded-3xl border-none shadow-2xl overflow-hidden" dir="rtl">
         <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle>{isEditing ? 'تعديل بيانات المنشأة' : 'إضافة منشأة جديدة'}</DialogTitle>
-                <DialogDescription>أدخل البيانات القانونية وتواريخ انتهاء التراخيص للمتابعة الرقابية.</DialogDescription>
+            <DialogHeader className="bg-primary/5 p-6 border-b">
+                <DialogTitle className="text-xl font-black">{isEditing ? 'تعديل بيانات المنشأة' : 'إضافة منشأة جديدة'}</DialogTitle>
+                <DialogDescription className="font-bold">أدخل البيانات القانونية وتواريخ انتهاء التراخيص للمتابعة الرقابية.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-6 py-6 max-h-[75vh] overflow-y-auto px-1 scrollbar-none">
+            <div className="grid gap-6 py-6 max-h-[75vh] overflow-y-auto px-6 scrollbar-none">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="name" className="font-bold">اسم الشركة (بالعربية) *</Label>
+                        <Label htmlFor="name" className="font-bold mr-1">اسم الشركة (بالعربية) *</Label>
                         <Input id="name" value={formData.name} onChange={handleChange} required className="h-11 rounded-xl" />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="nameEn" className="font-bold">اسم الشركة (بالإنجليزية)</Label>
+                        <Label htmlFor="nameEn" className="font-bold mr-1">اسم الشركة (بالإنجليزية)</Label>
                         <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-11 rounded-xl" />
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="activityType" className="font-bold">نوع النشاط</Label>
+                        <Label htmlFor="activityType" className="font-bold mr-1">نوع النشاط</Label>
                         <InlineSearchList 
                             value={formData.activityType || ''}
                             onSelect={(v) => handleSelectChange('activityType', v)}
@@ -119,12 +119,12 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="crNumber" className="font-bold">رقم السجل التجاري</Label>
+                        <Label htmlFor="crNumber" className="font-bold mr-1">رقم السجل التجاري</Label>
                         <Input id="crNumber" value={formData.crNumber} onChange={handleChange} dir="ltr" className="h-11 rounded-xl" />
                     </div>
                 </div>
 
-                <Separator />
+                <Separator className="bg-muted" />
 
                 <div className="space-y-4 bg-muted/20 p-4 rounded-2xl border-2 border-dashed">
                     <h4 className="text-sm font-black text-primary flex items-center gap-2">
@@ -156,17 +156,17 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="phone" className="font-bold">رقم الهاتف</Label>
+                        <Label htmlFor="phone" className="font-bold mr-1">رقم الهاتف</Label>
                         <Input id="phone" value={formData.phone} onChange={handleChange} dir="ltr" className="h-11 rounded-xl" />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="email" className="font-bold">البريد الإلكتروني</Label>
+                        <Label htmlFor="email" className="font-bold mr-1">البريد الإلكتروني</Label>
                         <Input id="email" type="email" value={formData.email} onChange={handleChange} dir="ltr" className="h-11 rounded-xl" />
                     </div>
                 </div>
 
                 <div className="grid gap-2">
-                    <Label htmlFor="address" className="font-bold">العنوان</Label>
+                    <Label htmlFor="address" className="font-bold mr-1">العنوان</Label>
                     <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} className="rounded-xl" />
                 </div>
 
@@ -175,9 +175,9 @@ export function CompanyForm({ isOpen, onClose, onSave, company }: CompanyFormPro
                     <Input id="parentCompanyId" value={formData.parentCompanyId || ''} onChange={handleChange} placeholder="انسخ الـ ID هنا..." dir="ltr" className="h-9 font-mono text-xs bg-white" />
                 </div>
             </div>
-            <DialogFooter className="gap-2 border-t pt-4">
-                <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" className="rounded-xl font-black px-10 shadow-lg shadow-primary/20">
+            <DialogFooter className="gap-2 border-t p-6 bg-muted/10">
+                <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                <Button type="submit" className="rounded-xl font-black px-10 h-12 shadow-xl shadow-primary/20">
                     <Save className="ml-2 h-4 w-4" />
                     {isEditing ? 'حفظ التعديلات' : 'إضافة المنشأة'}
                 </Button>
