@@ -413,7 +413,7 @@ export default function NewCashReceiptPage() {
             </div>
         </CardContent>
       <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
-        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black text-lg text-[#1e1b4b]/60">إلغاء</Button>
+        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-14 px-10 rounded-2xl font-black h-12 text-[#1e1b4b]/60">إلغاء</Button>
         <Button onClick={handleSave} disabled={isSaving || isGeneratingVoucher} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 gap-3 min-w-[300px] bg-[#7209B7] text-white">
             {isSaving ? <Loader2 className="h-6 w-6 animate-spin" /> : <Save className="h-6 w-6" />} اعتماد وإصدار السند
         </Button>
