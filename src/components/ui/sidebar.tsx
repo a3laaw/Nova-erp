@@ -262,7 +262,7 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7 text-primary", className)}
+      className={cn("h-7 w-7 text-[#1e1b4b]", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -313,7 +313,7 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "relative flex flex-1 flex-col bg-background min-w-0",
+        "relative flex flex-1 flex-col bg-transparent min-w-0",
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
         className
       )}
@@ -430,7 +430,7 @@ const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar="group-label"
       className={cn(
-        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-black uppercase tracking-widest text-sidebar-foreground/50 outline-none ring-sidebar-ring transition-[margin,opa] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-black uppercase tracking-widest text-[#1e1b4b]/50 outline-none ring-sidebar-ring transition-[margin,opa] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
         className
       )}
@@ -497,11 +497,11 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden text-start text-sm outline-none ring-sidebar-ring transition-all duration-300 ease-in-out rounded-2xl disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-md data-[active=true]:border-r-4 data-[active=true]:border-primary group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-3 group-data-[collapsible=icon]:justify-center [&>span]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center justify-start gap-3 overflow-hidden text-start text-sm outline-none ring-sidebar-ring transition-all duration-300 ease-in-out rounded-2xl disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:font-bold group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-3 group-data-[collapsible=icon]:justify-center [&>span]:truncate [&>svg]:size-8 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-white shadow-sm hover:bg-white hover:text-primary",
+        default: "text-[#1e1b4b] hover:bg-white/20",
         outline:
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
@@ -697,8 +697,8 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-2xl py-3 px-4 outline-none ring-sidebar-ring transition-all duration-300 text-primary bg-secondary/50 hover:bg-white hover:shadow-md disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0",
-        "data-[active=true]:bg-white data-[active=true]:text-primary data-[active=true]:font-bold data-[active=true]:shadow-md",
+        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-2xl py-3 px-4 outline-none ring-sidebar-ring transition-all duration-300 text-[#1e1b4b]",
+        "data-[active=true]:text-[#1e1b4b] data-[active=true]:font-black",
         size === "sm" && "text-xs",
         "group-data-[collapsible=icon]:hidden",
         className
