@@ -9,7 +9,6 @@ import { AuthProvider } from '@/context/auth-context';
 import { ThemeProvider } from '@/context/theme-context';
 import { CompanyProvider } from '@/context/company-context';
 
-// This component consumes the language context and updates the DOM.
 function LanguageManager({ children }: { children: React.ReactNode }) {
     const { language, direction } = useLanguage();
 
@@ -24,21 +23,21 @@ function LanguageManager({ children }: { children: React.ReactNode }) {
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
         <FirebaseProvider>
-            <BrandingProvider>
-                <CompanyProvider>
-                    <ThemeProvider>
-                        <LanguageProvider>
-                            <SyncStatusProvider>
-                                <AuthProvider>
+            <CompanyProvider>
+                <ThemeProvider>
+                    <LanguageProvider>
+                        <SyncStatusProvider>
+                            <AuthProvider>
+                                <BrandingProvider>
                                     <LanguageManager>
                                         {children}
                                     </LanguageManager>
-                                </AuthProvider>
-                            </SyncStatusProvider>
-                        </LanguageProvider>
-                    </ThemeProvider>
-                </CompanyProvider>
-            </BrandingProvider>
+                                </BrandingProvider>
+                            </AuthProvider>
+                        </SyncStatusProvider>
+                    </LanguageProvider>
+                </ThemeProvider>
+            </CompanyProvider>
         </FirebaseProvider>
     );
 }
