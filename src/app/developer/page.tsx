@@ -8,7 +8,7 @@ import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
@@ -37,17 +38,32 @@ export default function DeveloperDashboard() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = useState<Company | null>(null);
 
-  const { data: companies, loading } = useSubscription<Company>(firestore, 'companies', [orderBy('createdAt', 'desc')]);
+  // 🛡️ تم إزالة orderBy من الاستعلام المباشر لتجنب مشكلة الفهارس (Indexes) التي تسبب التحميل اللانهائي
+  const { data: rawCompanies, loading, error } = useSubscription<Company>(firestore, 'companies', []);
 
+  // 🔄 الترتيب والفلترة برمجياً لضمان السرعة المطلقة
   const filteredCompanies = useMemo(() => {
-    if (!searchQuery) return companies;
-    const lower = searchQuery.toLowerCase();
-    return companies.filter(c => 
-        c.name.toLowerCase().includes(lower) || 
-        c.adminEmail?.toLowerCase().includes(lower) ||
-        c.firebaseProjectId.toLowerCase().includes(lower)
-    );
-  }, [companies, searchQuery]);
+    if (!rawCompanies) return [];
+    
+    // 1. الترتيب حسب تاريخ الإنشاء (الأحدث أولاً)
+    let processed = [...rawCompanies].sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+        return timeB - timeA;
+    });
+
+    // 2. الفلترة حسب البحث
+    if (searchQuery) {
+        const lower = searchQuery.toLowerCase();
+        processed = processed.filter(c => 
+            c.name.toLowerCase().includes(lower) || 
+            c.adminEmail?.toLowerCase().includes(lower) ||
+            c.firebaseProjectId.toLowerCase().includes(lower)
+        );
+    }
+    
+    return processed;
+  }, [rawCompanies, searchQuery]);
 
   const handleToggleActive = async (company: Company) => {
     if (!firestore) return;
@@ -62,10 +78,6 @@ export default function DeveloperDashboard() {
     }
   };
 
-  /**
-   * التبديل السيادي (Switch Company):
-   * يستدعي الـ API لتعيين الـ Claims ثم يحدث الهوية رقمياً.
-   */
   const handleSwitchToCompany = async (company: Company) => {
       if (!clientAuth?.currentUser || isProcessing) return;
       
@@ -82,19 +94,13 @@ export default function DeveloperDashboard() {
 
           const result = await response.json();
           if (result.success) {
-              // 🔄 تحديث الـ Token لقراءة الـ Claims الجديدة
               await clientAuth.currentUser.getIdToken(true);
-              
-              // 🔑 تفعيل كوكي الجلسة لعبور الـ Middleware
               document.cookie = 'nova-user-session=1; path=/; max-age=86400';
-              
               setCurrentCompany(company);
               toast({ 
                   title: 'تم تفعيل التقمص السيادي', 
                   description: `أنت الآن في وضع التحكم بـ ${company.name}.` 
               });
-              
-              // التوجه الفوري للوحة التحكم الخاصة بالشركة
               window.location.href = '/dashboard';
           } else {
               throw new Error(result.error);
@@ -129,6 +135,16 @@ export default function DeveloperDashboard() {
             </CardHeader>
         </Card>
 
+        {error && (
+            <Alert variant="destructive" className="rounded-2xl border-2">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle className="font-black">خطأ في جلب البيانات السيادية</AlertTitle>
+                <AlertDescription className="font-medium">
+                    {error.message || "حدثت مشكلة أثناء محاولة الاتصال بقاعدة بيانات الشركات."}
+                </AlertDescription>
+            </Alert>
+        )}
+
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95 border border-white/40">
                 <CardHeader className="p-10 border-b-4 border-[#1e1b4b] bg-slate-50">
@@ -148,7 +164,7 @@ export default function DeveloperDashboard() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto min-h-[400px]">
                         <Table>
                             <TableHeader className="bg-[#1e1b4b] h-16">
                                 <TableRow className="border-none hover:bg-transparent">
@@ -160,9 +176,16 @@ export default function DeveloperDashboard() {
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center p-40"><Loader2 className="animate-spin h-16 w-16 mx-auto text-indigo-500" /></TableCell></TableRow>
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="text-center p-40">
+                                            <div className="flex flex-col items-center gap-4">
+                                                <Loader2 className="animate-spin h-16 w-16 text-indigo-500" />
+                                                <p className="font-black text-indigo-600 animate-pulse">جاري فحص مصفوفة المنشآت...</p>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
                                 ) : filteredCompanies.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="h-80 text-center text-slate-300 italic font-black text-2xl tracking-widest uppercase">No Active Tenants</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={4} className="h-80 text-center text-slate-300 italic font-black text-2xl tracking-widest uppercase">No Active Tenants Found</TableCell></TableRow>
                                 ) : (
                                     filteredCompanies.map(company => (
                                         <TableRow key={company.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all">
@@ -206,6 +229,7 @@ export default function DeveloperDashboard() {
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" dir="rtl" className="rounded-[2rem] shadow-2xl p-3 bg-white border-none w-72">
+                                                            <DropdownMenuLabel className="font-black px-3 py-2">خيارات المنشأة</DropdownMenuLabel>
                                                             <DropdownMenuItem onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }} className="gap-3 rounded-xl py-4 px-4 font-black text-base cursor-pointer hover:bg-indigo-50">
                                                                 <Pencil className="h-5 w-5 text-indigo-600" /> تعديل بيانات الربط
                                                             </DropdownMenuItem>
