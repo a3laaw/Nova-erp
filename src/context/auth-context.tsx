@@ -27,14 +27,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialized = useRef(false);
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
-  // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد في شاشة التحميل
+  // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد ويضمن إطلاق الواجهة
   useEffect(() => {
     const timer = setTimeout(() => {
       if (loading) {
-        console.warn("🛡️ Auth Shield: Initialization timeout reached. Forcing UI release.");
+        console.warn("🛡️ Auth Shield: Safety timeout reached. Releasing UI.");
         setLoading(false);
       }
-    }, 5000);
+    }, 6000);
     return () => clearTimeout(timer);
   }, [loading]);
 
@@ -56,36 +56,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const idTokenResult = await firebaseUser.getIdTokenResult();
         const claims = idTokenResult.claims as any;
 
-        // 1. حالة المطور السيادي (Master Developer)
+        // 1. معالجة حالة المطور السيادي (Master Developer)
         if (firebaseUser.email === MASTER_DEV_EMAIL) {
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
-          if (devDoc.exists()) {
-            const activeCompanyId = claims.currentCompanyId || null;
-            const userData = { 
-              ...devDoc.data() as UserProfile, 
-              uid: firebaseUser.uid,
-              id: firebaseUser.uid,
-              isSuperAdmin: true,
-              currentCompanyId: activeCompanyId,
-              companyName: claims.companyName || null
-            };
-            setUser(userData);
-            
-            if (activeCompanyId) {
-              const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
-              if (companyDoc.exists()) {
-                setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
-              }
+          
+          const activeCompanyId = claims.currentCompanyId || null;
+          const devData: AuthenticatedUser = {
+            id: firebaseUser.uid,
+            uid: firebaseUser.uid,
+            email: firebaseUser.email!,
+            username: 'root',
+            role: 'Developer',
+            isActive: true,
+            fullName: devDoc.exists() ? devDoc.data().fullName : 'Master Developer',
+            isSuperAdmin: true,
+            currentCompanyId: activeCompanyId,
+            companyName: claims.companyName || null
+          };
+
+          setUser(devData);
+          
+          if (activeCompanyId) {
+            const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
+            if (companyDoc.exists()) {
+              setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
             }
-            setLoading(false);
-            return;
           }
+          setLoading(false);
+          return;
         }
 
-        // 2. حالة مستخدم المنشأة (Tenant User)
+        // 2. معالجة مستخدم المنشأة (SaaS Tenant User)
         const userEmail = firebaseUser.email?.toLowerCase();
         if (userEmail) {
-          // البحث في الفهرس العالمي للربط السريع
+          // البحث السريع في الفهرس العالمي
           const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
           
           if (!userIndexSnap.empty) {
@@ -113,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       } catch (error) {
-        console.error("Critical Auth Error:", error);
+        console.error("Critical Auth Sync Error:", error);
       } finally {
         setLoading(false);
         isInitialized.current = true;
@@ -128,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // إذا لم يكن بريداً إلكترونياً، نفترض أنه اسم مستخدم ونبحث عنه
+    // دعم الدخول باسم المستخدم (Username)
     if (!email.includes('@')) {
       const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
       if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل في المنصة.');
@@ -137,9 +141,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await signInWithEmailAndPassword(masterAuth, email, password);
-      // ضبط كوكيز الجلسة لـ Middleware
-      document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
+      // ضبط الكوكيز السيادية لخدمة الـ Middleware والتوجيه
+      const sessionExpiry = 86400; // 24 hours
+      if (email === MASTER_DEV_EMAIL) {
+          document.cookie = `nova-dev-session=1; path=/; max-age=${sessionExpiry}; SameSite=Lax`;
+      } else {
+          document.cookie = `nova-user-session=1; path=/; max-age=${sessionExpiry}; SameSite=Lax`;
+      }
     } catch (e: any) {
+      console.error("Login attempt failed:", e);
+      if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+          throw new Error('بيانات الدخول غير صحيحة. يرجى التأكد من اسم المستخدم وكلمة المرور.');
+      }
       throw e;
     }
   }, [masterAuth, masterFirestore]);
@@ -148,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
         if (masterAuth) await signOut(masterAuth);
+        // تنظيف الكوكيز
         document.cookie = 'nova-dev-session=; max-age=0; path=/';
         document.cookie = 'nova-user-session=; max-age=0; path=/';
         setUser(null);
