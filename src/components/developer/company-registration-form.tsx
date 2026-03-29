@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -41,6 +40,7 @@ import { Badge } from '../ui/badge';
 import type { Company } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDays } from 'date-fns';
+import { DateInput } from '../ui/date-input';
 
 interface Props {
   isOpen: boolean;
