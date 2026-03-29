@@ -36,7 +36,10 @@ import {
   CalendarClock,
   Users,
   ShieldCheck,
-  CreditCard
+  CreditCard,
+  Eye,
+  EyeOff,
+  Copy
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -55,6 +58,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
   const { firestore: masterFirestore, auth: masterAuth } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const isEditing = !!company;
   const savingRef = useRef(false);
 
@@ -84,7 +88,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 nameEn: company.nameEn || '',
                 activityType: company.activityType || 'general',
                 adminEmail: company.adminEmail || '',
-                adminPassword: '', 
+                adminPassword: company.adminPassword || '', 
                 apiKey: company.firebaseConfig.apiKey || '',
                 authDomain: company.firebaseConfig.authDomain || '',
                 projectId: company.firebaseConfig.projectId || '',
@@ -113,6 +117,12 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: id === 'maxUsersLimit' ? parseInt(value) || 0 : value }));
+  };
+
+  const copyCredentials = () => {
+    const text = `بيانات دخول منشأة ${formData.name}:\nالبريد: ${formData.adminEmail}\nكلمة المرور: ${formData.adminPassword}`;
+    navigator.clipboard.writeText(text);
+    toast({ title: 'تم النسخ', description: 'يمكنك الآن إرسال البيانات للعميل.' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -144,6 +154,8 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               name: formData.name,
               nameEn: formData.nameEn,
               activityType: formData.activityType,
+              adminEmail: formData.adminEmail,
+              adminPassword: formData.adminPassword,
               firebaseProjectId: formData.projectId,
               firebaseConfig,
               ...licenseData,
@@ -163,6 +175,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               firebaseConfig,
               isActive: true,
               adminEmail: formData.adminEmail.toLowerCase().trim(),
+              adminPassword: formData.adminPassword,
               ...licenseData,
               createdAt: serverTimestamp(),
               createdBy: masterAuth.currentUser?.uid || 'system',
@@ -176,7 +189,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             });
           });
 
-          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتأسيس بيئة العمل بنظام التجربة (14 يوم).' });
+          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتأسيس بيئة العمل بنظام التجربة.' });
       }
 
       onClose();
@@ -201,7 +214,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     </div>
                     <div className="text-right">
                         <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل سيادة المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
-                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي ومفاتيح الوصول ونظام التراخيص المانيوال.</DialogDescription>
+                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص السيادية.</DialogDescription>
                     </div>
                 </div>
                 <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10"><X className="h-5 w-5"/></Button>
@@ -210,9 +223,17 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
           <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white scrollbar-none">
                 <section className="space-y-6">
-                    <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
-                        <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
-                    </h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
+                            <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
+                        </h3>
+                        {isEditing && (
+                            <Button type="button" variant="outline" size="sm" onClick={copyCredentials} className="rounded-xl font-black text-[10px] gap-2 border-indigo-200 text-indigo-700 bg-indigo-50">
+                                <Copy className="h-3 w-3" /> نسخ بيانات الدخول للعميل
+                            </Button>
+                        )}
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 shadow-inner">
                         <div className="grid gap-2">
                             <Label htmlFor="name" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالعربية) *</Label>
@@ -240,18 +261,33 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             </Select>
                         </div>
 
-                        {!isEditing && (
-                            <>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="adminEmail" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام *</Label>
-                                    <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.com" />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور التأسيسية *</Label>
-                                    <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="********" />
-                                </div>
-                            </>
-                        )}
+                        <div className="grid gap-2">
+                            <Label htmlFor="adminEmail" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام (Login) *</Label>
+                            <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.com" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور التأسيسية *</Label>
+                            <div className="relative">
+                                <Input 
+                                    id="adminPassword" 
+                                    type={showPassword ? "text" : "password"} 
+                                    value={formData.adminPassword} 
+                                    onChange={handleChange} 
+                                    required 
+                                    className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold pl-12" 
+                                    placeholder="********" 
+                                />
+                                <Button 
+                                    type="button" 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="absolute left-2 top-1/2 -translate-y-1/2" 
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -260,7 +296,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
                         <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-orange-600 pr-4 flex items-center gap-3">
-                            <CreditCard className="h-6 w-6 text-orange-600" /> نظام التراخيص المانيوال (Licensing)
+                            <CreditCard className="h-6 w-6 text-orange-600" /> نظام التراخيص والحصص المفتوحة
                         </h3>
                         <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-black px-4 py-1 rounded-full uppercase tracking-widest text-[10px]">Financial Quota System</Badge>
                     </div>
@@ -281,7 +317,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <div className="grid gap-2">
                             <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> عدد المستخدمين المسموح به *</Label>
                             <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-2xl text-center shadow-sm" />
-                            <p className="text-[10px] text-orange-700 font-black pr-1 uppercase">أدخل الرقم يدوياً حسب ما سدده العميل</p>
+                            <p className="text-[10px] text-orange-700 font-black pr-1 uppercase">أدخل الرقم يدوياً حسب ما سدده العميل (رخصة مقعد)</p>
                         </div>
                         {formData.subscriptionType === 'trial' && (
                             <div className="grid gap-2 md:col-span-2 animate-in slide-in-from-top-2">
@@ -360,7 +396,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                {isEditing ? 'حفظ التراخيص والحصص' : 'تأسيس المنشأة وتفعيل التراخيص'}
+                {isEditing ? 'حفظ وتأمين التراخيص' : 'تأسيس المنشأة وتفعيل التراخيص'}
             </Button>
           </DialogFooter>
         </form>

@@ -42,6 +42,7 @@ export interface Company extends BaseEntity {
   };
   isActive: boolean;
   adminEmail: string;
+  adminPassword?: string; // 🛡️ تخزين كلمة المرور التأسيسية للمطور
   logoUrl?: string;
   address?: string;
   phone?: string;
