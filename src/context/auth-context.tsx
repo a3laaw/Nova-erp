@@ -25,7 +25,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
-  const initialized = useRef(false);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -33,10 +32,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد
+    // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد في شاشة التحميل
     const safetyTimeout = setTimeout(() => {
       if (loading) {
-        console.warn("Auth initialization timed out. Breaking loop.");
+        console.warn("Auth initialization timed out. Breaking loading loop.");
         setLoading(false);
       }
     }, 6000);
@@ -52,7 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const idTokenResult = await firebaseUser.getIdTokenResult();
         const claims = idTokenResult.claims as any;
 
-        // 1. حالة المطور السيادي
+        // 1. حالة المطور السيادي (Master Developer)
         if (firebaseUser.email === MASTER_DEV_EMAIL) {
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
           if (devDoc.exists()) {
@@ -80,6 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // 2. حالة مستخدم المنشأة (Tenant User)
         const userEmail = firebaseUser.email?.toLowerCase();
         if (userEmail) {
+          // البحث في الفهرس العالمي للربط السريع
           const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
           
           if (!userIndexSnap.empty) {
@@ -103,19 +103,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 currentCompanyId: companyId,
                 companyName: companyData.name
               });
-            } else {
-                setUser(null);
-                setCurrentCompany(null);
             }
-          } else {
-              setUser(null);
-              setCurrentCompany(null);
           }
         }
       } catch (error) {
         console.error("Critical Auth initialization error:", error);
-        setUser(null);
-        setCurrentCompany(null);
       } finally {
         setLoading(false);
         clearTimeout(safetyTimeout);
@@ -133,15 +125,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
+    // إذا لم يكن بريداً إلكترونياً، نفترض أنه اسم مستخدم ونبحث عنه
     if (!email.includes('@')) {
       const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
-      if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل.');
+      if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل في المنصة.');
       email = userIndexSnap.docs[0].data().email;
     }
 
     setLoading(true);
     try {
       await signInWithEmailAndPassword(masterAuth, email, password);
+      // ضبط كوكيز الجلسة لـ Middleware
       document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
       setLoading(false);
