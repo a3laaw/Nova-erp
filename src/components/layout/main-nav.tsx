@@ -34,7 +34,8 @@ import {
   Layers,
   UserX,
   Zap,
-  LayoutGrid
+  LayoutGrid,
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -107,10 +108,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full px-4">
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "text-[#1e1b4b]" : "text-white")} />}
             <span className="flex-1 text-right truncate text-sm font-black">
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0", isActive ? "text-[#1e1b4b]" : "text-slate-400")} strokeWidth={3} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -132,11 +133,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               )}
             >
               <div className="flex items-center justify-between w-full px-4">
-                <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180", isActive ? "text-[#1e1b4b]/40" : "text-slate-400")} />
-                <span className="flex-1 text-right truncate text-sm font-black">
-                    {item.label}
-                </span>
-                {Icon && <Icon className={cn("size-5 shrink-0", isActive ? "text-[#1e1b4b]" : "text-slate-400")} strokeWidth={3} />}
+                <div className="flex items-center flex-1">
+                    {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "text-[#1e1b4b]" : "text-white")} />}
+                    <span className="text-right truncate text-sm font-black">
+                        {item.label}
+                    </span>
+                </div>
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90", isActive ? "text-[#1e1b4b]/40" : "text-white/60")} />
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -149,12 +152,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "bg-white text-[#1e1b4b] font-black shadow-md border-slate-100" 
-                          : "bg-white/20 hover:bg-white/40 text-slate-500"
+                          ? "bg-white text-[#1e1b4b] font-black shadow-md" 
+                          : "bg-white/10 hover:bg-white/20 text-white/80"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                        <span className="text-[11px] font-bold truncate">{child.label}</span>
-                        {child.icon && <child.icon className="h-3 w-3 opacity-40" />}
+                        <div className="flex items-center">
+                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-60" />}
+                            <span className="text-xs font-black truncate">{child.label}</span>
+                        </div>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
@@ -180,10 +185,9 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-8 mb-6">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</span>
+          <span className="text-3xl font-black text-white tracking-tighter">Nova ERP</span>
           <div className="flex items-center gap-2 mt-1">
-              <Zap className="h-3 w-3 text-indigo-600 animate-pulse" />
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">Light Edition</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/60">PURPLE SUITE</span>
           </div>
         </div>
       </SidebarHeader>
@@ -202,13 +206,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white hover:shadow-md transition-all cursor-pointer">
-            <div className="w-12 h-12 bg-[#1e1b4b] rounded-2xl flex items-center justify-center text-white font-black shadow-lg">
+        <div className="bg-white/30 border border-white/40 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/40 transition-all cursor-pointer">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[9px] truncate font-black uppercase tracking-widest text-slate-400">{currentUser.role}</p>
+                <p className="text-sm font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[9px] truncate font-black uppercase tracking-widest text-white/60">{currentUser.role}</p>
             </div>
         </div>
       </SidebarFooter>

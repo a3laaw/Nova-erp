@@ -8,11 +8,11 @@
   :root {
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
-    --card: 0 0% 100% / 0.7;
+    --card: 0 0% 100% / 0.4;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 222 47% 11%; /* Deep Navy */
+    --primary: 262 83% 38%; /* #7209B7 */
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222 47% 11%;
@@ -24,18 +24,17 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222 47% 11%;
-    --radius: 2rem;
+    --ring: 262 83% 38%;
+    --radius: 2.5rem;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body {
-    /* تدرج باستيل ناعم: أزرق سماوي شاحب وأرجواني لافندر خفيف */
-    background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 50%, #faf5ff 100%);
+    background: linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%);
     background-attachment: fixed;
-    color: #1e1b4b; /* Deep Navy Default */
+    color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
@@ -44,10 +43,10 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   }
   
@@ -57,27 +56,26 @@
     border: none !important;
   }
 
-  /* كبسولات القائمة العائمة - الوضع الفاتح */
+  /* كبسولات القائمة العائمة المطابقة للصورة */
   .nav-capsule-active {
     background: #ffffff !important;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-    @apply text-[#1e1b4b] font-black scale-[1.02] border border-slate-100;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    @apply text-[#1e1b4b] font-black scale-[1.02] border-none;
   }
 
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.4) !important;
-    border: 1px solid rgba(255, 255, 255, 0.6) !important;
-    @apply text-slate-600 font-bold hover:bg-white/80 hover:text-[#1e1b4b] transition-all duration-300;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    @apply text-white font-bold hover:bg-white/40 hover:text-white transition-all duration-300;
   }
   
   .navy-text {
     @apply text-[#1e1b4b] font-black;
   }
 
-  .charcoal-text {
-    @apply text-slate-700 font-bold;
+  .hover-lift { 
+    @apply transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl; 
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
-.hover-lift { @apply transition-all duration-500 hover:-translate-y-1 hover:shadow-lg; }
