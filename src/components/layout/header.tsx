@@ -15,6 +15,7 @@ import { Logo } from './logo';
 import { Skeleton } from '../ui/skeleton';
 import { UpdateIndicator } from '@/context/sync-context';
 import { useAppTheme } from '@/context/theme-context';
+import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
