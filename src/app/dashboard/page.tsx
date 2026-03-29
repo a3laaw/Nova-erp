@@ -56,10 +56,14 @@ export default function DashboardPage() {
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
                     <div className="flex flex-col gap-4 order-2 lg:order-1 items-center lg:items-start">
                         <Button asChild variant="outline" className="h-11 rounded-2xl font-black gap-2 bg-white/5 border-white/20 text-white shadow-lg hover:bg-white/10">
-                            <BellRing className="h-4 w-4" /> سجل التنبيهات
+                            <Link href="/dashboard/notifications" className="flex items-center gap-2">
+                                <BellRing className="h-4 w-4" /> سجل التنبيهات
+                            </Link>
                         </Button>
                         <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-[#7209B7] text-white shadow-[0_0_30px_rgba(114,9,183,0.4)] hover:scale-105 transition-transform">
-                            <PlusCircle className="h-5 w-5" /> إضافة عميل جديد
+                            <Link href="/dashboard/clients/new" className="flex items-center gap-2">
+                                <PlusCircle className="h-5 w-5" /> إضافة عميل جديد
+                            </Link>
                         </Button>
                     </div>
 
