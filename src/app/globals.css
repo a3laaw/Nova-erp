@@ -6,36 +6,36 @@
 
 @layer base {
   :root {
-    --background: 222 47% 4%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 6% / 0.7;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 4%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%; 
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100% / 0.7;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%; /* Deep Navy */
     --primary-foreground: 210 40% 98%;
-    --secondary: 271 91% 44%; 
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 10%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 32% 15%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 17% / 0.3;
-    --input: 217 32% 17% / 0.3;
-    --ring: 199 89% 48%;
-    --radius: 2.5rem;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222 47% 11%;
+    --radius: 2rem;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body {
-    /* تدرج كوني سيادي حاد وغير باهت */
-    background: radial-gradient(circle at 0% 0%, #1e3a8a 0%, #020617 50%, #4c1d95 100%);
+    /* تدرج باستيل ناعم: أزرق سماوي شاحب وأرجواني لافندر خفيف */
+    background: linear-gradient(135deg, #f0f9ff 0%, #f5f3ff 50%, #faf5ff 100%);
     background-attachment: fixed;
-    color: #f8fafc;
+    color: #1e1b4b; /* Deep Navy Default */
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
@@ -44,54 +44,40 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(2, 6, 23, 0.65);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   }
   
-  /* توهج النيون الأزرق الكهربائي الحاد */
-  .neon-glow-blue {
-    border: 1.5px solid rgba(56, 189, 248, 0.6);
-    box-shadow: 0 0 30px rgba(56, 189, 248, 0.2), inset 0 0 15px rgba(56, 189, 248, 0.1);
-  }
-
-  /* توهج النيون البنفسجي الجمشتي الحاد */
-  .neon-glow-purple {
-    border: 1.5px solid rgba(168, 85, 247, 0.6);
-    box-shadow: 0 0 30px rgba(168, 85, 247, 0.2), inset 0 0 15px rgba(168, 85, 247, 0.1);
-  }
-
   .sidebar-glass {
     background: transparent !important;
     backdrop-filter: none !important;
     border: none !important;
   }
 
-  /* كبسولات القائمة العائمة */
+  /* كبسولات القائمة العائمة - الوضع الفاتح */
   .nav-capsule-active {
     background: #ffffff !important;
-    box-shadow: 0 10px 40px rgba(255, 255, 255, 0.3), 0 0 20px rgba(56, 189, 248, 0.4);
-    @apply text-[#020617] font-black scale-[1.02] border-none;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    @apply text-[#1e1b4b] font-black scale-[1.02] border border-slate-100;
   }
 
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.06) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    @apply text-white/70 font-bold hover:bg-white/15 hover:border-white/40 hover:text-white transition-all duration-300;
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.6) !important;
+    @apply text-slate-600 font-bold hover:bg-white/80 hover:text-[#1e1b4b] transition-all duration-300;
   }
   
-  .ice-blue-text {
-    color: #7dd3fc;
-    text-shadow: 0 0 15px rgba(125, 211, 252, 0.4);
+  .navy-text {
+    @apply text-[#1e1b4b] font-black;
   }
 
-  .neon-purple-text {
-    color: #d8b4fe;
-    text-shadow: 0 0 15px rgba(216, 180, 254, 0.4);
+  .charcoal-text {
+    @apply text-slate-700 font-bold;
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
-.hover-lift { @apply transition-all duration-500 hover:-translate-y-2; }
+.hover-lift { @apply transition-all duration-500 hover:-translate-y-1 hover:shadow-lg; }
