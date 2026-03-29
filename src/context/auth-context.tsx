@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 // 2. حالة مستخدم الـ SaaS (Tenant)
-                // جلب الميتا-داتا للمستخدم من الفهرس العالمي
+                // جلب الميتا-داتا للمستخدم من الفهرس العالمي (Mapping)
                 const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
                 
                 if (!userIndexSnap.empty) {
@@ -108,24 +108,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // إذا كان المطور يدخل بحسابه الصريح
-    if (email === MASTER_DEV_EMAIL) {
-        await signInWithEmailAndPassword(masterAuth, email, password);
-        document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
-        return;
-    }
-
     // 🛡️ ذكاء الدخول السيادي:
-    // إذا لم يكتب المستخدم إيميل كامل، نبحث عنه كـ "اسم مستخدم" عالمي
+    // إذا لم يكتب المستخدم إيميل كامل، نبحث عنه كـ "اسم مستخدم" (Username) في الفهرس العالمي
     if (!email.includes('@')) {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
-        if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل لدينا.');
+        if (userIndexSnap.empty) {
+            throw new Error('اسم المستخدم هذا غير مسجل لدينا.');
+        }
         email = userIndexSnap.docs[0].data().email;
     }
 
     try {
         await signInWithEmailAndPassword(masterAuth, email, password);
-        document.cookie = 'nova-user-session=1; path=/; max-age=86400';
+        // تعيين كوكيز الجلسة لتأمين الـ Middleware
+        document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
         throw new Error('خطأ في كلمة المرور أو اسم المستخدم.');
     }

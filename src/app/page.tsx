@@ -20,7 +20,7 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', // اسم المستخدم أو الإيميل
+    identifier: '', // اسم المستخدم
     password: '',
   });
 
@@ -95,7 +95,7 @@ export default function UnifiedLoginPage() {
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> اسم المستخدم أو البريد
+                        <User className="h-3 w-3" /> اسم المستخدم (Username)
                     </Label>
                     <Input 
                         type="text" 
@@ -103,7 +103,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="username"
+                        placeholder="أدخل اسم المستخدم..."
                         disabled={isLoading}
                     />
                 </div>
@@ -118,6 +118,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
+                        placeholder="********"
                         disabled={isLoading}
                     />
                 </div>

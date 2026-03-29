@@ -17,8 +17,8 @@ service cloud.firestore {
 
     // --- 1. فهرس المستخدمين العالمي (للدخول فقط) ---
     match /global_users/{docId} {
-      allow read: if request.auth != null; 
-      allow write: if isDeveloper();
+      allow read: if true; // مسموح للكل لقراءة الفهرس عند تسجيل الدخول
+      allow write: if request.auth != null; // مسموح للمديرين الموثقين بالتسجيل
     }
 
     // --- 2. بيانات المطورين (المشروع الماستر) ---
