@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,31 +28,17 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
-
   // --- محرك التوجيه اللحظي (Immediate Redirection Engine) ---
   useEffect(() => {
     if (!authLoading && user) {
-        // إذا كان المستخدم مسجلاً دخوله، نقوم بتوجيهه فوراً
+        // توجيه فوري بناءً على الدور
         const targetPath = user.role === 'Developer' 
-            ? (user.currentCompanyId ? '/dashboard' : '/developer')
+            ? '/developer'
             : '/dashboard';
         
         router.replace(targetPath);
     }
   }, [user, authLoading, router]);
-
-  // صمام أمان لزر "جاري التحقق" لضمان تحرير الواجهة في حال تعثر الرد
-  useEffect(() => {
-    if (isLoading) {
-        redirectTimerRef.current = setTimeout(() => {
-            if (isLoading) setIsLoading(false);
-        }, 8000);
-    }
-    return () => {
-        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-    };
-  }, [isLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,25 +48,12 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        toast({ title: 'مرحباً بك في Nova ERP' });
-        // نترك حالة isLoading صحيحة حتى تكتمل عملية التوجيه من الـ useEffect
+        // التوجيه سيتم آلياً عبر الـ useEffect بمجرد تحديث حالة المستخدم
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
     }
   };
-
-  // عرض شاشة تحميل لؤلؤية إذا كان يتم استعادة الجلسة في الخلفية
-  if (authLoading && !isLoading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-[#1e1b4b]">
-            <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-12 w-12 animate-spin text-white opacity-20" />
-                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.5em]">Establishing Sovereign Connection</p>
-            </div>
-        </div>
-      );
-  }
 
   const vibrantGlassBackground = "linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%)";
 
