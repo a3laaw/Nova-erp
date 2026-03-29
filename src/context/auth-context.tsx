@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
+  const initialLoadHandled = useRef(false);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -32,87 +33,85 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
-    // 🛡️ صمام الأمان النووي: نضمن أن حالة التحميل ستنتهي مهما حدث بعد 7 ثوانٍ
+    // 🛡️ صمام الأمان النووي: نضمن أن حالة التحميل ستنتهي مهما حدث بعد 6 ثوانٍ
     const safetyTimer = setTimeout(() => {
-        if (loading) {
-            console.warn("Auth Safety Timeout Triggered - Forcing Loader Exit");
-            setLoading(false);
-        }
-    }, 7000);
+        setLoading(false);
+    }, 6000);
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
+        if (!firebaseUser) {
+            setUser(null);
+            setCurrentCompany(null);
+            setLoading(false);
+            clearTimeout(safetyTimer);
+            return;
+        }
+
         try {
-            if (firebaseUser) {
-                const idTokenResult = await firebaseUser.getIdTokenResult();
-                const claims = idTokenResult.claims as any;
+            const idTokenResult = await firebaseUser.getIdTokenResult();
+            const claims = idTokenResult.claims as any;
 
-                // 1. حالة المطور السيادي (Root Developer)
-                if (firebaseUser.email === MASTER_DEV_EMAIL) {
-                    const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
-                    if (devDoc.exists()) {
-                        const activeCompanyId = claims.currentCompanyId || null;
-                        setUser({ 
-                            ...devDoc.data() as UserProfile, 
-                            uid: firebaseUser.uid,
-                            id: firebaseUser.uid,
-                            isSuperAdmin: true,
-                            currentCompanyId: activeCompanyId,
-                            companyName: claims.companyName || null
-                        });
-                        
-                        if (activeCompanyId) {
-                            const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
-                            if (companyDoc.exists()) {
-                                setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
-                            }
-                        }
-                        clearTimeout(safetyTimer);
-                        setLoading(false);
-                        return;
-                    }
-                }
-
-                // 2. حالة مستخدم الـ SaaS (Tenant User)
-                const userEmail = firebaseUser.email?.toLowerCase();
-                if (userEmail) {
-                    // بحث سريع في الفهرس العالمي
-                    const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
+            // 1. حالة المطور السيادي (Root Developer)
+            if (firebaseUser.email === MASTER_DEV_EMAIL) {
+                const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
+                if (devDoc.exists()) {
+                    const activeCompanyId = claims.currentCompanyId || null;
+                    setUser({ 
+                        ...devDoc.data() as UserProfile, 
+                        uid: firebaseUser.uid,
+                        id: firebaseUser.uid,
+                        isSuperAdmin: true,
+                        currentCompanyId: activeCompanyId,
+                        companyName: claims.companyName || null
+                    });
                     
-                    if (!userIndexSnap.empty) {
-                        const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-                        const companyId = userIndex.companyId;
-                        
-                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
+                    if (activeCompanyId) {
+                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
                         if (companyDoc.exists()) {
-                            const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
-                            
-                            // سحب ملف الموظف من الصندوق المعزول
-                            const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
-                            
-                            if (tenantUserDoc.exists()) {
-                                const userData = tenantUserDoc.data() as UserProfile;
-                                setCurrentCompany(companyData);
-                                setUser({ 
-                                    ...userData, 
-                                    uid: firebaseUser.uid, 
-                                    id: tenantUserDoc.id,
-                                    currentCompanyId: companyId,
-                                    companyName: companyData.name
-                                });
-                            }
+                            setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                        }
+                    }
+                    return;
+                }
+            }
+
+            // 2. حالة مستخدم الـ SaaS (Tenant User)
+            const userEmail = firebaseUser.email?.toLowerCase();
+            if (userEmail) {
+                // بحث سريع في الفهرس العالمي (Global Routing Index)
+                const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
+                
+                if (!userIndexSnap.empty) {
+                    const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
+                    const companyId = userIndex.companyId;
+                    
+                    const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
+                    if (companyDoc.exists()) {
+                        const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
+                        
+                        // سحب ملف الموظف من الصندوق المعزول (Isolated Tenant Path)
+                        const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
+                        
+                        if (tenantUserDoc.exists()) {
+                            const userData = tenantUserDoc.data() as UserProfile;
+                            setCurrentCompany(companyData);
+                            setUser({ 
+                                ...userData, 
+                                uid: firebaseUser.uid, 
+                                id: tenantUserDoc.id,
+                                currentCompanyId: companyId,
+                                companyName: companyData.name
+                            });
                         }
                     }
                 }
-            } else {
-                setUser(null);
-                setCurrentCompany(null);
             }
         } catch (error) {
-            console.error("Auth Listener Critical Failure:", error);
+            console.error("Auth Listener Error:", error);
             setUser(null);
         } finally {
-            clearTimeout(safetyTimer);
             setLoading(false);
+            clearTimeout(safetyTimer);
         }
     });
 
@@ -127,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // إذا لم يكتب الموظف إيميلاً (كتب يوزر نيم)، نبحث له عن الإيميل في الفهرس
+    // إذا لم يكتب الموظف إيميلاً (كتب يوزر نيم)، نبحث له عن الإيميل في الفهرس العالمي
     if (!email.includes('@')) {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
         if (userIndexSnap.empty) {
@@ -137,10 +136,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+        setLoading(true);
         await signInWithEmailAndPassword(masterAuth, email, password);
         // تحديث الكوكي لمرور الـ Middleware
         document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
+        setLoading(false);
         console.error("Login Error:", e);
         if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
             throw new Error('بيانات الدخول غير صحيحة.');
@@ -150,11 +151,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [masterAuth, masterFirestore]);
 
   const logout = useCallback(async () => {
+    setLoading(true);
     if (masterAuth) await signOut(masterAuth);
     document.cookie = 'nova-dev-session=; max-age=0; path=/';
     document.cookie = 'nova-user-session=; max-age=0; path=/';
     setUser(null);
     setCurrentCompany(null);
+    setLoading(false);
     router.replace('/');
   }, [masterAuth, setCurrentCompany, router]);
 

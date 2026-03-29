@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
 import type { Company } from '@/lib/types';
 import { getCompanyFirebase, type CompanyFirebaseInstances } from '@/firebase/multi-tenant';
 import type { Firestore } from 'firebase/firestore';
@@ -20,10 +20,11 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [currentCompany, setCompany] = useState<Company | null>(null);
   const [instances, setInstances] = useState<CompanyFirebaseInstances | null>(null);
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
+  const mounted = useRef(false);
 
   /**
-   * ✨ حفظ دالة التبديل برمجياً (Memoization) ✨
-   * ضروري جداً لكسر حلقة التكرار اللانهائي مع AuthContext.
+   * ✨ مصفوفة التبديل السيادي المستقرة (Stable Switcher) ✨
+   * استخدام useCallback يمنع تذبذب الجلسة وتوقف التحميل.
    */
   const setCurrentCompany = useCallback((company: Company | null) => {
     if (!company) {
@@ -34,6 +35,9 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
       }
       return;
     }
+
+    // تجنب إعادة التهيئة لنفس الشركة
+    if (currentCompany?.id === company.id) return;
 
     setIsLoadingCompany(true);
     try {
@@ -48,18 +52,21 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoadingCompany(false);
     }
-  }, []);
+  }, [currentCompany?.id]);
 
-  // محاولة استعادة الشركة من التخزين المحلي عند إعادة التحميل (مرة واحدة فقط)
+  // استعادة الجلسة من التخزين المحلي لسرعة التحميل الأولى (Hydration Fix)
   useEffect(() => {
-    const saved = localStorage.getItem('nova_current_company');
-    if (saved) {
-      try {
-        const company = JSON.parse(saved);
-        setCurrentCompany(company);
-      } catch (e) {
-        localStorage.removeItem('nova_current_company');
-      }
+    if (!mounted.current) {
+        mounted.current = true;
+        const saved = localStorage.getItem('nova_current_company');
+        if (saved) {
+            try {
+                const company = JSON.parse(saved);
+                setCurrentCompany(company);
+            } catch (e) {
+                localStorage.removeItem('nova_current_company');
+            }
+        }
     }
   }, [setCurrentCompany]);
 
