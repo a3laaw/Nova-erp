@@ -55,6 +55,17 @@ export interface Company extends BaseEntity {
   currentUsersCount?: number;
 }
 
+export interface CompanyRequest extends BaseEntity {
+    companyName: string;
+    activity: string;
+    contactName: string;
+    email: string;
+    phone: string;
+    adminPassword?: string;
+    message?: string;
+    status: 'pending' | 'approved' | 'rejected';
+}
+
 export interface GlobalUserIndex {
     email: string;
     companyId: string;
@@ -526,6 +537,7 @@ export interface CashReceipt extends BaseEntity {
     reference?: string;
     journalEntryId?: string;
     commissionAmount?: number;
+    isBypassed?: boolean;
 }
 
 export interface PaymentVoucher extends BaseEntity {
