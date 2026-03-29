@@ -26,12 +26,13 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     if (!company) {
       setCompany(null);
       setInstances(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('nova_current_company');
-      }
+      try {
+        if (typeof window !== 'undefined') localStorage.removeItem('nova_current_company');
+      } catch (e) {}
       return;
     }
 
+    // منع إعادة التأسيس إذا كانت نفس الشركة
     if (currentCompany?.id === company.id) return;
 
     setIsLoadingCompany(true);
@@ -52,14 +53,14 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!mounted.current) {
         mounted.current = true;
-        const saved = localStorage.getItem('nova_current_company');
-        if (saved) {
-            try {
+        try {
+            const saved = localStorage.getItem('nova_current_company');
+            if (saved) {
                 const company = JSON.parse(saved);
                 setCurrentCompany(company);
-            } catch (e) {
-                localStorage.removeItem('nova_current_company');
             }
+        } catch (e) {
+            if (typeof window !== 'undefined') localStorage.removeItem('nova_current_company');
         }
     }
   }, [setCurrentCompany]);

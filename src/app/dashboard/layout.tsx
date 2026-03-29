@@ -26,12 +26,12 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
-    // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 6 ثوانٍ، نظهر خيارات الإصلاح
+    // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 5 ثوانٍ، نظهر خيارات الإصلاح
     const timer = setTimeout(() => {
-      if (loading) setShowEmergencyExit(true);
-    }, 6000);
+      setShowEmergencyExit(true);
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, []);
 
   const handleSafeExit = () => {
     logout();
