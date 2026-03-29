@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    --background: 271 91% 44%;
-    --foreground: 240 60% 10%;
-    --card: 0 0% 100% / 0.15;
-    --card-foreground: 240 50% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 60% 10%;
-    --primary: 271 91% 44%; /* #7209B7 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 240 50% 12%;
-    --muted: 220 30% 94%;
-    --muted-foreground: 220 20% 50%;
-    --accent: 220 30% 94%;
-    --accent-foreground: 240 50% 12%;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11% / 0.6;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 199 89% 48%; /* Electric Blue */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 271 91% 44%; /* Deep Purple */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 32% 17%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 100% / 0.25;
-    --input: 0 0% 100% / 0.15;
-    --ring: 271 91% 44%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 32% 17% / 0.5;
+    --input: 217 32% 17% / 0.5;
+    --ring: 199 89% 48%;
     --radius: 2.5rem;
   }
 }
@@ -32,10 +32,10 @@
 @layer base {
   * { @apply border-border; }
   body {
-    /* التدرج اللوني المطابق للصورة: من الأرجواني للوردي الفاقع */
-    background: linear-gradient(180deg, #a855f7 0%, #ec4899 100%);
+    /* التدرج الكوني العميق المشبع */
+    background: radial-gradient(circle at top left, #1e3a8a 0%, #020617 40%, #581c87 100%);
     background-attachment: fixed;
-    color: #1e1b4b;
+    color: #f8fafc;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
@@ -44,55 +44,57 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(25px);
-    -webkit-backdrop-filter: blur(25px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   }
   
-  .glass-card {
-    background: rgba(255, 255, 255, 0.25);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    @apply shadow-xl rounded-[2.5rem];
+  /* توهج النيون الأزرق */
+  .neon-glow-blue {
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.15), inset 0 0 10px rgba(56, 189, 248, 0.05);
+  }
+
+  /* توهج النيون البنفسجي */
+  .neon-glow-purple {
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.15), inset 0 0 10px rgba(168, 85, 247, 0.05);
   }
 
   .sidebar-glass {
     background: transparent !important;
     backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     border: none !important;
   }
 
-  /* نمط الكبسولة النشطة - أبيض ناصع كما في الصورة */
   .active-capsule {
     background: #ffffff !important;
-    border: none !important;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-    @apply text-[#1e1b4b] font-black scale-[1.02];
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
+    @apply text-[#020617] font-black scale-[1.02];
   }
 
-  /* نمط الكبسولة الشفافة - للعناصر غير النشطة */
   .glass-capsule {
-    background: rgba(255, 255, 255, 0.2) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
-    @apply text-white font-bold;
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    @apply text-white/80 font-bold hover:bg-white/10 hover:border-white/30 transition-all;
   }
   
-  /* نمط الكبسولة الفرعية - أكثر شفافية */
   .sub-capsule {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-    @apply text-white/90 font-medium;
+    background: rgba(255, 255, 255, 0.03) !important;
+    @apply text-white/60 font-medium;
   }
 
-  .header-icon-glass {
-    @apply bg-white/20 border-white/30 text-white hover:bg-white/40 transition-all rounded-full h-10 w-10 p-0;
+  .ice-blue-text {
+    color: #bae6fd;
+  }
+
+  .pale-purple-text {
+    color: #e9d5ff;
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
-.hover-lift { @apply transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl; }
+.hover-lift { @apply transition-all duration-500 hover:-translate-y-2; }
