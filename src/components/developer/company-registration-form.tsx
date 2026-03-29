@@ -132,6 +132,19 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     savingRef.current = true;
     setIsSaving(true);
     try {
+      // 1. مزامنة الحساب مع خادم الأمان (Firebase Auth) أولاً
+      const authResponse = await fetch('/api/manage-tenant-user', {
+          method: 'POST',
+          body: JSON.stringify({
+              email: formData.adminEmail,
+              password: formData.adminPassword,
+              displayName: formData.name,
+              action: 'create'
+          })
+      });
+      const authResult = await authResponse.json();
+      if (!authResult.success) throw new Error(authResult.error);
+
       const firebaseConfig = {
         apiKey: formData.apiKey.trim(),
         authDomain: formData.authDomain.trim(),
@@ -161,7 +174,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               ...licenseData,
               updatedAt: serverTimestamp()
           }));
-          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات ربط وترخيص المنشأة.' });
+          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات ربط وترخيص المنشأة ومزامنة الحماية.' });
       } else {
           const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
           
@@ -181,15 +194,29 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               createdBy: masterAuth.currentUser?.uid || 'system',
             });
 
+            // إنشاء ملف المستخدم المعزول داخل مجلد الشركة
+            const tenantUserRef = doc(masterFirestore, `companies/${companyId}/users`, authResult.uid);
+            transaction.set(tenantUserRef, {
+                uid: authResult.uid,
+                email: formData.adminEmail.toLowerCase().trim(),
+                username: formData.adminEmail.split('@')[0],
+                fullName: formData.name,
+                role: 'Admin',
+                isActive: true,
+                companyId: companyId,
+                createdAt: serverTimestamp()
+            });
+
             const globalUserRef = doc(collection(masterFirestore, 'global_users'));
             transaction.set(globalUserRef, {
               email: formData.adminEmail.toLowerCase().trim(),
+              username: formData.adminEmail.split('@')[0],
               companyId: companyId,
               role: 'Admin',
             });
           });
 
-          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتأسيس بيئة العمل بنظام التجربة.' });
+          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتفعيل حساب المالك بنجاح.' });
       }
 
       onClose();

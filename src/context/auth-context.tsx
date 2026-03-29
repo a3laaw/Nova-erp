@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -124,7 +125,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // تعيين كوكيز الجلسة لتأمين الـ Middleware
         document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
-        throw new Error('خطأ في كلمة المرور أو اسم المستخدم.');
+        console.error("Login attempt failed:", e);
+        if (e.code === 'auth/user-not-found') {
+            throw new Error('هذا الحساب غير موجود في خادم الأمان.');
+        } else if (e.code === 'auth/wrong-password') {
+            throw new Error('كلمة المرور غير صحيحة.');
+        }
+        throw new Error('خطأ في كلمة المرور أو اسم المستخدم. يرجى التأكد من المطور إذا كان الحساب قد تم تفعيله.');
     }
   }, [masterAuth, masterFirestore]);
 
