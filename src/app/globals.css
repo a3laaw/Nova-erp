@@ -61,16 +61,25 @@
   }
 
   .sidebar-glass {
-    background: rgba(255, 255, 255, 0.1); /* شفافية عالية جداً للمرور اللوني */
+    background: transparent !important; /* تجريد الخلفية لتظهر التدرجات كما في الصورة */
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
     border-left: 1px solid rgba(255, 255, 255, 0.1);
   }
 
-  .active-item-glow {
+  /* نمط الكبسولة النشطة (مثل Dashboard في الصورة) */
+  .active-capsule {
     background: rgba(255, 255, 255, 0.95) !important;
     border: 1px solid rgba(255, 255, 255, 1);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    @apply text-[#4c1d95] font-black;
+  }
+
+  /* نمط الكبسولة الشفافة (مثل بقية العناصر) */
+  .glass-capsule {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    @apply text-[#4c1d95]/80 font-bold;
   }
   
   .header-icon-glass {

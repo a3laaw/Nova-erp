@@ -105,15 +105,15 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           isActive={isActive} 
           asChild 
           className={cn(
-            "my-1.5 h-14 rounded-2xl transition-all duration-500",
+            "my-2 h-14 rounded-2xl transition-all duration-500",
             isActive 
-              ? "active-item-glow text-[#1e1b4b] font-black shadow-lg" 
-              : "bg-white/20 hover:bg-white/40 text-[#1e1b4b]/70 border border-white/10"
+              ? "active-capsule" 
+              : "glass-capsule hover:bg-white/30"
           )}
         >
-          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-3">
-            {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/80")} strokeWidth={isActive ? 3 : 2} />}
-            <span className="truncate text-sm">{item.label}</span>
+          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
+            <span className="truncate text-sm flex-1">{item.label}</span>
+            {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#4c1d95]/80")} strokeWidth={isActive ? 3 : 2} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -128,30 +128,30 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <SidebarMenuButton 
               isActive={isActive} 
               className={cn(
-                "my-1.5 h-14 rounded-2xl transition-all duration-500",
+                "my-2 h-14 rounded-2xl transition-all duration-500",
                 isActive 
-                  ? "active-item-glow text-[#1e1b4b] font-black shadow-md" 
-                  : "bg-white/20 hover:bg-white/40 text-[#1e1b4b]/70 border border-white/10"
+                  ? "active-capsule" 
+                  : "glass-capsule hover:bg-white/30"
               )}
             >
-              {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/80")} strokeWidth={isActive ? 3 : 2} />}
-              <span className="truncate text-sm flex-1">{item.label}</span>
-              <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/50")} />
+              <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50", isActive ? "text-[#7209B7]" : "text-[#4c1d95]/50")} />
+              <span className="truncate text-sm flex-1 mr-2">{item.label}</span>
+              {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#4c1d95]/80")} strokeWidth={isActive ? 3 : 2} />}
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 pr-4 space-y-2 border-none">
+            <SidebarMenuSub className="mt-1 mb-2 space-y-2 border-none pr-4">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl py-3 h-auto transition-all font-bold",
+                        "rounded-xl py-3 h-11 transition-all",
                         isChildActive 
-                          ? "active-item-glow text-[#1e1b4b] font-black shadow-sm" 
-                          : "bg-white/10 hover:bg-white/30 text-[#1e1b4b]/60 border border-white/5"
+                          ? "bg-white/80 text-[#4c1d95] font-black shadow-sm" 
+                          : "bg-white/10 hover:bg-white/20 text-[#4c1d95]/70"
                     )}>
-                      <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
+                      <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-end w-full">
                         <span className="text-xs truncate">{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
@@ -177,14 +177,9 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
   return (
     <>
       <SidebarHeader className="p-8 mb-4">
-        <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-3xl font-black tracking-tighter text-[#1e1b4b]">Nova ERP</span>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1e1b4b]/40 mt-1">PURPLE SUITE</span>
-            </div>
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border-2 border-primary/20 shadow-xl">
-              <span className="text-xl font-black text-primary">{currentUser.fullName?.charAt(0) || 'N'}</span>
-            </div>
+        <div className="flex flex-col items-center">
+          <span className="text-3xl font-black tracking-tighter text-[#1e1b4b]">Nova ERP</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1e1b4b]/40 mt-1">PURPLE SUITE</span>
         </div>
       </SidebarHeader>
 
@@ -202,7 +197,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-2xl backdrop-blur-md">
+        <div className="bg-white/30 border border-white/40 rounded-[2.5rem] p-5 flex items-center shadow-xl backdrop-blur-md">
             <div className="w-12 h-12 bg-[#7209B7] rounded-2xl flex items-center justify-center text-white font-black shadow-lg border-2 border-white/20">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
