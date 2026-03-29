@@ -6,13 +6,12 @@ import { useFirebase } from '@/firebase';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import type { UserProfile, Company, GlobalUserIndex, AuthenticatedUser } from '@/lib/types';
-import { getCompanyFirebase } from '@/firebase/multi-tenant';
 import { useCompany } from './company-context';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,22 +25,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
-  const isInitialized = useRef(false);
 
   useEffect(() => {
-    if (!masterAuth || !masterFirestore) {
-        console.warn("Firebase Auth or Firestore not available yet.");
-        setLoading(false);
-        return;
-    }
-
-    // 🛡️ صمام أمان زمني لضمان عدم بقاء شاشة التحميل عالقة للأبد
-    const fallbackTimer = setTimeout(() => {
-        if (loading && !isInitialized.current) {
-            console.warn("Auth initialization timed out. Forcing load completion.");
-            setLoading(false);
-        }
-    }, 8000);
+    if (!masterAuth || !masterFirestore) return;
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         try {
@@ -49,15 +35,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const idTokenResult = await firebaseUser.getIdTokenResult();
                 const claims = idTokenResult.claims as any;
 
-                // 1. حالة المطور السيادي
+                // 1. حالة المطور السيادي (Root)
                 if (firebaseUser.email === MASTER_DEV_EMAIL) {
                     const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
                     if (devDoc.exists()) {
-                        const devData = devDoc.data();
                         const activeCompanyId = claims.currentCompanyId || null;
-                        
                         setUser({ 
-                            ...devData as UserProfile, 
+                            ...devDoc.data() as UserProfile, 
                             uid: firebaseUser.uid,
                             id: firebaseUser.uid,
                             isSuperAdmin: true,
@@ -76,24 +60,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     }
                 }
 
-                // 2. حالة المستخدم العادي (Tenant)
+                // 2. حالة مستخدم الـ SaaS (Tenant)
+                // جلب الميتا-داتا للمستخدم من الفهرس العالمي
                 const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
                 
                 if (!userIndexSnap.empty) {
                     const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-                    const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
+                    const companyId = userIndex.companyId;
                     
+                    const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                     if (companyDoc.exists()) {
-                        const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
-                        const { firestore: companyFirestore } = getCompanyFirebase(company.firebaseConfig, company.id!);
+                        const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
                         
-                        const tenantUserQuery = query(collection(companyFirestore, 'users'), where('email', '==', firebaseUser.email));
-                        const tenantUserSnap = await getDocs(tenantUserQuery);
+                        // جلب بيانات المستخدم من داخل مجلد الشركة (المسار المعزول)
+                        const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
                         
-                        if (!tenantUserSnap.empty) {
-                            const userData = tenantUserSnap.docs[0].data() as UserProfile;
-                            setCurrentCompany(company);
-                            setUser({ ...userData, uid: firebaseUser.uid, id: tenantUserSnap.docs[0].id });
+                        if (tenantUserDoc.exists()) {
+                            const userData = tenantUserDoc.data() as UserProfile;
+                            setCurrentCompany(companyData);
+                            setUser({ 
+                                ...userData, 
+                                uid: firebaseUser.uid, 
+                                id: tenantUserDoc.id,
+                                currentCompanyId: companyId,
+                                companyName: companyData.name
+                            });
                         }
                     }
                 }
@@ -106,60 +97,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser(null);
         } finally {
             setLoading(false);
-            isInitialized.current = true;
-            clearTimeout(fallbackTimer);
         }
     });
 
-    return () => {
-        unsubscribe();
-        clearTimeout(fallbackTimer);
-    };
+    return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    if (!masterAuth || !masterFirestore) throw new Error("فشل الاتصال بالخادم الرئيسي.");
+  const login = useCallback(async (identifier: string, password: string) => {
+    if (!masterAuth || !masterFirestore) throw new Error("فشل الاتصال بخادم الأمان.");
 
-    const cleanEmail = email.toLowerCase().trim();
+    let email = identifier.toLowerCase().trim();
 
-    if (cleanEmail === MASTER_DEV_EMAIL) {
-        try {
-            const userCredential = await signInWithEmailAndPassword(masterAuth, cleanEmail, password);
-            const devDoc = await getDoc(doc(masterFirestore, 'developers', userCredential.user.uid));
-            
-            if (devDoc.exists()) {
-                document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
-                return;
-            } else {
-                await signOut(masterAuth);
-                throw new Error('حساب المطور غير مفعل سيادياً.');
-            }
-        } catch (e: any) {
-            throw new Error(e.message || 'بيانات الدخول السيادية غير صحيحة.');
-        }
+    // إذا كان المطور يدخل بحسابه الصريح
+    if (email === MASTER_DEV_EMAIL) {
+        await signInWithEmailAndPassword(masterAuth, email, password);
+        document.cookie = 'nova-dev-session=1; path=/; max-age=86400';
+        return;
+    }
+
+    // 🛡️ ذكاء الدخول السيادي:
+    // إذا لم يكتب المستخدم إيميل كامل، نبحث عنه كـ "اسم مستخدم" عالمي
+    if (!email.includes('@')) {
+        const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
+        if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل لدينا.');
+        email = userIndexSnap.docs[0].data().email;
     }
 
     try {
-        const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', cleanEmail)));
-        
-        if (!userIndexSnap.empty) {
-            const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-            const companyDoc = await getDoc(doc(masterFirestore, 'companies', userIndex.companyId));
-            
-            if (!companyDoc.exists()) throw new Error('بيانات الشركة غير موجودة.');
-            const company = { id: companyDoc.id, ...companyDoc.data() } as Company;
-            
-            if (!company.isActive) throw new Error('حساب الشركة معطل حالياً.');
-
-            const { auth: companyAuth } = getCompanyFirebase(company.firebaseConfig, company.id!);
-            await signInWithEmailAndPassword(companyAuth, cleanEmail, password);
-
-            document.cookie = 'nova-user-session=1; path=/; max-age=86400';
-        } else {
-            throw new Error('هذا البريد غير مسجل في أي منشأة.');
-        }
+        await signInWithEmailAndPassword(masterAuth, email, password);
+        document.cookie = 'nova-user-session=1; path=/; max-age=86400';
     } catch (e: any) {
-        throw new Error(e.message || 'بيانات الدخول غير صحيحة.');
+        throw new Error('خطأ في كلمة المرور أو اسم المستخدم.');
     }
   }, [masterAuth, masterFirestore]);
 

@@ -3,48 +3,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- مساعدات النظام السيادي ---
+    // --- مساعدات الحوكمة السيادية ---
     function isDeveloper() {
       return request.auth != null && 
-             request.auth.token.role == 'Developer' && 
-             request.auth.token.isSuperAdmin == true;
+             request.auth.token.role == 'Developer';
     }
 
-    function isCompanyAdmin(companyId) {
+    // التحقق من أن المستخدم ينتمي لهذه الشركة تحديداً
+    function belongsToCompany(companyId) {
       return request.auth != null && 
-             (request.auth.token.role == 'Admin' || request.auth.token.role == 'Developer') &&
-             (request.auth.token.currentCompanyId == companyId || request.auth.token.companyId == companyId);
+             (request.auth.token.companyId == companyId || request.auth.token.currentCompanyId == companyId);
     }
 
-    // السماح للمطور بالتحكم المطلق في مشروع الماستر
+    // --- 1. فهرس المستخدمين العالمي (للدخول فقط) ---
+    match /global_users/{docId} {
+      allow read: if request.auth != null; 
+      allow write: if isDeveloper();
+    }
+
+    // --- 2. بيانات المطورين (المشروع الماستر) ---
     match /developers/{uid} {
       allow read, write: if isDeveloper();
     }
 
+    // --- 3. بيانات الشركات المعزولة (The Isolated Tenants) ---
     match /companies/{companyId} {
-      // المطور يكتب في بيانات الربط، والادمن يقرأ فقط
-      allow read: if request.auth != null;
-      allow write: if isDeveloper() || isCompanyAdmin(companyId);
+      // المطور يقرأ الكل، المدير يقرأ شركته فقط
+      allow read: if isDeveloper() || belongsToCompany(companyId);
+      allow write: if isDeveloper() || (belongsToCompany(companyId) && request.auth.token.role == 'Admin');
       
-      // السماح لمدير الشركة بتعديل الإعدادات والعلامة التجارية داخل مجلد شركته
-      match /settings/{settingId} {
-        allow read, write: if isCompanyAdmin(companyId);
-      }
-      
-      // السماح لمدير الموظفين بالتحكم في المجلدات الفرعية
+      // عزل كافة المجموعات الفرعية (عملاء، موظفين، محاسبة)
       match /{allSubcollections=**} {
-        allow read, write: if isCompanyAdmin(companyId);
+        allow read, write: if isDeveloper() || belongsToCompany(companyId);
       }
     }
 
-    // --- حماية سجلات الحركات والترقيم في الماستر ---
+    // --- 4. العدادات العالمية ---
     match /counters/{doc} {
-      allow read, write: if isDeveloper() || request.auth != null;
+      allow read, write: if request.auth != null;
     }
 
-    // --- القاعدة العامة للوصول المعزول ---
+    // --- 5. القاعدة الصارمة لمنع التسريب ---
     match /{document=**} {
-      allow read, write: if isDeveloper() || (request.auth != null && request.auth.uid != null);
+      // أي مجموعة لا تتبع هيكل /companies/ تُعامل كمعلومات سيادية
+      allow read, write: if isDeveloper();
     }
   }
 }
