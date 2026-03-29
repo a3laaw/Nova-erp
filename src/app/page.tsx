@@ -12,6 +12,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+/**
+ * بوابة الدخول السيادية الموحدة لـ Nova ERP.
+ * تم تحديثها لضمان التوجيه اللحظي ومنع التعليق عند الدخول.
+ */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -24,28 +28,29 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  const checkRedirectRef = useRef<NodeJS.Timeout | null>(null);
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // --- محرك التوجيه اللحظي (Immediate Redirection Engine) ---
   useEffect(() => {
-    // توجيه تلقائي إذا كان المستخدم مسجلاً دخوله بالفعل
     if (!authLoading && user) {
-        if (user.role === 'Developer') {
-            router.replace(user.currentCompanyId ? '/dashboard' : '/developer');
-        } else {
-            router.replace('/dashboard');
-        }
+        // إذا كان المستخدم مسجلاً دخوله، نقوم بتوجيهه فوراً
+        const targetPath = user.role === 'Developer' 
+            ? (user.currentCompanyId ? '/dashboard' : '/developer')
+            : '/dashboard';
+        
+        router.replace(targetPath);
     }
   }, [user, authLoading, router]);
 
-  // صمام أمان لزر "جاري التحقق" لضمان عدم تعليقه
+  // صمام أمان لزر "جاري التحقق" لضمان تحرير الواجهة في حال تعثر الرد
   useEffect(() => {
     if (isLoading) {
-        checkRedirectRef.current = setTimeout(() => {
+        redirectTimerRef.current = setTimeout(() => {
             if (isLoading) setIsLoading(false);
-        }, 6000);
+        }, 8000);
     }
     return () => {
-        if (checkRedirectRef.current) clearTimeout(checkRedirectRef.current);
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
     };
   }, [isLoading]);
 
@@ -58,23 +63,21 @@ export default function UnifiedLoginPage() {
     try {
         await login(formData.identifier, formData.password);
         toast({ title: 'مرحباً بك في Nova ERP' });
-        // نترك isLoading صحيحاً حتى يتم التوجيه من الـ useEffect
+        // نترك حالة isLoading صحيحة حتى تكتمل عملية التوجيه من الـ useEffect
     } catch (error: any) {
         setErrorMessage(error.message);
-        toast({ 
-            variant: 'destructive', 
-            title: 'فشل الدخول', 
-            description: error.message 
-        });
         setIsLoading(false); 
     }
   };
 
-  // عرض شاشة تحميل خفيفة إذا كان يتم التحقق من الجلسة في الخلفية
+  // عرض شاشة تحميل لؤلؤية إذا كان يتم استعادة الجلسة في الخلفية
   if (authLoading && !isLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#1e1b4b]">
-            <Loader2 className="h-12 w-12 animate-spin text-white opacity-20" />
+            <div className="flex flex-col items-center gap-4">
+                <Loader2 className="h-12 w-12 animate-spin text-white opacity-20" />
+                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.5em]">Establishing Sovereign Connection</p>
+            </div>
         </div>
       );
   }
@@ -83,6 +86,7 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
+      {/* عناصر الإضاءة المحيطية */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
@@ -102,7 +106,7 @@ export default function UnifiedLoginPage() {
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تنبيه</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تنبيه بالخطأ</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
