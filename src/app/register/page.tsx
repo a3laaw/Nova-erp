@@ -1,10 +1,4 @@
-
 'use client';
-
-/**
- * @fileOverview بوابة تسجيل المنشآت الجديدة (SaaS Registration).
- * تم تحديثها لتشمل تعيين بيانات المدير الأول وتلقي نظام فترة التجربة.
- */
 
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -18,20 +12,18 @@ import {
     Building2, 
     User, 
     Mail, 
-    Phone, 
-    Save, 
-    ShieldCheck, 
+    Lock, 
     ArrowRight,
     Sparkles,
     CheckCircle2,
-    Lock,
-    Activity
+    Activity,
+    Phone,
+    ShieldCheck
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function RegisterPage() {
@@ -45,9 +37,9 @@ export default function RegisterPage() {
     companyName: '',
     activity: 'consulting',
     contactName: '',
-    email: '', // تم التصفير لضمان الأمان
+    email: '',
     phone: '',
-    adminPassword: '', // تم التصفير لضمان الأمان
+    adminPassword: '',
     message: ''
   });
 
@@ -62,7 +54,6 @@ export default function RegisterPage() {
 
     setIsSaving(true);
     try {
-        // تسجيل طلب المنشأة في مشروع الماستر ليتم اعتماده وتحويله لـ Demo
         await addDoc(collection(firestore, 'company_requests'), {
             ...formData,
             status: 'pending',
@@ -70,7 +61,7 @@ export default function RegisterPage() {
         });
 
         setIsSuccess(true);
-        toast({ title: 'تم استلام طلبك', description: 'سيقوم فريق الدعم الفني بمراجعة طلبك وتفعيل باقة الـ Demo (14 يوم) قريباً.' });
+        toast({ title: 'تم استلام طلبك', description: 'سيقوم فريق الدعم الفني بمراجعة طلبك وتفعيل باقة الـ Demo قريباً.' });
     } catch (error) {
         toast({ variant: 'destructive', title: 'خطأ في الإرسال', description: 'يرجى المحاولة مرة أخرى لاحقاً.' });
     } finally {
@@ -78,17 +69,15 @@ export default function RegisterPage() {
     }
   };
 
-  const vibrantGlassBackground = "linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%)";
-
   if (isSuccess) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: vibrantGlassBackground }}>
+        <div className="min-h-screen flex items-center justify-center p-4">
             <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95 duration-500">
                 <div className="bg-green-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-green-500/40">
                     <CheckCircle2 className="h-16 w-16 text-white" />
                 </div>
                 <h2 className="text-3xl font-black text-white mb-4">تم إرسال طلبك بنجاح!</h2>
-                <p className="text-white/80 font-bold mb-8">شكراً لثقتك بـ Nova ERP. سيتم مراجعة طلبك وتهيئة بيئة العمل الخاصة بك (Demo - 14 يوم) خلال 24 ساعة.</p>
+                <p className="text-white/80 font-bold mb-8">شكراً لثقتك بـ Nova ERP. سيتم مراجعة طلبك وتهيئة بيئة العمل الخاصة بك خلال 24 ساعة.</p>
                 <Button asChild className="h-12 px-10 rounded-xl bg-white text-purple-700 font-black hover:bg-white/90">
                     <Link href="/">العودة للرئيسية</Link>
                 </Button>
@@ -98,15 +87,16 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* Background Decor */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
+      {/* Ambient Lights */}
       <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-400/20 rounded-full blur-[120px] animate-pulse" />
-      
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-pink-400/20 rounded-full blur-[120px] animate-pulse" />
+
       <Card className="w-full max-w-2xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in slide-in-from-bottom-8 duration-700">
-        <CardHeader className="py-10 px-10 border-b border-white/20">
+        <CardHeader className="py-10 px-10 border-b border-white/10">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/30 rounded-2xl backdrop-blur-md border border-white/40">
+                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/30 shadow-lg">
                         <Rocket className="h-8 w-8 text-white" />
                     </div>
                     <div>
@@ -127,19 +117,22 @@ export default function RegisterPage() {
         </CardHeader>
         
         <CardContent className="p-10">
-            <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <form onSubmit={handleSubmit} className="space-y-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    {/* Section 1: Facility Info */}
                     <div className="space-y-6">
-                        <h3 className="font-black text-white/90 text-sm border-r-4 border-white/40 pr-3 uppercase tracking-widest">بيانات المنشأة</h3>
-                        <div className="grid gap-4">
+                        <h3 className="font-black text-white/90 text-sm border-r-4 border-white/40 pr-3 uppercase tracking-widest flex items-center gap-2">
+                            بيانات المنشأة
+                        </h3>
+                        <div className="grid gap-5">
                             <div className="grid gap-2">
                                 <Label className="text-white/80 font-bold mr-1">اسم المكتب / الشركة *</Label>
-                                <div className="relative">
-                                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                                <div className="relative group">
+                                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 group-focus-within:text-white transition-colors" />
                                     <Input 
                                         value={formData.companyName} 
                                         onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
-                                        className="pr-10 h-11 rounded-xl bg-white/10 border-white/20 text-white placeholder:text-white/30 font-bold" 
+                                        className="pr-10 h-12 glass-input rounded-xl placeholder:text-white/20" 
                                         placeholder="مثال: مكتب الخليج للاستشارات"
                                         required 
                                     />
@@ -148,7 +141,7 @@ export default function RegisterPage() {
                             <div className="grid gap-2">
                                 <Label className="text-white/80 font-bold mr-1">نوع النشاط الرئيسي</Label>
                                 <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
-                                    <SelectTrigger className="h-11 rounded-xl bg-white/10 border-white/20 text-white font-bold">
+                                    <SelectTrigger className="h-12 glass-input rounded-xl">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent dir="rtl">
@@ -162,43 +155,44 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
+                    {/* Section 2: Admin Info */}
                     <div className="space-y-6">
                         <h3 className="font-black text-white/90 text-sm border-r-4 border-white/40 pr-3 uppercase tracking-widest">بيانات حساب المدير</h3>
-                        <div className="grid gap-4">
+                        <div className="grid gap-5">
                             <div className="grid gap-2">
                                 <Label className="text-white/80 font-bold mr-1">اسم المدير المسؤول *</Label>
-                                <div className="relative">
-                                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                                <div className="relative group">
+                                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 group-focus-within:text-white" />
                                     <Input 
                                         value={formData.contactName} 
                                         onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} 
-                                        className="pr-10 h-11 rounded-xl bg-white/10 border-white/20 text-white font-bold" 
+                                        className="pr-10 h-12 glass-input rounded-xl" 
                                         required 
                                     />
                                 </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label className="text-white/80 font-bold mr-1">البريد الإلكتروني (للدخول) *</Label>
-                                <div className="relative">
-                                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                                <div className="relative group">
+                                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 group-focus-within:text-white" />
                                     <Input 
                                         type="email" 
                                         value={formData.email} 
                                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                                        className="pr-10 h-11 rounded-xl bg-white/10 border-white/20 text-white dir-ltr font-bold" 
+                                        className="pr-10 h-12 glass-input rounded-xl dir-ltr" 
                                         required 
                                     />
                                 </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label className="text-white/80 font-bold mr-1">كلمة المرور المطلوبة *</Label>
-                                <div className="relative">
-                                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                                <div className="relative group">
+                                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 group-focus-within:text-white" />
                                     <Input 
                                         type="password" 
                                         value={formData.adminPassword} 
                                         onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
-                                        className="pr-10 h-11 rounded-xl bg-white/10 border-white/20 text-white font-bold" 
+                                        className="pr-10 h-12 glass-input rounded-xl" 
                                         placeholder="8 أحرف على الأقل"
                                         required 
                                     />
@@ -208,45 +202,35 @@ export default function RegisterPage() {
                     </div>
                 </div>
 
-                <div className="grid gap-2">
+                <div className="grid gap-2 max-w-sm">
                     <Label className="text-white/80 font-bold mr-1">رقم التواصل (WhatsApp) *</Label>
-                    <div className="relative max-w-sm">
-                        <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                    <div className="relative group">
+                        <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 group-focus-within:text-white" />
                         <Input 
                             value={formData.phone} 
                             onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
-                            className="pr-10 h-11 rounded-xl bg-white/10 border-white/20 text-white dir-ltr font-bold" 
+                            className="pr-10 h-12 glass-input rounded-xl dir-ltr" 
                             required 
                         />
                     </div>
                 </div>
 
-                <div className="grid gap-2">
-                    <Label className="text-white/80 font-bold mr-1">ملاحظات إضافية (اختياري)</Label>
-                    <Textarea 
-                        value={formData.message} 
-                        onChange={e => setFormData(p => ({...p, message: e.target.value}))} 
-                        className="rounded-2xl bg-white/10 border-white/20 text-white font-medium p-4" 
-                        rows={2} 
-                    />
+                <div className="p-5 bg-white/10 rounded-2xl border border-white/20 flex items-center gap-4 backdrop-blur-sm">
+                    <div className="p-2 bg-indigo-500 rounded-lg shadow-lg"><Sparkles className="h-5 w-5 text-white" /></div>
+                    <p className="text-xs font-bold text-white/90 leading-relaxed">بمجرد التسجيل، ستحصل على 14 يوماً مجانية لاستكشاف كافة مزايا Nova ERP مع حد أقصى 5 مستخدمين.</p>
                 </div>
 
-                <div className="p-4 bg-white/10 rounded-2xl border border-white/20 flex items-center gap-3">
-                    <div className="p-2 bg-indigo-500 rounded-lg"><Sparkles className="h-4 w-4 text-white" /></div>
-                    <p className="text-xs font-bold text-white/90">بمجرد التسجيل، ستحصل على 14 يوماً مجانية لاستكشاف كافة مزايا Nova ERP مع حد أقصى 5 مستخدمين.</p>
-                </div>
-
-                <Button type="submit" disabled={isSaving} className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-white text-purple-700 hover:bg-white/90 transition-all border-b-4 border-purple-200">
+                <Button type="submit" disabled={isSaving} className="w-full h-16 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-white text-indigo-950 hover:bg-indigo-50 transition-all active:scale-95">
                     {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6" />}
                     تقديم طلب الانضمام وبدء التجربة
                 </Button>
             </form>
         </CardContent>
-        <CardFooter className="bg-black/20 p-6 flex justify-center border-t border-white/10">
+        <div className="bg-black/20 p-6 text-center border-t border-white/10">
             <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.5em]">
                 Nova ERP — Universal Autonomous Gateway
             </p>
-        </CardFooter>
+        </div>
       </Card>
     </div>
   );
