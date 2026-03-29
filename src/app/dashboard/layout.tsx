@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -26,9 +27,10 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
+    // صمام أمان: إذا استغرق التحميل أكثر من 8 ثوانٍ، نظهر زر إعادة المحاولة
     const timer = setTimeout(() => {
         if (loading) setShowRetry(true);
-    }, 10000);
+    }, 8000);
     return () => clearTimeout(timer);
   }, [loading]);
 
@@ -39,17 +41,22 @@ export default function DashboardLayout({
 
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-6">
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-[#1e1b4b]">
         <div className="relative">
             <div className="h-20 w-20 rounded-full border-4 border-white/20 border-t-white animate-spin" />
             <Loader className="h-8 w-8 text-white absolute inset-0 m-auto animate-pulse" />
         </div>
         <div className="text-center space-y-4">
-            <p className="text-white font-black text-xl tracking-tight">Nova ERP Core Booting...</p>
+            <p className="text-white font-black text-xl tracking-tight">جاري استعادة الجلسة السيادية...</p>
             {showRetry && (
-                <Button onClick={() => window.location.reload()} variant="outline" className="glass-effect rounded-xl font-bold gap-2 text-white">
-                    <RefreshCcw className="h-4 w-4" /> إعادة محاولة التحميل
-                </Button>
+                <div className="flex flex-col gap-2 animate-in fade-in zoom-in">
+                    <Button onClick={() => window.location.reload()} variant="outline" className="glass-effect rounded-xl font-bold gap-2 text-white border-white/40">
+                        <RefreshCcw className="h-4 w-4" /> إعادة محاولة التحميل
+                    </Button>
+                    <Button onClick={handleLogout} variant="ghost" className="text-white/60 text-xs font-bold hover:text-white">
+                        تسجيل الخروج والبدء من جديد
+                    </Button>
+                </div>
             )}
         </div>
       </div>
@@ -58,10 +65,11 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6">
-        <AlertCircle className="h-16 w-16 text-white mb-2" />
-        <h2 className="text-2xl font-black text-white">جلسة منتهية</h2>
-        <Button onClick={handleLogout} className="bg-white text-indigo-950 font-black px-10 rounded-xl h-12">تسجيل الخروج</Button>
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e1b4b]">
+        <AlertCircle className="h-16 w-16 text-white mb-2 opacity-40" />
+        <h2 className="text-2xl font-black text-white">انتهت جلسة العمل</h2>
+        <p className="text-white/60 max-w-xs mx-auto">يرجى تسجيل الدخول مرة أخرى للوصول إلى لوحة التحكم المعزولة.</p>
+        <Button onClick={handleLogout} className="bg-white text-indigo-950 font-black px-10 rounded-xl h-12 mt-4 shadow-2xl">بوابة الدخول</Button>
       </div>
     )
   }
