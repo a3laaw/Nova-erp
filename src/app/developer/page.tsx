@@ -95,10 +95,23 @@ export default function DeveloperDashboard() {
   }, [rawCompanies, searchQuery]);
 
   const handleApproveRequest = async (request: CompanyRequest) => {
-    if (!firestore || isProcessing || !clientAuth) return;
+    if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
     
     try {
+        // 1. مزامنة الحساب مع خادم الأمان (Firebase Auth) أولاً
+        const authResponse = await fetch('/api/manage-tenant-user', {
+            method: 'POST',
+            body: JSON.stringify({
+                email: request.email,
+                password: request.adminPassword,
+                displayName: request.contactName,
+                action: 'create'
+            })
+        });
+        const authResult = await authResponse.json();
+        if (!authResult.success) throw new Error(authResult.error);
+
         const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
         const trialEndDate = addDays(new Date(), 14);
 
@@ -123,9 +136,23 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
+            // 2. إنشاء ملف المستخدم المعزول داخل مجلد الشركة باستخدام الـ UID الحقيقي
+            const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
+            transaction.set(tenantUserRef, {
+                uid: authResult.uid,
+                email: request.email.toLowerCase().trim(),
+                username: request.email.split('@')[0],
+                fullName: request.contactName,
+                role: 'Admin',
+                isActive: true,
+                companyId: companyId,
+                createdAt: serverTimestamp()
+            });
+
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: request.email.toLowerCase().trim(),
+                username: request.email.split('@')[0],
                 companyId: companyId,
                 role: 'Admin'
             });
@@ -133,7 +160,7 @@ export default function DeveloperDashboard() {
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
 
-        toast({ title: 'تم الاعتماد', description: `تم تأسيس منشأة "${request.companyName}" بنجاح.` });
+        toast({ title: 'تم التفعيل والمزامنة', description: `تم تأسيس منشأة "${request.companyName}" وتفعيل حساب المالك بنجاح.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally {
@@ -141,10 +168,6 @@ export default function DeveloperDashboard() {
     }
   };
 
-  /**
-   * دالة التقمص السيادي (Impersonation):
-   * تسمح للمطور بالدخول بصفة مدير المنشأة لمعاينة البيانات.
-   */
   const handleSwitchToCompany = async (company: Company) => {
     if (!firestore || !currentUser || isProcessing) return;
     setIsProcessing(company.id!);
@@ -162,14 +185,11 @@ export default function DeveloperDashboard() {
         const result = await response.json();
         if (!result.success) throw new Error(result.error);
 
-        // تحديث التوكين فورياً لتطبيق المطالبات المخصصة (Custom Claims)
         if (clientAuth?.currentUser) {
             await clientAuth.currentUser.getIdToken(true);
         }
 
         toast({ title: 'نجاح التقمص', description: `تم تحويل الجلسة إلى منشأة ${company.name} بنجاح.` });
-        
-        // التوجه للوحة تحكم الشركة
         router.push('/dashboard');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التبديل', description: e.message });
@@ -180,7 +200,7 @@ export default function DeveloperDashboard() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول للمنارة.' });
+    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول.' });
   };
 
   return (
@@ -194,7 +214,7 @@ export default function DeveloperDashboard() {
                         </div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الكبرى</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، طلبات الانضمام، والتراخيص السيادية.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، مراجعة طلبات الانضمام، ومزامنة حسابات الأمان.</CardDescription>
                         </div>
                     </div>
                     <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Active</Badge>
