@@ -48,6 +48,11 @@ export interface Company extends BaseEntity {
   email?: string;
   activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
   status?: 'pending' | 'active' | 'suspended';
+  // --- Licensing & Subscription ---
+  subscriptionType: 'trial' | 'premium';
+  trialEndDate?: Timestamp | any;
+  maxUsersLimit: number;
+  currentUsersCount?: number;
 }
 
 export interface GlobalUserIndex {

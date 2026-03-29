@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -10,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck, Loader2 } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui
 import { Input } from '../ui/input';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { useCompany } from '@/context/company-context';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const roleTranslations: Record<UserProfile['role'], string> = {
     Admin: 'مدير نظام',
@@ -70,6 +73,7 @@ interface UserWithEmployee extends UserProfile {
 export function UsersTable() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
+    const { currentCompany } = useCompany();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -144,12 +148,34 @@ export function UsersTable() {
         );
     }, [users, searchQuery]);
 
+    // 🛡️ فحص الحصة المتبقية للمستخدمين
+    const quotaInfo = useMemo(() => {
+        const totalLimit = currentCompany?.maxUsersLimit || 0;
+        const usedCount = users.length;
+        return {
+            totalLimit,
+            usedCount,
+            isFull: usedCount >= totalLimit,
+            remaining: Math.max(0, totalLimit - usedCount)
+        };
+    }, [currentCompany, users]);
+
     const handleSaveUser = async (userData: Partial<UserProfile>) => {
         if (!firestore || !currentUser) return;
+        
+        // منع الإضافة إذا تم تجاوز الحصة (إلا إذا كان تعديلاً للمستخدم الحالي)
+        if (!selectedUser && quotaInfo.isFull) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'تجاوزت الحد المسموح', 
+                description: `لقد استهلكت كامل حصة المستخدمين (${quotaInfo.totalLimit}). يرجى ترقية الباقة لإضافة مستخدمين جدد.` 
+            });
+            return;
+        }
+
         try {
             const usersCollectionRef = collection(firestore, `${basePrefix}users`);
             
-            // 🛡️ منع تكرار اسم المستخدم في نفس المنشأة
             const usernameQuery = query(usersCollectionRef, where('username', '==', userData.username));
             const querySnapshot = await getDocs(usernameQuery);
             if (!querySnapshot.empty && (!selectedUser || querySnapshot.docs[0].id !== selectedUser.id)) {
@@ -215,29 +241,43 @@ export function UsersTable() {
 
     return (
     <div className="space-y-8" dir="rtl">
-        <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-blue-50 dark:from-card dark:to-card">
-            <CardHeader className="pb-8 px-8 border-b">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">
-                            <ShieldCheck className="h-8 w-8" />
-                        </div>
-                        <div>
-                            <CardTitle className="text-2xl font-black text-blue-900">إدارة حسابات المستخدمين</CardTitle>
-                            <CardDescription className="text-base font-medium">تحكم في صلاحيات دخول الموظفين وتفعيل حساباتهم في النظام.</CardDescription>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2 text-blue-700 hover:bg-blue-50">
-                            <ArrowRight className="h-4 w-4" /> العودة
-                        </Button>
-                        <Button onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} className="h-11 px-8 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-blue-100 bg-blue-600 hover:bg-blue-700">
-                            <PlusCircle className="h-5 w-5" /> إضافة مستخدم جديد
-                        </Button>
-                    </div>
+        <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">
+                    <ShieldCheck className="h-8 w-8" />
                 </div>
-            </CardHeader>
-        </Card>
+                <div>
+                    <h2 className="text-2xl font-black text-slate-900">إدارة حسابات المستخدمين</h2>
+                    <p className="text-sm font-bold text-muted-foreground mt-1">تحكم في صلاحيات دخول الموظفين وتفعيل حساباتهم.</p>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-4 bg-white/50 p-2 rounded-2xl border shadow-inner">
+                <div className="px-4 py-1 border-l border-slate-200 text-center">
+                    <p className="text-[9px] font-black text-muted-foreground uppercase">حصص المستخدمين</p>
+                    <p className={cn("text-lg font-black font-mono", quotaInfo.isFull ? "text-red-600" : "text-primary")}>
+                        {quotaInfo.usedCount} / {quotaInfo.totalLimit}
+                    </p>
+                </div>
+                <Button 
+                    onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} 
+                    disabled={quotaInfo.isFull}
+                    className="h-10 rounded-xl font-black gap-2 shadow-lg"
+                >
+                    <PlusCircle className="h-4 w-4" /> إضافة مستخدم
+                </Button>
+            </div>
+        </div>
+
+        {quotaInfo.isFull && (
+            <Alert variant="destructive" className="rounded-2xl border-2 animate-pulse">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle className="font-black">تنبيه: تم استنفاد حصة المستخدمين</AlertTitle>
+                <AlertDescription className="font-bold">
+                    لقد وصلت للحد الأقصى المسموح به في باقتك الحالية ({quotaInfo.totalLimit} مستخدم). يرجى التواصل مع الدعم لترقية الحساب.
+                </AlertDescription>
+            </Alert>
+        )}
 
         <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
             <CardHeader className="bg-muted/10 border-b p-8 px-10">
@@ -268,7 +308,7 @@ export function UsersTable() {
                                 <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl" /></TableCell></TableRow>
                             ))
                         ) : filteredUsers.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-muted-foreground italic font-bold">لا يوجد مستخدمون مطابقون حالياً لهذه المنشأة.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-muted-foreground italic font-bold">لا يوجد مستخدمون مطابقون حالياً.</TableCell></TableRow>
                         ) : (
                             filteredUsers.map((user) => (
                                 <TableRow key={user.id} className="hover:bg-primary/5 transition-colors h-24 border-b last:border-0 group">
@@ -305,12 +345,12 @@ export function UsersTable() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl border-none p-2">
                                                 <DropdownMenuLabel className="font-black px-3 py-2">خيارات الحساب</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => handleEditUser(user)} className="gap-2 rounded-xl py-3 font-bold">
+                                                <DropdownMenuItem onClick={() => { setSelectedUser(user); setIsFormOpen(true); }} className="gap-2 rounded-xl py-3 font-bold">
                                                     <Pencil className="h-4 w-4 text-primary" /> تعديل البيانات
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleToggleActivationClick(user)} className={cn("gap-2 rounded-xl py-3 font-bold", user.isActive ? "text-orange-600" : "text-green-600")}>
+                                                <DropdownMenuItem onClick={() => { setUserToToggle(user); setIsAlertOpen(true); }} className={cn("gap-2 rounded-xl py-3 font-bold", user.isActive ? "text-orange-600" : "text-green-600")}>
                                                     {user.isActive ? <UserX className="h-4 w-4"/> : <UserCheck className="h-4 w-4"/>}
-                                                    {user.isActive ? 'إيقاف الحساب مؤقتاً' : 'تفعيل الحساب الآن'}
+                                                    {user.isActive ? 'إيقاف الحساب' : 'تفعيل الحساب'}
                                                 </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-destructive gap-2 rounded-xl py-3 font-bold focus:bg-red-50" onClick={() => handleDeleteRole(user.id!)}>
