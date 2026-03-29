@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -29,10 +28,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
-        // إذا لم تتوفر الخدمات بعد 2 ثانية، نخرج من حالة التحميل لإظهار شاشة الدخول
-        const timer = setTimeout(() => setLoading(false), 2000);
-        return () => clearTimeout(timer);
+        setLoading(false);
+        return;
     }
+
+    // 🛡️ صمام الأمان النووي: نضمن أن حالة التحميل ستنتهي مهما حدث بعد 7 ثوانٍ
+    const safetyTimer = setTimeout(() => {
+        if (loading) {
+            console.warn("Auth Safety Timeout Triggered - Forcing Loader Exit");
+            setLoading(false);
+        }
+    }, 7000);
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         try {
@@ -60,6 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
                             }
                         }
+                        clearTimeout(safetyTimer);
                         setLoading(false);
                         return;
                     }
@@ -68,6 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 // 2. حالة مستخدم الـ SaaS (Tenant User)
                 const userEmail = firebaseUser.email?.toLowerCase();
                 if (userEmail) {
+                    // بحث سريع في الفهرس العالمي
                     const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
                     
                     if (!userIndexSnap.empty) {
@@ -78,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         if (companyDoc.exists()) {
                             const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
                             
-                            // جلب ملف المستخدم المعزول من داخل هيكل الشركة
+                            // سحب ملف الموظف من الصندوق المعزول
                             const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
                             
                             if (tenantUserDoc.exists()) {
@@ -100,14 +108,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setCurrentCompany(null);
             }
         } catch (error) {
-            console.error("Auth Critical Error:", error);
+            console.error("Auth Listener Critical Failure:", error);
             setUser(null);
         } finally {
+            clearTimeout(safetyTimer);
             setLoading(false);
         }
     });
 
-    return () => unsubscribe();
+    return () => {
+        unsubscribe();
+        clearTimeout(safetyTimer);
+    };
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -115,6 +127,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
+    // إذا لم يكتب الموظف إيميلاً (كتب يوزر نيم)، نبحث له عن الإيميل في الفهرس
     if (!email.includes('@')) {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
         if (userIndexSnap.empty) {
@@ -125,13 +138,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         await signInWithEmailAndPassword(masterAuth, email, password);
+        // تحديث الكوكي لمرور الـ Middleware
         document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
-        console.error("Login attempt failed:", e);
+        console.error("Login Error:", e);
         if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-            throw new Error('بيانات الدخول غير صحيحة. تأكد من البريد/اسم المستخدم وكلمة المرور.');
+            throw new Error('بيانات الدخول غير صحيحة.');
         }
-        throw new Error('حدث خطأ أثناء الاتصال بخادم الأمان. يرجى المحاولة لاحقاً.');
+        throw new Error('حدث خطأ أثناء الاتصال. يرجى المحاولة لاحقاً.');
     }
   }, [masterAuth, masterFirestore]);
 
@@ -141,7 +155,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     document.cookie = 'nova-user-session=; max-age=0; path=/';
     setUser(null);
     setCurrentCompany(null);
-    router.push('/');
+    router.replace('/');
   }, [masterAuth, setCurrentCompany, router]);
 
   return (
