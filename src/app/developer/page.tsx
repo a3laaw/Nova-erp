@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
-import { useCompany } from '@/context/company-context';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import {
@@ -59,11 +58,13 @@ export default function DeveloperDashboard() {
   const { data: rawCompanies, loading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
+  // محرك رصد استهلاك التراخيص (License Usage Radar)
   useEffect(() => {
     if (!firestore || rawCompanies.length === 0) return;
     
     const fetchUsage = async () => {
         const usageMap: Record<string, number> = {};
+        // استعلام سيادي لفحص عدد المستخدمين في كل منشأة عبر الفهرس العالمي
         const globalUsersSnap = await getDocs(collection(firestore, 'global_users'));
         globalUsersSnap.forEach(d => {
             const companyId = d.data().companyId;
@@ -99,7 +100,7 @@ export default function DeveloperDashboard() {
     setIsProcessing(request.id!);
     
     try {
-        // 1. مزامنة الحساب مع خادم الأمان (Firebase Auth) أولاً
+        // 🛡️ 1. إنشاء الحساب في خادم الأمان (Firebase Auth) أولاً
         const authResponse = await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({
@@ -117,6 +118,8 @@ export default function DeveloperDashboard() {
 
         await runTransaction(firestore, async (transaction) => {
             const companyRef = doc(firestore, 'companies', companyId);
+            
+            // 2. تأسيس المنشأة الرئيسية
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity,
@@ -124,7 +127,7 @@ export default function DeveloperDashboard() {
                 adminPassword: request.adminPassword,
                 subscriptionType: 'trial',
                 trialEndDate: Timestamp.fromDate(trialEndDate),
-                maxUsersLimit: 5,
+                maxUsersLimit: 5, // حصة تجريبية افتراضية
                 isActive: true,
                 firebaseConfig: {
                     apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
@@ -136,7 +139,7 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            // 2. إنشاء ملف المستخدم المعزول داخل مجلد الشركة باستخدام الـ UID الحقيقي
+            // 🛡️ 3. التأسيس الهيكلي: إنشاء الموظف/المدير الأول داخل مجلد الشركة حصراً
             const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
             transaction.set(tenantUserRef, {
                 uid: authResult.uid,
@@ -149,6 +152,7 @@ export default function DeveloperDashboard() {
                 createdAt: serverTimestamp()
             });
 
+            // 4. تحديث الفهرس العالمي للتوجيه السريع عند الدخول
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: request.email.toLowerCase().trim(),
@@ -157,10 +161,11 @@ export default function DeveloperDashboard() {
                 role: 'Admin'
             });
 
+            // 5. إغلاق الطلب
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
 
-        toast({ title: 'تم التفعيل والمزامنة', description: `تم تأسيس منشأة "${request.companyName}" وتفعيل حساب المالك بنجاح.` });
+        toast({ title: 'تم التفعيل الهيكلي', description: `تم تأسيس منشأة "${request.companyName}" وحفظ حساب المالك داخل هيكلها المعزول بنجاح.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally {
@@ -185,11 +190,12 @@ export default function DeveloperDashboard() {
         const result = await response.json();
         if (!result.success) throw new Error(result.error);
 
+        // تحديث التوكين السيادي لتبديل الجلسة فوراً
         if (clientAuth?.currentUser) {
             await clientAuth.currentUser.getIdToken(true);
         }
 
-        toast({ title: 'نجاح التقمص', description: `تم تحويل الجلسة إلى منشأة ${company.name} بنجاح.` });
+        toast({ title: 'نجاح التقمص الإداري', description: `تم تحويل الجلسة إلى منشأة ${company.name} بنجاح.` });
         router.push('/dashboard');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التبديل', description: e.message });
@@ -200,7 +206,7 @@ export default function DeveloperDashboard() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول.' });
+    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول للعهدة.' });
   };
 
   return (
@@ -214,7 +220,7 @@ export default function DeveloperDashboard() {
                         </div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الكبرى</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، مراجعة طلبات الانضمام، ومزامنة حسابات الأمان.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، مراجعة طلبات الانضمام، ومزامنة التراخيص السحابية.</CardDescription>
                         </div>
                     </div>
                     <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Active</Badge>
@@ -377,10 +383,10 @@ export default function DeveloperDashboard() {
                                             <div className="flex justify-end gap-3">
                                                 {req.status === 'pending' ? (
                                                     <Button onClick={() => handleApproveRequest(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-xl shadow-green-100 border-b-4 border-green-900">
-                                                        {isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} اعتماد وتفعيل Demo
+                                                        {isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} اعتماد وتفعيل هيكل المجلدات
                                                     </Button>
                                                 ) : (
-                                                    <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full border-2 border-green-200">APPROVED</Badge>
+                                                    <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full border-2 border-green-200">STRUCTURE ESTABLISHED</Badge>
                                                 )}
                                             </div>
                                         </TableCell>
