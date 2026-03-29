@@ -28,7 +28,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
   useEffect(() => {
-    if (!masterAuth || !masterFirestore) return;
+    if (!masterAuth || !masterFirestore) {
+        // إذا لم تتوفر الخدمات بعد 2 ثانية، نخرج من حالة التحميل لإظهار شاشة الدخول
+        const timer = setTimeout(() => setLoading(false), 2000);
+        return () => clearTimeout(timer);
+    }
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
         try {
@@ -62,40 +66,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 // 2. حالة مستخدم الـ SaaS (Tenant User)
-                // 🛡️ البحث في الفهرس العالمي عن ارتباط هذا البريد بشركة معينة
-                const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email.toLowerCase())));
-                
-                if (!userIndexSnap.empty) {
-                    const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-                    const companyId = userIndex.companyId;
+                const userEmail = firebaseUser.email?.toLowerCase();
+                if (userEmail) {
+                    const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
                     
-                    const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
-                    if (companyDoc.exists()) {
-                        const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
+                    if (!userIndexSnap.empty) {
+                        const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
+                        const companyId = userIndex.companyId;
                         
-                        // 🛡️ جلب ملف المستخدم المعزول من داخل هيكل الشركة حصراً
-                        const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
-                        
-                        if (tenantUserDoc.exists()) {
-                            const userData = tenantUserDoc.data() as UserProfile;
-                            setCurrentCompany(companyData);
-                            setUser({ 
-                                ...userData, 
-                                uid: firebaseUser.uid, 
-                                id: tenantUserDoc.id,
-                                currentCompanyId: companyId,
-                                companyName: companyData.name
-                            });
-                        } else {
-                            // محاولة أخيرة: البحث في مجلد المستخدمين القديم (للتوافق مع البيانات القديمة إن وجدت)
-                            const legacyUserDoc = await getDoc(doc(masterFirestore, 'users', firebaseUser.uid));
-                            if (legacyUserDoc.exists()) {
-                                const userData = legacyUserDoc.data() as UserProfile;
+                        const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
+                        if (companyDoc.exists()) {
+                            const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
+                            
+                            // جلب ملف المستخدم المعزول من داخل هيكل الشركة
+                            const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
+                            
+                            if (tenantUserDoc.exists()) {
+                                const userData = tenantUserDoc.data() as UserProfile;
                                 setCurrentCompany(companyData);
                                 setUser({ 
                                     ...userData, 
                                     uid: firebaseUser.uid, 
-                                    id: legacyUserDoc.id,
+                                    id: tenantUserDoc.id,
                                     currentCompanyId: companyId,
                                     companyName: companyData.name
                                 });
@@ -123,7 +115,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // 🛡️ ذكاء الدخول الموحد: البحث عن اسم المستخدم في الفهرس العالمي
     if (!email.includes('@')) {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
         if (userIndexSnap.empty) {
@@ -137,12 +128,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
         console.error("Login attempt failed:", e);
-        if (e.code === 'auth/user-not-found') {
-            throw new Error('هذا الحساب غير موجود في خادم الأمان.');
-        } else if (e.code === 'auth/wrong-password') {
-            throw new Error('كلمة المرور غير صحيحة.');
+        if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+            throw new Error('بيانات الدخول غير صحيحة. تأكد من البريد/اسم المستخدم وكلمة المرور.');
         }
-        throw new Error('خطأ في كلمة المرور أو اسم المستخدم. يرجى التأكد من المطور إذا كان الحساب قد تم تفعيله.');
+        throw new Error('حدث خطأ أثناء الاتصال بخادم الأمان. يرجى المحاولة لاحقاً.');
     }
   }, [masterAuth, masterFirestore]);
 
