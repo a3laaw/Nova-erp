@@ -12,9 +12,6 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
-/**
- * @fileOverview الغلاف العام للوحة التحكم مع محرك رقابة "التحميل العالق".
- */
 export default function DashboardLayout({
   children,
 }: {
@@ -25,14 +22,14 @@ export default function DashboardLayout({
   const { language } = useLanguage();
   
   const [mounted, setMounted] = useState(false);
-  const [isStuck, setIsStuck] = useState(false);
+  const [showEmergencyExit, setShowEmergencyExit] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // 🛡️ صمام الأمان: إذا استمر التحميل أكثر من 5 ثوانٍ، نظهر خيارات الإصلاح
+    // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 6 ثوانٍ، نظهر خيارات الإصلاح
     const timer = setTimeout(() => {
-        if (loading) setIsStuck(true);
-    }, 5000);
+      if (loading) setShowEmergencyExit(true);
+    }, 6000);
     return () => clearTimeout(timer);
   }, [loading]);
 
@@ -41,11 +38,10 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 1. حالة التحميل السيادية (مع معالجة التعليق)
+  // 1. معالجة حالة التحميل
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#1e1b4b] relative overflow-hidden">
-        {/* تأثيرات بصرية خلفية */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-6">
@@ -54,8 +50,8 @@ export default function DashboardLayout({
                 <Loader className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
             </div>
             <div className="text-center space-y-4">
-                <p className="text-white font-black text-2xl tracking-tighter animate-in fade-in duration-1000">جاري استعادة الجلسة السيادية...</p>
-                {isStuck && (
+                <p className="text-white font-black text-2xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
+                {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl">
                         <div className="flex items-center gap-2 text-orange-400 justify-center mb-2">
                             <AlertCircle className="h-4 w-4" />
@@ -75,7 +71,7 @@ export default function DashboardLayout({
     );
   }
 
-  // 2. التحقق من وجود المستخدم بعد انتهاء التحميل
+  // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e1b4b]">
@@ -86,7 +82,7 @@ export default function DashboardLayout({
         <p className="text-white/60 max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك المعزولة.</p>
         <Button onClick={handleSafeExit} className="bg-white text-indigo-950 font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-slate-100 active:scale-95 transition-all">بوابة الدخول</Button>
       </div>
-    )
+    );
   }
 
   return (

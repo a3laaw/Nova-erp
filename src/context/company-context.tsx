@@ -22,10 +22,6 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
   const mounted = useRef(false);
 
-  /**
-   * ✨ مصفوفة التبديل السيادي المستقرة (Stable Switcher) ✨
-   * استخدام useCallback يمنع تذبذب الجلسة وتوقف التحميل.
-   */
   const setCurrentCompany = useCallback((company: Company | null) => {
     if (!company) {
       setCompany(null);
@@ -36,7 +32,6 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // تجنب إعادة التهيئة لنفس الشركة
     if (currentCompany?.id === company.id) return;
 
     setIsLoadingCompany(true);
@@ -54,7 +49,6 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentCompany?.id]);
 
-  // استعادة الجلسة من التخزين المحلي لسرعة التحميل الأولى (Hydration Fix)
   useEffect(() => {
     if (!mounted.current) {
         mounted.current = true;
@@ -85,8 +79,6 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
 
 export const useCompany = () => {
   const context = useContext(CompanyContext);
-  if (context === undefined) {
-    throw new Error('useCompany must be used within a CompanyProvider');
-  }
+  if (context === undefined) throw new Error('useCompany must be used within a CompanyProvider');
   return context;
 };
