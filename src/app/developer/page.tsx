@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,7 @@ export default function DeveloperDashboard() {
     
     const fetchUsage = async () => {
         const usageMap: Record<string, number> = {};
+        // هذا مجرد تقريب، في نظام إنتاجي نستخدم Cloud Function لتحديث العدادات
         const globalUsersSnap = await getDocs(collection(firestore, 'global_users'));
         globalUsersSnap.forEach(d => {
             const companyId = d.data().companyId;
