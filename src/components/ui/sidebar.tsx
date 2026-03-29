@@ -21,7 +21,7 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "18.5rem"
+const SIDEBAR_WIDTH = "19rem"
 const SIDEBAR_WIDTH_MOBILE = "20rem"
 const SIDEBAR_WIDTH_ICON = "5.5rem" 
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
@@ -262,7 +262,7 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7 text-[#1e1b4b]", className)}
+      className={cn("h-7 w-7 text-white/80 hover:text-white hover:bg-white/20 rounded-full", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -430,7 +430,7 @@ const SidebarGroupLabel = React.forwardRef<
       ref={ref}
       data-sidebar="group-label"
       className={cn(
-        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-black uppercase tracking-widest text-[#1e1b4b]/50 outline-none ring-sidebar-ring transition-[margin,opa] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-black uppercase tracking-widest text-white/40 outline-none ring-sidebar-ring transition-[margin,opa] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
         "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
         className
       )}
@@ -501,7 +501,7 @@ const sidebarMenuButtonVariants = cva(
   {
     variants: {
       variant: {
-        default: "text-[#1e1b4b] hover:bg-white/20",
+        default: "text-white hover:bg-white/20",
         outline:
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
@@ -668,7 +668,7 @@ const SidebarMenuSub = React.forwardRef<
     ref={ref}
     data-sidebar="menu-sub"
     className={cn(
-      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-2 p-2 ml-0 mr-4 pr-4 pl-0 bg-transparent",
+      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-2 p-2 ml-0 mr-0 pr-0 pl-0 bg-transparent",
       "group-data-[collapsible=icon]:hidden",
       className
     )}
@@ -697,8 +697,8 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-2xl py-3 px-4 outline-none ring-sidebar-ring transition-all duration-300 text-[#1e1b4b]",
-        "data-[active=true]:text-[#1e1b4b] data-[active=true]:font-black",
+        "flex h-auto min-w-0 w-full justify-start -translate-x-px items-center gap-3 overflow-hidden rounded-2xl py-3 px-4 outline-none ring-sidebar-ring transition-all duration-300 text-white/80",
+        "data-[active=true]:text-white data-[active=true]:font-black",
         size === "sm" && "text-xs",
         "group-data-[collapsible=icon]:hidden",
         className

@@ -105,15 +105,18 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           isActive={isActive} 
           asChild 
           className={cn(
-            "my-2 h-14 rounded-2xl transition-all duration-500",
+            "my-2 h-14 rounded-[1.8rem] transition-all duration-500 border border-transparent",
             isActive 
               ? "active-capsule" 
               : "glass-capsule hover:bg-white/30"
           )}
         >
-          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            <span className="truncate text-sm flex-1">{item.label}</span>
-            {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#4c1d95]/80")} strokeWidth={isActive ? 3 : 2} />}
+          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full px-4">
+            <div className="w-4" /> {/* Empty div to balance space where caret would be */}
+            <span className={cn("flex-1 text-center truncate text-sm", isActive ? "text-[#1e1b4b]" : "text-white")}>
+                {item.label}
+            </span>
+            {Icon && <Icon className={cn("size-5 shrink-0", isActive ? "text-[#1e1b4b]" : "text-white/80")} strokeWidth={isActive ? 3 : 2} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -128,30 +131,34 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <SidebarMenuButton 
               isActive={isActive} 
               className={cn(
-                "my-2 h-14 rounded-2xl transition-all duration-500",
+                "my-2 h-14 rounded-[1.8rem] transition-all duration-500 border border-transparent",
                 isActive 
                   ? "active-capsule" 
                   : "glass-capsule hover:bg-white/30"
               )}
             >
-              <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50", isActive ? "text-[#7209B7]" : "text-[#4c1d95]/50")} />
-              <span className="truncate text-sm flex-1 mr-2">{item.label}</span>
-              {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#4c1d95]/80")} strokeWidth={isActive ? 3 : 2} />}
+              <div className="flex items-center justify-between w-full px-4">
+                <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180", isActive ? "text-[#1e1b4b]/50" : "text-white/50")} />
+                <span className={cn("flex-1 text-center truncate text-sm", isActive ? "text-[#1e1b4b]" : "text-white")}>
+                    {item.label}
+                </span>
+                {Icon && <Icon className={cn("size-5 shrink-0", isActive ? "text-[#1e1b4b]" : "text-white/80")} strokeWidth={isActive ? 3 : 2} />}
+              </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 space-y-2 border-none pr-4">
+            <SidebarMenuSub className="mt-1 mb-2 space-y-2 border-none pr-0 pl-0">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 return (
-                  <SidebarMenuSubItem key={child.href}>
+                  <SidebarMenuSubItem key={child.href} className="px-4">
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl py-3 h-11 transition-all",
+                        "rounded-2xl py-3 h-11 transition-all border border-transparent",
                         isChildActive 
-                          ? "bg-white/80 text-[#4c1d95] font-black shadow-sm" 
-                          : "bg-white/10 hover:bg-white/20 text-[#4c1d95]/70"
+                          ? "bg-white/90 text-[#1e1b4b] font-black shadow-md" 
+                          : "sub-capsule hover:bg-white/20 text-white/80"
                     )}>
-                      <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-end w-full">
+                      <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-center w-full">
                         <span className="text-xs truncate">{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
@@ -178,8 +185,8 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-8 mb-4">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black tracking-tighter text-[#1e1b4b]">Nova ERP</span>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1e1b4b]/40 mt-1">PURPLE SUITE</span>
+          <span className="text-3xl font-black tracking-tighter text-white drop-shadow-lg">Nova ERP</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 mt-1">SOVEREIGN SUITE</span>
         </div>
       </SidebarHeader>
 
@@ -197,13 +204,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/30 border border-white/40 rounded-[2.5rem] p-5 flex items-center shadow-xl backdrop-blur-md">
-            <div className="w-12 h-12 bg-[#7209B7] rounded-2xl flex items-center justify-center text-white font-black shadow-lg border-2 border-white/20">
+        <div className="bg-white/20 border border-white/30 rounded-[2.5rem] p-5 flex items-center shadow-2xl backdrop-blur-xl group hover:bg-white/30 transition-all">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg border-2 border-white/40">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[9px] truncate font-black uppercase tracking-widest text-[#1e1b4b]/50">ADMIN ROLE</p>
+                <p className="text-sm font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[9px] truncate font-black uppercase tracking-widest text-white/50">{currentUser.role} ROLE</p>
             </div>
         </div>
       </SidebarFooter>
