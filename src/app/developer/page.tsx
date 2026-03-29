@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -5,12 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert, FileStack, Rocket, XCircle } from 'lucide-react';
+import { PlusCircle, Building2, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert, FileStack, Rocket, XCircle, Key, Copy } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
@@ -93,19 +93,16 @@ export default function DeveloperDashboard() {
     setIsProcessing(request.id!);
     
     try {
-        // 🛡️ إنشاء حساب الـ Auth للمدير الجديد
-        // ملاحظة: في بيئة حقيقية يفضل استخدام Firebase Admin SDK عبر Server Action
-        // ولكن للنموذج الأولي سنقوم بالتأسيس السحابي المباشر
         const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
         const trialEndDate = addDays(new Date(), 14);
 
         await runTransaction(firestore, async (transaction) => {
-            // 1. إنشاء المنشأة
             const companyRef = doc(firestore, 'companies', companyId);
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity,
                 adminEmail: request.email.toLowerCase().trim(),
+                adminPassword: request.adminPassword, // 🛡️ حفظ كلمة المرور للـ Demo
                 subscriptionType: 'trial',
                 trialEndDate: Timestamp.fromDate(trialEndDate),
                 maxUsersLimit: 5,
@@ -120,7 +117,6 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            // 2. إنشاء فهرس المستخدم العالمي لتمكين الدخول بالبريد الشخصي
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: request.email.toLowerCase().trim(),
@@ -128,11 +124,10 @@ export default function DeveloperDashboard() {
                 role: 'Admin'
             });
 
-            // 3. تحديث حالة الطلب
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
 
-        toast({ title: 'تم الاعتماد', description: `تم تأسيس منشأة "${request.companyName}" بنجاح. يمكن للمدير الدخول ببريده الشخصي الآن.` });
+        toast({ title: 'تم الاعتماد', description: `تم تأسيس منشأة "${request.companyName}" بنجاح.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally {
@@ -140,39 +135,9 @@ export default function DeveloperDashboard() {
     }
   };
 
-  const handleToggleActive = async (company: Company) => {
-    if (!firestore) return;
-    setIsProcessing(company.id!);
-    try {
-        await updateDoc(doc(firestore, 'companies', company.id!), { isActive: !company.isActive });
-        toast({ title: 'نجاح التغيير', description: `تم ${!company.isActive ? 'تفعيل' : 'تعطيل'} المنشأة بنجاح.` });
-    } finally {
-        setIsProcessing(null);
-    }
-  };
-
-  const handleSwitchToCompany = async (company: Company) => {
-      if (!clientAuth?.currentUser || isProcessing) return;
-      setIsProcessing(company.id!);
-      try {
-          const response = await fetch('/api/switch-company', {
-              method: 'POST',
-              body: JSON.stringify({ uid: clientAuth.currentUser.uid, companyId: company.id, companyName: company.name })
-          });
-          const result = await response.json();
-          if (result.success) {
-              await clientAuth.currentUser.getIdToken(true);
-              document.cookie = 'nova-user-session=1; path=/; max-age=86400';
-              setCurrentCompany(company);
-              window.location.href = '/dashboard';
-          } else {
-              throw new Error(result.error);
-          }
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'فشل التبديل', description: e.message });
-      } finally {
-          setIsProcessing(null);
-      }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول للمنارة.' });
   };
 
   return (
@@ -186,7 +151,7 @@ export default function DeveloperDashboard() {
                         </div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الكبرى</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، طلبات الانضمام، والاشتراكات.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، طلبات الانضمام، والتراخيص السيادية.</CardDescription>
                         </div>
                     </div>
                     <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Active</Badge>
@@ -231,7 +196,7 @@ export default function DeveloperDashboard() {
                         <Table>
                             <TableHeader className="bg-[#1e1b4b] h-16">
                                 <TableRow className="border-none">
-                                    <TableHead className="px-12 font-black text-white text-base text-right">المنشأة والنشاط</TableHead>
+                                    <TableHead className="px-12 font-black text-white text-base text-right">المنشأة وبيانات الدخول</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">الاشتراك</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">الحصة</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">الحالة</TableHead>
@@ -248,7 +213,7 @@ export default function DeveloperDashboard() {
                                         const trialDate = toFirestoreDate(company.trialEndDate);
                                         const isExpired = trialDate && isPast(trialDate) && company.subscriptionType === 'trial';
                                         return (
-                                            <TableRow key={company.id} className={cn("h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all", isExpired && "bg-red-50/30")}>
+                                            <TableRow key={company.id} className={cn("h-36 hover:bg-indigo-50/50 border-slate-100 group transition-all", isExpired && "bg-red-50/30")}>
                                                 <TableCell className="px-12">
                                                     <div className="flex items-center gap-6">
                                                         <div className="p-4 bg-indigo-100 rounded-3xl border-2 border-indigo-200 group-hover:bg-[#1e1b4b] transition-all">
@@ -256,9 +221,17 @@ export default function DeveloperDashboard() {
                                                         </div>
                                                         <div className="flex flex-col">
                                                             <span className="font-black text-black text-2xl tracking-tight">{company.name}</span>
-                                                            <div className="flex gap-2 mt-1">
-                                                              <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-[9px]">{activityTranslations[company.activityType || 'general']}</Badge>
-                                                              <span className="text-[10px] text-indigo-600 font-black uppercase opacity-60">{company.adminEmail}</span>
+                                                            <div className="flex flex-col gap-1 mt-2">
+                                                                <div className="flex items-center gap-2 bg-indigo-50/50 px-3 py-1 rounded-xl border border-indigo-100 w-fit">
+                                                                    <Key className="h-3 w-3 text-indigo-600" />
+                                                                    <span className="text-[10px] font-black text-indigo-900">{company.adminEmail}</span>
+                                                                    <Separator orientation="vertical" className="h-3 bg-indigo-200" />
+                                                                    <span className="text-[10px] font-black text-indigo-600 font-mono">{company.adminPassword || '****'}</span>
+                                                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-indigo-100" onClick={() => copyToClipboard(`Email: ${company.adminEmail}\nPassword: ${company.adminPassword}`)}>
+                                                                        <Copy className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-[9px] w-fit">{activityTranslations[company.activityType || 'general']}</Badge>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -283,15 +256,7 @@ export default function DeveloperDashboard() {
                                                         <Button onClick={() => handleSwitchToCompany(company)} className="rounded-2xl font-black gap-3 bg-indigo-600 text-white hover:bg-indigo-700 h-12 shadow-xl border-b-4 border-indigo-900">
                                                             <ArrowRightLeft className="h-5 w-5" /> التحكم السيادي
                                                         </Button>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl bg-white border-2 shadow-md"><MoreHorizontal className="h-6 w-6" /></Button></DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl p-2 bg-white border-none">
-                                                                <DropdownMenuItem onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }} className="gap-3 rounded-xl py-3 font-black"><Pencil className="h-5 w-5 text-indigo-600" /> تعديل التراخيص</DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleToggleActive(company)} className={cn("gap-3 rounded-xl py-3 font-black", company.isActive ? "text-red-600" : "text-green-600")}>
-                                                                    {company.isActive ? <XCircle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />} {company.isActive ? 'تعطيل الخدمة' : 'تفعيل الخدمة'}
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                        <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl bg-white border-2 shadow-md" onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }}><Pencil className="h-6 w-6" /></Button>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -340,7 +305,9 @@ export default function DeveloperDashboard() {
                                         <TableCell className="text-center">
                                             <p className="font-black text-indigo-900">{req.contactName}</p>
                                             <p className="text-xs font-mono">{req.email}</p>
-                                            <p className="text-xs font-mono">{req.phone}</p>
+                                            <div className="flex items-center justify-center gap-2 mt-1">
+                                                <Badge variant="secondary" className="font-mono text-[9px]">{req.adminPassword}</Badge>
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-left px-12">
                                             <div className="flex justify-end gap-3">
