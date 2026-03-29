@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -20,7 +20,7 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', // اسم المستخدم
+    identifier: '', // بريد المدير أو اسم مستخدم الموظف
     password: '',
   });
 
@@ -42,12 +42,12 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        toast({ title: 'تم الدخول بنجاح' });
+        toast({ title: 'مرحباً بك في Nova ERP' });
     } catch (error: any) {
         setErrorMessage(error.message);
         toast({ 
             variant: 'destructive', 
-            title: 'فشل تسجيل الدخول', 
+            title: 'فشل الدخول', 
             description: error.message 
         });
         setIsLoading(false); 
@@ -85,7 +85,7 @@ export default function UnifiedLoginPage() {
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تنبيه بالخطأ</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تنبيه</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
@@ -95,7 +95,7 @@ export default function UnifiedLoginPage() {
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> اسم المستخدم (Username)
+                        <User className="h-3 w-3" /> اسم المستخدم أو البريد الإلكتروني
                     </Label>
                     <Input 
                         type="text" 
@@ -103,7 +103,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="أدخل اسم المستخدم..."
+                        placeholder="username or email..."
                         disabled={isLoading}
                     />
                 </div>

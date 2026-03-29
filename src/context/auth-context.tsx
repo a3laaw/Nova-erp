@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const idTokenResult = await firebaseUser.getIdTokenResult();
                 const claims = idTokenResult.claims as any;
 
-                // 1. حالة المطور السيادي (Root)
+                // 1. حالة المطور السيادي (Root Developer)
                 if (firebaseUser.email === MASTER_DEV_EMAIL) {
                     const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
                     if (devDoc.exists()) {
@@ -60,9 +60,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     }
                 }
 
-                // 2. حالة مستخدم الـ SaaS (Tenant)
-                // جلب الميتا-داتا للمستخدم من الفهرس العالمي (Mapping)
-                const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email)));
+                // 2. حالة مستخدم الـ SaaS (Tenant User or Company Admin)
+                // البحث في الفهرس العالمي عن ارتباط هذا البريد بشركة معينة
+                const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email.toLowerCase())));
                 
                 if (!userIndexSnap.empty) {
                     const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (companyDoc.exists()) {
                         const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
                         
-                        // جلب بيانات المستخدم من داخل مجلد الشركة (المسار المعزول)
+                        // جلب ملف المستخدم المعزول من داخل مجلد الشركة
                         const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
                         
                         if (tenantUserDoc.exists()) {
@@ -108,13 +108,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // 🛡️ ذكاء الدخول السيادي:
-    // إذا لم يكتب المستخدم إيميل كامل، نبحث عنه كـ "اسم مستخدم" (Username) في الفهرس العالمي
+    // 🛡️ ذكاء الدخول الموحد:
+    // إذا لم يكتب المستخدم بريداً كاملاً (مثلاً كتب "ali")، نبحث عنه كـ "اسم مستخدم"
     if (!email.includes('@')) {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
         if (userIndexSnap.empty) {
-            throw new Error('اسم المستخدم هذا غير مسجل لدينا.');
+            throw new Error('اسم المستخدم هذا غير مسجل في المنصة.');
         }
+        // استبدال اسم المستخدم بالبريد الحقيقي المسجل في Firebase Auth
         email = userIndexSnap.docs[0].data().email;
     }
 

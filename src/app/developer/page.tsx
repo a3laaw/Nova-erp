@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -6,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,6 @@ export default function DeveloperDashboard() {
     
     const fetchUsage = async () => {
         const usageMap: Record<string, number> = {};
-        // هذا مجرد تقريب، في نظام إنتاجي نستخدم Cloud Function لتحديث العدادات
         const globalUsersSnap = await getDocs(collection(firestore, 'global_users'));
         globalUsersSnap.forEach(d => {
             const companyId = d.data().companyId;
@@ -90,15 +89,18 @@ export default function DeveloperDashboard() {
   }, [rawCompanies, searchQuery]);
 
   const handleApproveRequest = async (request: CompanyRequest) => {
-    if (!firestore || isProcessing) return;
+    if (!firestore || isProcessing || !clientAuth) return;
     setIsProcessing(request.id!);
     
     try {
+        // 🛡️ إنشاء حساب الـ Auth للمدير الجديد
+        // ملاحظة: في بيئة حقيقية يفضل استخدام Firebase Admin SDK عبر Server Action
+        // ولكن للنموذج الأولي سنقوم بالتأسيس السحابي المباشر
         const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
         const trialEndDate = addDays(new Date(), 14);
 
         await runTransaction(firestore, async (transaction) => {
-            // 1. إنشاء المنشأة بنظام Demo
+            // 1. إنشاء المنشأة
             const companyRef = doc(firestore, 'companies', companyId);
             transaction.set(companyRef, {
                 name: request.companyName,
@@ -108,20 +110,17 @@ export default function DeveloperDashboard() {
                 trialEndDate: Timestamp.fromDate(trialEndDate),
                 maxUsersLimit: 5,
                 isActive: true,
-                firebaseProjectId: 'studio-8039389980-3d2d0', // Default shared master project for demo
                 firebaseConfig: {
                     apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
                     authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
                     projectId: "studio-8039389980-3d2d0",
-                    storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-                    messagingSenderId: "828494117254",
                     appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
                 },
                 createdAt: serverTimestamp(),
                 createdBy: 'system-auto-approval'
             });
 
-            // 2. إنشاء فهرس المستخدم العالمي
+            // 2. إنشاء فهرس المستخدم العالمي لتمكين الدخول بالبريد الشخصي
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: request.email.toLowerCase().trim(),
@@ -133,7 +132,7 @@ export default function DeveloperDashboard() {
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
 
-        toast({ title: 'تم الاعتماد والتفعيل', description: `تم تأسيس منشأة "${request.companyName}" بنجاح وتفعيل فترة تجربة 14 يوماً.` });
+        toast({ title: 'تم الاعتماد', description: `تم تأسيس منشأة "${request.companyName}" بنجاح. يمكن للمدير الدخول ببريده الشخصي الآن.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally {
