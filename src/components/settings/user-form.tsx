@@ -15,9 +15,9 @@ import { Label } from '../ui/label';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info } from 'lucide-react';
+import { Info, Sparkles, UserPlus } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-
+import { useAuth } from '@/context/auth-context';
 
 interface UserFormProps {
   isOpen: boolean;
@@ -28,38 +28,31 @@ interface UserFormProps {
   allUsers: UserProfile[];
 }
 
-const roleOptions: { value: UserProfile['role']; label: string }[] = [
-    { value: 'Admin', label: 'مدير' },
-    { value: 'Engineer', label: 'مهندس' },
-    { value: 'Accountant', label: 'محاسب' },
+const roleOptions = [
+    { value: 'Admin', label: 'مدير نظام' },
+    { value: 'Engineer', label: 'مهندس تنفيذ' },
+    { value: 'Accountant', label: 'محاسب مالي' },
     { value: 'Secretary', label: 'سكرتارية' },
     { value: 'HR', label: 'موارد بشرية' },
 ];
 
-const initialFormData: Partial<UserProfile> = {
-    employeeId: '',
-    username: '',
-    passwordHash: '',
-    role: 'Engineer',
-};
-
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }: UserFormProps) {
   const { toast } = useToast();
+  const { user: currentAdmin } = useAuth();
   const isEditing = !!user;
 
-  const [formData, setFormData] = useState<Partial<UserProfile>>(initialFormData);
+  const [formData, setFormData] = useState<Partial<UserProfile>>({
+    employeeId: '',
+    username: '',
+    role: 'Engineer',
+  });
   const [password, setPassword] = useState('');
-  const [usernameError, setUsernameError] = useState<string | null>(null);
 
   const availableEmployees = useMemo(() => {
-    // 🛡️ التصفية السيادية: إظهار الموظفين غير المرتبطين بحسابات في هذه المنشأة فقط
     const linkedEmployeeIds = new Set(allUsers.map(u => u.employeeId));
-    if (isEditing && user?.employeeId) {
-        linkedEmployeeIds.delete(user.employeeId);
-    }
+    if (isEditing && user?.employeeId) linkedEmployeeIds.delete(user.employeeId);
     return employees.filter(e => !linkedEmployeeIds.has(e.id));
   }, [employees, allUsers, user, isEditing]);
-
 
   useEffect(() => {
     if (user && isEditing) {
@@ -69,163 +62,125 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
             username: user.username,
             role: user.role,
         });
-        setPassword('');
     } else {
-        setFormData(initialFormData);
-        setPassword('');
+        setFormData({ employeeId: '', username: '', role: 'Engineer' });
     }
+    setPassword('');
   }, [user, isEditing, isOpen]);
   
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target;
-    if (id === 'username') {
-        const sanitizedValue = value.toLowerCase().replace(/[^a-z0-9._]/g, '');
-        setFormData(prev => ({ ...prev, [id]: sanitizedValue }));
-        checkUsername(sanitizedValue);
-    } else {
-       setFormData(prev => ({ ...prev, [id]: value }));
-    }
-  };
-
-  const checkUsername = useCallback((username: string) => {
-    if (!username) {
-        setUsernameError(null);
-        return;
-    }
-    const isTaken = allUsers.some(u => u.username === username && u.id !== user?.id);
-    if (isTaken) {
-        setUsernameError('اسم المستخدم هذا مستخدم بالفعل في هذه المنشأة.');
-    } else {
-        setUsernameError(null);
-    }
-  }, [allUsers, user]);
-
-
-  const handleSelectChange = (id: keyof UserProfile, value: any) => {
-      setFormData(prev => ({ ...prev, [id]: value }));
+  const handleUsernameChange = (val: string) => {
+    // تنظيف اسم المستخدم (حروف إنجليزية وأرقام فقط)
+    const sanitized = val.toLowerCase().replace(/[^a-z0-9]/g, '');
+    setFormData(prev => ({ ...prev, username: sanitized }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
 
       if (!formData.employeeId) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء اختيار موظف لربط الحساب به.' });
+          toast({ variant: 'destructive', title: 'خطأ', description: 'يجب اختيار موظف لربط الحساب.' });
           return;
       }
-      if (!formData.username || usernameError) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال اسم مستخدم صالح وغير مكرر.' });
-          return;
-      }
-       if (!isEditing && (!password || password.length < 8)) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'كلمة المرور مطلوبة ويجب أن لا تقل عن 8 أحرف.' });
+      if (!formData.username) {
+          toast({ variant: 'destructive', title: 'خطأ', description: 'اسم المستخدم مطلوب.' });
           return;
       }
       
-      const dataToSave = { ...formData };
-      if (password) {
-        dataToSave.passwordHash = password;
-      }
+      // 🛡️ إنشاء المعرف الفريد للـ SaaS خلف الكواليس
+      // ali @ company_id . nova
+      const tenantId = currentAdmin?.currentCompanyId;
+      const internalEmail = `${formData.username}@${tenantId}.nova`;
+      
+      const dataToSave = { 
+          ...formData, 
+          email: internalEmail,
+          passwordHash: password 
+      };
       
       onSave(dataToSave);
   }
-  
-  const currentEmployeeOptions = useMemo(() => {
-    const baseOptions = availableEmployees.map(e => ({ value: e.id!, label: e.fullName, searchKey: e.civilId }));
-    if (isEditing && user) {
-        const linkedEmployee = employees.find(e => e.id === user.employeeId);
-        if (linkedEmployee && !baseOptions.some(o => o.value === linkedEmployee.id)) {
-            return [{ value: linkedEmployee.id!, label: linkedEmployee.fullName, searchKey: linkedEmployee.civilId }, ...baseOptions];
-        }
-    }
-    return baseOptions;
-  }, [isEditing, user, employees, availableEmployees]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="sm:max-w-md rounded-3xl" 
-        dir="rtl"
-        onPointerDownOutside={(e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-radix-popper-content-wrapper]') || target.closest('[data-inline-search-list-options]')) {
-                e.preventDefault();
-            }
-        }}
-      >
+      <DialogContent className="sm:max-w-md rounded-[2rem] shadow-2xl border-none p-0 overflow-hidden" dir="rtl">
         <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle className="font-black text-xl">{isEditing ? 'تعديل مستخدم' : 'إنشاء حساب لموظف'}</DialogTitle>
-                <DialogDescription className="font-bold">
-                    {isEditing 
-                        ? `تعديل حساب المستخدم المرتبط بالموظف في هذه المنشأة.`
-                        : 'سيتم إنشاء حساب دخول جديد للموظف المختار ضمن هذه الشركة.'
-                    }
-                </DialogDescription>
+            <DialogHeader className="p-8 bg-primary/5 border-b">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-2xl text-primary"><UserPlus className="h-6 w-6"/></div>
+                    <div>
+                        <DialogTitle className="text-xl font-black">{isEditing ? 'تعديل بيانات الدخول' : 'تأسيس حساب موظف'}</DialogTitle>
+                        <DialogDescription className="text-xs font-bold">إدارة صلاحيات الدخول السيادية للموظف في المنشأة.</DialogDescription>
+                    </div>
+                </div>
             </DialogHeader>
-            <div className="grid gap-4 py-6">
+
+            <div className="p-8 space-y-6">
                 <div className="grid gap-2">
-                    <Label className="font-black text-gray-700">اختيار الموظف من قائمة المنشأة <span className="text-destructive">*</span></Label>
+                    <Label className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
                     <InlineSearchList
                         value={formData.employeeId || ''}
-                        onSelect={(v) => handleSelectChange('employeeId', v)}
-                        options={currentEmployeeOptions}
-                        placeholder="ابحث بالاسم أو الرقم المدني..."
+                        onSelect={(v) => setFormData(prev => ({ ...prev, employeeId: v }))}
+                        options={availableEmployees.map(e => ({ value: e.id!, label: e.fullName }))}
+                        placeholder="اختر موظفاً من القائمة..."
                         disabled={isEditing}
                     />
                 </div>
+
                  <div className="grid gap-2">
-                    <Label htmlFor="username" className="font-black text-gray-700">اسم المستخدم <span className="text-destructive">*</span></Label>
-                    <Input 
-                        id="username" 
-                        value={formData.username} 
-                        onChange={handleInputChange} 
-                        placeholder="english.letters.only" 
-                        dir="ltr" 
-                        required 
-                        className="h-11 rounded-xl font-bold border-2"
-                    />
-                    {usernameError && <p className="text-xs text-destructive font-bold">{usernameError}</p>}
-                     <p className="text-[10px] text-muted-foreground font-bold">
-                        سيتم إنشاء بريد إلكتروني داخلي: <span dir='ltr' className='font-mono text-primary'>{formData.username || '...'}@scoop.local</span>
-                     </p>
+                    <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم (Username) *</Label>
+                    <div className="relative">
+                        <Input 
+                            id="username" 
+                            value={formData.username} 
+                            onChange={e => handleUsernameChange(e.target.value)}
+                            placeholder="ali.ahmed" 
+                            dir="ltr" 
+                            required 
+                            className="h-12 rounded-xl font-black text-primary border-2 pl-12"
+                        />
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground opacity-40">.nova</div>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground font-bold pr-1">سيستخدم الموظف هذا الاسم فقط لتسجيل الدخول دون الحاجة لكتابة دومين.</p>
                 </div>
+
                  <div className="grid gap-2">
-                    <Label htmlFor="password" className="font-black text-gray-700">
-                        {isEditing ? 'كلمة المرور الجديدة (اختياري)' : 'كلمة المرور المؤقتة'} <span className={!isEditing ? "text-destructive" : ""}>*</span>
+                    <Label htmlFor="password" className="font-black text-gray-700 pr-1">
+                        {isEditing ? 'تغيير كلمة المرور (اختياري)' : 'كلمة المرور التأسيسية *'}
                     </Label>
                     <Input 
                         id="password" 
                         type="password" 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder={isEditing ? 'اتركه فارغاً لعدم التغيير' : '8 أحرف على الأقل'}
+                        placeholder="8 أحرف على الأقل..."
                         required={!isEditing} 
-                        className="h-11 rounded-xl font-mono border-2"
+                        className="h-12 rounded-xl font-mono border-2"
                     />
                 </div>
+
                 <div className="grid gap-2">
-                    <Label className="font-black text-gray-700">الدور والمسؤولية *</Label>
+                    <Label className="font-black text-gray-700 pr-1">الدور والصلاحيات *</Label>
                      <InlineSearchList
                         value={formData.role || ''}
-                        onSelect={(v) => handleSelectChange('role', v as UserProfile['role'])}
+                        onSelect={(v) => setFormData(prev => ({ ...prev, role: v as any }))}
                         options={roleOptions}
-                        placeholder="اختر دور المستخدم..."
+                        placeholder="حدد دور الموظف..."
                     />
                 </div>
-                 {!isEditing && (
-                    <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
-                        <Info className="h-4 w-4 text-primary" />
-                        <AlertTitle className="text-xs font-black text-primary">ملاحظة هامة</AlertTitle>
-                        <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1">
-                            سيتم إنشاء الحساب في حالة "غير مفعل". يجب عليك تفعيله يدوياً من قائمة الإجراءات بعد الحفظ ليتمكن المستخدم من تسجيل الدخول.
-                        </AlertDescription>
-                    </Alert>
-                )}
+
+                <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <AlertTitle className="text-[10px] font-black uppercase text-primary">SaaS Identity Shield</AlertTitle>
+                    <AlertDescription className="text-[9px] font-bold text-slate-600">
+                        سيتم عزل هذا الحساب برمجياً؛ لا يمكن للموظف رؤية أي بيانات خارج نطاق منشأتك المعتمدة.
+                    </AlertDescription>
+                </Alert>
             </div>
-            <DialogFooter className="gap-2 border-t pt-6">
-                <Button type="button" variant="outline" onClick={onClose} className="rounded-xl font-bold">إلغاء</Button>
-                <Button type="submit" disabled={!!usernameError} className="rounded-xl font-black px-10 shadow-lg">
-                    {isEditing ? 'حفظ التعديلات' : 'إنشاء المستخدم الآن'}
+
+            <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+                <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                <Button type="submit" className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/20">
+                    {isEditing ? 'تحديث الحساب' : 'تفعيل الحساب الآن'}
                 </Button>
             </DialogFooter>
         </form>

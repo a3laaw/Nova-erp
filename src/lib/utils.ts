@@ -1,6 +1,6 @@
 /**
  * @fileOverview المحرك البرمجي للأدوات المساعدة (Utils).
- * تم تحديثه ليشمل محرك التوجيه السيادي (getTenantPath) لضمان العزل التام للبيانات.
+ * تم تحديثه لفرض العزل التام للمنشآت (SaaS Multi-tenancy).
  */
 
 import { clsx, type ClassValue } from "clsx"
@@ -8,7 +8,6 @@ import { twMerge } from "tailwind-merge"
 
 /**
  * دالة دمج التنسيقات (CN):
- * تدمج كلاسات Tailwind مع معالجة التعارضات البرمجية وضمان الأولوية.
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -16,7 +15,6 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * تنسيق العملة الكويتية (formatCurrency):
- * تحول الرقم إلى نص مالي بـ 3 خانات عشرية (دينار كويتي) وفق المعايير البنكية.
  */
 export function formatCurrency(amount: number) {
   if (amount === null || amount === undefined) return "0.000 د.ك";
@@ -29,7 +27,6 @@ export function formatCurrency(amount: number) {
 
 /**
  * محرك التفقيط (numberToArabicWords):
- * يحول المبالغ المالية من أرقام إلى كلمات عربية قانونية للاستخدام في السندات والعقود الرسمية.
  */
 export function numberToArabicWords(inputNumber: number | string): string {
     const num = parseFloat(String(inputNumber).replace(/,/g, ''));
@@ -45,33 +42,34 @@ export function numberToArabicWords(inputNumber: number | string): string {
 }
 
 /**
- * محرك توجيه المسارات السيادي (getTenantPath):
- * 🛡️ الضابط الأكبر لعزل البيانات في نظام الـ Multi-Tenancy.
- * يقوم بتحويل أي مسار مجرد (مثل 'projects') إلى مسار معزول للمنشأة.
+ * محرك توجيه المسارات السيادي المطور (SaaS Tenant Routing):
+ * 🛡️ الضابط الأكبر لعزل البيانات. 
+ * يضمن بقاء كل شركة داخل "صندوقها" الخاص.
  */
 export function getTenantPath(path: string, tenantId: string | null | undefined): string {
   if (!tenantId) return path;
   
-  // استثناء مجموعات "مشروع الماستر" التي يجب أن تظل عالمية للمطور
-  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'company_settings/master'];
-  const isMaster = masterCollections.some(mc => path.startsWith(mc));
+  // مجموعات مشروع الماستر (لا يتم عزلها لأنها عالمية للإدارة والمطور)
+  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
   
+  const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
 
-  // توجيه كافة البيانات التشغيلية والمرجعية والعدادات لمجلد الشركة
+  // توجيه كافة البيانات إلى: companies/{tenantId}/{collectionName}
+  // إذا كان المسار يبدأ بـ companies بالفعل، نتركه كما هو لخدمة المطور
+  if (path.startsWith('companies/')) return path;
+
   return `companies/${tenantId}/${path}`;
 }
 
 /**
  * منظف بيانات Firebase (cleanFirestoreData):
- * يقوم بحذف أي قيم "undefined" من الكائنات قبل حفظها لمنع أخطاء Firebase.
  */
 export function cleanFirestoreData(data: any): any {
   if (data === undefined) return null;
   if (Array.isArray(data)) return data.map(item => cleanFirestoreData(item));
   if (data && typeof data === 'object') {
     if (typeof data.toDate === 'function' || data instanceof Date) return data;
-    
     const cleanedData: { [key: string]: any } = {};
     for (const key in data) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
