@@ -13,6 +13,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+  // 🛡️ التأسيس السيادي: جعل الوضع الزجاجي هو الافتراضي
   const [theme, setThemeState] = useState<Theme>('glass');
 
   useEffect(() => {
