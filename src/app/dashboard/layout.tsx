@@ -81,11 +81,11 @@ export default function DashboardLayout({
   }
   
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="relative min-h-screen">
       <SidebarProvider>
           <Sidebar
             side={language === 'ar' ? 'right' : 'left'}
-            className="no-print border-l border-sidebar-border bg-white shadow-sm"
+            className="no-print glass-sidebar"
           >
             <MainNav currentUser={user} onLogout={handleLogout} />
           </Sidebar>

@@ -1,43 +1,52 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
 @import "react-day-picker/dist/style.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* مصفوفة الألوان السيادية - PURPLE SUITE */
-    --background: 260 100% 98%;
-    --foreground: 224 71% 4%;
-    --card: 0 0% 100% / 0.4;
-    --card-foreground: 240 50% 15%;
+    --background: 240 50% 97%;
+    --foreground: 240 60% 10%;
+    --card: 0 0% 100% / 0.3;
+    --card-foreground: 240 50% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 270 70% 40%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 0 0% 100% / 0.2;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 262 83% 58%;
-    --radius: 1.5rem;
+    --popover-foreground: 240 60% 10%;
+    --primary: 252 80% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 240 50% 12%;
+    --muted: 220 30% 94%;
+    --muted-foreground: 220 20% 50%;
+    --accent: 220 30% 94%;
+    --accent-foreground: 240 50% 12%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 100% / 0.3;
+    --input: 0 0% 100% / 0.4;
+    --ring: 252 80% 62%;
+    --radius: 1.25rem;
+    --sidebar-background: 252 40% 18%;
+    --sidebar-foreground: 240 20% 90%;
+    --sidebar-primary: 252 80% 70%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 252 30% 28%;
+    --sidebar-accent-foreground: 240 20% 95%;
+    --sidebar-border: 252 30% 28%;
+    --sidebar-ring: 252 80% 62%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body {
-    /* الخلفية الأساسية: تدرج لوني ناعم وعميق (Ambient Gradient) */
-    background: radial-gradient(circle at top right, rgba(165, 243, 252, 0.4), transparent 40%),
-                radial-gradient(circle at bottom left, rgba(244, 114, 182, 0.2), transparent 40%),
-                linear-gradient(135deg, #f3e8ff 0%, #e0e7ff 50%, #fce7f3 100%);
+    background:
+      radial-gradient(ellipse at 15% 15%, rgba(167,139,250,0.4) 0%, transparent 45%),
+      radial-gradient(ellipse at 85% 10%, rgba(129,140,248,0.3) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 85%, rgba(147,197,253,0.35) 0%, transparent 50%),
+      radial-gradient(ellipse at 5% 85%, rgba(196,181,253,0.25) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 50%, rgba(224,231,255,0.5) 0%, transparent 60%),
+      linear-gradient(145deg, #ede9fe 0%, #e0e7ff 30%, #dbeafe 60%, #ede9fe 100%);
     background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
@@ -46,34 +55,83 @@
 }
 
 @layer components {
-  /* تأثير Glassmorphism المتطور */
   .glass-effect {
-    @apply bg-white/20 backdrop-blur-[20px] border border-white/30 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+    background: rgba(255,255,255,0.3);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.5);
+    box-shadow: 0 8px 32px rgba(99,74,210,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
   }
-  
-  .glass-input {
-    @apply bg-white/10 backdrop-blur-md border-white/20 focus:bg-white/30 transition-all shadow-inner;
+  .glass-card {
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.55);
+    box-shadow: 0 4px 24px rgba(99,74,210,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
+    border-radius: 1.5rem;
+    transition: all 0.3s ease;
   }
-
+  .glass-card:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.45);
+    box-shadow: 0 12px 40px rgba(99,74,210,0.12);
+  }
+  .glass-sidebar {
+    background: linear-gradient(180deg, rgba(45,30,100,0.92) 0%, rgba(35,22,80,0.95) 100%);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-left: 1px solid rgba(255,255,255,0.1);
+    box-shadow: -4px 0 40px rgba(30,15,60,0.2);
+  }
   .sidebar-glass {
-    @apply bg-white/10 backdrop-blur-[40px] border-l border-white/20 shadow-2xl;
+    background: linear-gradient(180deg, rgba(45,30,100,0.92) 0%, rgba(35,22,80,0.95) 100%);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border-left: 1px solid rgba(255,255,255,0.1);
   }
-
+  .glass-input {
+    background: rgba(255,255,255,0.25);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.4);
+    transition: all 0.2s ease;
+  }
+  .glass-input:focus {
+    background: rgba(255,255,255,0.45);
+    border-color: rgba(139,92,246,0.5);
+  }
   .active-item-glow {
-    background: rgba(114, 9, 183, 0.4);
-    box-shadow: 0 8px 32px 0 rgba(114, 9, 183, 0.2),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-    @apply border-white/30;
+    background: linear-gradient(135deg, rgba(139,92,246,0.4), rgba(99,102,241,0.3));
+    box-shadow: 0 4px 20px rgba(139,92,246,0.25), inset 0 0 0 1px rgba(255,255,255,0.2);
+    border-radius: 0.875rem;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.32);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.55);
+    box-shadow: 0 4px 20px rgba(99,74,210,0.07), inset 0 1px 0 rgba(255,255,255,0.8);
+    border-radius: 1.5rem;
+    transition: all 0.3s ease;
+  }
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 48px rgba(99,74,210,0.14);
+    background: rgba(255,255,255,0.45);
+  }
+  .nova-btn-primary {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+    border: none;
+    color: white;
+    transition: all 0.3s ease;
+  }
+  .nova-btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 30px rgba(124,58,237,0.45);
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
-
-.hover-lift {
-  @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
-}
-
-.soft-shadow-input {
-  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
-}
+.hover-lift { @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg; }
+.soft-shadow-input { box-shadow: inset 0 2px 4px 0 rgba(0,0,0,0.05); }

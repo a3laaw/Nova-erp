@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -14,7 +15,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -31,12 +32,15 @@ import {
   LayoutGrid,
   Target,
   Send,
-  Activity
+  Activity,
+  CalendarClock,
+  Users
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import type { Company } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { addDays } from 'date-fns';
 
 interface Props {
   isOpen: boolean;
@@ -64,6 +68,9 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     messagingSenderId: '',
     appId: '',
     measurementId: '',
+    subscriptionType: 'trial' as 'trial' | 'premium',
+    maxUsersLimit: 5,
+    trialEndDate: undefined as Date | undefined,
   });
 
   useEffect(() => {
@@ -82,19 +89,28 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 messagingSenderId: company.firebaseConfig.messagingSenderId || '',
                 appId: company.firebaseConfig.appId || '',
                 measurementId: company.firebaseConfig.measurementId || '',
+                subscriptionType: company.subscriptionType || 'trial',
+                maxUsersLimit: company.maxUsersLimit || 5,
+                trialEndDate: company.trialEndDate ? new Date(company.trialEndDate.seconds * 1000) : undefined,
             });
         } else {
+            // Default Demo Mode: 14 days from now
+            const defaultTrialEnd = addDays(new Date(), 14);
             setFormData({
                 name: '', nameEn: '', activityType: 'general', adminEmail: '', adminPassword: '',
                 apiKey: '', authDomain: '', projectId: '', storageBucket: '',
                 messagingSenderId: '', appId: '', measurementId: '',
+                subscriptionType: 'trial',
+                maxUsersLimit: 5,
+                trialEndDate: defaultTrialEnd,
             });
         }
     }
   }, [isOpen, company]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }));
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: id === 'maxUsersLimit' ? parseInt(value) || 0 : value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,6 +130,12 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
         measurementId: formData.measurementId.trim(),
       };
 
+      const licenseData = {
+          subscriptionType: formData.subscriptionType,
+          maxUsersLimit: formData.maxUsersLimit,
+          trialEndDate: formData.trialEndDate ? Timestamp.fromDate(formData.trialEndDate) : null,
+      };
+
       if (isEditing && company?.id) {
           const companyRef = doc(masterFirestore, 'companies', company.id);
           await updateDoc(companyRef, cleanFirestoreData({
@@ -122,9 +144,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               activityType: formData.activityType,
               firebaseProjectId: formData.projectId,
               firebaseConfig,
+              ...licenseData,
               updatedAt: serverTimestamp()
           }));
-          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات ربط المنشأة.' });
+          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات ربط وترخيص المنشأة.' });
       } else {
           const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
           
@@ -138,6 +161,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               firebaseConfig,
               isActive: true,
               adminEmail: formData.adminEmail.toLowerCase().trim(),
+              ...licenseData,
               createdAt: serverTimestamp(),
               createdBy: masterAuth.currentUser?.uid || 'system',
             });
@@ -150,7 +174,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             });
           });
 
-          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتأسيس بيئة العمل بنجاح.' });
+          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتأسيس بيئة العمل بنظام التجربة (14 يوم).' });
       }
 
       onClose();
@@ -175,7 +199,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     </div>
                     <div className="text-right">
                         <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل سيادة المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
-                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي ومفاتيح الوصول الحيوية.</DialogDescription>
+                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي ومفاتيح الوصول ونظام التراخيص.</DialogDescription>
                     </div>
                 </div>
                 <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10"><X className="h-5 w-5"/></Button>
@@ -212,7 +236,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     <SelectItem value="consulting">استشارات هندسية</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <p className="text-[10px] text-muted-foreground font-bold pr-1">هذا الاختيار سيحدد طبيعة الدورة المستندية والقوانين المطبقة (مثل كروت الصحة للمطاعم).</p>
                         </div>
 
                         {!isEditing && (
@@ -226,6 +249,43 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     <Input id="adminPassword" type="password" value={formData.adminPassword} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="********" />
                                 </div>
                             </>
+                        )}
+                    </div>
+                </section>
+
+                <Separator className="bg-slate-100" />
+
+                <section className="space-y-6">
+                    <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-orange-600 pr-4 flex items-center gap-3">
+                        <CalendarClock className="h-6 w-6 text-orange-600" /> نظام التراخيص والحصص (Licensing)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-orange-50/20 border-2 border-dashed border-orange-200 shadow-inner">
+                        <div className="grid gap-2">
+                            <Label className="font-black text-black text-xs pr-1 uppercase">نوع الاشتراك</Label>
+                            <Select value={formData.subscriptionType} onValueChange={(v: any) => setFormData(p => ({...p, subscriptionType: v}))}>
+                                <SelectTrigger className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="trial">فترة تجريبية (Demo)</SelectItem>
+                                    <SelectItem value="premium">اشتراك كامل (Premium)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> الحد الأقصى للمستخدمين *</Label>
+                            <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-lg" />
+                        </div>
+                        {formData.subscriptionType === 'trial' && (
+                            <div className="grid gap-2 md:col-span-2">
+                                <Label className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest">تاريخ انتهاء الفترة التجريبية</Label>
+                                <DateInput 
+                                    value={formData.trialEndDate} 
+                                    onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))}
+                                    className="h-12 rounded-xl"
+                                />
+                                <p className="text-[10px] text-orange-700 font-bold pr-1">سيتم قفل لوحة تحكم العميل تلقائياً عند تجاوز هذا التاريخ.</p>
+                            </div>
                         )}
                     </div>
                 </section>
@@ -293,7 +353,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                {isEditing ? 'حفظ التحديثات السيادية' : 'تأسيس بيئة العمل السحابية'}
+                {isEditing ? 'حفظ التحديثات السيادية' : 'تأسيس المنشأة وتفعيل التراخيص'}
             </Button>
           </DialogFooter>
         </form>
