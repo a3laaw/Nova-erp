@@ -108,7 +108,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             "my-1.5 h-14 rounded-2xl transition-all duration-500",
             isActive 
               ? "active-item-glow text-[#1e1b4b] font-black shadow-lg" 
-              : "hover:bg-white/20 text-[#1e1b4b]/70"
+              : "bg-white/20 hover:bg-white/40 text-[#1e1b4b]/70 border border-white/10"
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-3">
@@ -130,8 +130,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               className={cn(
                 "my-1.5 h-14 rounded-2xl transition-all duration-500",
                 isActive 
-                  ? "active-item-glow text-[#1e1b4b] font-black" 
-                  : "hover:bg-white/20 text-[#1e1b4b]/70"
+                  ? "active-item-glow text-[#1e1b4b] font-black shadow-md" 
+                  : "bg-white/20 hover:bg-white/40 text-[#1e1b4b]/70 border border-white/10"
               )}
             >
               {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/80")} strokeWidth={isActive ? 3 : 2} />}
@@ -140,14 +140,16 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 pr-10 space-y-2 border-none">
+            <SidebarMenuSub className="mt-1 mb-2 pr-4 space-y-2 border-none">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl py-2 h-auto transition-all font-bold bg-transparent",
-                        isChildActive ? "text-[#7209B7] font-black" : "text-[#1e1b4b]/60 hover:text-[#1e1b4b]"
+                        "rounded-xl py-3 h-auto transition-all font-bold",
+                        isChildActive 
+                          ? "active-item-glow text-[#1e1b4b] font-black shadow-sm" 
+                          : "bg-white/10 hover:bg-white/30 text-[#1e1b4b]/60 border border-white/5"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
                         <span className="text-xs truncate">{child.label}</span>
@@ -180,7 +182,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
               <span className="text-3xl font-black tracking-tighter text-[#1e1b4b]">Nova ERP</span>
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1e1b4b]/40 mt-1">PURPLE SUITE</span>
             </div>
-            <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-inner">
+            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border-2 border-primary/20 shadow-xl">
               <span className="text-xl font-black text-primary">{currentUser.fullName?.charAt(0) || 'N'}</span>
             </div>
         </div>
@@ -200,13 +202,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/40 border border-white/60 rounded-[2rem] p-4 flex items-center shadow-xl backdrop-blur-md">
+        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-2xl backdrop-blur-md">
             <div className="w-12 h-12 bg-[#7209B7] rounded-2xl flex items-center justify-center text-white font-black shadow-lg border-2 border-white/20">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                <p className="text-sm font-black truncate text-[#1e1b4b]">{currentUser.fullName}</p>
-                <p className="text-[10px] truncate font-black uppercase tracking-widest text-[#1e1b4b]/50">ADMIN</p>
+                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[9px] truncate font-black uppercase tracking-widest text-[#1e1b4b]/50">ADMIN ROLE</p>
             </div>
         </div>
       </SidebarFooter>
