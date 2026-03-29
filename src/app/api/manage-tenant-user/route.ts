@@ -8,7 +8,7 @@ const SERVICE_ACCOUNT_PATH = './service-account.json';
 
 /**
  * @fileOverview API سيادي لإدارة حسابات المستخدمين في Firebase Auth.
- * يسمح للمطور بإنشاء وتحديث كلمات مرور المستخدمين دون الحاجة للـ Client SDK.
+ * تم تحديثه ليدعم "الترميم" (Repair) في حال وجود الحساب مسبقاً ببيانات خاطئة.
  */
 
 if (getApps().length === 0 && fs.existsSync(SERVICE_ACCOUNT_PATH)) {
@@ -27,33 +27,38 @@ export async function POST(request: NextRequest) {
 
     const auth = getAuth();
     let userRecord;
+    const sanitizedEmail = email.toLowerCase().trim();
 
-    if (action === 'create') {
+    if (action === 'create' || action === 'repair') {
         try {
+            // محاولة إنشاء مستخدم جديد
             userRecord = await auth.createUser({
-                email: email.toLowerCase().trim(),
+                email: sanitizedEmail,
                 password: password,
                 displayName: displayName || 'Nova User',
                 emailVerified: true,
             });
         } catch (e: any) {
             if (e.code === 'auth/email-already-exists') {
-                userRecord = await auth.getUserByEmail(email.toLowerCase().trim());
-                // تحديث كلمة المرور في حال كان موجوداً مسبقاً لمزامنته
-                await auth.updateUser(userRecord.uid, { password: password });
+                // إذا كان موجوداً، نقوم بتحديث كلمة المرور لضمان المطابقة مع ما يراه المطور
+                userRecord = await auth.getUserByEmail(sanitizedEmail);
+                await auth.updateUser(userRecord.uid, { 
+                    password: password,
+                    displayName: displayName || userRecord.displayName
+                });
             } else {
                 throw e;
             }
         }
     } else if (action === 'update_password') {
-        userRecord = await auth.getUserByEmail(email.toLowerCase().trim());
+        userRecord = await auth.getUserByEmail(sanitizedEmail);
         await auth.updateUser(userRecord.uid, { password: password });
     }
 
     return NextResponse.json({ 
         success: true, 
         uid: userRecord?.uid,
-        message: "تمت معالجة الحساب في خادم الأمان بنجاح." 
+        message: "تمت مزامنة الحساب مع خادم الأمان بنجاح." 
     });
 
   } catch (error: any) {

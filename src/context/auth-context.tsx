@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
@@ -26,18 +27,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
-  // 🛡️ صمام الأمان السيادي: يمنع التعليق للأبد ويضمن إطلاق الواجهة تحت أي ظرف
+  // 🛡️ صمام الأمان القاطع: يمنع تعليق التحميل للأبد
   useEffect(() => {
     const safetyTimer = setTimeout(() => {
       if (loading) {
-        console.warn("🛡️ Auth Shield: Safety timeout reached. Releasing UI state.");
+        console.warn("🛡️ Auth Guard: Timeout reached. Forcing UI release.");
         setLoading(false);
       }
-    }, 5000);
+    }, 6000);
     return () => clearTimeout(safetyTimer);
   }, [loading]);
 
-  // دالة ضبط الكوكيز السيادية لخدمة الـ Middleware
   const setSovereignCookies = (email: string) => {
     const expiry = 86400; // 24 hours
     const cookieName = email === MASTER_DEV_EMAIL ? 'nova-dev-session' : 'nova-user-session';
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const userEmail = firebaseUser.email?.toLowerCase();
         
-        // 1. معالجة حالة المطور السيادي (Master Developer)
+        // 1. حالة المطور السيادي (Master Developer)
         if (userEmail === MASTER_DEV_EMAIL) {
           setSovereignCookies(userEmail);
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
@@ -82,48 +82,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        // 2. معالجة مستخدم المنشأة (SaaS Tenant User)
+        // 2. حالة مستخدم المنشأة (SaaS Tenant User)
         if (userEmail) {
           setSovereignCookies(userEmail);
           
-          // البحث السريع في الفهرس العالمي (Global Index Lookup)
+          // محاولة البحث في الفهرس العالمي (Global Index Lookup)
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
             limit(1)
           ));
           
+          let companyId = '';
+          
           if (!userIndexSnap.empty) {
-            const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
-            const companyId = userIndex.companyId;
-            
+            companyId = userIndexSnap.docs[0].data().companyId;
+          } else {
+            // 🛡️ خط دفاع إضافي: إذا لم يكن في الفهرس، نبحث في قائمة الشركات عن البريد الإداري (Gmail Support)
+            const companyAdminQuery = query(collection(masterFirestore, 'companies'), where('adminEmail', '==', userEmail), limit(1));
+            const companySnap = await getDocs(companyAdminQuery);
+            if (!companySnap.empty) {
+                companyId = companySnap.docs[0].id;
+            }
+          }
+
+          if (companyId) {
             // جلب ملف المستخدم من المجلد المعزول
             const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
 
             if (tenantUserDoc.exists()) {
               const userData = tenantUserDoc.data() as UserProfile;
-              
               setUser({ 
                 ...userData, 
                 uid: firebaseUser.uid, 
                 id: tenantUserDoc.id,
                 currentCompanyId: companyId,
-                companyName: userIndex.companyId // Fallback
+                companyName: companyId // Fallback
               });
 
-              // جلب بيانات الشركة لتغذية السياق
               getDoc(doc(masterFirestore, 'companies', companyId)).then(companyDoc => {
                 if (companyDoc.exists()) {
                   setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
                 }
               });
+            } else {
+                // إذا وجد في الفهرس ولكن ملفه الداخلي مفقود (حالة نادرة)
+                // نعتبره مديراً مؤقتاً بالبيانات المتاحة
+                setUser({
+                    id: firebaseUser.uid, uid: firebaseUser.uid, email: userEmail,
+                    username: userEmail.split('@')[0], role: 'Admin', isActive: true,
+                    currentCompanyId: companyId
+                } as any);
             }
+          } else {
+              console.warn("User authenticated but not found in any tenant index.");
+              setUser(null);
           }
         }
       } catch (error) {
         console.error("Critical Auth Sync Error:", error);
       } finally {
-        // نضمن دائماً إنهاء حالة التحميل
         setLoading(false);
       }
     });
@@ -136,7 +154,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // دعم الدخول باسم المستخدم المباشر (Direct SaaS Username Support)
+    // دعم الدخول باسم المستخدم المباشر
     if (!email.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 
@@ -148,20 +166,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // 🛡️ زرع الكوكيز بشكل استباقي لمنع طرد الـ Middleware
       setSovereignCookies(email);
-      
       await signInWithEmailAndPassword(masterAuth, email, password);
     } catch (e: any) {
       console.error("Login attempt failed:", e);
-      // تنظيف الكوكيز في حال فشل الدخول
       document.cookie = 'nova-dev-session=; max-age=0; path=/';
       document.cookie = 'nova-user-session=; max-age=0; path=/';
-      
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-          throw new Error('بيانات الدخول غير صحيحة. يرجى التأكد من اسم المستخدم وكلمة المرور.');
-      }
-      throw e;
+      throw new Error('بيانات الدخول غير صحيحة. يرجى التأكد من البريد وكلمة المرور.');
     }
   }, [masterAuth, masterFirestore]);
 
