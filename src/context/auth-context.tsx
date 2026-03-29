@@ -24,7 +24,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
   
+  const isInitialized = useRef(false);
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
+
+  // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد في شاشة التحميل
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
+        console.warn("🛡️ Auth Shield: Initialization timeout reached. Forcing UI release.");
+        setLoading(false);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -32,19 +44,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد في شاشة التحميل
-    const safetyTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn("Auth initialization timed out. Breaking loading loop.");
-        setLoading(false);
-      }
-    }, 6000);
-
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
       try {
         if (!firebaseUser) {
           setUser(null);
           setCurrentCompany(null);
+          setLoading(false);
           return;
         }
 
@@ -72,6 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
               }
             }
+            setLoading(false);
             return;
           }
         }
@@ -107,17 +113,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       } catch (error) {
-        console.error("Critical Auth initialization error:", error);
+        console.error("Critical Auth Error:", error);
       } finally {
         setLoading(false);
-        clearTimeout(safetyTimeout);
+        isInitialized.current = true;
       }
     });
 
-    return () => {
-        unsubscribe();
-        clearTimeout(safetyTimeout);
-    };
+    return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -132,13 +135,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email = userIndexSnap.docs[0].data().email;
     }
 
-    setLoading(true);
     try {
       await signInWithEmailAndPassword(masterAuth, email, password);
       // ضبط كوكيز الجلسة لـ Middleware
       document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
-      setLoading(false);
       throw e;
     }
   }, [masterAuth, masterFirestore]);

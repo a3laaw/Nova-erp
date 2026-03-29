@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,8 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
+  const checkRedirectRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     // توجيه تلقائي إذا كان المستخدم مسجلاً دخوله بالفعل
     if (!authLoading && user) {
@@ -35,6 +37,18 @@ export default function UnifiedLoginPage() {
     }
   }, [user, authLoading, router]);
 
+  // صمام أمان لزر "جاري التحقق" لضمان عدم تعليقه
+  useEffect(() => {
+    if (isLoading) {
+        checkRedirectRef.current = setTimeout(() => {
+            if (isLoading) setIsLoading(false);
+        }, 6000);
+    }
+    return () => {
+        if (checkRedirectRef.current) clearTimeout(checkRedirectRef.current);
+    };
+  }, [isLoading]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
@@ -44,6 +58,7 @@ export default function UnifiedLoginPage() {
     try {
         await login(formData.identifier, formData.password);
         toast({ title: 'مرحباً بك في Nova ERP' });
+        // نترك isLoading صحيحاً حتى يتم التوجيه من الـ useEffect
     } catch (error: any) {
         setErrorMessage(error.message);
         toast({ 
