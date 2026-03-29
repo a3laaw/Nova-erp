@@ -1,9 +1,8 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Languages, Calendar, LogOut, Palette, Sparkles, ShieldAlert, ArrowRight, Zap, Cloud } from 'lucide-react';
+import { Languages, Calendar, LogOut, Palette, Sparkles, ShieldAlert, ArrowRight, Zap } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -11,8 +10,6 @@ import { Notifications } from './notifications';
 import Link from 'next/link';
 import { Breadcrumbs } from './breadcrumbs';
 import { useBranding } from '@/context/branding-context';
-import { Logo } from './logo';
-import { Skeleton } from '../ui/skeleton';
 import { UpdateIndicator } from '@/context/sync-context';
 import { useAppTheme } from '@/context/theme-context';
 import { Separator } from '@/components/ui/separator';
@@ -36,7 +33,7 @@ interface HeaderProps {
 
 export function Header({ currentUser, onLogout, className }: HeaderProps) {
     const { toggleLanguage } = useLanguage();
-    const { branding, loading: brandingLoading } = useBranding();
+    const { branding } = useBranding();
     const { theme, toggleTheme } = useAppTheme();
     const { auth } = useFirebase();
     const { toast } = useToast();
@@ -117,7 +114,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="relative h-10 w-10 rounded-2xl p-0 hover:scale-105 transition-transform">
+                        <Button variant="ghost" className="relative h-10 w-10 rounded-2xl p-0 hover:scale-105 transition-transform border-none">
                             <Avatar className="h-10 w-10 border-2 border-primary/40 shadow-lg neon-glow-blue">
                                 <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} />
                                 <AvatarFallback className="bg-slate-900 text-white font-black">{currentUser.fullName?.charAt(0)}</AvatarFallback>
