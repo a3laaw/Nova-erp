@@ -20,7 +20,7 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [currentCompany, setCompany] = useState<Company | null>(null);
   const [instances, setInstances] = useState<CompanyFirebaseInstances | null>(null);
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
-  const mounted = useRef(false);
+  const isMounted = useRef(false);
 
   const setCurrentCompany = useCallback((company: Company | null) => {
     if (!company) {
@@ -51,8 +51,8 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   }, [currentCompany?.id]);
 
   useEffect(() => {
-    if (!mounted.current) {
-        mounted.current = true;
+    if (!isMounted.current) {
+        isMounted.current = true;
         try {
             const saved = localStorage.getItem('nova_current_company');
             if (saved) {
