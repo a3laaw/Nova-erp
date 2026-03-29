@@ -25,17 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
-
-  // 🛡️ صمام الأمان السيادي لضمان عدم تعليق الواجهة
-  useEffect(() => {
-    const safetyTimer = setTimeout(() => {
-      if (loading) {
-        console.warn("Auth safety timeout triggered. Forcing loading to false.");
-        setLoading(false);
-      }
-    }, 5000);
-    return () => clearTimeout(safetyTimer);
-  }, [loading]);
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -43,20 +33,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
-      // 1. إذا لم يكن هناك مستخدم مسجل الدخول، نتوقف فوراً
-      if (!firebaseUser) {
-        setUser(null);
-        setCurrentCompany(null);
+    // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("Auth initialization timed out. Breaking loop.");
         setLoading(false);
-        return;
       }
+    }, 6000);
 
+    const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
       try {
+        if (!firebaseUser) {
+          setUser(null);
+          setCurrentCompany(null);
+          return;
+        }
+
         const idTokenResult = await firebaseUser.getIdTokenResult();
         const claims = idTokenResult.claims as any;
 
-        // 2. حالة المطور السيادي
+        // 1. حالة المطور السيادي
         if (firebaseUser.email === MASTER_DEV_EMAIL) {
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
           if (devDoc.exists()) {
@@ -77,12 +73,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
               }
             }
-            setLoading(false);
             return;
           }
         }
 
-        // 3. حالة مستخدم المنشأة (Tenant User)
+        // 2. حالة مستخدم المنشأة (Tenant User)
         const userEmail = firebaseUser.email?.toLowerCase();
         if (userEmail) {
           const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
@@ -108,17 +103,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 currentCompanyId: companyId,
                 companyName: companyData.name
               });
+            } else {
+                setUser(null);
+                setCurrentCompany(null);
             }
+          } else {
+              setUser(null);
+              setCurrentCompany(null);
           }
         }
       } catch (error) {
-        console.error("Auth profile fetch error:", error);
+        console.error("Critical Auth initialization error:", error);
+        setUser(null);
+        setCurrentCompany(null);
       } finally {
         setLoading(false);
+        clearTimeout(safetyTimeout);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+        unsubscribe();
+        clearTimeout(safetyTimeout);
+    };
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
   const login = useCallback(async (identifier: string, password: string) => {
@@ -132,8 +139,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email = userIndexSnap.docs[0].data().email;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       await signInWithEmailAndPassword(masterAuth, email, password);
       document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
@@ -144,13 +151,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     setLoading(true);
-    if (masterAuth) await signOut(masterAuth);
-    document.cookie = 'nova-dev-session=; max-age=0; path=/';
-    document.cookie = 'nova-user-session=; max-age=0; path=/';
-    setUser(null);
-    setCurrentCompany(null);
-    setLoading(false);
-    router.replace('/');
+    try {
+        if (masterAuth) await signOut(masterAuth);
+        document.cookie = 'nova-dev-session=; max-age=0; path=/';
+        document.cookie = 'nova-user-session=; max-age=0; path=/';
+        setUser(null);
+        setCurrentCompany(null);
+        router.replace('/');
+    } finally {
+        setLoading(false);
+    }
   }, [masterAuth, setCurrentCompany, router]);
 
   return (
