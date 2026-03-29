@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -5,7 +6,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { Loader, AlertCircle, LogOut, RefreshCcw } from 'lucide-react';
+import { Loader, AlertCircle, LogOut, RefreshCcw, Lock, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
@@ -13,9 +14,13 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { useBranding } from '@/context/branding-context';
 import { cn } from '@/lib/utils';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
+import { useCompany } from '@/context/company-context';
+import { isPast } from 'date-fns';
+import { toFirestoreDate } from '@/services/date-converter';
 
 /**
  * @fileOverview Dashboard layout with professional clean style and recovery options.
+ * تم تحديثه ليشمل صمام الأمان الزمني (Trial Period Lock).
  */
 export default function DashboardLayout({
   children,
@@ -23,6 +28,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, loading, logout } = useAuth();
+  const { currentCompany } = useCompany();
   const router = useRouter();
   const { language } = useLanguage();
   const { branding } = useBranding();
@@ -33,11 +39,9 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
-    
     loadingTimeoutRef.current = setTimeout(() => {
         if (loading) setShowRetry(true);
     }, 10000);
-
     return () => {
         if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
     };
@@ -47,6 +51,13 @@ export default function DashboardLayout({
     logout();
     router.push('/');
   };
+
+  // --- 🛡️ صمام الأمان السيادي (Licensing Lock) ---
+  const isTrialExpired = React.useMemo(() => {
+    if (!currentCompany || currentCompany.subscriptionType !== 'trial') return false;
+    const expiry = toFirestoreDate(currentCompany.trialEndDate);
+    return expiry ? isPast(expiry) : false;
+  }, [currentCompany]);
 
   if (loading || !mounted) {
     return (
@@ -78,6 +89,34 @@ export default function DashboardLayout({
         </div>
       </div>
     )
+  }
+
+  // شاشة القفل عند انتهاء الـ Demo
+  if (isTrialExpired && !user.isSuperAdmin) {
+    return (
+        <div className="flex h-screen w-full flex-col items-center justify-center p-6 bg-[#0f172a] text-white" dir="rtl">
+            <div className="max-w-md w-full text-center space-y-8 animate-in zoom-in-95 duration-700">
+                <div className="bg-red-500/20 p-8 rounded-[3rem] w-fit mx-auto border-2 border-red-500/40 shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+                    <Lock className="h-20 w-20 text-red-500" />
+                </div>
+                <div className="space-y-3">
+                    <h1 className="text-4xl font-black tracking-tighter text-red-500">انتهت الفترة التجريبية</h1>
+                    <p className="text-slate-400 font-bold text-lg leading-relaxed">
+                        نأسف، لقد انتهت صلاحية استخدام نظام Nova ERP لهذه المنشأة (14 يوماً). يرجى التواصل مع الإدارة للترقية إلى باقة Premium واستعادة الوصول لبياناتكم.
+                    </p>
+                </div>
+                <div className="grid gap-4">
+                    <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                        <span className="font-bold text-slate-400">حالة الاشتراك:</span>
+                        <Badge variant="destructive" className="font-black px-4">Demo Expired</Badge>
+                    </div>
+                    <Button variant="outline" onClick={handleLogout} className="h-14 rounded-2xl font-black text-xl border-white/20 text-white hover:bg-white/10 gap-2">
+                        <LogOut className="h-5 w-5" /> تسجيل الخروج
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
   }
   
   return (
