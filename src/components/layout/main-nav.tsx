@@ -58,6 +58,7 @@ const navItems = {
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
+        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: ArrowUpRight },
       ]
     },
     { 
@@ -72,7 +73,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'المحاسبة والمالية', 
+      label: 'المطالبات المالية', 
       icon: Wallet, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
@@ -81,26 +82,6 @@ const navItems = {
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-      ]
-    },
-    { 
-      label: 'الموارد البشرية', 
-      icon: Handshake, 
-      roles: ['Developer', 'Admin', 'HR'],
-      hrefPrefix: '/dashboard/hr',
-      children: [
-        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
-        { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
-      ]
-    },
-    { 
-      label: 'الإعدادات', 
-      icon: Settings, 
-      roles: ['Developer', 'Admin'],
-      hrefPrefix: '/dashboard/settings',
-      children: [
-        { href: '/dashboard/settings', label: 'الإعدادات العامة', icon: Settings2 },
-        { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: Users },
       ]
     },
   ],
@@ -126,12 +107,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           className={cn(
             "my-1.5 h-14 rounded-2xl transition-all duration-500",
             isActive 
-              ? "active-item-glow text-indigo-950 font-black shadow-lg" 
-              : "hover:bg-white/20 text-indigo-950/70"
+              ? "active-item-glow text-[#1e1b4b] font-black shadow-lg" 
+              : "hover:bg-white/20 text-[#1e1b4b]/70"
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-3">
-            {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-indigo-950" : "text-indigo-950/80")} strokeWidth={3} />}
+            {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/80")} strokeWidth={isActive ? 3 : 2} />}
             <span className="truncate text-sm">{item.label}</span>
           </Link>
         </SidebarMenuButton>
@@ -149,13 +130,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               className={cn(
                 "my-1.5 h-14 rounded-2xl transition-all duration-500",
                 isActive 
-                  ? "active-item-glow text-indigo-950 font-black" 
-                  : "hover:bg-white/20 text-indigo-950/70"
+                  ? "active-item-glow text-[#1e1b4b] font-black" 
+                  : "hover:bg-white/20 text-[#1e1b4b]/70"
               )}
             >
-              {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-indigo-950" : "text-indigo-950/80")} strokeWidth={3} />}
+              {Icon && <Icon className={cn("size-6 shrink-0", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/80")} strokeWidth={isActive ? 3 : 2} />}
               <span className="truncate text-sm flex-1">{item.label}</span>
-              <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50", isActive ? "text-indigo-950" : "text-indigo-950/50")} />
+              <ChevronDown className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180 opacity-50", isActive ? "text-[#7209B7]" : "text-[#1e1b4b]/50")} />
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -166,10 +147,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-xl py-2 h-auto transition-all font-bold bg-transparent",
-                        isChildActive ? "text-indigo-950 font-black" : "text-indigo-950/60 hover:text-indigo-950"
+                        isChildActive ? "text-[#7209B7] font-black" : "text-[#1e1b4b]/60 hover:text-[#1e1b4b]"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)} className="flex items-center gap-2">
-                        {isChildActive && <span className="w-1.5 h-1.5 bg-indigo-950 rounded-full ml-2" />}
                         <span className="text-xs truncate">{child.label}</span>
                       </Link>
                     </SidebarMenuSubButton>
@@ -197,11 +177,11 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       <SidebarHeader className="p-8 mb-4">
         <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-3xl font-bold tracking-tighter text-indigo-950">Nova</span>
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-950/50 mt-1">Purple Suite</span>
+              <span className="text-3xl font-black tracking-tighter text-[#1e1b4b]">Nova ERP</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#1e1b4b]/40 mt-1">PURPLE SUITE</span>
             </div>
-            <div className="w-10 h-10 bg-white/30 rounded-2xl flex items-center justify-center border border-white/40 shadow-sm">
-              <Layers className="h-5 w-5 text-indigo-950" />
+            <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-inner">
+              <span className="text-xl font-black text-primary">{currentUser.fullName?.charAt(0) || 'N'}</span>
             </div>
         </div>
       </SidebarHeader>
@@ -220,13 +200,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/20 border border-white/30 rounded-[2rem] p-4 flex items-center shadow-xl backdrop-blur-md">
-            <div className="w-12 h-12 bg-purple-200 rounded-2xl flex items-center justify-center text-indigo-950 font-bold shadow-md border border-white/40">
+        <div className="bg-white/40 border border-white/60 rounded-[2rem] p-4 flex items-center shadow-xl backdrop-blur-md">
+            <div className="w-12 h-12 bg-[#7209B7] rounded-2xl flex items-center justify-center text-white font-black shadow-lg border-2 border-white/20">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                <p className="text-sm font-bold truncate text-indigo-950">{currentUser.fullName}</p>
-                <p className="text-[10px] truncate font-black uppercase tracking-widest text-indigo-950/50">{currentUser.role}</p>
+                <p className="text-sm font-black truncate text-[#1e1b4b]">{currentUser.fullName}</p>
+                <p className="text-[10px] truncate font-black uppercase tracking-widest text-[#1e1b4b]/50">ADMIN</p>
             </div>
         </div>
       </SidebarFooter>

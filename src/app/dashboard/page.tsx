@@ -18,7 +18,10 @@ import {
     LayoutGrid,
     PlusCircle,
     BellRing,
-    ArrowUpRight
+    ArrowUpRight,
+    Sparkles,
+    Calendar,
+    ChevronLeft
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -29,19 +32,10 @@ import { DataAnomalyAlert } from '@/components/dashboard/data-anomaly-alert';
 import { TaskPrioritization } from '@/components/dashboard/task-prioritization';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const StatCard = ({ title, value, icon, description, loading, colorClass }: any) => (
-    <Card className="glass-effect hover-lift border-white/40 rounded-[2rem]">
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-black text-indigo-950/60 uppercase tracking-widest">{title}</CardTitle>
-            <div className={cn("p-2 rounded-xl bg-white/30 border border-white/40", colorClass)}>{icon}</div>
-        </CardHeader>
-        <CardContent>
-            {loading ? <Skeleton className="h-8 w-24 mt-1" /> : <div className="text-3xl font-black font-mono tracking-tighter text-indigo-950">{value}</div>}
-            <p className="text-[10px] text-indigo-950/50 mt-1 font-bold">{description}</p>
-        </CardContent>
-    </Card>
-);
-
+/**
+ * لوحة التحكم المركزية - النمط الزجاجي السيادي المحدث.
+ * تم إعادة توزيع العناصر لتطابق المخطط البصري المطلوب.
+ */
 export default function DashboardPage() {
   const { journalEntries, projects, clients, loading } = useAnalyticalData();
 
@@ -58,75 +52,109 @@ export default function DashboardPage() {
   }, [journalEntries, projects, clients, loading]);
 
   return (
-    <div className="space-y-10 p-2 lg:p-6" dir="rtl">
-        {/* Header Header */}
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div className="space-y-1 text-center lg:text-right">
-                <h1 className="text-4xl font-black flex items-center justify-center lg:justify-start gap-3 text-indigo-950 tracking-tighter">
-                    <LayoutGrid className="text-indigo-900 h-9 w-9" />
-                    لوحة التحكم العامة
-                </h1>
-                <p className="text-base font-bold text-indigo-950/60">مرحباً بك مجدداً. إليك نظرة شاملة على أداء المنشأة.</p>
-            </div>
-            
-            <div className="flex flex-wrap items-center justify-center gap-3">
-                <Button asChild variant="outline" className="h-12 px-8 rounded-2xl font-black gap-2 glass-effect border-white/60 text-indigo-950">
-                    <Link href="/dashboard/notifications"><BellRing className="h-5 w-5" /> التنبيهات</Link>
-                </Button>
-                <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 shadow-2xl bg-white text-indigo-950 hover:bg-white/90">
-                    <Link href="/dashboard/clients/new"><PlusCircle className="h-5 w-5" /> إضافة عميل جديد</Link>
-                </Button>
-            </div>
-        </div>
+    <div className="space-y-8 p-2 lg:p-4" dir="rtl">
+        {/* --- Header Banner --- */}
+        <Card className="glass-effect border-white/40 rounded-[3rem] overflow-hidden">
+            <CardContent className="p-10">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                    <div className="flex flex-col gap-4 order-2 lg:order-1 items-center lg:items-start">
+                        <Button asChild variant="outline" className="h-11 rounded-2xl font-black gap-2 bg-white/40 border-white/60 text-[#1e1b4b] shadow-lg">
+                            <Link href="/dashboard/notifications"><BellRing className="h-4 w-4" /> سجل التنبيهات</Link>
+                        </Button>
+                        <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-[#7209B7] text-white shadow-2xl hover:scale-105 transition-transform border-b-4 border-black/20">
+                            <Link href="/dashboard/clients/new"><PlusCircle className="h-5 w-5" /> إضافة عميل جديد</Link>
+                        </Button>
+                    </div>
+
+                    <div className="text-center lg:text-right order-1 lg:order-2 space-y-2">
+                        <div className="flex items-center justify-center lg:justify-end gap-4 mb-2">
+                            <h1 className="text-4xl font-black text-[#1e1b4b] tracking-tighter">لوحة التحكم المركزية</h1>
+                            <div className="p-2.5 bg-primary/10 rounded-2xl">
+                                <LayoutGrid className="text-primary h-8 w-8" />
+                            </div>
+                        </div>
+                        <p className="text-lg font-bold text-[#1e1b4b]/60 leading-relaxed">
+                            مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
+                        </p>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
 
         <DataAnomalyAlert />
 
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            <StatCard 
-                title="إجمالي التدفقات" 
-                value={formatCurrency(stats?.totalRevenue || 0)} 
-                icon={<CircleDollarSign className="h-5 w-5" />} 
-                description="إيرادات العقود المرحلة"
-                loading={loading}
-                colorClass="text-green-700"
-            />
-            <StatCard 
-                title="المواقع النشطة" 
-                value={stats?.activeProjectsCount || 0} 
-                icon={<Briefcase className="h-5 w-5" />} 
-                description="مشاريع قيد التنفيذ الميداني"
-                loading={loading}
-                colorClass="text-blue-700"
-            />
-            <StatCard 
-                title="قاعدة العملاء" 
-                value={stats?.totalClientsCount || 0} 
-                icon={<Users className="h-5 w-5" />} 
-                description="إجمالي الملفات المسجلة"
-                loading={loading}
-                colorClass="text-purple-700"
-            />
-        </div>
-
-        <div className="grid gap-10 lg:grid-cols-2 xl:grid-cols-3">
-            <div className="grid gap-8 xl:col-span-2">
-                <RecentActivity />
-                <UpcomingAppointments />
-            </div>
-            <div className="grid gap-8">
-                <Card className="border-none shadow-xl glass-effect rounded-[2.5rem] overflow-hidden group">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-lg font-black text-indigo-950">يوميات المواقع</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm font-bold text-indigo-950/70 mb-6 leading-relaxed">تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات في المواقع النشطة.</p>
-                        <Button asChild className="w-full h-12 rounded-2xl font-black bg-indigo-950 text-white hover:bg-black transition-all">
-                            <Link href="/dashboard/construction/field-visits" className="gap-2">فتح العرض الهندسي <ArrowUpRight className="h-4 w-4"/></Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-                <PendingVisits />
+        <div className="grid gap-8 lg:grid-cols-12 items-start">
+            {/* --- Left Column: Tasks & Pnl --- */}
+            <div className="lg:col-span-4 space-y-8">
                 <TaskPrioritization />
+                <PendingVisits />
+            </div>
+
+            {/* --- Center Column: Main Stats --- */}
+            <div className="lg:col-span-4 space-y-8">
+                <div className="grid grid-cols-1 gap-6">
+                    {/* Active Projects Stat */}
+                    <Card className="glass-effect rounded-[2.5rem] p-8 border-white/40 shadow-xl group hover-lift">
+                        <div className="flex justify-between items-start">
+                            <div className="p-3 bg-orange-100 rounded-2xl text-orange-600 shadow-inner group-hover:scale-110 transition-transform">
+                                <Briefcase className="h-6 w-6" />
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">المواقع النشطة</p>
+                                <div className="text-4xl font-black font-mono text-[#1e1b4b] mt-1">{loading ? '...' : stats?.activeProjectsCount}</div>
+                                <p className="text-[10px] text-orange-600 font-bold mt-1">مواقع تخضع للإشراف حالياً</p>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Revenue Stat */}
+                    <Card className="glass-effect rounded-[2.5rem] p-8 border-white/40 shadow-xl group hover-lift">
+                        <div className="flex justify-between items-start">
+                            <div className="p-3 bg-purple-100 rounded-2xl text-purple-600 shadow-inner group-hover:scale-110 transition-transform">
+                                <CircleDollarSign className="h-6 w-6" />
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">إجمالي التدفقات الداخلة</p>
+                                <div className="text-3xl font-black font-mono text-primary mt-1">{loading ? '...' : formatCurrency(stats?.totalRevenue || 0)}</div>
+                                <p className="text-[10px] text-muted-foreground font-bold mt-1">بناءً على القيود المرحلة</p>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Clients Stat */}
+                    <Card className="glass-effect rounded-[2.5rem] p-8 border-white/40 shadow-xl group hover-lift">
+                        <div className="flex justify-between items-start">
+                            <div className="p-3 bg-blue-100 rounded-2xl text-blue-600 shadow-inner group-hover:scale-110 transition-transform">
+                                <Users className="h-6 w-6" />
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">قاعدة بيانات العملاء</p>
+                                <div className="text-4xl font-black font-mono text-[#1e1b4b] mt-1">{loading ? '...' : stats?.totalClientsCount}</div>
+                                <p className="text-[10px] text-muted-foreground font-bold mt-1">إجمالي الملفات المسجلة</p>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Logistics CTA */}
+                    <Card className="bg-[#7209B7] text-white rounded-[2.5rem] p-8 shadow-2xl border-none group relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16 blur-3xl" />
+                        <div className="relative z-10 space-y-4">
+                            <div className="text-center space-y-1">
+                                <h4 className="text-lg font-black tracking-tight">كشف يوميات المواقع</h4>
+                                <p className="text-xs font-bold text-white/70">تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.</p>
+                            </div>
+                            <Button asChild className="w-full h-12 rounded-2xl font-black bg-white text-[#7209B7] hover:bg-white/90 shadow-xl transition-all">
+                                <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+
+            {/* --- Right Column: Activity & Appointments --- */}
+            <div className="lg:col-span-4 space-y-8">
+                <UpcomingAppointments />
+                <RecentActivity />
             </div>
         </div>
     </div>
