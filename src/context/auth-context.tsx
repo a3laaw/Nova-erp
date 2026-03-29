@@ -61,8 +61,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     }
                 }
 
-                // 2. حالة مستخدم الـ SaaS (Tenant User or Company Admin)
-                // البحث في الفهرس العالمي عن ارتباط هذا البريد بشركة معينة
+                // 2. حالة مستخدم الـ SaaS (Tenant User)
+                // 🛡️ البحث في الفهرس العالمي عن ارتباط هذا البريد بشركة معينة
                 const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', firebaseUser.email.toLowerCase())));
                 
                 if (!userIndexSnap.empty) {
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (companyDoc.exists()) {
                         const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
                         
-                        // جلب ملف المستخدم المعزول من داخل مجلد الشركة
+                        // 🛡️ جلب ملف المستخدم المعزول من داخل هيكل الشركة حصراً
                         const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
                         
                         if (tenantUserDoc.exists()) {
@@ -86,6 +86,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 currentCompanyId: companyId,
                                 companyName: companyData.name
                             });
+                        } else {
+                            // محاولة أخيرة: البحث في مجلد المستخدمين القديم (للتوافق مع البيانات القديمة إن وجدت)
+                            const legacyUserDoc = await getDoc(doc(masterFirestore, 'users', firebaseUser.uid));
+                            if (legacyUserDoc.exists()) {
+                                const userData = legacyUserDoc.data() as UserProfile;
+                                setCurrentCompany(companyData);
+                                setUser({ 
+                                    ...userData, 
+                                    uid: firebaseUser.uid, 
+                                    id: legacyUserDoc.id,
+                                    currentCompanyId: companyId,
+                                    companyName: companyData.name
+                                });
+                            }
                         }
                     }
                 }
@@ -109,20 +123,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // 🛡️ ذكاء الدخول الموحد:
-    // إذا لم يكتب المستخدم بريداً كاملاً (مثلاً كتب "ali")، نبحث عنه كـ "اسم مستخدم"
+    // 🛡️ ذكاء الدخول الموحد: البحث عن اسم المستخدم في الفهرس العالمي
     if (!email.includes('@')) {
         const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
         if (userIndexSnap.empty) {
             throw new Error('اسم المستخدم هذا غير مسجل في المنصة.');
         }
-        // استبدال اسم المستخدم بالبريد الحقيقي المسجل في Firebase Auth
         email = userIndexSnap.docs[0].data().email;
     }
 
     try {
         await signInWithEmailAndPassword(masterAuth, email, password);
-        // تعيين كوكيز الجلسة لتأمين الـ Middleware
         document.cookie = `nova-user-session=1; path=/; max-age=86400; SameSite=Lax`;
     } catch (e: any) {
         console.error("Login attempt failed:", e);
