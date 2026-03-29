@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -14,7 +15,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, getDocs, query, where, Timestamp, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -33,7 +34,9 @@ import {
   Send,
   Activity,
   CalendarClock,
-  Users
+  Users,
+  ShieldCheck,
+  CreditCard
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -91,10 +94,9 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 measurementId: company.firebaseConfig.measurementId || '',
                 subscriptionType: company.subscriptionType || 'trial',
                 maxUsersLimit: company.maxUsersLimit || 5,
-                trialEndDate: company.trialEndDate ? new Date(company.trialEndDate.seconds * 1000) : undefined,
+                trialEndDate: company.trialEndDate ? (company.trialEndDate.toDate ? company.trialEndDate.toDate() : new Date(company.trialEndDate.seconds * 1000)) : undefined,
             });
         } else {
-            // Default Demo Mode: 14 days from now
             const defaultTrialEnd = addDays(new Date(), 14);
             setFormData({
                 name: '', nameEn: '', activityType: 'general', adminEmail: '', adminPassword: '',
@@ -132,7 +134,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
       const licenseData = {
           subscriptionType: formData.subscriptionType,
-          maxUsersLimit: formData.maxUsersLimit,
+          maxUsersLimit: Number(formData.maxUsersLimit) || 0,
           trialEndDate: formData.trialEndDate ? Timestamp.fromDate(formData.trialEndDate) : null,
       };
 
@@ -199,14 +201,14 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     </div>
                     <div className="text-right">
                         <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل سيادة المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
-                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي ومفاتيح الوصول ونظام التراخيص.</DialogDescription>
+                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي ومفاتيح الوصول ونظام التراخيص المانيوال.</DialogDescription>
                     </div>
                 </div>
                 <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10"><X className="h-5 w-5"/></Button>
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white">
+          <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white scrollbar-none">
                 <section className="space-y-6">
                     <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
                         <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
@@ -256,9 +258,13 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 <Separator className="bg-slate-100" />
 
                 <section className="space-y-6">
-                    <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-orange-600 pr-4 flex items-center gap-3">
-                        <CalendarClock className="h-6 w-6 text-orange-600" /> نظام التراخيص والحصص (Licensing)
-                    </h3>
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-orange-600 pr-4 flex items-center gap-3">
+                            <CreditCard className="h-6 w-6 text-orange-600" /> نظام التراخيص المانيوال (Licensing)
+                        </h3>
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-black px-4 py-1 rounded-full uppercase tracking-widest text-[10px]">Financial Quota System</Badge>
+                    </div>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-orange-50/20 border-2 border-dashed border-orange-200 shadow-inner">
                         <div className="grid gap-2">
                             <Label className="font-black text-black text-xs pr-1 uppercase">نوع الاشتراك</Label>
@@ -267,24 +273,25 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent dir="rtl">
-                                    <SelectItem value="trial">فترة تجريبية (Demo)</SelectItem>
-                                    <SelectItem value="premium">اشتراك كامل (Premium)</SelectItem>
+                                    <SelectItem value="trial">فترة تجريبية (Demo Mode)</SelectItem>
+                                    <SelectItem value="premium">اشتراك مدفوع (Premium)</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> الحد الأقصى للمستخدمين *</Label>
-                            <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-lg" />
+                            <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> عدد المستخدمين المسموح به *</Label>
+                            <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-2xl text-center shadow-sm" />
+                            <p className="text-[10px] text-orange-700 font-black pr-1 uppercase">أدخل الرقم يدوياً حسب ما سدده العميل</p>
                         </div>
                         {formData.subscriptionType === 'trial' && (
-                            <div className="grid gap-2 md:col-span-2">
-                                <Label className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest">تاريخ انتهاء الفترة التجريبية</Label>
+                            <div className="grid gap-2 md:col-span-2 animate-in slide-in-from-top-2">
+                                <Label className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><CalendarClock className="h-3 w-3 text-orange-600"/> تاريخ انتهاء الفترة التجريبية</Label>
                                 <DateInput 
                                     value={formData.trialEndDate} 
                                     onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))}
                                     className="h-12 rounded-xl"
                                 />
-                                <p className="text-[10px] text-orange-700 font-bold pr-1">سيتم قفل لوحة تحكم العميل تلقائياً عند تجاوز هذا التاريخ.</p>
+                                <p className="text-[10px] text-orange-700 font-bold pr-1 italic">سيتم قفل لوحة التحكم للعميل آلياً بعد هذا التاريخ.</p>
                             </div>
                         )}
                     </div>
@@ -350,10 +357,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           </div>
 
           <DialogFooter className="p-8 border-t bg-slate-50 shrink-0 flex gap-4">
-            <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                {isEditing ? 'حفظ التحديثات السيادية' : 'تأسيس المنشأة وتفعيل التراخيص'}
+                {isEditing ? 'حفظ التراخيص والحصص' : 'تأسيس المنشأة وتفعيل التراخيص'}
             </Button>
           </DialogFooter>
         </form>

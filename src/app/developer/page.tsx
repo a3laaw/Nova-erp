@@ -9,7 +9,7 @@ import type { Company } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, AlertCircle, Activity, Users, Clock, Timer, CheckCircle2 } from 'lucide-react';
+import { PlusCircle, Building2, Power, PowerOff, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, AlertCircle, Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -25,10 +25,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toFirestoreDate } from '@/services/date-converter';
 import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { toFirestoreDate } from '@/services/date-converter';
 
 const activityTranslations: Record<string, string> = {
     general: 'تجاري عام',
@@ -39,7 +38,7 @@ const activityTranslations: Record<string, string> = {
 
 /**
  * @fileOverview غرفة التحكم الكبرى (Developer Console).
- * تم تحديثها لمراقبة حصص المستخدمين وفترات التجربة (Demo Mode).
+ * تم تحديثها لمراقبة حصص المستخدمين المحددة يدوياً وفترات التجربة.
  */
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
@@ -53,20 +52,15 @@ export default function DeveloperDashboard() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   const [selectedCompanyForEdit, setSelectedCompanyForEdit] = useState<Company | null>(null);
   
-  // تتبع استهلاك المستخدمين لكل شركة
   const [usersUsage, setUsersUsage] = useState<Record<string, number>>({});
 
-  // 🛡️ جلب كافة المنشآت من المجلد الرئيسي مباشرة (Sovereign Fetch)
-  const { data: rawCompanies, loading, error } = useSubscription<Company>(firestore, 'companies', []);
+  const { data: rawCompanies, loading } = useSubscription<Company>(firestore, 'companies', []);
 
-  // جلب إحصائيات المستخدمين لكل شركة (تحتاج لصلاحية مطور لقراءة الـ collectionGroup)
   useEffect(() => {
     if (!firestore || rawCompanies.length === 0) return;
     
     const fetchUsage = async () => {
         const usageMap: Record<string, number> = {};
-        // ملاحظة: في بيئة الـ Multi-Tenancy الحقيقية، قد نحتاج لتخزين هذا الرقم في وثيقة المنشأة نفسها
-        // للتسهيل هنا سنقوم بعد المستخدمين في الـ Global User Index
         const globalUsersSnap = await getDocs(collection(firestore, 'global_users'));
         globalUsersSnap.forEach(d => {
             const companyId = d.data().companyId;
@@ -160,7 +154,6 @@ export default function DeveloperDashboard() {
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية والترخيص والولوج السيادي.</CardDescription>
                         </div>
                     </div>
-                    
                     <div className="flex items-center gap-4">
                         <Badge className="bg-green-500 text-white font-black px-6 py-1.5 rounded-full border-2 border-white/20 shadow-lg animate-pulse uppercase tracking-widest">Master Node: Connected</Badge>
                     </div>
@@ -216,6 +209,7 @@ export default function DeveloperDashboard() {
                                         const isExpired = trialDate && isPast(trialDate) && company.subscriptionType === 'trial';
                                         const usedUsers = usersUsage[company.id!] || 0;
                                         const totalUsers = company.maxUsersLimit || 0;
+                                        const isQuotaFull = usedUsers >= totalUsers;
                                         
                                         return (
                                             <TableRow key={company.id} className={cn("h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all", isExpired && "bg-red-50/30")}>
@@ -257,10 +251,14 @@ export default function DeveloperDashboard() {
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     <div className="flex flex-col items-center gap-1">
-                                                        <div className="bg-white px-4 py-1.5 rounded-xl border-2 border-slate-200 font-black text-lg text-indigo-950 shadow-sm">
+                                                        <div className={cn(
+                                                            "bg-white px-6 py-2 rounded-2xl border-2 font-black text-2xl shadow-sm transition-all",
+                                                            totalUsers === 0 ? "border-red-500 text-red-600 bg-red-50" : 
+                                                            isQuotaFull ? "border-orange-400 text-orange-600" : "border-slate-200 text-indigo-950"
+                                                        )}>
                                                             {usedUsers} / {totalUsers}
                                                         </div>
-                                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Users Usage</span>
+                                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Manual User Quota</span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center">
@@ -289,7 +287,7 @@ export default function DeveloperDashboard() {
                                                             <DropdownMenuContent align="end" dir="rtl" className="rounded-[2rem] shadow-2xl p-3 bg-white border-none w-72">
                                                                 <DropdownMenuLabel className="font-black px-3 py-2 text-indigo-950">خيارات المنشأة</DropdownMenuLabel>
                                                                 <DropdownMenuItem onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }} className="gap-3 rounded-xl py-4 px-4 font-black text-base cursor-pointer hover:bg-indigo-50">
-                                                                    <Pencil className="h-5 w-5 text-indigo-600" /> تعديل التراخيص والربط
+                                                                    <Pencil className="h-5 w-5 text-indigo-600" /> تعديل التراخيص والحصص
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem onClick={() => handleToggleActive(company)} disabled={isProcessing === company.id} className={cn("gap-3 rounded-xl py-4 px-4 font-black text-base cursor-pointer", company.isActive ? "text-red-600 hover:bg-red-50" : "text-green-600 hover:bg-green-50")}>

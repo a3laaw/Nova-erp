@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck, Loader2, AlertCircle, Sparkles } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck, Loader2, AlertCircle, Sparkles, Key } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,7 +87,6 @@ export function UsersTable() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
-    // ✨ محرك تحديد المسار السيادي ✨
     const basePrefix = useMemo(() => {
         const tenantId = currentUser?.currentCompanyId;
         return tenantId ? `companies/${tenantId}/` : '';
@@ -148,7 +147,6 @@ export function UsersTable() {
         );
     }, [users, searchQuery]);
 
-    // 🛡️ فحص الحصة المتبقية للمستخدمين
     const quotaInfo = useMemo(() => {
         const totalLimit = currentCompany?.maxUsersLimit || 0;
         const usedCount = users.length;
@@ -163,12 +161,11 @@ export function UsersTable() {
     const handleSaveUser = async (userData: Partial<UserProfile>) => {
         if (!firestore || !currentUser) return;
         
-        // منع الإضافة إذا تم تجاوز الحصة (إلا إذا كان تعديلاً للمستخدم الحالي)
         if (!selectedUser && quotaInfo.isFull) {
             toast({ 
                 variant: 'destructive', 
-                title: 'تجاوزت الحد المسموح', 
-                description: `لقد استهلكت كامل حصة المستخدمين (${quotaInfo.totalLimit}). يرجى ترقية الباقة لإضافة مستخدمين جدد.` 
+                title: 'تم استنفاد حصة التراخيص', 
+                description: `لقد استهلكت كامل عدد المستخدمين المسموح به (${quotaInfo.totalLimit}). يرجى شراء تراخيص إضافية من الإدارة.` 
             });
             return;
         }
@@ -253,28 +250,34 @@ export function UsersTable() {
             </div>
 
             <div className="flex items-center gap-4 bg-white/50 p-2 rounded-2xl border shadow-inner">
-                <div className="px-4 py-1 border-l border-slate-200 text-center">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase">حصص المستخدمين</p>
-                    <p className={cn("text-lg font-black font-mono", quotaInfo.isFull ? "text-red-600" : "text-primary")}>
-                        {quotaInfo.usedCount} / {quotaInfo.totalLimit}
-                    </p>
+                <div className="px-6 py-1 border-l border-slate-200 text-center">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">تراخيص المستخدمين</p>
+                    <div className="flex items-center justify-center gap-2">
+                        <span className={cn("text-2xl font-black font-mono", quotaInfo.isFull ? "text-red-600" : "text-primary")}>
+                            {quotaInfo.usedCount}
+                        </span>
+                        <span className="text-muted-foreground font-black text-xl">/</span>
+                        <span className="text-slate-400 font-black text-2xl font-mono">
+                            {quotaInfo.totalLimit}
+                        </span>
+                    </div>
                 </div>
                 <Button 
                     onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} 
                     disabled={quotaInfo.isFull}
-                    className="h-10 rounded-xl font-black gap-2 shadow-lg"
+                    className="h-12 rounded-xl font-black gap-2 shadow-lg"
                 >
-                    <PlusCircle className="h-4 w-4" /> إضافة مستخدم
+                    <PlusCircle className="h-5 w-5" /> إضافة مستخدم جديد
                 </Button>
             </div>
         </div>
 
         {quotaInfo.isFull && (
-            <Alert variant="destructive" className="rounded-2xl border-2 animate-pulse">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle className="font-black">تنبيه: تم استنفاد حصة المستخدمين</AlertTitle>
-                <AlertDescription className="font-bold">
-                    لقد وصلت للحد الأقصى المسموح به في باقتك الحالية ({quotaInfo.totalLimit} مستخدم). يرجى التواصل مع الدعم لترقية الحساب.
+            <Alert variant="destructive" className="rounded-2xl border-2 shadow-xl bg-red-50/50">
+                <AlertCircle className="h-5 w-5" />
+                <AlertTitle className="font-black text-lg">تنبيه رقابي: حصة التراخيص مكتملة</AlertTitle>
+                <AlertDescription className="font-bold text-base mt-1">
+                    لقد استهلكت كامل حصة التراخيص المشتراة ({quotaInfo.totalLimit} مستخدم). يرجى التواصل مع الإدارة لشراء مقاعد إضافية لتتمكن من إضافة موظفين جدد.
                 </AlertDescription>
             </Alert>
         )}
