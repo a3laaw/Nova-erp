@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import type { UserProfile, GlobalUserIndex, AuthenticatedUser, Company } from '@/lib/types';
 import { useCompany } from './company-context';
 
@@ -24,19 +24,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const isInitialized = useRef(false);
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
-  // 🛡️ صمام الأمان النووي: يمنع التعليق للأبد ويضمن إطلاق الواجهة
+  // 🛡️ صمام الأمان السيادي: يمنع التعليق للأبد ويضمن إطلاق الواجهة تحت أي ظرف
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const safetyTimer = setTimeout(() => {
       if (loading) {
-        console.warn("🛡️ Auth Shield: Safety timeout reached. Releasing UI.");
+        console.warn("🛡️ Auth Shield: Safety timeout reached. Releasing UI state.");
         setLoading(false);
       }
-    }, 6000);
-    return () => clearTimeout(timer);
+    }, 5000);
+    return () => clearTimeout(safetyTimer);
   }, [loading]);
+
+  // دالة ضبط الكوكيز السيادية لخدمة الـ Middleware
+  const setSovereignCookies = (email: string) => {
+    const expiry = 86400; // 24 hours
+    const cookieName = email === MASTER_DEV_EMAIL ? 'nova-dev-session' : 'nova-user-session';
+    document.cookie = `${cookieName}=1; path=/; max-age=${expiry}; SameSite=Lax`;
+  };
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -53,14 +59,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-        const claims = idTokenResult.claims as any;
-
+        const userEmail = firebaseUser.email?.toLowerCase();
+        
         // 1. معالجة حالة المطور السيادي (Master Developer)
-        if (firebaseUser.email === MASTER_DEV_EMAIL) {
+        if (userEmail === MASTER_DEV_EMAIL) {
+          setSovereignCookies(userEmail);
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
           
-          const activeCompanyId = claims.currentCompanyId || null;
           const devData: AuthenticatedUser = {
             id: firebaseUser.uid,
             uid: firebaseUser.uid,
@@ -70,48 +75,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isActive: true,
             fullName: devDoc.exists() ? devDoc.data().fullName : 'Master Developer',
             isSuperAdmin: true,
-            currentCompanyId: activeCompanyId,
-            companyName: claims.companyName || null
           };
 
           setUser(devData);
-          
-          if (activeCompanyId) {
-            const companyDoc = await getDoc(doc(masterFirestore, 'companies', activeCompanyId));
-            if (companyDoc.exists()) {
-              setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
-            }
-          }
           setLoading(false);
           return;
         }
 
         // 2. معالجة مستخدم المنشأة (SaaS Tenant User)
-        const userEmail = firebaseUser.email?.toLowerCase();
         if (userEmail) {
-          // البحث السريع في الفهرس العالمي
-          const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('email', '==', userEmail)));
+          setSovereignCookies(userEmail);
+          
+          // البحث السريع في الفهرس العالمي (Global Index Lookup)
+          const userIndexSnap = await getDocs(query(
+            collection(masterFirestore, 'global_users'), 
+            where('email', '==', userEmail),
+            limit(1)
+          ));
           
           if (!userIndexSnap.empty) {
             const userIndex = userIndexSnap.docs[0].data() as GlobalUserIndex;
             const companyId = userIndex.companyId;
             
-            const [companyDoc, tenantUserDoc] = await Promise.all([
-              getDoc(doc(masterFirestore, 'companies', companyId)),
-              getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
-            ]);
+            // جلب ملف المستخدم من المجلد المعزول
+            const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
 
-            if (companyDoc.exists() && tenantUserDoc.exists()) {
-              const companyData = { id: companyDoc.id, ...companyDoc.data() } as Company;
+            if (tenantUserDoc.exists()) {
               const userData = tenantUserDoc.data() as UserProfile;
               
-              setCurrentCompany(companyData);
               setUser({ 
                 ...userData, 
                 uid: firebaseUser.uid, 
                 id: tenantUserDoc.id,
                 currentCompanyId: companyId,
-                companyName: companyData.name
+                companyName: userIndex.companyId // Fallback
+              });
+
+              // جلب بيانات الشركة لتغذية السياق
+              getDoc(doc(masterFirestore, 'companies', companyId)).then(companyDoc => {
+                if (companyDoc.exists()) {
+                  setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                }
               });
             }
           }
@@ -119,8 +123,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error("Critical Auth Sync Error:", error);
       } finally {
+        // نضمن دائماً إنهاء حالة التحميل
         setLoading(false);
-        isInitialized.current = true;
       }
     });
 
@@ -132,24 +136,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // دعم الدخول باسم المستخدم (Username)
+    // دعم الدخول باسم المستخدم المباشر (Direct SaaS Username Support)
     if (!email.includes('@')) {
-      const userIndexSnap = await getDocs(query(collection(masterFirestore, 'global_users'), where('username', '==', email)));
-      if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل في المنصة.');
+      const userIndexSnap = await getDocs(query(
+        collection(masterFirestore, 'global_users'), 
+        where('username', '==', email),
+        limit(1)
+      ));
+      if (userIndexSnap.empty) throw new Error('اسم المستخدم هذا غير مسجل في أي منشأة.');
       email = userIndexSnap.docs[0].data().email;
     }
 
     try {
+      // 🛡️ زرع الكوكيز بشكل استباقي لمنع طرد الـ Middleware
+      setSovereignCookies(email);
+      
       await signInWithEmailAndPassword(masterAuth, email, password);
-      // ضبط الكوكيز السيادية لخدمة الـ Middleware والتوجيه
-      const sessionExpiry = 86400; // 24 hours
-      if (email === MASTER_DEV_EMAIL) {
-          document.cookie = `nova-dev-session=1; path=/; max-age=${sessionExpiry}; SameSite=Lax`;
-      } else {
-          document.cookie = `nova-user-session=1; path=/; max-age=${sessionExpiry}; SameSite=Lax`;
-      }
     } catch (e: any) {
       console.error("Login attempt failed:", e);
+      // تنظيف الكوكيز في حال فشل الدخول
+      document.cookie = 'nova-dev-session=; max-age=0; path=/';
+      document.cookie = 'nova-user-session=; max-age=0; path=/';
+      
       if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
           throw new Error('بيانات الدخول غير صحيحة. يرجى التأكد من اسم المستخدم وكلمة المرور.');
       }
@@ -161,7 +169,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
         if (masterAuth) await signOut(masterAuth);
-        // تنظيف الكوكيز
         document.cookie = 'nova-dev-session=; max-age=0; path=/';
         document.cookie = 'nova-user-session=; max-age=0; path=/';
         setUser(null);
