@@ -5,8 +5,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp } from 'firebase/firestore';
-import type { Company, CompanyRequest } from '@/lib/types';
+import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp, deleteField } from 'firebase/firestore';
+import type { Company, CompanyRequest, UserProfile, GlobalUserIndex } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
     MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
     Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert, 
-    FileStack, Rocket, XCircle, Key, Copy 
+    FileStack, Rocket, XCircle, Key, Copy, RefreshCw 
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -58,13 +58,10 @@ export default function DeveloperDashboard() {
   const { data: rawCompanies, loading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
-  // محرك رصد استهلاك التراخيص (License Usage Radar)
   useEffect(() => {
     if (!firestore || rawCompanies.length === 0) return;
-    
     const fetchUsage = async () => {
         const usageMap: Record<string, number> = {};
-        // استعلام سيادي لفحص عدد المستخدمين في كل منشأة عبر الفهرس العالمي
         const globalUsersSnap = await getDocs(collection(firestore, 'global_users'));
         globalUsersSnap.forEach(d => {
             const companyId = d.data().companyId;
@@ -77,30 +74,22 @@ export default function DeveloperDashboard() {
 
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
-    
     let processed = [...rawCompanies].sort((a, b) => {
         const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
         const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
         return timeB - timeA;
     });
-
     if (searchQuery) {
         const lower = searchQuery.toLowerCase();
-        processed = processed.filter(c => 
-            c.name.toLowerCase().includes(lower) || 
-            c.adminEmail?.toLowerCase().includes(lower)
-        );
+        processed = processed.filter(c => c.name.toLowerCase().includes(lower) || c.adminEmail?.toLowerCase().includes(lower));
     }
-    
     return processed;
   }, [rawCompanies, searchQuery]);
 
   const handleApproveRequest = async (request: CompanyRequest) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
-    
     try {
-        // 🛡️ 1. إنشاء الحساب في خادم الأمان (Firebase Auth) أولاً
         const authResponse = await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({
@@ -118,8 +107,6 @@ export default function DeveloperDashboard() {
 
         await runTransaction(firestore, async (transaction) => {
             const companyRef = doc(firestore, 'companies', companyId);
-            
-            // 2. تأسيس المنشأة الرئيسية
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity,
@@ -127,7 +114,7 @@ export default function DeveloperDashboard() {
                 adminPassword: request.adminPassword,
                 subscriptionType: 'trial',
                 trialEndDate: Timestamp.fromDate(trialEndDate),
-                maxUsersLimit: 5, // حصة تجريبية افتراضية
+                maxUsersLimit: 5,
                 isActive: true,
                 firebaseConfig: {
                     apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
@@ -139,7 +126,6 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            // 🛡️ 3. التأسيس الهيكلي: إنشاء الموظف/المدير الأول داخل مجلد الشركة حصراً
             const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
             transaction.set(tenantUserRef, {
                 uid: authResult.uid,
@@ -152,7 +138,6 @@ export default function DeveloperDashboard() {
                 createdAt: serverTimestamp()
             });
 
-            // 4. تحديث الفهرس العالمي للتوجيه السريع عند الدخول
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: request.email.toLowerCase().trim(),
@@ -160,17 +145,44 @@ export default function DeveloperDashboard() {
                 companyId: companyId,
                 role: 'Admin'
             });
-
-            // 5. إغلاق الطلب
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
-
-        toast({ title: 'تم التفعيل الهيكلي', description: `تم تأسيس منشأة "${request.companyName}" وحفظ حساب المالك داخل هيكلها المعزول بنجاح.` });
+        toast({ title: 'تم التفعيل', description: `تم تأسيس منشأة "${request.companyName}" بنجاح.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
-    } finally {
-        setIsProcessing(null);
-    }
+    } finally { setIsProcessing(null); }
+  };
+
+  const handleRepairAuth = async (company: Company) => {
+    if (!firestore || isProcessing) return;
+    setIsProcessing(company.id!);
+    try {
+        const response = await fetch('/api/manage-tenant-user', {
+            method: 'POST',
+            body: JSON.stringify({
+                email: company.adminEmail,
+                password: company.adminPassword || 'Sovereign@2026',
+                displayName: company.name,
+                action: 'repair'
+            })
+        });
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
+
+        const globalIndexQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail.toLowerCase()));
+        const snap = await getDocs(globalIndexQuery);
+        if (snap.empty) {
+            await addDoc(collection(firestore, 'global_users'), {
+                email: company.adminEmail.toLowerCase().trim(),
+                username: company.adminEmail.split('@')[0],
+                companyId: company.id,
+                role: 'Admin'
+            });
+        }
+        toast({ title: 'تم ترميم الحساب', description: 'تمت مزامنة بيانات الدخول والفهرس العالمي بنجاح.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل الترميم', description: e.message });
+    } finally { setIsProcessing(null); }
   };
 
   const handleSwitchToCompany = async (company: Company) => {
@@ -180,33 +192,21 @@ export default function DeveloperDashboard() {
         const response = await fetch('/api/switch-company', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                uid: currentUser.id,
-                companyId: company.id,
-                companyName: company.name
-            })
+            body: JSON.stringify({ uid: currentUser.id, companyId: company.id, companyName: company.name })
         });
-
         const result = await response.json();
         if (!result.success) throw new Error(result.error);
-
-        // تحديث التوكين السيادي لتبديل الجلسة فوراً
-        if (clientAuth?.currentUser) {
-            await clientAuth.currentUser.getIdToken(true);
-        }
-
-        toast({ title: 'نجاح التقمص الإداري', description: `تم تحويل الجلسة إلى منشأة ${company.name} بنجاح.` });
+        if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
+        toast({ title: 'تم التقمص', description: `أنت الآن تتحكم بمنشأة ${company.name}.` });
         router.push('/dashboard');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التبديل', description: e.message });
-    } finally {
-        setIsProcessing(null);
-    }
+    } finally { setIsProcessing(null); }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: 'تم النسخ', description: 'تم نسخ بيانات الدخول للعهدة.' });
+    toast({ title: 'تم النسخ' });
   };
 
   return (
@@ -215,9 +215,7 @@ export default function DeveloperDashboard() {
             <CardHeader className="p-10 pb-8 bg-indigo-950/60 border-b border-white/10">
                 <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-6">
-                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20">
-                            <Terminal className="h-10 w-10 text-white" />
-                        </div>
+                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الكبرى</CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة البنية التحتية، مراجعة طلبات الانضمام، ومزامنة التراخيص السحابية.</CardDescription>
@@ -230,16 +228,10 @@ export default function DeveloperDashboard() {
 
         <Tabs defaultValue="companies" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 backdrop-blur-xl h-16 w-fit mx-auto flex gap-4">
-                <TabsTrigger value="companies" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-                    <Building2 className="h-5 w-5"/> المنشآت النشطة
-                </TabsTrigger>
+                <TabsTrigger value="companies" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white"><Building2 className="h-5 w-5"/> المنشآت النشطة</TabsTrigger>
                 <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white relative">
                     <FileStack className="h-5 w-5"/> طلبات الانضمام
-                    {requests.filter(r => r.status === 'pending').length > 0 && (
-                        <span className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-black animate-bounce shadow-lg">
-                            {requests.filter(r => r.status === 'pending').length}
-                        </span>
-                    )}
+                    {requests.filter(r => r.status === 'pending').length > 0 && <span className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-black animate-bounce shadow-lg">{requests.filter(r => r.status === 'pending').length}</span>}
                 </TabsTrigger>
             </TabsList>
 
@@ -249,16 +241,9 @@ export default function DeveloperDashboard() {
                         <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                             <div className="relative w-full max-w-xl">
                                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-indigo-600" />
-                                <Input 
-                                    placeholder="بحث سيادي في قائمة المنشآت..." 
-                                    value={searchQuery} 
-                                    onChange={e => setSearchQuery(e.target.value)} 
-                                    className="pl-14 h-14 rounded-3xl border-2 border-slate-200 text-black font-black text-xl shadow-inner focus:ring-4 focus:ring-indigo-100 transition-all"
-                                />
+                                <Input placeholder="بحث سيادي في قائمة المنشآت..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-14 h-14 rounded-3xl border-2 border-slate-200 text-black font-black text-xl shadow-inner focus:ring-4 focus:ring-indigo-100 transition-all" />
                             </div>
-                            <Button onClick={() => { setSelectedCompanyForEdit(null); setIsRegistrationOpen(true); }} className="h-14 px-12 rounded-[2rem] font-black text-xl gap-3 bg-[#1e1b4b] text-white hover:bg-black shadow-2xl transition-all">
-                                <PlusCircle className="h-6 w-6" /> إضافة وتأسيس منشأة
-                            </Button>
+                            <Button onClick={() => { setSelectedCompanyForEdit(null); setIsRegistrationOpen(true); }} className="h-14 px-12 rounded-[2rem] font-black text-xl gap-3 bg-[#1e1b4b] text-white hover:bg-black shadow-2xl transition-all"><PlusCircle className="h-6 w-6" /> إضافة وتأسيس منشأة</Button>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -285,9 +270,7 @@ export default function DeveloperDashboard() {
                                             <TableRow key={company.id} className={cn("h-36 hover:bg-indigo-50/50 border-slate-100 group transition-all", isExpired && "bg-red-50/30")}>
                                                 <TableCell className="px-12">
                                                     <div className="flex items-center gap-6">
-                                                        <div className="p-4 bg-indigo-100 rounded-3xl border-2 border-indigo-200 group-hover:bg-[#1e1b4b] transition-all">
-                                                            <Building2 className="h-10 w-10 text-indigo-600 group-hover:text-white" />
-                                                        </div>
+                                                        <div className="p-4 bg-indigo-100 rounded-3xl border-2 border-indigo-200 group-hover:bg-[#1e1b4b] transition-all"><Building2 className="h-10 w-10 text-indigo-600 group-hover:text-white" /></div>
                                                         <div className="flex flex-col">
                                                             <span className="font-black text-black text-2xl tracking-tight">{company.name}</span>
                                                             <div className="flex flex-col gap-1 mt-2">
@@ -296,9 +279,7 @@ export default function DeveloperDashboard() {
                                                                     <span className="text-[10px] font-black text-indigo-900">{company.adminEmail}</span>
                                                                     <Separator orientation="vertical" className="h-3 bg-indigo-200" />
                                                                     <span className="text-[10px] font-black text-indigo-600 font-mono">{company.adminPassword || '****'}</span>
-                                                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-indigo-100" onClick={() => copyToClipboard(`Email: ${company.adminEmail}\nPassword: ${company.adminPassword}`)}>
-                                                                        <Copy className="h-3 w-3" />
-                                                                    </Button>
+                                                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-indigo-100" onClick={() => copyToClipboard(`Email: ${company.adminEmail}\nPassword: ${company.adminPassword}`)}><Copy className="h-3 w-3" /></Button>
                                                                 </div>
                                                                 <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-[9px] w-fit">{activityTranslations[company.activityType || 'general']}</Badge>
                                                             </div>
@@ -306,9 +287,7 @@ export default function DeveloperDashboard() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    <Badge className={cn("px-4 py-1 rounded-full font-black text-[9px] tracking-widest", company.subscriptionType === 'trial' ? (isExpired ? "bg-red-600" : "bg-orange-500") : "bg-indigo-600")}>
-                                                        {company.subscriptionType === 'trial' ? `DEMO (${isExpired ? 'EXPIRED' : 'ACTIVE'})` : 'PREMIUM'}
-                                                    </Badge>
+                                                    <Badge className={cn("px-4 py-1 rounded-full font-black text-[9px] tracking-widest", company.subscriptionType === 'trial' ? (isExpired ? "bg-red-600" : "bg-orange-500") : "bg-indigo-600")}>{company.subscriptionType === 'trial' ? `DEMO (${isExpired ? 'EXPIRED' : 'ACTIVE'})` : 'PREMIUM'}</Badge>
                                                     {trialDate && <p className="text-[10px] font-bold mt-1 text-muted-foreground">ينتهي: {format(trialDate, 'dd/MM/yyyy')}</p>}
                                                 </TableCell>
                                                 <TableCell className="text-center">
@@ -316,17 +295,21 @@ export default function DeveloperDashboard() {
                                                     <span className="text-[9px] font-black text-muted-foreground uppercase">Users Quota</span>
                                                 </TableCell>
                                                 <TableCell className="text-center">
-                                                    <Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive && !isExpired ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200')}>
-                                                        {company.isActive && !isExpired ? 'ACTIVE' : 'LOCKED'}
-                                                    </Badge>
+                                                    <Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive && !isExpired ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200')}>{company.isActive && !isExpired ? 'ACTIVE' : 'LOCKED'}</Badge>
                                                 </TableCell>
                                                 <TableCell className="text-left px-12">
                                                     <div className="flex justify-end gap-4 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <Button onClick={() => handleSwitchToCompany(company)} disabled={isProcessing === company.id} className="rounded-2xl font-black gap-3 bg-indigo-600 text-white hover:bg-indigo-700 h-12 shadow-xl border-b-4 border-indigo-900">
-                                                            {isProcessing === company.id ? <Loader2 className="h-5 w-5 animate-spin"/> : <ArrowRightLeft className="h-5 w-5" />}
-                                                            التحكم السيادي
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl bg-white border-2 shadow-md" onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }}><Pencil className="h-6 w-6" /></Button>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="outline" className="rounded-2xl font-black h-12 gap-2 border-indigo-200">التحكم <MoreHorizontal className="h-4 w-4"/></Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl">
+                                                                <DropdownMenuItem onClick={() => handleSwitchToCompany(company)} className="gap-2 py-3 font-bold text-indigo-600"><ArrowRightLeft className="h-4 w-4"/> التقمص السيادي</DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleRepairAuth(company)} className="gap-2 py-3 font-bold text-green-600"><RefreshCw className="h-4 w-4"/> مزامنة وإصلاح الدخول</DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }} className="gap-2 py-3 font-bold"><Pencil className="h-4 w-4"/> تعديل البيانات</DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -339,64 +322,7 @@ export default function DeveloperDashboard() {
                 </Card>
             </TabsContent>
 
-            <TabsContent value="requests">
-                <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
-                    <Table>
-                        <TableHeader className="bg-[#1e1b4b] h-16">
-                            <TableRow className="border-none">
-                                <TableHead className="px-12 font-black text-white text-base text-right">الطلب والمنشأة</TableHead>
-                                <TableHead className="font-black text-indigo-100 text-base text-center">التاريخ</TableHead>
-                                <TableHead className="font-black text-indigo-100 text-base text-center">البيانات</TableHead>
-                                <TableHead className="text-left px-12 font-black text-indigo-100 text-base">القرار</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {requestsLoading ? (
-                                <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>
-                            ) : requests.length === 0 ? (
-                                <TableRow><TableCell colSpan={4} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Pending Requests</TableCell></TableRow>
-                            ) : (
-                                requests.map(req => (
-                                    <TableRow key={req.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all">
-                                        <TableCell className="px-12">
-                                            <div className="flex items-center gap-6">
-                                                <div className="p-4 bg-orange-100 rounded-3xl text-orange-600">
-                                                    <Rocket className="h-8 w-8" />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-black text-black text-2xl tracking-tight">{req.companyName}</span>
-                                                    <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center font-bold text-muted-foreground">
-                                            {req.createdAt ? format(toFirestoreDate(req.createdAt)!, 'dd/MM/yyyy', { locale: ar }) : '-'}
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <p className="font-black text-indigo-900">{req.contactName}</p>
-                                            <p className="text-xs font-mono">{req.email}</p>
-                                            <div className="flex items-center justify-center gap-2 mt-1">
-                                                <Badge variant="secondary" className="font-mono text-[9px]">{req.adminPassword}</Badge>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-left px-12">
-                                            <div className="flex justify-end gap-3">
-                                                {req.status === 'pending' ? (
-                                                    <Button onClick={() => handleApproveRequest(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-xl shadow-green-100 border-b-4 border-green-900">
-                                                        {isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} اعتماد وتفعيل هيكل المجلدات
-                                                    </Button>
-                                                ) : (
-                                                    <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full border-2 border-green-200">STRUCTURE ESTABLISHED</Badge>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </Card>
-            </TabsContent>
+            <TabsContent value="requests"><Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95"><Table><TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-base text-right">الطلب والمنشأة</TableHead><TableHead className="font-black text-indigo-100 text-base text-center">التاريخ</TableHead><TableHead className="font-black text-indigo-100 text-base text-center">البيانات</TableHead><TableHead className="text-left px-12 font-black text-indigo-100 text-base">القرار</TableHead></TableRow></TableHeader><TableBody>{requestsLoading ? (<TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>) : requests.length === 0 ? (<TableRow><TableCell colSpan={4} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Pending Requests</TableCell></TableRow>) : (requests.map(req => (<TableRow key={req.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all"><TableCell className="px-12"><div className="flex items-center gap-6"><div className="p-4 bg-orange-100 rounded-3xl text-orange-600"><Rocket className="h-8 w-8" /></div><div className="flex flex-col"><span className="font-black text-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></div></TableCell><TableCell className="text-center font-bold text-muted-foreground">{req.createdAt ? format(toFirestoreDate(req.createdAt)!, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell><TableCell className="text-center"><p className="font-black text-indigo-900">{req.contactName}</p><p className="text-xs font-mono">{req.email}</p><div className="flex items-center justify-center gap-2 mt-1"><Badge variant="secondary" className="font-mono text-[9px]">{req.adminPassword}</Badge></div></TableCell><TableCell className="text-left px-12"><div className="flex justify-end gap-3">{req.status === 'pending' ? (<Button onClick={() => handleApproveRequest(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-xl shadow-green-100 border-b-4 border-green-900">{isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} اعتماد وتفعيل باقة Demo</Button>) : (<Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full border-2 border-green-200">STRUCTURE ESTABLISHED</Badge>)}</div></TableCell></TableRow>)))}</TableBody></Table></Card></TabsContent>
         </Tabs>
 
         <CompanyRegistrationForm isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} company={selectedCompanyForEdit} />
