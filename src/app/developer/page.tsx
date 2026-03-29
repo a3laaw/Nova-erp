@@ -10,7 +10,13 @@ import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PlusCircle, Building2, Search, Loader2, Terminal, Pencil, MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert, FileStack, Rocket, XCircle, Key, Copy } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { 
+    PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
+    MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
+    Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert, 
+    FileStack, Rocket, XCircle, Key, Copy 
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
@@ -41,7 +47,7 @@ export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const { setCurrentCompany } = useCompany();
+  const router = useRouter();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
@@ -102,7 +108,7 @@ export default function DeveloperDashboard() {
                 name: request.companyName,
                 activityType: request.activity,
                 adminEmail: request.email.toLowerCase().trim(),
-                adminPassword: request.adminPassword, // 🛡️ حفظ كلمة المرور للـ Demo
+                adminPassword: request.adminPassword,
                 subscriptionType: 'trial',
                 trialEndDate: Timestamp.fromDate(trialEndDate),
                 maxUsersLimit: 5,
@@ -130,6 +136,43 @@ export default function DeveloperDashboard() {
         toast({ title: 'تم الاعتماد', description: `تم تأسيس منشأة "${request.companyName}" بنجاح.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
+    } finally {
+        setIsProcessing(null);
+    }
+  };
+
+  /**
+   * دالة التقمص السيادي (Impersonation):
+   * تسمح للمطور بالدخول بصفة مدير المنشأة لمعاينة البيانات.
+   */
+  const handleSwitchToCompany = async (company: Company) => {
+    if (!firestore || !currentUser || isProcessing) return;
+    setIsProcessing(company.id!);
+    try {
+        const response = await fetch('/api/switch-company', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                uid: currentUser.id,
+                companyId: company.id,
+                companyName: company.name
+            })
+        });
+
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
+
+        // تحديث التوكين فورياً لتطبيق المطالبات المخصصة (Custom Claims)
+        if (clientAuth?.currentUser) {
+            await clientAuth.currentUser.getIdToken(true);
+        }
+
+        toast({ title: 'نجاح التقمص', description: `تم تحويل الجلسة إلى منشأة ${company.name} بنجاح.` });
+        
+        // التوجه للوحة تحكم الشركة
+        router.push('/dashboard');
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل التبديل', description: e.message });
     } finally {
         setIsProcessing(null);
     }
@@ -253,8 +296,9 @@ export default function DeveloperDashboard() {
                                                 </TableCell>
                                                 <TableCell className="text-left px-12">
                                                     <div className="flex justify-end gap-4 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <Button onClick={() => handleSwitchToCompany(company)} className="rounded-2xl font-black gap-3 bg-indigo-600 text-white hover:bg-indigo-700 h-12 shadow-xl border-b-4 border-indigo-900">
-                                                            <ArrowRightLeft className="h-5 w-5" /> التحكم السيادي
+                                                        <Button onClick={() => handleSwitchToCompany(company)} disabled={isProcessing === company.id} className="rounded-2xl font-black gap-3 bg-indigo-600 text-white hover:bg-indigo-700 h-12 shadow-xl border-b-4 border-indigo-900">
+                                                            {isProcessing === company.id ? <Loader2 className="h-5 w-5 animate-spin"/> : <ArrowRightLeft className="h-5 w-5" />}
+                                                            التحكم السيادي
                                                         </Button>
                                                         <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl bg-white border-2 shadow-md" onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }}><Pencil className="h-6 w-6" /></Button>
                                                     </div>
