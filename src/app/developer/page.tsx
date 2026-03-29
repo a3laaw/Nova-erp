@@ -257,7 +257,10 @@ export default function DeveloperDashboard() {
                                                         </div>
                                                         <div className="flex flex-col">
                                                             <span className="font-black text-black text-2xl tracking-tight">{company.name}</span>
-                                                            <span className="text-[10px] text-indigo-600 font-black uppercase opacity-60">{company.adminEmail}</span>
+                                                            <div className="flex gap-2 mt-1">
+                                                              <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-[9px]">{activityTranslations[company.activityType || 'general']}</Badge>
+                                                              <span className="text-[10px] text-indigo-600 font-black uppercase opacity-60">{company.adminEmail}</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </TableCell>

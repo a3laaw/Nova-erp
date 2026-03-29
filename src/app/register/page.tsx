@@ -45,9 +45,9 @@ export default function RegisterPage() {
     companyName: '',
     activity: 'consulting',
     contactName: '',
-    email: '',
+    email: '', // تم التصفير لضمان الأمان
     phone: '',
-    adminPassword: '',
+    adminPassword: '', // تم التصفير لضمان الأمان
     message: ''
   });
 
