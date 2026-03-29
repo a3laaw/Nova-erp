@@ -22,7 +22,8 @@ import {
     Sparkles,
     Calendar,
     ChevronLeft,
-    ShieldCheck
+    ShieldCheck,
+    Banknote
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -60,7 +61,7 @@ export default function DashboardPage() {
                                 <BellRing className="h-4 w-4" /> سجل التنبيهات
                             </Link>
                         </Button>
-                        <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-[#7209B7] text-white shadow-[0_0_30px_rgba(114,9,183,0.4)] hover:scale-105 transition-transform">
+                        <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-[#7209B7] text-white shadow-[0_0_30px_rgba(114,9,183,0.4)] hover:scale-105 transition-transform border-none">
                             <Link href="/dashboard/clients/new" className="flex items-center gap-2">
                                 <PlusCircle className="h-5 w-5" /> إضافة عميل جديد
                             </Link>
@@ -70,7 +71,7 @@ export default function DashboardPage() {
                     <div className="text-center lg:text-right order-1 lg:order-2 space-y-2">
                         <div className="flex items-center justify-center lg:justify-end gap-4 mb-2">
                             <h1 className="text-4xl font-black text-white tracking-tighter">لوحة التحكم المركزية</h1>
-                            <div className="p-2.5 bg-primary/20 rounded-2xl neon-glow-blue">
+                            <div className="p-2.5 bg-primary/20 rounded-2xl neon-glow-blue border-none">
                                 <LayoutGrid className="text-primary h-8 w-8" />
                             </div>
                         </div>
@@ -95,7 +96,7 @@ export default function DashboardPage() {
             <div className="lg:col-span-4 space-y-8">
                 <div className="grid grid-cols-1 gap-6">
                     {/* Active Projects - Blue Glow */}
-                    <Card className="glass-effect neon-glow-blue rounded-[2.5rem] p-8 group hover-lift">
+                    <Card className="glass-effect neon-glow-blue rounded-[2.5rem] p-8 group hover-lift border-none">
                         <div className="flex justify-between items-start">
                             <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner group-hover:scale-110 transition-transform">
                                 <Briefcase className="h-6 w-6" />
@@ -109,21 +110,21 @@ export default function DashboardPage() {
                     </Card>
 
                     {/* Revenue - Purple Glow */}
-                    <Card className="glass-effect neon-glow-purple rounded-[2.5rem] p-8 group hover-lift">
+                    <Card className="glass-effect neon-glow-purple rounded-[2.5rem] p-8 group hover-lift border-none">
                         <div className="flex justify-between items-start">
-                            <div className="p-3 bg-secondary/20 rounded-2xl text-secondary shadow-inner group-hover:scale-110 transition-transform">
+                            <div className="p-3 bg-[#7209B7]/20 rounded-2xl text-[#d8b4fe] shadow-inner group-hover:scale-110 transition-transform">
                                 <CircleDollarSign className="h-6 w-6" />
                             </div>
                             <div className="text-right">
                                 <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">التدفقات النقدية</p>
                                 <div className="text-3xl font-black font-mono ice-blue-text mt-1">{loading ? '...' : formatCurrency(stats?.totalRevenue || 0)}</div>
-                                <p className="text-[10px] pale-purple-text font-bold mt-1">بناءً على القيود المرحلة</p>
+                                <p className="text-[10px] text-purple-300/60 font-bold mt-1">بناءً على القيود المرحلة</p>
                             </div>
                         </div>
                     </Card>
 
                     {/* Clients - Blue Glow */}
-                    <Card className="glass-effect neon-glow-blue rounded-[2.5rem] p-8 group hover-lift">
+                    <Card className="glass-effect neon-glow-blue rounded-[2.5rem] p-8 group hover-lift border-none">
                         <div className="flex justify-between items-start">
                             <div className="p-3 bg-primary/20 rounded-2xl text-primary shadow-inner group-hover:scale-110 transition-transform">
                                 <Users className="h-6 w-6" />
@@ -144,10 +145,13 @@ export default function DashboardPage() {
                                 <h4 className="text-lg font-black tracking-tight flex items-center justify-center gap-2">
                                     <ShieldCheck className="h-4 w-4 text-primary" /> الرقابة الميدانية
                                 </h4>
-                                <p className="text-[10px] font-bold text-white/60 uppercase">Real-time Logistics Engine</p>
+                                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Real-time Logistics Engine</p>
                             </div>
-                            <Button asChild className="w-full h-12 rounded-2xl font-black bg-white text-[#1e1b4b] hover:bg-white/90 shadow-xl transition-all">
-                                <Link href="/dashboard/construction/field-visits">فتح خريطة العمليات</Link>
+                            <Button asChild className="w-full h-12 rounded-2xl font-black bg-white text-[#1e1b4b] hover:bg-white/90 shadow-xl transition-all border-none">
+                                <Link href="/dashboard/construction/field-visits" className="flex items-center justify-center gap-2">
+                                    <span>فتح خريطة العمليات</span>
+                                    <ArrowUpRight className="h-4 w-4" />
+                                </Link>
                             </Button>
                         </div>
                     </Card>

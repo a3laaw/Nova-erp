@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
 @tailwind components;
@@ -6,24 +6,24 @@
 
 @layer base {
   :root {
-    --background: 222 47% 11%;
+    --background: 222 47% 4%;
     --foreground: 210 40% 98%;
-    --card: 222 47% 11% / 0.6;
+    --card: 222 47% 6% / 0.7;
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
+    --popover: 222 47% 4%;
     --popover-foreground: 210 40% 98%;
-    --primary: 199 89% 48%; /* Electric Blue */
+    --primary: 199 89% 48%; 
     --primary-foreground: 210 40% 98%;
-    --secondary: 271 91% 44%; /* Deep Purple */
+    --secondary: 271 91% 44%; 
     --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 17%;
+    --muted: 217 32% 10%;
     --muted-foreground: 215 20% 65%;
-    --accent: 217 32% 17%;
+    --accent: 217 32% 15%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 17% / 0.5;
-    --input: 217 32% 17% / 0.5;
+    --border: 217 32% 17% / 0.3;
+    --input: 217 32% 17% / 0.3;
     --ring: 199 89% 48%;
     --radius: 2.5rem;
   }
@@ -32,8 +32,8 @@
 @layer base {
   * { @apply border-border; }
   body {
-    /* التدرج الكوني العميق المشبع */
-    background: radial-gradient(circle at top left, #1e3a8a 0%, #020617 40%, #581c87 100%);
+    /* تدرج كوني سيادي حاد وغير باهت */
+    background: radial-gradient(circle at 0% 0%, #1e3a8a 0%, #020617 50%, #4c1d95 100%);
     background-attachment: fixed;
     color: #f8fafc;
     font-family: 'Tajawal', sans-serif;
@@ -44,23 +44,23 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: rgba(2, 6, 23, 0.65);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
   }
   
-  /* توهج النيون الأزرق */
+  /* توهج النيون الأزرق الكهربائي الحاد */
   .neon-glow-blue {
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.15), inset 0 0 10px rgba(56, 189, 248, 0.05);
+    border: 1.5px solid rgba(56, 189, 248, 0.6);
+    box-shadow: 0 0 30px rgba(56, 189, 248, 0.2), inset 0 0 15px rgba(56, 189, 248, 0.1);
   }
 
-  /* توهج النيون البنفسجي */
+  /* توهج النيون البنفسجي الجمشتي الحاد */
   .neon-glow-purple {
-    border: 1px solid rgba(168, 85, 247, 0.4);
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.15), inset 0 0 10px rgba(168, 85, 247, 0.05);
+    border: 1.5px solid rgba(168, 85, 247, 0.6);
+    box-shadow: 0 0 30px rgba(168, 85, 247, 0.2), inset 0 0 15px rgba(168, 85, 247, 0.1);
   }
 
   .sidebar-glass {
@@ -69,32 +69,29 @@
     border: none !important;
   }
 
-  .active-capsule {
+  /* كبسولات القائمة العائمة */
+  .nav-capsule-active {
     background: #ffffff !important;
-    box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
-    @apply text-[#020617] font-black scale-[1.02];
+    box-shadow: 0 10px 40px rgba(255, 255, 255, 0.3), 0 0 20px rgba(56, 189, 248, 0.4);
+    @apply text-[#020617] font-black scale-[1.02] border-none;
   }
 
-  .glass-capsule {
-    background: rgba(255, 255, 255, 0.05) !important;
+  .nav-capsule {
+    background: rgba(255, 255, 255, 0.06) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    @apply text-white/80 font-bold hover:bg-white/10 hover:border-white/30 transition-all;
+    @apply text-white/70 font-bold hover:bg-white/15 hover:border-white/40 hover:text-white transition-all duration-300;
   }
   
-  .sub-capsule {
-    background: rgba(255, 255, 255, 0.03) !important;
-    @apply text-white/60 font-medium;
-  }
-
   .ice-blue-text {
-    color: #bae6fd;
+    color: #7dd3fc;
+    text-shadow: 0 0 15px rgba(125, 211, 252, 0.4);
   }
 
-  .pale-purple-text {
-    color: #e9d5ff;
+  .neon-purple-text {
+    color: #d8b4fe;
+    text-shadow: 0 0 15px rgba(216, 180, 254, 0.4);
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
-.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 .hover-lift { @apply transition-all duration-500 hover:-translate-y-2; }
