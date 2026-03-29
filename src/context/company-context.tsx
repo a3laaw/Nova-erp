@@ -32,7 +32,7 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // منع إعادة التأسيس إذا كانت نفس الشركة
+    // منع إعادة التأسيس إذا كانت نفس الشركة لضمان استقرار التحميل
     if (currentCompany?.id === company.id) return;
 
     setIsLoadingCompany(true);

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle, Mail } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -20,11 +20,12 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', // بريد المدير أو اسم مستخدم الموظف
+    identifier: '', 
     password: '',
   });
 
   useEffect(() => {
+    // توجيه تلقائي إذا كان المستخدم مسجلاً دخوله بالفعل
     if (!authLoading && user) {
         if (user.role === 'Developer') {
             router.replace(user.currentCompanyId ? '/dashboard' : '/developer');
@@ -54,7 +55,8 @@ export default function UnifiedLoginPage() {
     }
   };
 
-  if (authLoading || user) {
+  // عرض شاشة تحميل خفيفة إذا كان يتم التحقق من الجلسة في الخلفية
+  if (authLoading && !isLoading) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#1e1b4b]">
             <Loader2 className="h-12 w-12 animate-spin text-white opacity-20" />
