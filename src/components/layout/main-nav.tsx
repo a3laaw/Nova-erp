@@ -143,10 +143,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full px-4">
-            <span className="flex-1 text-right truncate text-sm font-black text-black">
+            <span className={cn(
+                "flex-1 text-right truncate text-sm font-black text-black",
+                isActive ? "text-black" : "text-black/80"
+            )}>
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3", "text-black")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -168,11 +171,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               )}
             >
               <div className="flex items-center justify-between w-full px-4 text-black">
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90", "text-black/40")} />
-                <span className="text-right truncate text-sm font-black">
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black", isActive ? "opacity-40" : "opacity-20")} />
+                <span className={cn(
+                    "text-right truncate text-sm font-black text-black",
+                    isActive ? "opacity-100" : "opacity-80"
+                )}>
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3", "text-black")} />}
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black", isActive ? "opacity-100" : "opacity-60")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -190,8 +196,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full text-black">
-                            <span className="text-xs font-black truncate">{child.label}</span>
-                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-60 text-black" />}
+                            <span className={cn(
+                                "text-xs font-black truncate",
+                                isChildActive ? "text-black" : "text-black/70"
+                            )}>{child.label}</span>
+                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3 text-black", isChildActive ? "opacity-100" : "opacity-40")} />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>

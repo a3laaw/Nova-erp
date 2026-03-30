@@ -50,23 +50,23 @@
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   }
   
-  /* 🛡️ خلفية القائمة الجانبية المطابقة للصورة (Light Lavender) */
+  /* 🛡️ خلفية القائمة الجانبية المتدرجة رأسياً (Lavender to Pinkish) المطابقة للصورة */
   .sidebar-glass {
-    background: #e9e4ff !important;
+    background: linear-gradient(180deg, #e9e4ff 0%, #f5d0fe 100%) !important;
     border: none !important;
     box-shadow: -10px 0 30px rgba(0,0,0,0.05) !important;
   }
 
-  /* 💊 كبسولة العنصر النشط بتدرج لوني من الأخف للأغمق مع نص أسود */
+  /* 💊 كبسولة العنصر النشط بتدرج لؤلؤي مشرق مع نص أسود */
   .nav-capsule-active {
-    background: linear-gradient(90deg, #f5d0fe 0%, #d8b4fe 100%) !important;
-    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.15) !important;
+    background: linear-gradient(90deg, #ffffff 0%, #fdf4ff 100%) !important;
+    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.1) !important;
     @apply text-black font-black scale-[1.02] border-none;
   }
 
-  /* 💊 كبسولة العنصر غير النشط بتدرج شفاف ناعم مع نص أسود */
+  /* 💊 كبسولة العنصر غير النشط بتدرج شفاف يمتص لون القائمة الجانبية */
   .nav-capsule {
-    background: linear-gradient(90deg, rgba(245, 208, 254, 0.4) 0%, rgba(216, 180, 254, 0.4) 100%) !important;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(245, 208, 254, 0.4) 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
     @apply text-black font-bold hover:bg-white/60 transition-all duration-300;
   }
