@@ -35,7 +35,9 @@ import {
   UserX,
   Zap,
   LayoutGrid,
-  ChevronLeft
+  ChevronLeft,
+  Briefcase,
+  Home
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -43,16 +45,17 @@ import { useLanguage } from '@/context/language-context';
 
 const navItems = {
   ar: [
-    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       label: 'علاقات العملاء (CRM)', 
-      icon: Users, 
+      icon: LayoutGrid, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
+        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: Briefcase },
       ]
     },
     { 
@@ -67,6 +70,16 @@ const navItems = {
       ]
     },
     { 
+      label: 'مقاولين الباطن', 
+      icon: Home, 
+      roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
+      hrefPrefix: '/dashboard/construction/subcontractors',
+      children: [
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: Users },
+        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات الإنجاز', icon: FileSignature },
+      ]
+    },
+    { 
       label: 'المطالبات المالية', 
       icon: Wallet, 
       roles: ['Developer', 'Admin', 'Accountant'],
@@ -78,13 +91,35 @@ const navItems = {
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
       ]
     },
+    { 
+      label: 'إدارة المشتريات', 
+      icon: ShoppingCart, 
+      roles: ['Developer', 'Admin', 'Accountant', 'Purchasing'],
+      hrefPrefix: '/dashboard/purchasing',
+      children: [
+        { href: '/dashboard/purchasing/requests', label: 'طلبات الشراء', icon: FileText },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير', icon: Search },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
+      ]
+    },
+    { 
+      label: 'المخازن والمستودعات', 
+      icon: LayoutGrid, 
+      roles: ['Developer', 'Admin', 'Accountant', 'Warehouse'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Layers },
+        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: FileSignature },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: ArrowUpRight },
+      ]
+    },
   ],
   en: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
   ]
 };
 
-import { Briefcase } from 'lucide-react';
+import { ShoppingCart, FileText } from 'lucide-react';
 
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile } = useSidebar();
@@ -108,10 +143,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full px-4">
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "text-[#1e1b4b]" : "text-white")} />}
             <span className="flex-1 text-right truncate text-sm font-black">
                 {item.label}
             </span>
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3", "text-black")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -133,13 +168,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               )}
             >
               <div className="flex items-center justify-between w-full px-4">
-                <div className="flex items-center flex-1">
-                    {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "text-[#1e1b4b]" : "text-white")} />}
-                    <span className="text-right truncate text-sm font-black">
-                        {item.label}
-                    </span>
-                </div>
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90", isActive ? "text-[#1e1b4b]/40" : "text-white/60")} />
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90", "text-black/40")} />
+                <span className="text-right truncate text-sm font-black">
+                    {item.label}
+                </span>
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3", "text-black")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -152,13 +185,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "bg-white text-[#1e1b4b] font-black shadow-md" 
-                          : "bg-white/10 hover:bg-white/20 text-white/80"
+                          ? "nav-capsule-active !bg-white/80" 
+                          : "nav-capsule !bg-white/20"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                        <div className="flex items-center">
-                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-60" />}
+                        <div className="flex items-center justify-between w-full">
                             <span className="text-xs font-black truncate">{child.label}</span>
+                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-60 text-black" />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -185,9 +218,9 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-8 mb-6">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black text-white tracking-tighter">Nova ERP</span>
+          <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</span>
           <div className="flex items-center gap-2 mt-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/60">PURPLE SUITE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500">PURPLE SUITE</span>
           </div>
         </div>
       </SidebarHeader>
@@ -206,13 +239,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/30 border border-white/40 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/40 transition-all cursor-pointer">
+        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/60 transition-all cursor-pointer">
+            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1">
+                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[9px] truncate font-black uppercase tracking-widest text-slate-500">{currentUser.role}</p>
+            </div>
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg">
                 {currentUser.fullName?.charAt(0) || 'N'}
-            </div>
-            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden">
-                <p className="text-sm font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[9px] truncate font-black uppercase tracking-widest text-white/60">{currentUser.role}</p>
             </div>
         </div>
       </SidebarFooter>
