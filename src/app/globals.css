@@ -57,16 +57,16 @@
     box-shadow: -10px 0 30px rgba(0,0,0,0.05) !important;
   }
 
-  /* 💊 كبسولة العنصر النشط بتدرج لؤلؤي مشرق مع نص أسود */
+  /* 💊 كبسولة العنصر النشط بتدرج أفقي من اليمين لليسار (فاتح إلى أرجواني) مع نص أسود */
   .nav-capsule-active {
-    background: linear-gradient(90deg, #ffffff 0%, #fdf4ff 100%) !important;
+    background: linear-gradient(to left, #ffffff 0%, #fdf4ff 100%) !important;
     box-shadow: 0 10px 30px rgba(168, 85, 247, 0.1) !important;
     @apply text-black font-black scale-[1.02] border-none;
   }
 
-  /* 💊 كبسولة العنصر غير النشط بتدرج شفاف يمتص لون القائمة الجانبية */
+  /* 💊 كبسولة العنصر غير النشط بتدرج شفاف يمتص لون القائمة الجانبية من اليمين لليسار */
   .nav-capsule {
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.4) 0%, rgba(245, 208, 254, 0.4) 100%) !important;
+    background: linear-gradient(to left, rgba(255, 255, 255, 0.4) 0%, rgba(245, 208, 254, 0.4) 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
     @apply text-black font-bold hover:bg-white/60 transition-all duration-300;
   }

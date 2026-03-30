@@ -174,7 +174,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black", isActive ? "opacity-40" : "opacity-20")} />
                 <span className={cn(
                     "text-right truncate text-sm font-black text-black",
-                    isActive ? "opacity-100" : "opacity-80"
+                    isActive ? "text-black" : "text-black/80"
                 )}>
                     {item.label}
                 </span>
