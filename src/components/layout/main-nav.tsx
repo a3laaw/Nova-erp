@@ -37,7 +37,9 @@ import {
   LayoutGrid,
   ChevronLeft,
   Briefcase,
-  Home
+  Home,
+  ShoppingCart,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -119,8 +121,6 @@ const navItems = {
   ]
 };
 
-import { ShoppingCart, FileText } from 'lucide-react';
-
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
   const { setOpenMobile } = useSidebar();
   const Icon = item.icon;
@@ -143,7 +143,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           )}
         >
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full px-4">
-            <span className="flex-1 text-right truncate text-sm font-black">
+            <span className="flex-1 text-right truncate text-sm font-black text-black">
                 {item.label}
             </span>
             {Icon && <Icon className={cn("size-5 shrink-0 ml-3", "text-black")} />}
@@ -167,7 +167,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   : "nav-capsule"
               )}
             >
-              <div className="flex items-center justify-between w-full px-4">
+              <div className="flex items-center justify-between w-full px-4 text-black">
                 <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90", "text-black/40")} />
                 <span className="text-right truncate text-sm font-black">
                     {item.label}
@@ -189,7 +189,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                           : "nav-capsule !bg-white/20"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                        <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center justify-between w-full text-black">
                             <span className="text-xs font-black truncate">{child.label}</span>
                             {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-60 text-black" />}
                         </div>
