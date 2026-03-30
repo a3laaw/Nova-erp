@@ -1,14 +1,3 @@
-افتح الملف src/firebase/provider.tsx
-ابحث عن firebaseConfig وضع هذه القيم مباشرة:
-const firebaseConfig = {
-apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-projectId: "studio-8039389980-3d2d0",
-storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-messagingSenderId: "828494117254",
-appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
-measurementId: "G-Q7DPZ802VJ"
-};
 لا تغير أي شيء آخر في الملف.ابحث# Nova ERP - نظام الإدارة المتكامل للمكاتب الهندسية وشركات المقاولات
 
 نظام احترافي شامل مصمم خصيصاً للسوق الكويتي، يربط العمليات الهندسية الميدانية بالدورة المستندية والمحاسبية والموارد البشرية في منصة واحدة.

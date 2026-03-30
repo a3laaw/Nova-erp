@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+@import "react-day-picker/dist/style.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100% / 0.4;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 262 83% 38%; /* #7209B7 */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 262 83% 38%;
+    --radius: 2.5rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    background: linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%);
+    background-attachment: fixed;
+    color: #1e1b4b;
+    font-family: 'Tajawal', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+  }
+  
+  .sidebar-glass {
+    background: transparent !important;
+    backdrop-filter: none !important;
+    border: none !important;
+  }
+
+  /* كبسولات القائمة العائمة المطابقة للصورة */
+  .nav-capsule-active {
+    background: #ffffff !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    @apply text-[#1e1b4b] font-black scale-[1.02] border-none;
+  }
+
+  .nav-capsule {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    @apply text-white font-bold hover:bg-white/40 hover:text-white transition-all duration-300;
+  }
+  
+  .navy-text {
+    @apply text-[#1e1b4b] font-black;
+  }
+
+  .hover-lift { 
+    @apply transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl; 
+  }
+}
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
