@@ -131,7 +131,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   if (!item.children && item.href) {
     return (
-      <SidebarMenuItem className="px-4">
+      <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton 
           isActive={isActive} 
           asChild 
@@ -142,14 +142,18 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               : "nav-capsule"
           )}
         >
-          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full px-4">
+          <Link 
+            href={item.href} 
+            onClick={() => setOpenMobile(false)} 
+            className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
+          >
             <span className={cn(
-                "flex-1 text-right truncate text-sm font-black",
+                "flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden",
                 isActive ? "text-black" : "text-black/80"
             )}>
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "text-black opacity-100" : "text-black opacity-60")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "text-black opacity-100" : "text-black opacity-60")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -158,8 +162,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   
   if (item.children) {
     return (
-      <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
-        <SidebarMenuItem>
+      <Collapsible defaultOpen={isActive} className="group/collapsible px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+        <SidebarMenuItem className="w-full">
           <CollapsibleTrigger asChild>
             <SidebarMenuButton 
               isActive={isActive} 
@@ -170,19 +174,23 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                   : "nav-capsule"
               )}
             >
-              <div className="flex items-center justify-between w-full px-4">
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black", isActive ? "opacity-40" : "opacity-20")} />
+              <div className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
+                <ChevronLeft className={cn(
+                    "h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black group-data-[collapsible=icon]:size-3 group-data-[collapsible=icon]:mr-1", 
+                    isActive ? "opacity-40" : "opacity-20",
+                    "group-data-[collapsible=icon]:group-data-[state=open]/collapsible:-rotate-90"
+                )} />
                 <span className={cn(
-                    "text-right truncate text-sm font-black text-black",
+                    "text-right truncate text-sm font-black text-black group-data-[collapsible=icon]:hidden",
                     isActive ? "opacity-100" : "opacity-80"
                 )}>
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black", isActive ? "opacity-100" : "opacity-60")} />}
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
-          <CollapsibleContent>
+          <CollapsibleContent className="group-data-[collapsible=icon]:hidden">
             <SidebarMenuSub className="mt-1 mb-4 space-y-2 border-none pr-4">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
@@ -225,10 +233,10 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
 
   return (
     <>
-      <SidebarHeader className="p-8 mb-6">
+      <SidebarHeader className="p-8 mb-6 group-data-[collapsible=icon]:p-4 group-data-[collapsible=icon]:mb-2">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</span>
-          <div className="flex items-center gap-2 mt-1">
+          <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-lg">Nova</span>
+          <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
               <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500">PURPLE SUITE</span>
           </div>
         </div>
@@ -247,13 +255,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-6 mt-auto">
-        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/60 transition-all cursor-pointer">
-            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1">
+      <SidebarFooter className="p-6 mt-auto group-data-[collapsible=icon]:p-2">
+        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/60 transition-all cursor-pointer group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
+            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1 group-data-[collapsible=icon]:hidden">
                 <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
                 <p className="text-[9px] truncate font-black uppercase tracking-widest text-slate-500">{currentUser.role}</p>
             </div>
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg">
+            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:rounded-xl">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
         </div>
