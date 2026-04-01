@@ -147,6 +147,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             onClick={() => setOpenMobile(false)} 
             className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
           >
+            {/* خانة وهمية جهة اليسار لمحاكاة هيكل القائمة المنسدلة لضمان التوسط المجهري */}
+            <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
+            
             <span className={cn(
                 "flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden",
                 isActive ? "text-black" : "text-black/80"
@@ -178,7 +181,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 <ChevronLeft className={cn(
                     "h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black", 
                     isActive ? "opacity-40" : "opacity-20",
-                    "group-data-[collapsible=icon]:hidden" // Critical: Hide chevron in icon mode for perfect alignment
+                    "group-data-[collapsible=icon]:hidden" 
                 )} />
                 <span className={cn(
                     "text-right truncate text-sm font-black text-black group-data-[collapsible=icon]:hidden",
@@ -199,8 +202,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "nav-capsule-active !bg-white/80" 
-                          : "nav-capsule !bg-white/20"
+                          ? "nav-capsule-active !bg-white/80 shadow-none border-none scale-100" 
+                          : "nav-capsule !bg-white/20 shadow-none border-none scale-100"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
