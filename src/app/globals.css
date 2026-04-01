@@ -50,14 +50,14 @@
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   }
   
-  /* 🛡️ خلفية القائمة الجانبية المتدرجة رأسياً (Lavender to Pinkish) المطابقة للصورة */
+  /* 🛡️ خلفية القائمة الجانبية المتدرجة رأسياً المطابقة للصورة */
   .sidebar-glass {
     background: linear-gradient(180deg, #e9e4ff 0%, #f5d0fe 100%) !important;
     border: none !important;
     box-shadow: -10px 0 30px rgba(0,0,0,0.05) !important;
   }
 
-  /* 💊 كبسولة العنصر النشط بتدرج أفقي أعمق لليسار لزيادة تأثير الطفو */
+  /* 💊 كبسولة العنصر النشط بتدرج أفقي أعمق لليسار لزيادة تأثير الطفو (تطابق الصورة 1) */
   .nav-capsule-active {
     background: linear-gradient(to left, #ffffff 0%, #d8b4fe 100%) !important;
     box-shadow: 0 10px 30px rgba(168, 85, 247, 0.15) !important;
