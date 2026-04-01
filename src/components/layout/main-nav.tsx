@@ -176,9 +176,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             >
               <div className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
                 <ChevronLeft className={cn(
-                    "h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black group-data-[collapsible=icon]:size-3 group-data-[collapsible=icon]:mr-1", 
+                    "h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black", 
                     isActive ? "opacity-40" : "opacity-20",
-                    "group-data-[collapsible=icon]:group-data-[state=open]/collapsible:-rotate-90"
+                    "group-data-[collapsible=icon]:hidden" // Critical: Hide chevron in icon mode for perfect alignment
                 )} />
                 <span className={cn(
                     "text-right truncate text-sm font-black text-black group-data-[collapsible=icon]:hidden",
