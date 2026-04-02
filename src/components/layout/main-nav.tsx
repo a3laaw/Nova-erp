@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -25,6 +26,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
@@ -134,7 +136,7 @@ const navItems = {
 };
 
 /**
- * مكوّن زر القائمة المطور: يدعم التلميحات والقوائم المنبثقة عند الإغلاق
+ * مكوّن زر القائمة المطور: يدعم التلميحات والمحاذاة الرأسية المطلقة عند الإغلاق
  */
 function SidebarMenuButton({ 
   isActive, 
@@ -151,7 +153,7 @@ function SidebarMenuButton({
       isActive={isActive}
       className={cn(
         "my-2 h-12 rounded-full transition-all duration-500 flex items-center w-full px-4",
-        "group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center",
+        "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
         isActive ? "nav-capsule-active" : "nav-capsule",
         className
       )}
@@ -203,10 +205,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   
   // 2. حالة القوائم المنسدلة (مثل المقاولات)
   if (item.children) {
-    // إذا كانت القائمة مغلقة، نستخدم DropdownMenu للأقسام الفرعية
+    // إذا كانت القائمة مغلقة، نستخدم DropdownMenu للأقسام الفرعية مع ضمان المحاذاة المركزية
     if (state === 'collapsed') {
       return (
-        <SidebarMenuItem className="flex justify-center group-data-[collapsible=icon]:px-0">
+        <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
           <DropdownMenu>
             <TooltipProvider>
               <Tooltip>
@@ -215,7 +217,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <BaseSidebarMenuButton 
                       isActive={isActive} 
                       className={cn(
-                        "my-2 size-14 rounded-full flex items-center justify-center p-0 transition-all duration-500",
+                        "my-2 size-14 rounded-full flex items-center justify-center p-0 transition-all duration-500 group-data-[collapsible=icon]:mx-auto",
                         isActive ? "nav-capsule-active" : "nav-capsule"
                       )}
                     >
