@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -17,19 +16,16 @@ import type {
     PurchaseOrder 
 } from '@/lib/types';
 
-// مرجع ثابت للمصفوفة الفارغة لمنع الحلقات اللانهائية في useEffect
 const EMPTY_CONSTRAINTS: any[] = [];
 
 /**
- * محرك البيانات التحليلية اللحظي (The Real-time Analytical Engine):
- * تم تحديثه ليدعم الـ Multi-Tenancy عبر تمرير أسماء المجموعات المجردة 
- * والاعتماد على عزل useSubscription الذكي.
+ * محرك البيانات التحليلية اللحظي المطور:
+ * تم تحصينه بـ "حواجز الحماية" لضمان عدم توقف النظام عند نقص البيانات.
  */
 export function useAnalyticalData() {
   const { firestore } = useFirebase();
 
-  // جلب كافة المجموعات المطلوبة بشكل متزامن ولحظي
-  // ملاحظة: معاملات العملاء تُجلب كـ collectionGroup بفلترة الشركة
+  // جلب كافة المجموعات الأساسية
   const { data: journalEntries, loading: jesLoading } = useSubscription<JournalEntry>(firestore, 'journalEntries');
   const { data: clients, loading: clientsLoading } = useSubscription<Client>(firestore, 'clients');
   const { data: rawTransactions, loading: txsLoading } = useSubscription<ClientTransaction>(firestore, 'transactions', EMPTY_CONSTRAINTS, true);
@@ -41,12 +37,10 @@ export function useAnalyticalData() {
   const { data: rfqs, loading: rfqsLoading } = useSubscription<RequestForQuotation>(firestore, 'rfqs');
   const { data: purchaseOrders, loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders');
 
-  // معالجة المعاملات لضمان وجود المعرفات الصحيحة
+  // معالجة البيانات لضمان عدم وجود قيم undefined تكسر الشاشات
   const processedTransactions = useMemo(() => {
     if (!rawTransactions) return [];
-    return rawTransactions.map(tx => {
-        return { ...tx } as ClientTransaction & { clientId: string };
-    });
+    return rawTransactions.map(tx => ({ ...tx }) as ClientTransaction & { clientId: string });
   }, [rawTransactions]);
 
   const loading = 
@@ -55,16 +49,16 @@ export function useAnalyticalData() {
     apptsLoading || projectsLoading || rfqsLoading || posLoading;
 
   return { 
-    journalEntries,
-    clients,
+    journalEntries: journalEntries || [],
+    clients: clients || [],
     transactions: processedTransactions,
-    employees,
-    departments,
-    accounts,
-    appointments,
-    projects,
-    rfqs,
-    purchaseOrders,
+    employees: employees || [],
+    departments: departments || [],
+    accounts: accounts || [],
+    appointments: appointments || [],
+    projects: projects || [],
+    rfqs: rfqs || [],
+    purchaseOrders: purchaseOrders || [],
     loading 
   };
 }

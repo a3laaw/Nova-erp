@@ -1,7 +1,6 @@
-
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -36,28 +35,24 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  UsersRound,
-  Search,
+  Home,
+  Users,
+  PencilRuler,
+  Briefcase,
+  Landmark,
+  ShoppingBag,
+  LayoutGrid,
+  ChevronLeft,
+  UserX,
   FileSignature,
-  Construction,
+  Search,
   MapPin,
-  Wallet,
+  Layers,
   BookOpen,
   ArrowDownLeft,
   ArrowUpRight,
-  ChevronDown,
-  Layers,
-  UserX,
-  Zap,
-  LayoutGrid,
-  ChevronLeft,
-  Briefcase,
-  Home,
-  ShoppingCart,
   FileText,
-  PencilRuler,
-  Landmark,
-  ShoppingBag
+  ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -68,14 +63,13 @@ const navItems = {
     { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       label: 'علاقات العملاء (CRM)', 
-      icon: UsersRound, 
+      icon: Users, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
-        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
+        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
-        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: Briefcase },
       ]
     },
     { 
@@ -90,12 +84,12 @@ const navItems = {
       ]
     },
     { 
-      label: 'مقاولين الباطن', 
+      label: 'المقاولين من الباطن', 
       icon: Briefcase, 
       roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/construction/subcontractors',
       children: [
-        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: UsersRound },
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: Users },
         { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات الإنجاز', icon: FileSignature },
       ]
     },
@@ -192,6 +186,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
+            {/* 🛡️ إضافة مساحة وهمية لضمان تطابق الهيكل مع القوائم المنسدلة والمحاذاة الرأسية */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
             <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-black">
                 {item.label}
