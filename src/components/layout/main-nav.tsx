@@ -8,7 +8,7 @@ import {
   SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton,
+  SidebarMenuButton as BaseSidebarMenuButton,
   SidebarFooter,
   SidebarMenuSub,
   SidebarMenuSubItem,
@@ -20,6 +20,18 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Users,
   Search,
@@ -121,37 +133,65 @@ const navItems = {
   ]
 };
 
+/**
+ * مكوّن زر القائمة المطور: يدعم التلميحات والقوائم المنبثقة عند الإغلاق
+ */
+function SidebarMenuButton({ 
+  isActive, 
+  tooltip, 
+  children, 
+  asChild, 
+  className, 
+  ...props 
+}: any) {
+  const { state, isMobile } = useSidebar();
+  
+  const button = (
+    <BaseSidebarMenuButton
+      isActive={isActive}
+      className={cn(
+        "my-2 h-12 rounded-full transition-all duration-500 flex items-center w-full px-4",
+        "group-data-[collapsible=icon]:size-14 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center",
+        isActive ? "nav-capsule-active" : "nav-capsule",
+        className
+      )}
+      asChild={asChild}
+      {...props}
+    >
+      {children}
+    </BaseSidebarMenuButton>
+  );
+
+  if (state === "collapsed" && !isMobile && tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="left" align="center" className="font-black bg-slate-900 text-white border-none rounded-lg shadow-xl">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
+}
+
 function NavItem({ item, userRole, currentPath }: { item: any, userRole: string, currentPath: string }) {
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state } = useSidebar();
   const Icon = item.icon;
 
   if (item.roles && !item.roles.includes(userRole)) return null;
 
   const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : (item.href ? currentPath === item.href : false);
 
+  // 1. حالة الروابط المفردة (مثل لوحة التحكم)
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-        <SidebarMenuButton 
-          isActive={isActive} 
-          asChild 
-          className={cn(
-            "my-2 h-12 rounded-full transition-all duration-500",
-            isActive 
-              ? "nav-capsule-active" 
-              : "nav-capsule"
-          )}
-        >
-          <Link 
-            href={item.href} 
-            onClick={() => setOpenMobile(false)} 
-            className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
-          >
+        <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
+          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
-            <span className={cn(
-                "flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-black",
-                isActive ? "opacity-100" : "opacity-80"
-            )}>
+            <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-black">
                 {item.label}
             </span>
             {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
@@ -161,37 +201,65 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
   
+  // 2. حالة القوائم المنسدلة (مثل المقاولات)
   if (item.children) {
+    // إذا كانت القائمة مغلقة، نستخدم DropdownMenu للأقسام الفرعية
+    if (state === 'collapsed') {
+      return (
+        <SidebarMenuItem className="flex justify-center group-data-[collapsible=icon]:px-0">
+          <DropdownMenu>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <BaseSidebarMenuButton 
+                      isActive={isActive} 
+                      className={cn(
+                        "my-2 size-14 rounded-full flex items-center justify-center p-0 transition-all duration-500",
+                        isActive ? "nav-capsule-active" : "nav-capsule"
+                      )}
+                    >
+                      {Icon && <Icon className={cn("size-5 text-black", isActive ? "opacity-100" : "opacity-60")} />}
+                    </BaseSidebarMenuButton>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="font-black bg-slate-900 text-white border-none rounded-lg">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <DropdownMenuContent side="left" align="start" className="w-56 rounded-2xl p-2 shadow-2xl bg-white/95 backdrop-blur-xl border-none" dir="rtl">
+              <DropdownMenuLabel className="font-black text-primary text-xs px-3 py-2 border-b mb-1">{item.label}</DropdownMenuLabel>
+              {item.children.map((child: any) => (
+                <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
+                  <Link href={child.href} className="flex items-center justify-between w-full">
+                    <span className="font-bold text-xs text-black">{child.label}</span>
+                    {child.icon && <child.icon className="h-4 w-4 text-black opacity-40" />}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+      );
+    }
+
+    // الوضع العادي عند التوسيع
     return (
-      <Collapsible defaultOpen={isActive} className="group/collapsible px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-        <SidebarMenuItem className="w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+      <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
+        <SidebarMenuItem>
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton 
-              isActive={isActive} 
-              className={cn(
-                "my-2 h-12 rounded-full transition-all duration-500",
-                isActive 
-                  ? "nav-capsule-active" 
-                  : "nav-capsule"
-              )}
-            >
-              <div className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
-                <ChevronLeft className={cn(
-                    "h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black", 
-                    isActive ? "opacity-40" : "opacity-20",
-                    "group-data-[collapsible=icon]:hidden" 
-                )} />
-                <span className={cn(
-                    "text-right truncate text-sm font-black text-black group-data-[collapsible=icon]:hidden",
-                    isActive ? "opacity-100" : "opacity-80"
-                )}>
+            <SidebarMenuButton isActive={isActive}>
+              <div className="flex items-center justify-between w-full">
+                <ChevronLeft className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black opacity-20" />
+                <span className="text-right truncate text-sm font-black text-black flex-1">
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black", isActive ? "opacity-100" : "opacity-60")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
-          <CollapsibleContent className="group-data-[collapsible=icon]:hidden">
+          <CollapsibleContent>
             <SidebarMenuSub className="mt-1 mb-4 space-y-2 border-none pr-4">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
@@ -200,8 +268,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "nav-capsule-active !bg-white/80 shadow-none border-none scale-100" 
-                          : "nav-capsule !bg-white/20 shadow-none border-none scale-100"
+                          ? "bg-white/80 shadow-none border-none" 
+                          : "bg-white/20 shadow-none border-none"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
@@ -229,11 +297,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
   const pathname = usePathname();
   const { language } = useLanguage();
+  const { state } = useSidebar();
   
   const currentNavItems = navItems[language] || navItems.ar;
 
   return (
-    <>
+    <TooltipProvider>
       <SidebarHeader className="p-8 mb-6 group-data-[collapsible=icon]:p-4 group-data-[collapsible=icon]:mb-2">
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-lg">Nova</span>
@@ -267,6 +336,6 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
             </div>
         </div>
       </SidebarFooter>
-    </>
+    </TooltipProvider>
   );
 }
