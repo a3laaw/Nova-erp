@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
@@ -35,7 +36,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
-  Users,
+  UsersRound,
   Search,
   FileSignature,
   Construction,
@@ -53,7 +54,10 @@ import {
   Briefcase,
   Home,
   ShoppingCart,
-  FileText
+  FileText,
+  PencilRuler,
+  Landmark,
+  ShoppingBag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -64,11 +68,11 @@ const navItems = {
     { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       label: 'علاقات العملاء (CRM)', 
-      icon: LayoutGrid, 
+      icon: UsersRound, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
-        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
+        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
         { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: Briefcase },
@@ -76,7 +80,7 @@ const navItems = {
     },
     { 
       label: 'المقاولات والقياسات',
-      icon: Construction,
+      icon: PencilRuler,
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
@@ -87,17 +91,17 @@ const navItems = {
     },
     { 
       label: 'مقاولين الباطن', 
-      icon: Home, 
+      icon: Briefcase, 
       roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/construction/subcontractors',
       children: [
-        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: Users },
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: UsersRound },
         { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات الإنجاز', icon: FileSignature },
       ]
     },
     { 
       label: 'المطالبات المالية', 
-      icon: Wallet, 
+      icon: Landmark, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
@@ -109,7 +113,7 @@ const navItems = {
     },
     { 
       label: 'إدارة المشتريات', 
-      icon: ShoppingCart, 
+      icon: ShoppingBag, 
       roles: ['Developer', 'Admin', 'Accountant', 'Purchasing'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
@@ -135,9 +139,6 @@ const navItems = {
   ]
 };
 
-/**
- * مكوّن زر القائمة المطور: يدعم التلميحات والمحاذاة الرأسية المطلقة عند الإغلاق
- */
 function SidebarMenuButton({ 
   isActive, 
   tooltip, 
@@ -186,7 +187,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : (item.href ? currentPath === item.href : false);
 
-  // 1. حالة الروابط المفردة (مثل لوحة التحكم)
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
@@ -203,9 +203,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
   
-  // 2. حالة القوائم المنسدلة (مثل المقاولات)
   if (item.children) {
-    // إذا كانت القائمة مغلقة، نستخدم DropdownMenu للأقسام الفرعية مع ضمان المحاذاة المركزية
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
@@ -246,7 +244,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       );
     }
 
-    // الوضع العادي عند التوسيع
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
