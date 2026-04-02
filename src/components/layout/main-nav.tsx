@@ -147,16 +147,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             onClick={() => setOpenMobile(false)} 
             className="flex items-center justify-between w-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center"
           >
-            {/* خانة وهمية جهة اليسار لمحاكاة هيكل القائمة المنسدلة لضمان التوسط المجهري */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
-            
             <span className={cn(
-                "flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden",
-                isActive ? "text-black" : "text-black/80"
+                "flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-black",
+                isActive ? "opacity-100" : "opacity-80"
             )}>
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "text-black opacity-100" : "text-black opacity-60")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -166,7 +164,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (item.children) {
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
-        <SidebarMenuItem className="w-full">
+        <SidebarMenuItem className="w-full group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
           <CollapsibleTrigger asChild>
             <SidebarMenuButton 
               isActive={isActive} 
