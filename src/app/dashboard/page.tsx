@@ -15,7 +15,6 @@ import {
     PlusCircle,
     BellRing,
     Sparkles,
-    ShieldCheck,
     Wallet,
     Users,
     Activity,
@@ -49,20 +48,23 @@ export default function DashboardPage() {
   const { journalEntries, projects, clients, loading } = useAnalyticalData();
 
   const stats = useMemo(() => {
-    if (loading) return null;
+    if (loading || !journalEntries) return null;
+    
+    // حساب الإيرادات من واقع القيود المرحلة فقط لضمان الصحة المالية
     const totalRevenue = journalEntries
         .filter(e => e.status === 'posted')
         .flatMap(e => e.lines)
-        .filter(l => l.accountName?.includes('إيرادات'))
+        .filter(l => l.accountName?.includes('إيرادات') || l.accountId?.startsWith('4'))
         .reduce((sum, l) => sum + (l.credit || 0), 0);
-    const activeProjectsCount = projects.filter(p => p.status === 'قيد التنفيذ').length;
-    const totalClientsCount = clients.length;
+
+    const activeProjectsCount = (projects || []).filter(p => p.status === 'قيد التنفيذ').length;
+    const totalClientsCount = (clients || []).length;
+
     return { totalRevenue, activeProjectsCount, totalClientsCount };
   }, [journalEntries, projects, clients, loading]);
 
   return (
     <div className="space-y-8 p-2 lg:p-4" dir="rtl">
-        {/* --- Header Section (Matching Image) --- */}
         <Card className="border-white/40 bg-white/40 rounded-[3rem] shadow-sm overflow-hidden">
             <CardContent className="p-10">
                 <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
@@ -92,18 +94,13 @@ export default function DashboardPage() {
             </CardContent>
         </Card>
 
-        {/* --- Main Grid (Matching Image) --- */}
         <div className="grid gap-8 lg:grid-cols-12">
-            
-            {/* Left Column: Priority Alerts */}
             <div className="lg:col-span-4">
                 <Card className="h-full border-white/40 bg-white/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-xl font-black flex items-center gap-2">
-                                <Sparkles className="text-purple-500 h-5 w-5" /> تنبيهات الأولويات (WBS)
-                            </CardTitle>
-                        </div>
+                        <CardTitle className="text-xl font-black flex items-center gap-2">
+                            <Sparkles className="text-purple-500 h-5 w-5" /> تنبيهات الأولويات (WBS)
+                        </CardTitle>
                         <CardDescription>المهام الميدانية التي تجاوزت جدولها الزمني المخطط.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-1 flex flex-col items-center justify-center text-center p-10 opacity-40">
@@ -113,7 +110,6 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            {/* Middle Column: Operational Stats */}
             <div className="lg:col-span-4 grid grid-cols-2 gap-6">
                 <StatCard 
                     title="المواقع النشطة" 
@@ -124,7 +120,7 @@ export default function DashboardPage() {
                     loading={loading}
                 />
                 <StatCard 
-                    title="إجمالي التدفقات الداخلة" 
+                    title="إجمالي الإيرادات" 
                     value={loading ? 0 : stats?.totalRevenue || 0} 
                     icon={<Wallet className="h-5 w-5" />} 
                     subText="بناءً على القيود المرحلة"
@@ -132,19 +128,18 @@ export default function DashboardPage() {
                     loading={loading}
                 />
                 
-                {/* Engineering Report Box */}
                 <Card className="col-span-1 border-white/40 bg-white/40 rounded-[2.5rem] p-6 flex flex-col items-center justify-center text-center gap-4">
                     <div className="space-y-1">
                         <p className="font-black text-sm">كشف يوميات المواقع</p>
-                        <p className="text-[10px] text-slate-400 font-bold leading-tight">تابع إنجاز الفرق الميدانية وتوزيع اللوجستيات.</p>
+                        <p className="text-[10px] text-slate-400 font-bold leading-tight">تابع إنجاز الفرق الميدانية.</p>
                     </div>
-                    <Button asChild className="rounded-xl h-9 px-6 bg-primary text-white font-black text-[10px]">
+                    <Button asChild className="rounded-xl h-9 px-6 bg-[#7209B7] text-white font-black text-[10px]">
                         <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
                     </Button>
                 </Card>
 
                 <StatCard 
-                    title="قاعدة بيانات العملاء" 
+                    title="قاعدة العملاء" 
                     value={loading ? 0 : stats?.totalClientsCount || 0} 
                     icon={<Users className="h-5 w-5" />} 
                     subText="إجمالي الملفات المسجلة"
@@ -153,40 +148,19 @@ export default function DashboardPage() {
                 />
             </div>
 
-            {/* Right Column: Recent Activity */}
             <div className="lg:col-span-4">
                 <Card className="h-full border-white/40 bg-white/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8 border-b border-white/10">
                         <CardTitle className="text-xl font-black flex items-center gap-2">
-                            <History className="text-indigo-600 h-5 w-5" /> آخر النشاطات في النظام
+                            <History className="text-indigo-600 h-5 w-5" /> آخر النشاطات
                         </CardTitle>
-                        <CardDescription>متابعة حية لكل ما يتم تسجيله من تعليقات وإجراءات في كافة الأقسام.</CardDescription>
+                        <CardDescription>متابعة حية للإجراءات المتخذة في النظام.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 flex-1 flex items-center justify-center opacity-30">
                         <p className="font-bold italic">جاري جلب آخر التحديثات...</p>
                     </CardContent>
                 </Card>
             </div>
-        </div>
-
-        {/* --- Footer Widgets (Matching Image) --- */}
-        <div className="grid gap-8 lg:grid-cols-2">
-            <Card className="border-white/40 bg-white/40 rounded-[3rem] shadow-sm">
-                <CardHeader className="p-8 flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-2xl font-black">المواعيد القادمة</CardTitle>
-                        <CardDescription>زياراتك الميدانية واجتماعاتك المجدولة التالية.</CardDescription>
-                    </div>
-                    <Button asChild variant="secondary" className="rounded-xl h-10 px-6 font-black bg-[#7209B7] text-white">
-                        <Link href="/dashboard/appointments">عرض الكل ↗</Link>
-                    </Button>
-                </CardHeader>
-                <CardContent className="p-8 pt-0">
-                    <div className="h-24 border-2 border-dashed rounded-3xl flex items-center justify-center text-slate-400 font-bold italic">
-                        لا توجد مواعيد مجدولة لليوم.
-                    </div>
-                </CardContent>
-            </Card>
         </div>
     </div>
   );
