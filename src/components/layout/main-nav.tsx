@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -36,23 +36,13 @@ import {
 } from '@/components/ui/tooltip';
 import {
   Home,
-  Users,
+  UsersRound,
   PencilRuler,
   Briefcase,
   Landmark,
   ShoppingBag,
   LayoutGrid,
   ChevronLeft,
-  UserX,
-  FileSignature,
-  Search,
-  MapPin,
-  Layers,
-  BookOpen,
-  ArrowDownLeft,
-  ArrowUpRight,
-  FileText,
-  ShoppingCart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -63,13 +53,12 @@ const navItems = {
     { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     { 
       label: 'علاقات العملاء (CRM)', 
-      icon: Users, 
+      icon: UsersRound, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
       hrefPrefix: '/dashboard/clients',
       children: [
-        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: Users },
-        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
-        { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserX },
+        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
+        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UsersRound },
       ]
     },
     { 
@@ -78,9 +67,9 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: FileSignature },
+        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: PencilRuler },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
-        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
+        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: PencilRuler },
       ]
     },
     { 
@@ -89,8 +78,8 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
       hrefPrefix: '/dashboard/construction/subcontractors',
       children: [
-        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: Users },
-        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات الإنجاز', icon: FileSignature },
+        { href: '/dashboard/construction/subcontractors', label: 'إدارة المقاولين', icon: UsersRound },
+        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات الإنجاز', icon: Landmark },
       ]
     },
     { 
@@ -99,10 +88,10 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Layers },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
-        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Landmark },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: Landmark },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: Landmark },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: Landmark },
       ]
     },
     { 
@@ -111,9 +100,9 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant', 'Purchasing'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
-        { href: '/dashboard/purchasing/requests', label: 'طلبات الشراء', icon: FileText },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير', icon: Search },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
+        { href: '/dashboard/purchasing/requests', label: 'طلبات الشراء', icon: ShoppingBag },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير', icon: ShoppingBag },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingBag },
       ]
     },
     { 
@@ -122,9 +111,9 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant', 'Warehouse'],
       hrefPrefix: '/dashboard/warehouse',
       children: [
-        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Layers },
-        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: FileSignature },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: ArrowUpRight },
+        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: LayoutGrid },
+        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: LayoutGrid },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: LayoutGrid },
       ]
     },
   ],
@@ -133,6 +122,11 @@ const navItems = {
   ]
 };
 
+/**
+ * مكون الزر الجانبي المطور:
+ * - يفرض المحاذاة العمودية المطلقة (The Perfect Axis).
+ * - يستخدم هيكل الثلاث خانات (يسار - وسط - يمين) لضمان التماثل.
+ */
 function SidebarMenuButton({ 
   isActive, 
   tooltip, 
@@ -186,12 +180,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            {/* 🛡️ إضافة مساحة وهمية لضمان تطابق الهيكل مع القوائم المنسدلة والمحاذاة الرأسية */}
+            {/* 🛡️ خانة اليسار الوهمية لضمان المحاذاة مع القوائم المنسدلة */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
-            <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-black">
+            <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden">
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -199,6 +193,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   }
   
   if (item.children) {
+    // حالة الإغلاق: استخدام القوائم المنبثقة (Dropdowns) لضمان المحاذاة المركزية
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
@@ -228,8 +223,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               {item.children.map((child: any) => (
                 <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
                   <Link href={child.href} className="flex items-center justify-between w-full">
-                    <span className="font-bold text-xs text-black">{child.label}</span>
-                    {child.icon && <child.icon className="h-4 w-4 text-black opacity-40" />}
+                    <span className="font-bold text-xs">{child.label}</span>
+                    {child.icon && <child.icon className="h-4 w-4 opacity-40" />}
                   </Link>
                 </DropdownMenuItem>
               ))}
@@ -239,17 +234,18 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       );
     }
 
+    // حالة التوسيع: استخدام Collapsible المعتاد
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full">
-                <ChevronLeft className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 text-black opacity-20" />
-                <span className="text-right truncate text-sm font-black text-black flex-1">
+                <ChevronLeft className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20" />
+                <span className="text-right truncate text-sm font-black flex-1">
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-black", isActive ? "opacity-100" : "opacity-60")} />}
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "opacity-100" : "opacity-60")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -262,16 +258,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "bg-white/80 shadow-none border-none" 
-                          : "bg-white/20 shadow-none border-none"
+                          ? "bg-white text-[#1e1b4b] font-black shadow-md" 
+                          : "bg-white/10 hover:bg-white/20 text-white/80"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className={cn(
-                                "text-xs font-black truncate text-black",
-                                isChildActive ? "opacity-100" : "opacity-70"
-                            )}>{child.label}</span>
-                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3 text-black", isChildActive ? "opacity-100" : "opacity-40")} />}
+                            <span className="text-xs font-black truncate">{child.label}</span>
+                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -291,7 +284,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
   const pathname = usePathname();
   const { language } = useLanguage();
-  const { state } = useSidebar();
   
   const currentNavItems = navItems[language] || navItems.ar;
 
@@ -301,7 +293,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-lg">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-500">PURPLE SUITE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/60">PURPLE SUITE</span>
           </div>
         </div>
       </SidebarHeader>
@@ -320,13 +312,13 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-6 mt-auto group-data-[collapsible=icon]:p-2">
-        <div className="bg-white/40 border border-white/60 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/60 transition-all cursor-pointer group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1 group-data-[collapsible=icon]:hidden">
-                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[9px] truncate font-black uppercase tracking-widest text-slate-500">{currentUser.role}</p>
-            </div>
+        <div className="bg-white/30 border border-white/40 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/40 transition-all cursor-pointer group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
             <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:rounded-xl">
                 {currentUser.fullName?.charAt(0) || 'N'}
+            </div>
+            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1 group-data-[collapsible=icon]:hidden">
+                <p className="text-sm font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[9px] truncate font-black uppercase tracking-widest text-white/60">{currentUser.role}</p>
             </div>
         </div>
       </SidebarFooter>
