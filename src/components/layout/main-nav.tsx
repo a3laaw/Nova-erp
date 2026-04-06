@@ -61,29 +61,33 @@ import {
   FileCheck,
   ListTree,
   BookOpen,
+  FileText,
   ArrowDownLeft,
   ArrowUpRight,
   RotateCcw,
   Scale,
+  FileBarChart,
   CalendarCheck,
   Calculator,
-  FileBarChart,
   Building2,
   Tags,
   ShieldCheck,
   DatabaseZap,
-  Globe
+  Globe,
+  CheckCircle2,
+  Ban
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
+import { ScrollArea } from '../ui/scroll-area';
 
 const navItems = {
   ar: [
-    // 1. لوحة التحكم
+    // 1. لوحة التحكم المركزية
     { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     
-    // 2. علاقات العملاء
+    // 2. علاقات العملاء (CRM)
     { 
       label: 'علاقات العملاء (CRM)', 
       icon: UsersRound, 
@@ -180,7 +184,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: BookOpen },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: BookOpen },
         { href: '/dashboard/accounting/cost-center-ledger', label: 'كشف حركة مراكز التكلفة', icon: Target },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: FileText },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
@@ -194,7 +198,7 @@ const navItems = {
       ]
     },
 
-    // 9. شؤون الموظفين
+    // 9. شؤون الموظفين (HR)
     { 
       label: 'شؤون الموظفين (HR)', 
       icon: Users, 
