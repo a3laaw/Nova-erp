@@ -45,8 +45,12 @@ import {
   LayoutGrid,
   ChevronLeft,
   Settings2,
-  ShieldCheck,
-  FileSignature
+  FileSignature,
+  Search,
+  BookOpen,
+  ArrowDownLeft,
+  ArrowUpRight,
+  UserCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -62,7 +66,8 @@ const navItems = {
       hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
-        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: UsersRound },
+        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
+        { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserCheck },
       ]
     },
     { 
@@ -92,10 +97,10 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: Landmark },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: Landmark },
-        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: Landmark },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: Landmark },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: LayoutGrid },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
       ]
     },
     { 
@@ -104,8 +109,8 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Accountant', 'Purchasing'],
       hrefPrefix: '/dashboard/purchasing',
       children: [
-        { href: '/dashboard/purchasing/requests', label: 'طلبات الشراء', icon: ShoppingBag },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير', icon: ShoppingBag },
+        { href: '/dashboard/purchasing/requests', label: 'طلبات الشراء', icon: FileSignature },
+        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير', icon: Search },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingBag },
       ]
     },
@@ -116,8 +121,8 @@ const navItems = {
       hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: LayoutGrid },
-        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: LayoutGrid },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: LayoutGrid },
+        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: ShieldCheck },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: ArrowUpRight },
       ]
     },
     { 
@@ -191,13 +196,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            {/* خانة وهمية لليسار لضمان التوازن الهيكلي */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
-            
             <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-[#1e1b4b]">
                 {item.label}
             </span>
-            
             {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
@@ -234,9 +236,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               <DropdownMenuLabel className="font-black text-[#1e1b4b] text-xs px-3 py-2 border-b mb-1">{item.label}</DropdownMenuLabel>
               {item.children.map((child: any) => (
                 <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
-                  <Link href={child.href} className="flex items-center justify-between w-full">
-                    <span className="font-bold text-xs text-[#1e1b4b]">{child.label}</span>
-                    {child.icon && <child.icon className="h-4 w-4 text-[#1e1b4b] opacity-40" />}
+                  <Link href={child.href} className="flex items-center justify-between w-full text-[#1e1b4b]">
+                    <span className="font-bold text-xs">{child.label}</span>
+                    {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
                   </Link>
                 </DropdownMenuItem>
               ))}
