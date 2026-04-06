@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -38,18 +37,10 @@ import {
 import {
   LayoutGrid,
   UsersRound,
-  PencilRuler,
-  HardHat,
-  Coins,
-  ShoppingBag,
-  Box,
-  Landmark,
-  Users,
-  Settings2,
-  ChevronLeft,
   Search,
   UserCheck,
   Sparkles,
+  PencilRuler,
   FileSignature,
   ClipboardList,
   Briefcase,
@@ -58,24 +49,34 @@ import {
   Package,
   History,
   AlertTriangle,
+  HardHat,
   FileCheck,
+  Coins,
+  ArrowDownLeft,
+  ShoppingBag,
+  CheckCircle2,
+  Landmark,
+  Box,
+  Building2,
+  RotateCcw,
+  Ban,
   ListTree,
   BookOpen,
+  Target,
   FileText,
-  ArrowDownLeft,
   ArrowUpRight,
-  RotateCcw,
+  Wallet,
   Scale,
   FileBarChart,
+  Users,
   CalendarCheck,
   Calculator,
-  Building2,
-  Tags,
-  ShieldCheck,
-  DatabaseZap,
+  Settings2,
   Globe,
-  CheckCircle2,
-  Ban
+  ShieldCheck,
+  Tags,
+  DatabaseZap,
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
