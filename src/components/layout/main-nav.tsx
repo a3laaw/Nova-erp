@@ -122,11 +122,6 @@ const navItems = {
   ]
 };
 
-/**
- * مكون الزر الجانبي المطور:
- * - يفرض المحاذاة العمودية المطلقة (The Perfect Axis).
- * - يستخدم هيكل الثلاث خانات (يسار - وسط - يمين) لضمان التماثل.
- */
 function SidebarMenuButton({ 
   isActive, 
   tooltip, 
@@ -180,12 +175,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            {/* 🛡️ خانة اليسار الوهمية لضمان المحاذاة مع القوائم المنسدلة */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
-            <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden">
+            <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-[#1e1b4b]">
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -193,7 +187,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   }
   
   if (item.children) {
-    // حالة الإغلاق: استخدام القوائم المنبثقة (Dropdowns) لضمان المحاذاة المركزية
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
@@ -209,7 +202,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         isActive ? "nav-capsule-active" : "nav-capsule"
                       )}
                     >
-                      {Icon && <Icon className={cn("size-5 text-black", isActive ? "opacity-100" : "opacity-60")} />}
+                      {Icon && <Icon className={cn("size-5 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
                     </BaseSidebarMenuButton>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
@@ -223,8 +216,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               {item.children.map((child: any) => (
                 <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
                   <Link href={child.href} className="flex items-center justify-between w-full">
-                    <span className="font-bold text-xs">{child.label}</span>
-                    {child.icon && <child.icon className="h-4 w-4 opacity-40" />}
+                    <span className="font-bold text-xs text-[#1e1b4b]">{child.label}</span>
+                    {child.icon && <child.icon className="h-4 w-4 text-[#1e1b4b] opacity-40" />}
                   </Link>
                 </DropdownMenuItem>
               ))}
@@ -234,18 +227,17 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       );
     }
 
-    // حالة التوسيع: استخدام Collapsible المعتاد
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full">
-                <ChevronLeft className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20" />
-                <span className="text-right truncate text-sm font-black flex-1">
+                <ChevronLeft className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20 text-[#1e1b4b]" />
+                <span className="text-right truncate text-sm font-black flex-1 text-[#1e1b4b]">
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "opacity-100" : "opacity-60")} />}
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -259,12 +251,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
                           ? "bg-white text-[#1e1b4b] font-black shadow-md" 
-                          : "bg-white/10 hover:bg-white/20 text-white/80"
+                          : "bg-white/10 hover:bg-white/20 text-[#1e1b4b]"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className="text-xs font-black truncate">{child.label}</span>
-                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
+                            <span className="text-xs font-black truncate text-[#1e1b4b]">{child.label}</span>
+                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40 text-[#1e1b4b]" />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -293,7 +285,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-lg">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/60">PURPLE SUITE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#1e1b4b]/40">PURPLE SUITE</span>
           </div>
         </div>
       </SidebarHeader>
@@ -317,8 +309,8 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1 group-data-[collapsible=icon]:hidden">
-                <p className="text-sm font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[9px] truncate font-black uppercase tracking-widest text-white/60">{currentUser.role}</p>
+                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[9px] truncate font-black uppercase tracking-widest text-[#1e1b4b]/60">{currentUser.role}</p>
             </div>
         </div>
       </SidebarFooter>
