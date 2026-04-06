@@ -76,7 +76,8 @@ import {
   ShieldCheck,
   Tags,
   DatabaseZap,
-  ChevronLeft
+  ChevronLeft,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -132,9 +133,9 @@ const navItems = {
       ]
     },
 
-    // 5. المطالبات المالية
+    // 5. المحاسبة (سابقاً المطالبات المالية)
     { 
-      label: 'المطالبات المالية', 
+      label: 'المحاسبة', 
       icon: Coins, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/construction/payment-applications',
