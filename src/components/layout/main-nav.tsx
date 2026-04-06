@@ -152,7 +152,7 @@ function SidebarMenuButton({
     return (
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="left" align="center" className="font-black bg-slate-900 text-white border-none rounded-lg shadow-xl">
+        <TooltipContent side="left" align="center" className="font-black bg-[#1e1b4b] text-white border-none rounded-lg shadow-xl">
           {tooltip}
         </TooltipContent>
       </Tooltip>
@@ -206,13 +206,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     </BaseSidebarMenuButton>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="left" className="font-black bg-slate-900 text-white border-none rounded-lg">
+                <TooltipContent side="left" className="font-black bg-[#1e1b4b] text-white border-none rounded-lg">
                   {item.label}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <DropdownMenuContent side="left" align="start" className="w-56 rounded-2xl p-2 shadow-2xl bg-white/95 backdrop-blur-xl border-none" dir="rtl">
-              <DropdownMenuLabel className="font-black text-primary text-xs px-3 py-2 border-b mb-1">{item.label}</DropdownMenuLabel>
+              <DropdownMenuLabel className="font-black text-[#1e1b4b] text-xs px-3 py-2 border-b mb-1">{item.label}</DropdownMenuLabel>
               {item.children.map((child: any) => (
                 <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
                   <Link href={child.href} className="flex items-center justify-between w-full">
