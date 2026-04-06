@@ -16,7 +16,8 @@ import {
     PlusCircle,
     Banknote,
     RotateCcw,
-    ListTree
+    ListTree,
+    Landmark
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -50,7 +51,7 @@ export default function AccountingDashboardPage() {
         
         const postedEntries = journalEntries.filter(e => e.status === 'posted');
         
-        const liquidAccountIds = accounts.filter(a => a.code.startsWith('1101') && a.isPayable).map(a => a.id);
+        const liquidAccountIds = accounts.filter(a => (a.code.startsWith('1101') || a.code.startsWith('110103')) && a.isPayable).map(a => a.id);
         const cashBalance = postedEntries.flatMap(e => e.lines).filter(l => liquidAccountIds.includes(l.accountId)).reduce((sum, l) => sum + (l.debit || 0) - (l.credit || 0), 0);
 
         const arAccountIds = accounts.filter(a => a.code.startsWith('1102')).map(a => a.id);
@@ -73,16 +74,16 @@ export default function AccountingDashboardPage() {
         <div className="space-y-8" dir="rtl">
             <Card className={cn(
                 "border-none rounded-[2.5rem] overflow-hidden",
-                isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-blue-50 shadow-sm"
+                isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-indigo-50 shadow-sm"
             )}>
                 <CardHeader className="pb-8 px-8 border-b">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
                         <div className="space-y-1 text-center lg:text-right">
                             <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3">
-                                <Banknote className="text-primary h-8 w-8" />
-                                الرقابة المالية والمحاسبية
+                                <Landmark className="text-primary h-8 w-8" />
+                                المحاسبة والرقابة المالية
                             </CardTitle>
-                            <CardDescription className={cn("text-base font-medium", isGlass && "text-slate-800")}>إدارة السيولة، مديونيات العملاء، والمؤشرات المالية الحية للشركة.</CardDescription>
+                            <CardDescription className={cn("text-base font-medium", isGlass && "text-slate-800")}>إدارة السيولة، مديونيات العملاء، والقوائم المالية المعتمدة.</CardDescription>
                         </div>
                         
                         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -132,7 +133,7 @@ export default function AccountingDashboardPage() {
                     isGlass ? "glass-effect" : "bg-primary text-primary-foreground shadow-sm"
                 )}>
                     <CardHeader className="pb-2">
-                        <CardTitle className={cn("text-xs font-black uppercase tracking-widest", isGlass ? "text-muted-foreground" : "text-white opacity-80")}>قيود قيد المراجعة</CardTitle>
+                        <CardTitle className={cn("text-xs font-black uppercase tracking-widest", isGlass ? "text-muted-foreground" : "text-white opacity-80")}>قيود بانتظار الترحيل</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className={cn("text-4xl font-black font-mono", !isGlass && "text-white")}>{loading ? '...' : stats?.draftCount}</div>
@@ -145,32 +146,33 @@ export default function AccountingDashboardPage() {
 
             <div className="grid gap-8 md:grid-cols-2">
                 <Card className={cn(
-                    "rounded-[2rem] border-none",
-                    isGlass ? "glass-effect" : "bg-white shadow-sm"
+                    "rounded-[2rem] border-none shadow-sm",
+                    isGlass ? "glass-effect" : "bg-white"
                 )}>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="text-lg font-black flex items-center gap-2">
-                            <PieChart className="text-primary h-5 w-5"/> التقارير الختامية (IFRS)
+                            <PieChart className="text-primary h-5 w-5"/> القوائم المالية الختامية (IFRS)
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 pt-6">
-                        <QuickLink href="/dashboard/accounting/income-statement" label="قائمة الدخل" isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/income-statement" label="قائمة الدخل (P&L)" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/balance-sheet" label="المركز المالي" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/trial-balance" label="ميزان المراجعة" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ العام" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/cost-center-ledger" label="كشف حركة مراكز التكلفة" isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/cost-center-ledger" label="كشف حركة مركز التكلفة" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/client-statements" label="كشوفات العملاء" isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/vendor-statements" label="حسابات الموردين" isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/reports" label="التحليلات والربحية" isGlass={isGlass} />
                     </CardContent>
                 </Card>
 
                 <Card className={cn(
-                    "rounded-[2rem] border-none",
-                    isGlass ? "glass-effect" : "bg-white shadow-sm"
+                    "rounded-[2rem] border-none shadow-sm",
+                    isGlass ? "glass-effect" : "bg-white"
                 )}>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="text-lg font-black flex items-center gap-2">
-                            <Scale className="text-primary h-5 w-5"/> أدوات التدقيق والرقابة
+                            <Scale className="text-primary h-5 w-5"/> الرقابة وأدوات التدقيق
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4 pt-6">
@@ -180,7 +182,7 @@ export default function AccountingDashboardPage() {
                         )}>
                             <div className="space-y-1">
                                 <p className="text-sm font-black">تسوية العهد النقدية</p>
-                                <p className="text-[10px] text-muted-foreground font-bold">مراجعة مصروفات الموظفين الميدانية</p>
+                                <p className="text-[10px] text-muted-foreground font-bold">مراجعة مصروفات الميدان</p>
                             </div>
                             <Button asChild size="sm" variant={isGlass ? "default" : "secondary"} className="rounded-xl font-bold">
                                 <Link href="/dashboard/hr/custody-reconciliation">بدء المراجعة</Link>
@@ -192,7 +194,7 @@ export default function AccountingDashboardPage() {
                         )}>
                             <div className="space-y-1">
                                 <p className="text-sm font-black">التسوية البنكية الذكية</p>
-                                <p className="text-[10px] text-muted-foreground font-bold">مطابقة كشوف الحساب مع القيود</p>
+                                <p className="text-[10px] text-muted-foreground font-bold">مطابقة الكشوف مع القيود</p>
                             </div>
                             <Button asChild size="sm" variant={isGlass ? "default" : "secondary"} className="rounded-xl font-bold">
                                 <Link href="/dashboard/accounting/reconciliation">بدء التسوية</Link>

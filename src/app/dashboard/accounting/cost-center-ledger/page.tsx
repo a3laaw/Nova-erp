@@ -293,7 +293,7 @@ export default function CostCenterLedgerPage() {
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end justify-center text-left">
-                                    <Label className="text-[10px] uppercase font-black text-primary mb-1">صافي الرصيد المتدفق</Label>
+                                    <Label className="text-[10px] uppercase font-black text-primary mb-1">صافي الرصد المتدفق</Label>
                                     <p className={cn("text-4xl font-black font-mono tracking-tighter", reportData.netBalance >= 0 ? "text-primary" : "text-red-600")}>
                                         {formatCurrency(reportData.netBalance)}
                                     </p>

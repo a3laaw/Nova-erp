@@ -50,7 +50,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  PieChart,
+  BarChart3,
+  ListTree,
+  Scale
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -101,6 +105,9 @@ const navItems = {
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/reports', label: 'التقارير الربحية', icon: BarChart3 },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: ListTree },
+        { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
       ]
     },
     { 
@@ -126,6 +133,18 @@ const navItems = {
       ]
     },
     { 
+      label: 'الموارد البشرية', 
+      icon: UsersRound, 
+      roles: ['Developer', 'Admin', 'HR'],
+      hrefPrefix: '/dashboard/hr',
+      children: [
+        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: UsersRound },
+        { href: '/dashboard/hr/payroll', label: 'إدارة الرواتب', icon: Landmark },
+        { href: '/dashboard/hr/leaves', label: 'الإجازات', icon: CalendarCheck },
+        { href: '/dashboard/hr/reports', label: 'تقارير HR', icon: BarChart3 },
+      ]
+    },
+    { 
       label: 'الإعدادات', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
@@ -139,17 +158,10 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { 
-      label: 'Accounting', 
-      icon: Landmark, 
-      roles: ['Developer', 'Admin', 'Accountant'], 
-      hrefPrefix: '/dashboard/accounting', 
-      children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' }
-      ] 
-    }
   ]
 };
+
+import { CalendarCheck } from 'lucide-react';
 
 function SidebarMenuButton({ 
   isActive, 
@@ -204,7 +216,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            {/* Structural spacers to ensure identical centering with dropdown icons */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
             <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-[#1e1b4b]">
                 {item.label}

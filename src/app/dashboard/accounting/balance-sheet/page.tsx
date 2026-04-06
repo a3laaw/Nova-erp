@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -17,7 +16,7 @@ import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore
 import type { Account, JournalEntry } from '@/lib/types';
 import { format, endOfYear } from 'date-fns';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Scale, AlertCircle, FileSearch } from 'lucide-react';
+import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
@@ -45,9 +44,9 @@ interface BalanceSheetData {
 }
 
 const AccountRow = ({ name, balance, className }: { name: string, balance: number, className?: string }) => (
-    <div className={cn("flex justify-between py-1.5", className)}>
-        <span>{name}</span>
-        <span className="font-mono">{formatCurrency(balance)}</span>
+    <div className={cn("flex justify-between py-2 border-b border-dashed border-slate-100 last:border-0", className)}>
+        <span className="font-bold text-slate-700">{name}</span>
+        <span className="font-mono font-black">{formatCurrency(balance)}</span>
     </div>
 );
 
@@ -104,9 +103,11 @@ export default function BalanceSheetPage() {
             
             accounts.forEach(acc => {
                 let balance = accountBalances.get(acc.id!) || 0;
-                if (balance === 0 && acc.type !== 'equity') return;
-
+                
+                // إضافة صافي الربح للأرباح المبقاة آلياً
                 if (acc.name.includes('أرباح')) balance += netIncome;
+                
+                if (balance === 0 && acc.type !== 'equity') return;
 
                 const item = { name: acc.name, balance };
                 if (acc.code.startsWith('11')) { data.assets.current.push(item); data.assets.totalCurrent += balance; }
@@ -132,83 +133,129 @@ export default function BalanceSheetPage() {
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-            <Card className="mb-4 no-print rounded-2xl border-none shadow-sm">
-                 <CardHeader>
-                    <CardTitle className="text-xl font-black">المركز المالي (نتائج ثابتة للمراجعة)</CardTitle>
-                    <CardDescription>عرض الأصول والالتزامات وحقوق الملكية. يتطلب الضغط على إنشاء لتحديث القراءة.</CardDescription>
+            <Card className="mb-6 no-print rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
+                <CardHeader className="bg-primary/5 pb-6 border-b">
+                    <CardTitle className="text-xl font-black flex items-center gap-2">
+                        <Scale className="text-primary h-6 w-6"/> قائمة المركز المالي (الميزانية العمومية)
+                    </CardTitle>
+                    <CardDescription>عرض الأصول والالتزامات وحقوق الملكية في لحظة زمنية محددة.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col md:flex-row gap-4 items-end">
-                    <div className="grid gap-2">
-                        <Label className="font-bold">حتى تاريخ</Label>
-                        <DateInput value={asOfDate} onChange={setAsOfDate} />
+                <CardContent className="p-8 flex flex-col md:flex-row gap-6 items-end">
+                    <div className="grid gap-2 w-64">
+                        <Label className="font-black text-gray-700 pr-1">حتى تاريخ *</Label>
+                        <DateInput value={asOfDate} onChange={setAsOfDate} className="h-12 rounded-2xl border-2" />
                      </div>
-                     <Button onClick={handleGenerate} disabled={isGenerating} className="h-10 px-8 rounded-xl font-bold gap-2">
-                        {isGenerating ? <Loader2 className="animate-spin h-4 w-4"/> : <FileSearch className="h-4 w-4" />}
+                     <Button onClick={handleGenerate} disabled={isGenerating} className="h-12 px-12 rounded-2xl font-black text-lg gap-3 shadow-xl shadow-primary/20">
+                        {isGenerating ? <Loader2 className="animate-spin h-5 w-5"/> : <FileSearch className="h-5 w-5" />}
                         توليد المركز المالي
                      </Button>
                 </CardContent>
             </Card>
 
-            {brandingLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin h-8 w-8 mx-auto" /></CardContent></Card>}
-
-            {!brandingLoading && reportData ? (
-                 <div className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
-                    <div id="printable-area" className="p-8 md:p-12">
-                        <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800">
-                            <div className="text-left">
-                                <h2 className="text-2xl font-bold">قائمة المركز المالي</h2>
-                                <p className="text-lg font-semibold">Balance Sheet</p>
-                                <p className="font-mono text-sm mt-2">كما في: {asOfDate ? format(asOfDate, 'dd/MM/yyyy') : ''}</p>
+            {reportData ? (
+                 <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                    <div id="printable-area" className="bg-white dark:bg-card shadow-2xl rounded-[2.5rem] overflow-hidden p-8 sm:p-12 print:shadow-none print:border-none">
+                        <header className="flex justify-between items-start border-b-4 border-primary pb-8 mb-10">
+                            <div className="text-left space-y-1">
+                                <h2 className="text-3xl font-black text-primary tracking-tighter">قائمة المركز المالي</h2>
+                                <p className="text-lg font-bold text-gray-500 uppercase tracking-widest font-mono">Statement of Financial Position</p>
+                                <p className="text-xs text-muted-foreground mt-2">كما في: {asOfDate ? format(asOfDate, 'eeee, dd MMMM yyyy', { locale: ar }) : ''}</p>
                             </div>
                             <div className="flex items-center gap-4">
-                                <Logo className="h-16 w-16" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                                <Logo className="h-20 w-20 !p-3 shadow-inner border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                                 <div>
-                                    <h1 className="font-bold text-lg">{branding?.company_name}</h1>
+                                    <h1 className="text-xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
                                     <p className="text-xs text-muted-foreground">{branding?.address}</p>
                                 </div>
                             </div>
-                        </div>
-                        <CardContent className="px-0 pt-6 space-y-6">
+                        </header>
+
+                        <CardContent className="px-0 space-y-10">
                             {!reportData.isBalanced && (
-                                <Alert variant="destructive" className="rounded-xl border-2">
-                                    <AlertCircle className="h-4 w-4" />
-                                    <AlertTitle>الميزانية غير متوازنة!</AlertTitle>
-                                    <AlertDescription>يوجد فرق بين الأصول والالتزامات. يرجى مراجعة القيود.</AlertDescription>
+                                <Alert variant="destructive" className="rounded-3xl border-2 py-6 bg-red-50 shadow-red-100">
+                                    <AlertCircle className="h-6 w-6" />
+                                    <AlertTitle className="text-lg font-black">الميزانية غير متوازنة!</AlertTitle>
+                                    <AlertDescription className="font-bold">يوجد فرق مادي بين إجمالي الأصول وإجمالي الالتزامات وحقوق الملكية. يرجى مراجعة كافة القيود المرحلة.</AlertDescription>
                                 </Alert>
                             )}
-                            <div className="grid md:grid-cols-2 gap-x-12 gap-y-8">
-                                <div className="space-y-6">
-                                    <h4 className="font-bold border-b pb-1">الأصول المتداولة</h4>
-                                    {reportData.assets.current.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
-                                    <AccountRow name="إجمالي الأصول المتداولة" balance={reportData.assets.totalCurrent} className="font-bold bg-muted/30 p-2 rounded" />
-                                    <h4 className="font-bold border-b pb-1 mt-4">الأصول غير المتداولة</h4>
-                                    {reportData.assets.nonCurrent.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
-                                    <div className="flex justify-between items-center text-lg p-2 font-black bg-blue-50 border border-blue-200 rounded-lg">
-                                        <span>مجموع الأصول</span>
-                                        <span className="font-mono">{formatCurrency(reportData.assets.total)}</span>
+
+                            <div className="grid lg:grid-cols-2 gap-16">
+                                {/* جانب الأصول */}
+                                <div className="space-y-8">
+                                    <div className="space-y-4">
+                                        <h4 className="font-black text-primary border-r-4 border-primary pr-3 text-lg flex items-center gap-2">
+                                            <Landmark className="h-5 w-5" /> الأصول المتداولة
+                                        </h4>
+                                        {reportData.assets.current.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                        <AccountRow name="إجمالي الأصول المتداولة" balance={reportData.assets.totalCurrent} className="font-black bg-slate-50 p-3 rounded-xl border-2 border-slate-100 mt-2" />
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h4 className="font-black text-primary border-r-4 border-primary pr-3 text-lg flex items-center gap-2">
+                                            <Building2 className="h-5 w-5" /> الأصول غير المتداولة
+                                        </h4>
+                                        {reportData.assets.nonCurrent.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                        <AccountRow name="إجمالي الأصول غير المتداولة" balance={reportData.assets.totalNonCurrent} className="font-black bg-slate-50 p-3 rounded-xl border-2 border-slate-100 mt-2" />
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-xl p-6 font-black bg-primary text-white rounded-3xl shadow-xl shadow-primary/20">
+                                        <span>إجمالي الأصول</span>
+                                        <span className="font-mono text-3xl">{formatCurrency(reportData.assets.total)}</span>
                                     </div>
                                 </div>
-                                <div className="space-y-6">
-                                    <h4 className="font-bold border-b pb-1">الالتزامات</h4>
-                                    {reportData.liabilitiesAndEquity.currentLiabilities.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
-                                    <h4 className="font-bold border-b pb-1 mt-4">حقوق الملكية</h4>
-                                    {reportData.liabilitiesAndEquity.equity.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
-                                    <div className="flex justify-between items-center text-lg p-2 font-black bg-blue-50 border border-blue-200 rounded-lg">
-                                        <span>المجموع الإجمالي</span>
-                                        <span className="font-mono">{formatCurrency(reportData.liabilitiesAndEquity.total)}</span>
+
+                                {/* جانب الالتزامات وحقوق الملكية */}
+                                <div className="space-y-8">
+                                    <div className="space-y-4">
+                                        <h4 className="font-black text-orange-600 border-r-4 border-orange-600 pr-3 text-lg flex items-center gap-2">
+                                            <ShieldCheck className="h-5 w-5" /> الالتزامات
+                                        </h4>
+                                        {reportData.liabilitiesAndEquity.currentLiabilities.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                        {reportData.liabilitiesAndEquity.nonCurrentLiabilities.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h4 className="font-black text-indigo-600 border-r-4 border-indigo-600 pr-3 text-lg flex items-center gap-2">
+                                            <User className="h-5 w-5" /> حقوق الملكية
+                                        </h4>
+                                        {reportData.liabilitiesAndEquity.equity.map(i => <AccountRow key={i.name} name={i.name} balance={i.balance} />)}
+                                    </div>
+
+                                    <Separator className="my-4" />
+
+                                    <div className="flex justify-between items-center text-xl p-6 font-black bg-slate-900 text-white rounded-3xl shadow-xl">
+                                        <span>إجمالي الالتزامات وحقوق الملكية</span>
+                                        <span className="font-mono text-3xl">{formatCurrency(reportData.liabilitiesAndEquity.total)}</span>
                                     </div>
                                 </div>
                             </div>
                         </CardContent>
-                        <CardFooter className="p-0 pt-8 flex justify-end no-print">
-                            <Button onClick={handlePrint} variant="outline"><Printer className="ml-2 h-4 w-4" /> طباعة</Button>
-                        </CardFooter>
+
+                        <footer className="pt-32 grid grid-cols-2 gap-20 text-center text-[10px] font-black uppercase text-muted-foreground">
+                            <div className="space-y-16">
+                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">الإدارة المالية</p>
+                                <div className="pt-2 border-t border-dashed">التدقيق والاعتماد</div>
+                            </div>
+                            <div className="space-y-16">
+                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">المدير العام</p>
+                                <div className="pt-2 border-t border-dashed">الختم والمصادقة</div>
+                            </div>
+                        </footer>
+                    </div>
+                    
+                    <div className="flex justify-end no-print pb-20">
+                        <Button onClick={handlePrint} className="h-14 px-12 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30">
+                            <Printer className="h-6 w-6" /> طباعة الميزانية العمومية
+                        </Button>
                     </div>
                  </div>
             ) : (
-                <div className="h-96 flex flex-col items-center justify-center border-2 border-dashed rounded-[3rem] bg-muted/5 opacity-40 no-print">
-                    <Scale className="h-16 w-16 mb-4 text-muted-foreground" />
-                    <p className="text-xl font-black text-muted-foreground">اختر التاريخ واضغط على زر "توليد المركز المالي" لعرض البيانات المثبتة.</p>
+                <div className="h-[60vh] flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 opacity-30 grayscale transition-all">
+                    <div className="p-10 bg-muted rounded-full mb-6">
+                        <Scale className="h-24 w-24 text-muted-foreground" />
+                    </div>
+                    <h3 className="text-3xl font-black text-muted-foreground">بانتظار بناء المركز المالي</h3>
+                    <p className="text-lg font-bold mt-2">حدد التاريخ المستهدف واضغط على "توليد" لعرض الموقف المالي للمنشأة.</p>
                 </div>
             )}
         </div>
