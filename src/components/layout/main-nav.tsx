@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -31,9 +30,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
-  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  TooltipContent,
 } from '@/components/ui/tooltip';
 import {
   Home,
@@ -50,7 +49,8 @@ import {
   BookOpen,
   ArrowDownLeft,
   ArrowUpRight,
-  UserCheck
+  UserCheck,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -139,7 +139,15 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { label: 'Accounting', icon: Landmark, roles: ['Developer', 'Admin', 'Accountant'], hrefPrefix: '/dashboard/accounting', children: [{ href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' }] }
+    { 
+      label: 'Accounting', 
+      icon: Landmark, 
+      roles: ['Developer', 'Admin', 'Accountant'], 
+      hrefPrefix: '/dashboard/accounting', 
+      children: [
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' }
+      ] 
+    }
   ]
 };
 
@@ -196,6 +204,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
+            {/* Structural spacers to ensure identical centering with dropdown icons */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
             <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-[#1e1b4b]">
                 {item.label}
@@ -238,7 +247,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
                   <Link href={child.href} className="flex items-center justify-between w-full text-[#1e1b4b]">
                     <span className="font-bold text-xs">{child.label}</span>
-                    {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
+                    {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40 text-[#1e1b4b]" />}
                   </Link>
                 </DropdownMenuItem>
               ))}
