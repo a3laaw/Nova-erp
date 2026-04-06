@@ -44,6 +44,9 @@ import {
   ShoppingBag,
   LayoutGrid,
   ChevronLeft,
+  Settings2,
+  ShieldCheck,
+  FileSignature
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -68,7 +71,7 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: PencilRuler },
+        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: FileSignature },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: PencilRuler },
       ]
@@ -84,7 +87,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'المطالبات المالية', 
+      label: 'المحاسبة', 
       icon: Landmark, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
@@ -117,9 +120,21 @@ const navItems = {
         { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: LayoutGrid },
       ]
     },
+    { 
+      label: 'الإعدادات', 
+      icon: Settings2, 
+      roles: ['Developer', 'Admin'],
+      hrefPrefix: '/dashboard/settings',
+      children: [
+        { href: '/dashboard/settings/users', label: 'المستخدمين', icon: UsersRound },
+        { href: '/dashboard/settings/branding', label: 'العلامة التجارية', icon: FileSignature },
+        { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: LayoutGrid },
+      ]
+    },
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { label: 'Accounting', icon: Landmark, roles: ['Developer', 'Admin', 'Accountant'], hrefPrefix: '/dashboard/accounting', children: [{ href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts' }] }
   ]
 };
 
@@ -138,7 +153,7 @@ function SidebarMenuButton({
       isActive={isActive}
       className={cn(
         "my-2 h-12 rounded-full transition-all duration-500 flex items-center w-full px-4",
-        "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
+        "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:!rounded-full",
         isActive ? "nav-capsule-active" : "nav-capsule",
         className
       )}
@@ -176,10 +191,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
+            {/* خانة وهمية لليسار لضمان التوازن الهيكلي */}
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
+            
             <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-[#1e1b4b]">
                 {item.label}
             </span>
+            
             {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
