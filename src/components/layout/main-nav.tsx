@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -89,7 +88,7 @@ import { ScrollArea } from '../ui/scroll-area';
 const navItems = {
   ar: [
     // 1. لوحة التحكم المركزية
-    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     
     // 2. علاقات العملاء (CRM)
     { 
@@ -180,7 +179,7 @@ const navItems = {
       ]
     },
 
-    // 8. المحاسبة والمالية (التقارير العميقة)
+    // 8. المحاسبة والمالية
     { 
       label: 'المحاسبة والمالية', 
       icon: Landmark, 
@@ -227,7 +226,7 @@ const navItems = {
       hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings/branding', label: 'الإعدادات العامة', icon: Globe },
-        { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UsersRound },
+        { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
         { href: '/dashboard/settings/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
         { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building2 },
         { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },

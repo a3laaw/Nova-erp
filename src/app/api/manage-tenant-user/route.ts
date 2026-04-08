@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -7,7 +6,7 @@ import path from 'path';
 
 /**
  * @fileOverview API سيادي لإدارة حسابات المستخدمين في Firebase Auth.
- * تم تحديثه لضمان إرجاع JSON ومنع الانهيار عند فقدان ملف الاعتماد.
+ * تم تحصينه للتعامل مع ملفات الاعتماد المفقودة بسبب حماية GitHub.
  */
 
 export async function POST(request: NextRequest) {
@@ -20,24 +19,28 @@ export async function POST(request: NextRequest) {
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
 
+    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+        return NextResponse.json({ 
+            success: false, 
+            error: "نظام الأمان: ملف الاعتماد مفقود." 
+        }, { status: 500 });
+    }
+
+    let serviceAccount;
+    try {
+        serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
+        if (!serviceAccount.project_id) throw new Error("Empty credentials");
+    } catch (e) {
+        return NextResponse.json({ 
+            success: false, 
+            error: "فشل تهيئة المحرك السيادي. ملف الاعتماد مفرغ لحماية GitHub." 
+        }, { status: 500 });
+    }
+
     if (getApps().length === 0) {
-        if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-            return NextResponse.json({ 
-                success: false, 
-                error: "نظام الأمان: ملف الاعتماد مفقود." 
-            }, { status: 500 });
-        }
-        
-        try {
-            const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
-            if (!serviceAccount.project_id) throw new Error("Empty credentials");
-            
-            initializeApp({
-                credential: cert(serviceAccount),
-            });
-        } catch (e) {
-            return NextResponse.json({ success: false, error: "فشل تهيئة المحرك السيادي." }, { status: 500 });
-        }
+        initializeApp({
+            credential: cert(serviceAccount),
+        });
     }
 
     const auth = getAuth();
