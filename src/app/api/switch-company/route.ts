@@ -1,13 +1,13 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
  * @fileOverview API سيادي لتبديل الشركة للمطور (Super Admin Switcher).
- * تم تحصينه للتعامل مع ملفات الاعتماد المفقودة بسبب حماية GitHub.
+ * تم تحصينه للتعامل مع ملفات الاعتماد المفرغة لحماية GitHub.
  */
 
 export async function POST(request: NextRequest) {
@@ -24,18 +24,26 @@ export async function POST(request: NextRequest) {
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         return NextResponse.json({ 
             success: false, 
-            error: "فشل تهيئة المحرك السيادي. تأكد من صحة ملف service-account.json." 
+            error: "فشل تهيئة المحرك السيادي. ملف الحساب (service-account.json) غير موجود." 
         }, { status: 500 });
     }
 
     let serviceAccount;
     try {
-        serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
-        if (!serviceAccount.project_id) throw new Error("Empty credentials");
+        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
+        serviceAccount = JSON.parse(fileContent);
+        
+        // فحص إذا كان الملف مفرغاً لحماية GitHub
+        if (!serviceAccount || Object.keys(serviceAccount).length === 0 || !serviceAccount.project_id) {
+            return NextResponse.json({ 
+                success: false, 
+                error: "ملف الاعتماد مفرغ لحماية GitHub. يرجى تزويد الخادم بالمفتاح الأصلي لتفعيل التقمص." 
+            }, { status: 500 });
+        }
     } catch (parseErr) {
         return NextResponse.json({ 
             success: false, 
-            error: "فشل تهيئة المحرك السيادي. ملف الاعتماد مفرغ لحماية GitHub. يرجى تزويد الخادم بالمفتاح الأصلي." 
+            error: "خطأ في قراءة ملف الاعتماد. تأكد من صحة تنسيق الـ JSON." 
         }, { status: 500 });
     }
 
