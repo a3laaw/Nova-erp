@@ -3,19 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import * as fs from 'fs';
-
-const SERVICE_ACCOUNT_PATH = './service-account.json';
+import path from 'path';
 
 /**
  * @fileOverview API سيادي لإدارة حسابات المستخدمين في Firebase Auth.
- * تم تحديثه ليدعم "الترميم" (Repair) في حال وجود الحساب مسبقاً ببيانات خاطئة.
+ * تم تحديثه لضمان إرجاع JSON ومنع الانهيار عند فقدان ملف الاعتماد.
  */
-
-if (getApps().length === 0 && fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-  initializeApp({
-    credential: cert(JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'))),
-  });
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,13 +18,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing parameters" }, { status: 400 });
     }
 
+    const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
+
+    if (getApps().length === 0) {
+        if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+            return NextResponse.json({ 
+                success: false, 
+                error: "نظام الأمان: ملف الاعتماد مفقود." 
+            }, { status: 500 });
+        }
+        
+        try {
+            const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
+            if (!serviceAccount.project_id) throw new Error("Empty credentials");
+            
+            initializeApp({
+                credential: cert(serviceAccount),
+            });
+        } catch (e) {
+            return NextResponse.json({ success: false, error: "فشل تهيئة المحرك السيادي." }, { status: 500 });
+        }
+    }
+
     const auth = getAuth();
     let userRecord;
     const sanitizedEmail = email.toLowerCase().trim();
 
     if (action === 'create' || action === 'repair') {
         try {
-            // محاولة إنشاء مستخدم جديد
             userRecord = await auth.createUser({
                 email: sanitizedEmail,
                 password: password,
@@ -40,7 +54,6 @@ export async function POST(request: NextRequest) {
             });
         } catch (e: any) {
             if (e.code === 'auth/email-already-exists') {
-                // إذا كان موجوداً، نقوم بتحديث كلمة المرور لضمان المطابقة مع ما يراه المطور
                 userRecord = await auth.getUserByEmail(sanitizedEmail);
                 await auth.updateUser(userRecord.uid, { 
                     password: password,

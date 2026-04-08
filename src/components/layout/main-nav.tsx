@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -35,7 +36,7 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import {
-  LayoutGrid,
+  Home,
   UsersRound,
   Search,
   UserCheck,
@@ -77,7 +78,8 @@ import {
   Tags,
   DatabaseZap,
   ChevronLeft,
-  BarChart3
+  BarChart3,
+  LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -87,7 +89,7 @@ import { ScrollArea } from '../ui/scroll-area';
 const navItems = {
   ar: [
     // 1. لوحة التحكم المركزية
-    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
     
     // 2. علاقات العملاء (CRM)
     { 
@@ -133,7 +135,7 @@ const navItems = {
       ]
     },
 
-    // 5. المحاسبة (سابقاً المطالبات المالية)
+    // 5. المحاسبة (التحصيل والمستخلصات)
     { 
       label: 'المحاسبة', 
       icon: Coins, 
@@ -178,7 +180,7 @@ const navItems = {
       ]
     },
 
-    // 8. المحاسبة والمالية
+    // 8. المحاسبة والمالية (التقارير العميقة)
     { 
       label: 'المحاسبة والمالية', 
       icon: Landmark, 
@@ -235,7 +237,7 @@ const navItems = {
     },
   ],
   en: [
-    { href: '/dashboard', label: 'Central Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
   ]
 };
 
