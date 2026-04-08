@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -35,7 +36,7 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import {
-  Home,
+  LayoutGrid,
   UsersRound,
   Search,
   UserCheck,
@@ -68,6 +69,7 @@ import {
   Wallet,
   Scale,
   FileBarChart,
+  BarChart3,
   Users,
   CalendarCheck,
   Calculator,
@@ -77,8 +79,6 @@ import {
   Tags,
   DatabaseZap,
   ChevronLeft,
-  BarChart3,
-  LayoutGrid
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -88,7 +88,12 @@ import { ScrollArea } from '../ui/scroll-area';
 const navItems = {
   ar: [
     // 1. لوحة التحكم المركزية
-    { href: '/dashboard', label: 'لوحة التحكم المركزية', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { 
+      href: '/dashboard', 
+      label: 'لوحة التحكم المركزية', 
+      icon: LayoutGrid, 
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
+    },
     
     // 2. علاقات العملاء (CRM)
     { 
@@ -134,9 +139,9 @@ const navItems = {
       ]
     },
 
-    // 5. المحاسبة (التحصيل والمستخلصات)
+    // 5. المطالبات المالية (كانت تسمى المحاسبة)
     { 
-      label: 'المحاسبة', 
+      label: 'المطالبات المالية', 
       icon: Coins, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/construction/payment-applications',
@@ -236,7 +241,7 @@ const navItems = {
     },
   ],
   en: [
-    { href: '/dashboard', label: 'Dashboard', icon: Home, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
   ]
 };
 
