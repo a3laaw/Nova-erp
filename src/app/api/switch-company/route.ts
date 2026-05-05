@@ -7,7 +7,7 @@ import path from 'path';
 
 /**
  * @fileOverview API سيادي لتبديل الشركة للمطور (Super Admin Switcher).
- * تم تحصينه للتعامل مع ملفات الاعتماد المفرغة لحماية GitHub.
+ * تم تحصينه ليعيد أخطاء JSON واضحة ويمنع انهيار HTML.
  */
 
 export async function POST(request: NextRequest) {
@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     
-    // 🛡️ فحص سيادي: هل ملف الاعتماد موجود وصالح؟
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         return NextResponse.json({ 
             success: false, 
@@ -33,7 +32,6 @@ export async function POST(request: NextRequest) {
         const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
         serviceAccount = JSON.parse(fileContent);
         
-        // فحص إذا كان الملف مفرغاً لحماية GitHub
         if (!serviceAccount || Object.keys(serviceAccount).length === 0 || !serviceAccount.project_id) {
             return NextResponse.json({ 
                 success: false, 
@@ -55,8 +53,6 @@ export async function POST(request: NextRequest) {
 
     const auth = getAuth();
 
-    // تعيين الختم السيادي (Custom Claims)
-    // ملاحظة: المطور يملك صلاحيات الماستر للتبديل بين المنشآت
     await auth.setCustomUserClaims(uid, {
       role: 'Developer',
       isSuperAdmin: true,
@@ -70,7 +66,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error("Switch Company Critical Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: error.message || "حدث خطأ داخلي في الخادم." 

@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -6,7 +7,7 @@ import path from 'path';
 
 /**
  * @fileOverview API سيادي لإدارة حسابات المستخدمين في Firebase Auth.
- * تم تحصينه للتعامل مع ملفات الاعتماد المفقودة بسبب حماية GitHub.
+ * تم تحصينه لضمان استقرار استجابة الـ JSON.
  */
 
 export async function POST(request: NextRequest) {
@@ -20,10 +21,7 @@ export async function POST(request: NextRequest) {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
 
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        return NextResponse.json({ 
-            success: false, 
-            error: "نظام الأمان: ملف الاعتماد مفقود." 
-        }, { status: 500 });
+        return NextResponse.json({ success: false, error: "ملف الاعتماد مفقود." }, { status: 500 });
     }
 
     let serviceAccount;
@@ -31,10 +29,7 @@ export async function POST(request: NextRequest) {
         serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
         if (!serviceAccount.project_id) throw new Error("Empty credentials");
     } catch (e) {
-        return NextResponse.json({ 
-            success: false, 
-            error: "فشل تهيئة المحرك السيادي. ملف الاعتماد مفرغ لحماية GitHub." 
-        }, { status: 500 });
+        return NextResponse.json({ success: false, error: "ملف الاعتماد مفرغ لحماية GitHub." }, { status: 500 });
     }
 
     if (getApps().length === 0) {
@@ -74,11 +69,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
         success: true, 
         uid: userRecord?.uid,
-        message: "تمت مزامنة الحساب مع خادم الأمان بنجاح." 
+        message: "تمت المزامنة بنجاح." 
     });
 
   } catch (error: any) {
-    console.error("Manage Tenant User Error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

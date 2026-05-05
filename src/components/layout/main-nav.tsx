@@ -139,7 +139,7 @@ const navItems = {
       ]
     },
 
-    // 5. المطالبات المالية (كانت تسمى المحاسبة)
+    // 5. المطالبات المالية
     { 
       label: 'المطالبات المالية', 
       icon: Coins, 
@@ -192,7 +192,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: BookOpen },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: BookOpen },
         { href: '/dashboard/accounting/cost-center-ledger', label: 'كشف حركة مراكز التكلفة', icon: Target },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: FileText },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
