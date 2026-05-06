@@ -2,14 +2,13 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Languages, Calendar, LogOut, Palette, Sparkles, ShieldAlert, ArrowRight, Zap, User } from 'lucide-react';
+import { Languages, LogOut, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
 import { Notifications } from './notifications';
 import Link from 'next/link';
 import { Breadcrumbs } from './breadcrumbs';
-import { useBranding } from '@/context/branding-context';
 import { useAppTheme } from '@/context/theme-context';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -21,8 +20,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { useFirebase } from '@/firebase';
-import { useToast } from '@/hooks/use-toast';
 
 interface HeaderProps {
     currentUser: AuthenticatedUser;
@@ -31,12 +28,8 @@ interface HeaderProps {
 }
 
 export function Header({ currentUser, onLogout, className }: HeaderProps) {
-    const { toggleLanguage } = useLanguage();
-    const { branding } = useBranding();
-    const { theme, toggleTheme } = useAppTheme();
-    const { auth } = useFirebase();
-    const { toast } = useToast();
-    const isGlass = theme === 'glass';
+    const { toggleLanguage, language } = useLanguage();
+    const { toggleTheme } = useAppTheme();
 
     return (
         <header className={cn("sticky top-0 z-30 flex h-20 items-center gap-4 bg-transparent px-8 sm:h-auto sm:border-0", className)}>
@@ -55,17 +48,23 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         variant="ghost" 
                         size="icon" 
                         onClick={toggleTheme} 
-                        className="rounded-xl h-10 w-10 text-[#1e1b4b] hover:bg-white/40"
+                        className="rounded-xl h-10 w-10 text-[#1e1b4b] hover:bg-white/40 transition-all active:scale-90"
                     >
                         <Sparkles className="h-5 w-5" />
                     </Button>
                     
-                    <Separator orientation="vertical" className="h-6 bg-white/20" />
+                    <Separator orientation="vertical" className="h-6 bg-[#1e1b4b]/10" />
 
                     <Notifications />
 
-                    <Button variant="ghost" size="icon" onClick={toggleLanguage} className="h-10 w-10 rounded-xl text-[#1e1b4b] hover:bg-white/40 font-black">
-                        {currentUser.role === 'Admin' ? 'AD' : 'EN'}
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={toggleLanguage} 
+                        className="h-10 w-10 rounded-xl text-[#1e1b4b] hover:bg-white/40 transition-all flex items-center justify-center gap-1 group"
+                    >
+                        <Languages className="h-4 w-4 group-hover:rotate-12 transition-transform" />
+                        <span className="text-[10px] font-black uppercase">{language === 'ar' ? 'EN' : 'AD'}</span>
                     </Button>
                 </div>
 

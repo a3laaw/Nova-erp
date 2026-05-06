@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -7,7 +6,7 @@ import path from 'path';
 
 /**
  * @fileOverview API سيادي لتبديل الشركة للمطور (Super Admin Switcher).
- * تم تحصينه ليعيد أخطاء JSON واضحة ويمنع انهيار HTML.
+ * تم تحصينه ليعيد أخطاء JSON واضحة ويمنع انهيار الواجهة.
  */
 
 export async function POST(request: NextRequest) {
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         return NextResponse.json({ 
             success: false, 
-            error: "فشل تهيئة المحرك السيادي. ملف الحساب (service-account.json) غير موجود." 
+            error: "فشل تهيئة المحرك. ملف الحساب (service-account.json) غير موجود." 
         }, { status: 500 });
     }
 
@@ -35,7 +34,7 @@ export async function POST(request: NextRequest) {
         if (!serviceAccount || Object.keys(serviceAccount).length === 0 || !serviceAccount.project_id) {
             return NextResponse.json({ 
                 success: false, 
-                error: "ملف الاعتماد مفرغ لحماية GitHub. يرجى تزويد الخادم بالمفتاح الأصلي لتفعيل التقمص." 
+                error: "محرك التقمص متوقف. يرجى تزويد ملف الحساب بالمفاتيح الأصلية يدوياً وتفريغها عند الرفع لـ GitHub." 
             }, { status: 500 });
         }
     } catch (parseErr) {
@@ -68,7 +67,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ 
         success: false, 
-        error: error.message || "حدث خطأ داخلي في الخادم." 
+        error: error.message || "حدث خطأ داخلي في الخادم السيادي." 
     }, { status: 500 });
   }
 }

@@ -17,8 +17,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import Link from 'next/link';
-import type { Notification } from '@/lib/types';
-import { useNotifications } from '@/hooks/use-notifications'; // Use the new hook
+import { useNotifications } from '@/hooks/use-notifications';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return '';
@@ -40,10 +39,7 @@ export function Notifications() {
 
   const handleMarkAsRead = (notificationId: string) => {
     if (!firestore || !notificationId) return;
-
     const notifRef = doc(firestore, 'notifications', notificationId);
-    // This is a "fire-and-forget" operation, we don't await it
-    // to avoid blocking navigation.
     updateDoc(notifRef, { isRead: true }).catch(error => {
       console.error("Failed to mark notification as read:", error);
     });
@@ -52,46 +48,51 @@ export function Notifications() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
+        <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-xl text-[#1e1b4b] hover:bg-white/40">
+          <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{unreadCount > 9 ? '9+' : unreadCount}</Badge>
+            <Badge className="absolute -top-1 -right-1 h-4 w-4 justify-center p-0 bg-red-600 text-white border-white text-[8px] font-black">{unreadCount > 9 ? '9+' : unreadCount}</Badge>
           )}
           <span className="sr-only">Toggle notifications</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80" dir="rtl">
-        <DropdownMenuLabel>
-          <Link href="/dashboard/notifications" className="hover:underline">
-            الإشعارات
+      <DropdownMenuContent align="end" className="w-80 rounded-3xl p-2 shadow-2xl bg-white border-none" dir="rtl">
+        <DropdownMenuLabel className="font-black text-[#1e1b4b] p-3 flex items-center justify-between">
+          إشعارات النظام
+          <Link href="/dashboard/notifications" className="text-[10px] font-bold text-primary hover:underline">
+            عرض الكل
           </Link>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {loading && <DropdownMenuItem>جاري تحميل الإشعارات...</DropdownMenuItem>}
-        {!loading && notifications.length === 0 && (
-          <DropdownMenuItem disabled className="text-center">لا توجد إشعارات جديدة.</DropdownMenuItem>
-        )}
-        {!loading && notifications.slice(0, 10).map(notif => ( // slice to show only latest
-          <DropdownMenuItem key={notif.id} className="p-0" asChild>
-             <Link
-              href={notif.link || '#'}
-              className="flex items-start gap-2 cursor-pointer p-2 w-full h-full"
-              onClick={() => {
-                if (!notif.isRead && notif.id) {
-                    handleMarkAsRead(notif.id);
-                }
-              }}
-            >
-                {!notif.isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary flex-shrink-0" />}
-                <div className={`flex-1 ${notif.isRead ? 'ml-4' : ''}`}>
-                <p className="font-semibold">{notif.title}</p>
-                <p className="text-xs text-muted-foreground whitespace-normal">{notif.body}</p>
-                <p className="text-xs text-muted-foreground mt-1">{formatDate(notif.createdAt)}</p>
-                </div>
-            </Link>
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuSeparator className="bg-slate-100" />
+        <div className="max-h-[350px] overflow-y-auto scrollbar-none">
+            {loading && <div className="p-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></div>}
+            {!loading && notifications.length === 0 && (
+            <div className="p-10 text-center text-xs font-bold text-muted-foreground italic">لا توجد إشعارات حالياً.</div>
+            )}
+            {!loading && notifications.slice(0, 10).map(notif => (
+            <DropdownMenuItem key={notif.id} className="p-0 mb-1" asChild>
+                <Link
+                href={notif.link || '#'}
+                className="flex items-start gap-3 cursor-pointer p-4 rounded-2xl hover:bg-muted/50 transition-colors w-full h-full"
+                onClick={() => {
+                    if (!notif.isRead && notif.id) {
+                        handleMarkAsRead(notif.id);
+                    }
+                }}
+                >
+                    {!notif.isRead && <Circle className="h-2 w-2 mt-1.5 fill-primary text-primary flex-shrink-0" />}
+                    <div className={cn("flex-1 space-y-1", notif.isRead && "mr-5")}>
+                    <p className="font-black text-sm text-[#1e1b4b] leading-tight">{notif.title}</p>
+                    <p className="text-[11px] font-medium text-slate-500 line-clamp-2">{notif.body}</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-2">{formatDate(notif.createdAt)}</p>
+                    </div>
+                </Link>
+            </DropdownMenuItem>
+            ))}
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+
+import { Loader2 } from 'lucide-react';
