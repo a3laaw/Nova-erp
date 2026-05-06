@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -79,6 +78,8 @@ import {
   Tags,
   DatabaseZap,
   ChevronLeft,
+  CalendarDays,
+  Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -109,7 +110,20 @@ const navItems = {
       ]
     },
 
-    // 3. المقاولات والقياسات
+    // 3. حجز المواعيد والتقويم (تمت الاستعادة)
+    { 
+      label: 'حجز المواعيد والتقويم',
+      icon: CalendarDays,
+      roles: ['Developer', 'Admin', 'Engineer', 'Secretary'],
+      hrefPrefix: '/dashboard/appointments',
+      children: [
+        { href: '/dashboard/appointments', label: 'التقويم العام للمكتب', icon: CalendarDays },
+        { href: '/dashboard/appointments/new', label: 'حجز موعد معماري', icon: MapPin },
+        { href: '/dashboard/appointments/new-other', label: 'حجز قاعة اجتماعات', icon: Home },
+      ]
+    },
+
+    // 4. المقاولات والقياسات
     { 
       label: 'المقاولات والقياسات',
       icon: PencilRuler,
@@ -127,7 +141,7 @@ const navItems = {
       ]
     },
 
-    // 4. مقاولين الباطن
+    // 5. مقاولين الباطن
     { 
       label: 'مقاولين الباطن', 
       icon: HardHat, 
@@ -139,19 +153,19 @@ const navItems = {
       ]
     },
 
-    // 5. المطالبات المالية
+    // 6. المحاسبة (سابقاً المطالبات المالية)
     { 
-      label: 'المطالبات المالية', 
+      label: 'المحاسبة', 
       icon: Coins, 
       roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/construction/payment-applications',
+      hrefPrefix: '/dashboard/accounting/invoices',
       children: [
         { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال', icon: FileSignature },
         { href: '/dashboard/accounting/client-statements', label: 'مديونيات العملاء', icon: ArrowDownLeft },
       ]
     },
 
-    // 6. إدارة المشتريات
+    // 7. إدارة المشتريات
     { 
       label: 'إدارة المشتريات', 
       icon: ShoppingBag, 
@@ -168,7 +182,7 @@ const navItems = {
       ]
     },
 
-    // 7. المخازن والمستودعات
+    // 8. المخازن والمستودعات
     { 
       label: 'المخازن والمستودعات', 
       icon: Box, 
@@ -184,7 +198,7 @@ const navItems = {
       ]
     },
 
-    // 8. المحاسبة والمالية
+    // 9. المحاسبة والمالية (العميقة)
     { 
       label: 'المحاسبة والمالية', 
       icon: Landmark, 
@@ -192,7 +206,7 @@ const navItems = {
       hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ', icon: BookOpen },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: BookOpen },
         { href: '/dashboard/accounting/cost-center-ledger', label: 'كشف حركة مراكز التكلفة', icon: Target },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: FileText },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
@@ -206,7 +220,7 @@ const navItems = {
       ]
     },
 
-    // 9. شؤون الموظفين (HR)
+    // 10. شؤون الموظفين (HR)
     { 
       label: 'شؤون الموظفين (HR)', 
       icon: Users, 
@@ -214,7 +228,7 @@ const navItems = {
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
-        { href: '/dashboard/hr/custody-reconciliation/new', label: 'تسوية عهدة نقدية', icon: Wallet },
+        { href: '/dashboard/hr/custody-reconciliation/new', label: 'تقديم تسوية عهدة', icon: Wallet },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذانات', icon: Clock3 },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Landmark },
@@ -223,7 +237,7 @@ const navItems = {
       ]
     },
 
-    // 10. الإعدادات
+    // 11. الإعدادات
     { 
       label: 'الإعدادات', 
       icon: Settings2, 
