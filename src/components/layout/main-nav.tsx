@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -153,9 +154,9 @@ const navItems = {
       ]
     },
 
-    // 6. المحاسبة
+    // 6. المطالبات المالية (Re-integrated per user request)
     { 
-      label: 'المحاسبة', 
+      label: 'المطالبات المالية', 
       icon: Coins, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting/invoices',
