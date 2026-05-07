@@ -168,7 +168,7 @@ export function ReferenceDataManager() {
         } finally { setIsSaving(false); }
     };
 
-    const handleDeleteAction = async () => {
+    const handleDelete = async () => { // FIXED: Renamed to handleDelete from handleDeleteAction to avoid ReferenceError
         if (!firestore || !itemToDelete || !tenantId) return;
         setIsSaving(true);
         try {
@@ -346,7 +346,7 @@ export function ReferenceDataManager() {
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={() => setIsDeleteDialogOpen(false)}>
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
@@ -354,7 +354,7 @@ export function ReferenceDataManager() {
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteAction} disabled={isSaving} className="bg-red-600 rounded-xl font-black px-10">
+                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 rounded-xl font-black px-10">
                             {isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>

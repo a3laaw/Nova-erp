@@ -135,7 +135,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'المحاسبة', 
+      label: 'المحاسبة والمالية', 
       icon: Landmark, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting',
@@ -172,7 +172,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'التقارير والمالية', 
+      label: 'التقارير التحليلية', 
       icon: FileBarChart, 
       roles: ['Developer', 'Admin', 'Accountant'],
       hrefPrefix: '/dashboard/accounting/reports',
