@@ -28,7 +28,7 @@ import type { Client, Company, ClientTransaction, Account, Employee, Department,
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { numberToArabicWords, formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';

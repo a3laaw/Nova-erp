@@ -2,7 +2,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sparkles, User, Languages, Globe, Bell } from 'lucide-react';
+import { Sparkles, User, Globe, Bell, Languages } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -57,7 +57,6 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Notifications />
 
-                    {/* زر اللغة العصري بتصميم Glassmorphism */}
                     <Button 
                         variant="ghost" 
                         onClick={toggleLanguage} 
@@ -70,11 +69,10 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     </Button>
                 </div>
 
-                {/* كبسولة الملف الشخصي الاحترافية بنقاء تام */}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
-                            <Avatar className="h-11 w-11 border border-primary/20 shadow-[0_10px_25px_rgba(0,0,0,0.1)] ring-offset-background transition-all group-hover:ring-2 group-hover:ring-primary/40">
+                            <Avatar className="h-11 w-11 border border-primary/20 shadow-[0_10px_25px_rgba(0,0,0,0.1)] ring-offset-background transition-all group-hover:ring-2 group-hover:ring-primary/40 overflow-hidden bg-white">
                                 <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} className="object-cover" />
                                 <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-xs">
                                     {currentUser.fullName?.charAt(0) || 'N'}
