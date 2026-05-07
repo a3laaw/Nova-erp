@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -80,6 +81,7 @@ import {
   ChevronLeft,
   CalendarDays,
   Home,
+  UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -88,15 +90,12 @@ import { ScrollArea } from '../ui/scroll-area';
 
 const navItems = {
   ar: [
-    // 1. لوحة التحكم المركزية
     { 
       href: '/dashboard', 
       label: 'لوحة التحكم المركزية', 
       icon: LayoutGrid, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
     },
-    
-    // 2. علاقات العملاء (CRM)
     { 
       label: 'علاقات العملاء (CRM)', 
       icon: UsersRound, 
@@ -109,8 +108,6 @@ const navItems = {
         { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: Sparkles },
       ]
     },
-
-    // 3. المقاولات والقياسات
     { 
       label: 'المقاولات والقياسات',
       icon: PencilRuler,
@@ -128,8 +125,6 @@ const navItems = {
         { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: AlertTriangle },
       ]
     },
-
-    // 4. مقاولين الباطن
     { 
       label: 'مقاولين الباطن', 
       icon: HardHat, 
@@ -140,8 +135,6 @@ const navItems = {
         { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات إنجاز الأعمال', icon: FileCheck },
       ]
     },
-
-    // 5. المطالبات المالية
     { 
       label: 'المطالبات المالية', 
       icon: Coins, 
@@ -152,8 +145,6 @@ const navItems = {
         { href: '/dashboard/accounting/client-statements', label: 'مديونيات العملاء', icon: ArrowDownLeft },
       ]
     },
-
-    // 6. إدارة المشتريات
     { 
       label: 'إدارة المشتريات', 
       icon: ShoppingBag, 
@@ -169,8 +160,6 @@ const navItems = {
         { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: Landmark },
       ]
     },
-
-    // 7. المخازن والمستودعات
     { 
       label: 'المخازن والمستودعات', 
       icon: Box, 
@@ -185,8 +174,6 @@ const navItems = {
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: ListTree },
       ]
     },
-
-    // 8. المحاسبة والمالية
     { 
       label: 'المحاسبة والمالية', 
       icon: Landmark, 
@@ -207,8 +194,6 @@ const navItems = {
         { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: BarChart3 },
       ]
     },
-
-    // 9. شؤون الموظفين (HR)
     { 
       label: 'شؤون الموظفين (HR)', 
       icon: Users, 
@@ -224,8 +209,6 @@ const navItems = {
         { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
     },
-
-    // 10. الإعدادات
     { 
       label: 'الإعدادات', 
       icon: Settings2, 
