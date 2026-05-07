@@ -121,7 +121,7 @@ const CommandItem = React.forwardRef<
       className
     )}
     onMouseDown={(e) => {
-      e.preventDefault();
+      // 🛡️ Force event propagation to ensure mouse clicks work
       onMouseDown?.(e);
     }}
     {...props}

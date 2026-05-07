@@ -168,7 +168,7 @@ export function ReferenceDataManager() {
         } finally { setIsSaving(false); }
     };
 
-    const handleDelete = async () => { // FIXED: Renamed to handleDelete from handleDeleteAction to avoid ReferenceError
+    const handleDelete = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
         setIsSaving(true);
         try {

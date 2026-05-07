@@ -62,7 +62,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         onClick={toggleLanguage} 
                         className="h-10 px-4 rounded-full text-[#1e1b4b] hover:bg-primary/5 transition-all flex items-center gap-2 group relative overflow-hidden"
                     >
-                        <Languages className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform" />
+                        <Globe className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform" />
                         <span className="text-[10px] font-black uppercase tracking-tighter">
                             {language === 'ar' ? 'English' : 'عربي'}
                         </span>
@@ -81,7 +81,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                             <div className="absolute -bottom-0.5 -left-0.5 h-4 w-4 rounded-full border-2 border-white bg-green-500 shadow-md ring-1 ring-green-600/20" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_25px_60px_rgba(0,0,0,0.2)] bg-white/95 backdrop-blur-2xl border-white/40" align="end" forceMount dir="rtl">
+                    <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_25px_60px_rgba(0,0,0,0.2)] bg-white/95 backdrop-blur-2xl border-white/40" align="end" forceMount dir="rtl" style={{ pointerEvents: 'auto' }}>
                         <DropdownMenuLabel className="font-normal p-5">
                             <div className="flex flex-col space-y-2 text-right">
                                 <p className="text-sm font-black text-[#1e1b4b] leading-none">{currentUser.fullName}</p>

@@ -23,6 +23,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -102,11 +103,23 @@ export default function RegisterPage() {
                         <div className="grid gap-5">
                             <div className="grid gap-2">
                                 <Label className="text-[#1e1b4b] font-black text-xs">اسم المكتب / الشركة *</Label>
-                                <div className="relative"><Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" /><Input value={formData.companyName} onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-inner font-black text-[#1e1b4b]" required /></div>
+                                <div className="relative group">
+                                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
+                                    <Input value={formData.companyName} onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-inner font-black text-[#1e1b4b]" required />
+                                </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label className="text-[#1e1b4b] font-black text-xs">نوع النشاط الرئيسي</Label>
-                                <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}><SelectTrigger className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]"><SelectValue /></SelectTrigger><SelectContent dir="rtl"><SelectItem value="consulting">استشارات هندسية</SelectItem><SelectItem value="construction">مقاولات وبناء</SelectItem><SelectItem value="food_delivery">مطاعم وأغذية</SelectItem></SelectContent></Select>
+                                <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
+                                    <SelectTrigger className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                        <SelectItem value="consulting">استشارات هندسية</SelectItem>
+                                        <SelectItem value="construction">مقاولات وبناء</SelectItem>
+                                        <SelectItem value="food_delivery">مطاعم وأغذية</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                     </div>
@@ -114,9 +127,18 @@ export default function RegisterPage() {
                     <div className="space-y-6">
                         <h3 className="font-black text-[#1e1b4b] text-xs border-r-4 border-indigo-600 pr-3 uppercase">بيانات المدير</h3>
                         <div className="grid gap-5">
-                            <div className="grid gap-2"><Label className="text-[#1e1b4b] font-black text-xs">اسم المدير المسؤول *</Label><Input value={formData.contactName} onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]" required /></div>
-                            <div className="grid gap-2"><Label className="text-[#1e1b4b] font-black text-xs">البريد الإلكتروني *</Label><Input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b] dir-ltr" required /></div>
-                            <div className="grid gap-2"><Label className="text-[#1e1b4b] font-black text-xs">كلمة المرور المطلوبة *</Label><Input type="password" value={formData.adminPassword} onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]" required /></div>
+                            <div className="grid gap-2">
+                                <Label className="text-[#1e1b4b] font-black text-xs">اسم المدير المسؤول *</Label>
+                                <Input value={formData.contactName} onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]" required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="text-[#1e1b4b] font-black text-xs">البريد الإلكتروني *</Label>
+                                <Input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b] dir-ltr" required />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="text-[#1e1b4b] font-black text-xs">كلمة المرور المطلوبة *</Label>
+                                <Input type="password" value={formData.adminPassword} onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} className="h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]" required />
+                            </div>
                         </div>
                     </div>
                 </div>

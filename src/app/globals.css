@@ -81,3 +81,26 @@
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* 🛡️ Sovereign Pointer Events Shield 🛡️ */
+/* Fixes mouse selection issues in all Radix-based popovers/selects */
+[data-radix-popper-content-wrapper], 
+[role="listbox"], 
+[role="combobox"], 
+[data-radix-select-content],
+[data-radix-popover-content] {
+  pointer-events: auto !important;
+  z-index: 99999 !important;
+}
+
+[role="option"], 
+[role="menuitem"], 
+[cmdk-item] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* Ensure dialog overlays don't block clicks in portals */
+[data-radix-portal] {
+  pointer-events: auto !important;
+}
