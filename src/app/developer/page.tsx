@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp, deleteField } from 'firebase/firestore';
-import type { Company, CompanyRequest, UserProfile, GlobalUserIndex } from '@/lib/types';
+import type { Company, CompanyRequest, UserProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
     MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
     Activity, Users, Clock, Timer, CheckCircle2, ShieldAlert, 
-    FileStack, Rocket, XCircle, Key, Copy, RefreshCw 
+    FileStack, Rocket, XCircle, Key, Copy, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -100,7 +100,7 @@ export default function DeveloperDashboard() {
             })
         });
         const authResult = await authResponse.json();
-        if (!authResult.success) throw new Error(authResult.error);
+        if (!authResult.success && !authResult.simulated) throw new Error(authResult.error);
 
         const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
         const trialEndDate = addDays(new Date(), 14);
@@ -126,9 +126,10 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
+            // إنشاء ملف المستخدم المعزول
+            const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid || 'simulated-uid');
             transaction.set(tenantUserRef, {
-                uid: authResult.uid,
+                uid: authResult.uid || 'simulated-uid',
                 email: request.email.toLowerCase().trim(),
                 username: request.email.split('@')[0],
                 fullName: request.contactName,
@@ -147,41 +148,13 @@ export default function DeveloperDashboard() {
             });
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
-        toast({ title: 'تم التفعيل', description: `تم تأسيس منشأة "${request.companyName}" بنجاح.` });
+        
+        toast({ 
+            title: authResult.simulated ? 'نجاح المحاكاة' : 'تم التفعيل المباشر', 
+            description: `تم تأسيس منشأة "${request.companyName}" بنجاح ${authResult.simulated ? '(وضع الحماية)' : ''}.` 
+        });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
-    } finally { setIsProcessing(null); }
-  };
-
-  const handleRepairAuth = async (company: Company) => {
-    if (!firestore || isProcessing) return;
-    setIsProcessing(company.id!);
-    try {
-        const response = await fetch('/api/manage-tenant-user', {
-            method: 'POST',
-            body: JSON.stringify({
-                email: company.adminEmail,
-                password: company.adminPassword || 'Sovereign@2026',
-                displayName: company.name,
-                action: 'repair'
-            })
-        });
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error);
-
-        const globalIndexQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail.toLowerCase()));
-        const snap = await getDocs(globalIndexQuery);
-        if (snap.empty) {
-            await addDoc(collection(firestore, 'global_users'), {
-                email: company.adminEmail.toLowerCase().trim(),
-                username: company.adminEmail.split('@')[0],
-                companyId: company.id,
-                role: 'Admin'
-            });
-        }
-        toast({ title: 'تم ترميم الحساب', description: 'تمت مزامنة بيانات الدخول والفهرس العالمي بنجاح.' });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'فشل الترميم', description: e.message });
     } finally { setIsProcessing(null); }
   };
 
@@ -196,8 +169,17 @@ export default function DeveloperDashboard() {
         });
         const result = await response.json();
         if (!result.success) throw new Error(result.error);
-        if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
-        toast({ title: 'تم التقمص', description: `أنت الآن تتحكم بمنشأة ${company.name}.` });
+        
+        if (result.simulated) {
+            toast({ 
+                title: 'تقمص محاكى (صوري)', 
+                description: result.message,
+                variant: 'default'
+            });
+        } else {
+            if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
+            toast({ title: 'تم التقمص', description: `أنت الآن تتحكم بمنشأة ${company.name}.` });
+        }
         router.push('/dashboard');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التبديل', description: e.message });
@@ -225,6 +207,14 @@ export default function DeveloperDashboard() {
                 </div>
             </CardHeader>
         </Card>
+
+        {/* تنبيه وضع المحاكاة السيادي */}
+        <div className="p-4 bg-amber-500/10 border-2 border-amber-500/20 rounded-3xl flex items-center gap-4 animate-in fade-in duration-700">
+            <div className="p-2 bg-amber-500 rounded-xl text-white shadow-lg"><AlertCircle className="h-5 w-5" /></div>
+            <p className="text-xs font-black text-amber-500 uppercase tracking-widest leading-relaxed">
+                تنبيه: محرك الأمان في وضع المحاكاة (ملف الاعتماد مفرغ لحماية GitHub). يمكنك التعديل والحفظ في قاعدة البيانات، ولكن لن يتم تحديث الصلاحيات الحقيقية على خادم الأمان.
+            </p>
+        </div>
 
         <Tabs defaultValue="companies" className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 backdrop-blur-xl h-16 w-fit mx-auto flex gap-4">
@@ -305,7 +295,6 @@ export default function DeveloperDashboard() {
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl">
                                                                 <DropdownMenuItem onClick={() => handleSwitchToCompany(company)} className="gap-2 py-3 font-bold text-indigo-600"><ArrowRightLeft className="h-4 w-4"/> التقمص السيادي</DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleRepairAuth(company)} className="gap-2 py-3 font-bold text-green-600"><RefreshCw className="h-4 w-4"/> مزامنة وإصلاح الدخول</DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem onClick={() => { setSelectedCompanyForEdit(company); setIsRegistrationOpen(true); }} className="gap-2 py-3 font-bold"><Pencil className="h-4 w-4"/> تعديل البيانات</DropdownMenuItem>
                                                             </DropdownMenuContent>

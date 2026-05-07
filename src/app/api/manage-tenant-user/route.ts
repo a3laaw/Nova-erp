@@ -7,56 +7,39 @@ import path from 'path';
 
 /**
  * @fileOverview API سيادي لإدارة حسابات المستخدمين.
- * تم تحديثه لدعم "وضع المحاكاة" عند تفريغ ملف الاعتماد لحماية GitHub.
+ * تم تحديثه لفرض "وضع المحاكاة الناجح" دائماً عند تفريغ الملف للسماح للمدير بالتعديل والحفظ.
  */
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password, displayName, action } = await request.json();
 
-    if (!email || !password) {
-      return NextResponse.json({ success: false, error: "Missing parameters" }, { status: 400 });
-    }
-
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
+    let useSimulation = false;
 
-    // 🛡️ فحص وجود الملف ومحتواه
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        return NextResponse.json({ 
-            success: true, 
-            simulated: true,
-            uid: `sim_${Math.random().toString(36).substring(7)}`,
-            message: "وضع المحاكاة نشط (الملف مفقود)." 
-        });
+        useSimulation = true;
+    } else {
+        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
+        const sa = JSON.parse(fileContent || '{}');
+        if (!sa || Object.keys(sa).length === 0 || !sa.project_id) {
+            useSimulation = true;
+        }
     }
 
-    let serviceAccount;
-    try {
-        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-        serviceAccount = JSON.parse(fileContent);
-        
-        if (!serviceAccount || Object.keys(serviceAccount).length === 0 || !serviceAccount.project_id) {
-            // 🚀 العودة لوضع المحاكاة بدلاً من إرجاع خطأ يعيق العمل
-            return NextResponse.json({ 
-                success: true, 
-                simulated: true,
-                uid: `sim_${Math.random().toString(36).substring(7)}`,
-                message: "وضع المحاكاة نشط (ملف مفرغ لحماية GitHub)." 
-            });
-        }
-    } catch (e) {
+    // 🛡️ بروتوكول التجاوز السيادي: إذا كان الملف مفرغاً لحماية GitHub، نُعيد نجاحاً محاكياً
+    if (useSimulation) {
         return NextResponse.json({ 
             success: true, 
             simulated: true,
             uid: `sim_${Math.random().toString(36).substring(7)}`,
-            message: "وضع المحاكاة نشط (خطأ في قراءة الملف)." 
+            message: "تم الحفظ في وضع المحاكاة (ملف الاعتماد مفرغ لحماية GitHub)." 
         });
     }
 
     if (getApps().length === 0) {
-        initializeApp({
-            credential: cert(serviceAccount),
-        });
+        const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
+        initializeApp({ credential: cert(sa) });
     }
 
     const auth = getAuth();
@@ -90,7 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
         success: true, 
         uid: userRecord?.uid,
-        message: "تمت المزامنة بنجاح." 
+        message: "تمت المزامنة بنجاح مع خادم الأمان." 
     });
 
   } catch (error: any) {
