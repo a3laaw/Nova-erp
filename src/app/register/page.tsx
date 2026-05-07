@@ -96,8 +96,8 @@ export default function RegisterPage() {
         <CardHeader className="py-12 px-10 border-b border-black/5 bg-white/20">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-5">
-                    <div className="p-4 bg-white/60 rounded-[2rem] backdrop-blur-md border border-white shadow-xl transition-transform hover:scale-110 duration-500">
-                        <Rocket className="h-10 w-10 text-[#1e1b4b]" />
+                    <div className="p-4 bg-[#1e1b4b] rounded-[2rem] backdrop-blur-md border border-white/20 shadow-xl transition-transform hover:scale-110 duration-500">
+                        <Rocket className="h-10 w-10 text-white" />
                     </div>
                     <div>
                         <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter flex items-center gap-2">
@@ -126,29 +126,29 @@ export default function RegisterPage() {
                         </h3>
                         <div className="grid gap-5">
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b]/80 font-black text-xs mr-1">اسم المكتب / الشركة *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs mr-1">اسم المكتب / الشركة *</Label>
                                 <div className="relative group">
-                                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600/40 group-focus-within:text-indigo-600 transition-colors" />
+                                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
                                     <Input 
                                         value={formData.companyName} 
                                         onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
-                                        className="pr-10 h-12 rounded-xl bg-white/80 border-2 border-transparent focus:border-indigo-600/20 shadow-inner font-bold text-[#1e1b4b]" 
+                                        className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 focus:border-indigo-600 shadow-sm font-black text-[#1e1b4b] placeholder:text-slate-300" 
                                         placeholder="مثال: مكتب الخليج للاستشارات"
                                         required 
                                     />
                                 </div>
                             </div>
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b]/80 font-black text-xs mr-1">نوع النشاط الرئيسي</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs mr-1">نوع النشاط الرئيسي</Label>
                                 <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
-                                    <SelectTrigger className="h-12 rounded-xl bg-white/80 border-2 border-transparent shadow-inner font-bold text-[#1e1b4b]">
+                                    <SelectTrigger className="h-12 rounded-xl bg-white border-2 border-slate-200 shadow-sm font-black text-[#1e1b4b]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent dir="rtl" className="rounded-2xl border-none shadow-2xl">
-                                        <SelectItem value="consulting" className="font-bold py-3">استشارات هندسية</SelectItem>
-                                        <SelectItem value="construction" className="font-bold py-3">مقاولات وبناء</SelectItem>
-                                        <SelectItem value="food_delivery" className="font-bold py-3">مطاعم وأغذية</SelectItem>
-                                        <SelectItem value="general" className="font-bold py-3">تجاري عام</SelectItem>
+                                        <SelectItem value="consulting" className="font-black py-3">استشارات هندسية</SelectItem>
+                                        <SelectItem value="construction" className="font-black py-3">مقاولات وبناء</SelectItem>
+                                        <SelectItem value="food_delivery" className="font-black py-3">مطاعم وأغذية</SelectItem>
+                                        <SelectItem value="general" className="font-black py-3">تجاري عام</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -160,41 +160,41 @@ export default function RegisterPage() {
                         <h3 className="font-black text-[#1e1b4b] text-xs border-r-4 border-indigo-600 pr-3 uppercase tracking-[0.2em]">حساب المدير السيادي</h3>
                         <div className="grid gap-5">
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b]/80 font-black text-xs mr-1">اسم المدير المسؤول *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs mr-1">اسم المدير المسؤول *</Label>
                                 <div className="relative group">
-                                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600/40 group-focus-within:text-indigo-600" />
+                                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
                                     <Input 
                                         value={formData.contactName} 
                                         onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} 
-                                        className="pr-10 h-12 rounded-xl bg-white/80 border-2 border-transparent shadow-inner font-bold text-[#1e1b4b]" 
+                                        className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-sm font-black text-[#1e1b4b] placeholder:text-slate-300" 
                                         required 
                                         placeholder="الاسم الثلاثي..."
                                     />
                                 </div>
                             </div>
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b]/80 font-black text-xs mr-1">البريد الإلكتروني (للدخول) *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs mr-1">البريد الإلكتروني (للدخول) *</Label>
                                 <div className="relative group">
-                                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600/40 group-focus-within:text-indigo-600" />
+                                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
                                     <Input 
                                         type="email" 
                                         value={formData.email} 
                                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                                        className="pr-10 h-12 rounded-xl bg-white/80 border-2 border-transparent shadow-inner font-bold text-[#1e1b4b] dir-ltr" 
+                                        className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-sm font-black text-[#1e1b4b] dir-ltr placeholder:text-slate-300" 
                                         required 
                                         placeholder="email@example.com"
                                     />
                                 </div>
                             </div>
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b]/80 font-black text-xs mr-1">كلمة المرور المطلوبة *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs mr-1">كلمة المرور المطلوبة *</Label>
                                 <div className="relative group">
-                                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600/40 group-focus-within:text-indigo-600" />
+                                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
                                     <Input 
                                         type="password" 
                                         value={formData.adminPassword} 
                                         onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
-                                        className="pr-10 h-12 rounded-xl bg-white/80 border-2 border-transparent shadow-inner font-bold text-[#1e1b4b]" 
+                                        className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-sm font-black text-[#1e1b4b] placeholder:text-slate-300" 
                                         placeholder="8 أحرف على الأقل"
                                         required 
                                     />
@@ -205,13 +205,13 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="grid gap-3 max-w-sm">
-                    <Label className="text-[#1e1b4b]/80 font-black text-xs mr-1">رقم التواصل (WhatsApp) *</Label>
+                    <Label className="text-[#1e1b4b] font-black text-xs mr-1">رقم التواصل (WhatsApp) *</Label>
                     <div className="relative group">
-                        <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600/40 group-focus-within:text-indigo-600" />
+                        <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
                         <Input 
                             value={formData.phone} 
                             onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
-                            className="pr-10 h-12 rounded-xl bg-white/80 border-2 border-transparent shadow-inner font-bold text-[#1e1b4b] dir-ltr" 
+                            className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-sm font-black text-[#1e1b4b] dir-ltr placeholder:text-slate-300" 
                             required 
                             placeholder="+965 XXXXXXXX"
                         />
@@ -219,10 +219,10 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="p-6 bg-indigo-600/5 rounded-3xl border-2 border-dashed border-indigo-600/20 flex items-center gap-5 backdrop-blur-sm shadow-inner">
-                    <div className="p-3 bg-indigo-600 rounded-2xl shadow-lg animate-bounce">
+                    <div className="p-3 bg-[#1e1b4b] rounded-2xl shadow-lg animate-bounce">
                         <Sparkles className="h-6 w-6 text-white" />
                     </div>
-                    <p className="text-xs font-black text-[#1e1b4b]/80 leading-relaxed">
+                    <p className="text-xs font-black text-[#1e1b4b] leading-relaxed">
                         بمجرد إرسال الطلب، سيتم مراجعته وتهيئة <span className="text-indigo-600">رخصة المطور</span> لشركتك. ستحصل على فترة تجريبية كاملة لكافة المزايا السيادية للنظام.
                     </p>
                 </div>

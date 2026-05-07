@@ -14,7 +14,8 @@ import {
     getDocs, 
     where, 
     serverTimestamp,
-    getDoc
+    getDoc,
+    collectionGroup
 } from 'firebase/firestore';
 import type { 
     Department, 
@@ -58,7 +59,8 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, Briefcase, FileSignature, Layers
+    MapPin, Briefcase, FileSignature, Layers,
+    ChevronLeft, CheckCircle2, X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -66,7 +68,6 @@ import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Badge } from '../ui/badge';
-import { InlineSearchList } from '../ui/inline-search-list';
 import { defaultDepartments, defaultGovernorates, defaultAreas, defaultJobs, defaultWorkStages } from '@/lib/default-reference-data';
 
 // --- مساعدات العرض السيادي ---
@@ -90,7 +91,6 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { tit
     );
 }
 
-// --- محرك الإدارة السيادي الموحد (The Sovereign Registry Engine) ---
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
@@ -173,7 +173,8 @@ export function ReferenceDataManager() {
         } finally { setIsSaving(false); }
     };
 
-    const handleDeleteConfirm = async () => {
+    // ✨ تصحيح الخطأ البرمجي: دالة الحذف الموحدة ✨
+    const handleDelete = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
         setIsSaving(true);
         try {
@@ -198,14 +199,12 @@ export function ReferenceDataManager() {
                     const deptRef = doc(collection(firestore, getTenantPath('departments', tenantId)));
                     batch.set(deptRef, { ...dept, companyId: tenantId, createdAt: serverTimestamp() });
                     
-                    // استيراد الوظائف التابعة
                     const deptJobs = defaultJobs[dept.name] || [];
                     for (const job of deptJobs) {
                         const jobRef = doc(collection(firestore, `${deptRef.path}/jobs`));
                         batch.set(jobRef, { ...job, companyId: tenantId, createdAt: serverTimestamp() });
                     }
                     
-                    // استيراد مراحل العمل (WBS) التابعة
                     const deptStages = defaultWorkStages[dept.name] || [];
                     for (const stage of deptStages) {
                         const stageRef = doc(collection(firestore, `${deptRef.path}/workStages`));
@@ -417,7 +416,7 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-medium">سيتم مسح سجل "{itemToDelete?.name}" من النظام تماماً. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-medium text-slate-800">سيتم مسح سجل "{itemToDelete?.name}" من النظام تماماً. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
@@ -431,11 +430,11 @@ export function ReferenceDataManager() {
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black text-primary">استيراد القائمة الافتراضية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-medium leading-relaxed">هذا الإجراء سيقوم بـ <strong>تصفير كافة البيانات الحالية</strong> لهذا القسم واستبدالها بالقائمة القياسية لنظام Nova ERP.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">استيراد القائمة الافتراضية؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-medium leading-relaxed text-slate-800">هذا الإجراء سيقوم بـ <strong>تصفير كافة البيانات الحالية</strong> لهذا القسم واستبدالها بالقائمة القياسية لنظام Nova ERP.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-xl font-bold text-slate-900">إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="bg-primary hover:bg-primary/90 rounded-xl font-black px-10 shadow-lg shadow-primary/20">
                             {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، استبدال الآن'}
                         </AlertDialogAction>
