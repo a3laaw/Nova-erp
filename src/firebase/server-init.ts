@@ -1,24 +1,17 @@
-import { initializeApp, getApp, getApps, type FirebaseOptions } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-const firebaseConfig: FirebaseOptions = {
-  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-  projectId: "studio-8039389980-3d2d0",
-  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-  messagingSenderId: "828494117254",
-  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
-  measurementId: "G-Q7DPZ802VJ"
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
+  authDomain: "nov-erp-1-25549967-c24e5.firebaseapp.com",
+  projectId: "nov-erp-1-25549967-c24e5",
+  storageBucket: "nov-erp-1-25549967-c24e5.firebasestorage.app",
+  messagingSenderId: "71297676078",
+  appId: "1:71297676078:web:b956ab00372e6ba237c0bf"
 };
 
-let app;
 // Initialize Firebase
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
-
-const firestore = getFirestore(app);
-
-export { firestore };
+const app = initializeApp(firebaseConfig);
