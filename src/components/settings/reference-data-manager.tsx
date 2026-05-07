@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { 
     collection, 
@@ -120,7 +120,7 @@ export function ReferenceDataManager() {
     const secondaryCollection = useMemo(() => {
         if (view === 'departments') return activeSubTab === 'jobs' ? 'jobs' : 'workStages';
         if (view === 'locations') return 'areas';
-        return ''; // Transactions don't have secondary items in this view
+        return '';
     }, [view, activeSubTab]);
 
     const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollection || null, [orderBy('name')]);
@@ -145,10 +145,7 @@ export function ReferenceDataManager() {
         if (!firestore || !tenantId || !itemName.trim()) return;
         
         const path = type === 'primary' ? primaryCollection : secondaryPath;
-        if (!path) {
-            toast({ variant: 'destructive', title: 'خطأ في المسار', description: 'لا يمكن الحفظ؛ المسار المرجعي غير معرّف.' });
-            return;
-        }
+        if (!path) return;
 
         setIsSaving(true);
         try {
@@ -164,13 +161,11 @@ export function ReferenceDataManager() {
                 await addDoc(collection(firestore, getTenantPath(path, tenantId)), {
                     ...dataToSave,
                     createdAt: serverTimestamp(),
-                    order: (type === 'primary' ? primaryItems.length : secondaryItems.length) + 1
                 });
             }
             toast({ title: 'نجاح الحفظ' });
             closeDialog();
         } catch (e) {
-            console.error("Save Error:", e);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         } finally { setIsSaving(false); }
     };
@@ -349,19 +344,20 @@ export function ReferenceDataManager() {
 
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
                 <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] p-8 shadow-2xl border-none">
-                    <DialogHeader><DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل' : 'إضافة'} سجل</DialogTitle></DialogHeader>
-                    <div className="py-8">
-                        <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label>
-                        <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black" />
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                        <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')} disabled={isSaving} className="rounded-xl font-black h-12 px-12">
-                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
+                    <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
+                        <DialogHeader><DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل' : 'إضافة'} سجل</DialogTitle></DialogHeader>
+                        <div className="py-8">
+                            <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label>
+                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black" />
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                            <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12">
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
             </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
