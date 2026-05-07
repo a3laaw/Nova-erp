@@ -50,21 +50,18 @@
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
   }
   
-  /* 🛡️ خلفية القائمة الجانبية المتدرجة رأسياً */
   .sidebar-glass {
     background: linear-gradient(180deg, #e9e4ff 0%, #f5d0fe 100%) !important;
     border: none !important;
     box-shadow: -10px 0 30px rgba(0,0,0,0.05) !important;
   }
 
-  /* 💊 كبسولة العنصر النشط بتدرج أفقي أعمق لليسار مع نص أسود */
   .nav-capsule-active {
     background: linear-gradient(to left, #ffffff 0%, #d8b4fe 100%) !important;
     box-shadow: 0 10px 30px rgba(168, 85, 247, 0.15) !important;
     @apply text-[#1e1b4b] font-black scale-[1.02] border-none;
   }
 
-  /* 💊 كبسولة العنصر غير النشط بتدرج أعمق جهة اليسار مع نص أسود */
   .nav-capsule {
     background: linear-gradient(to left, rgba(255, 255, 255, 0.5) 0%, rgba(168, 85, 247, 0.15) 100%) !important;
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
@@ -82,15 +79,15 @@
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* 🛡️ Sovereign Pointer Events Shield 🛡️ */
-/* Fixes mouse selection issues in all Radix-based popovers/selects */
+/* 🛡️ Sovereign Mouse Dominance Shield 🛡️ */
 [data-radix-popper-content-wrapper], 
 [role="listbox"], 
 [role="combobox"], 
 [data-radix-select-content],
-[data-radix-popover-content] {
+[data-radix-popover-content],
+[data-radix-portal] {
   pointer-events: auto !important;
-  z-index: 99999 !important;
+  z-index: 999999 !important;
 }
 
 [role="option"], 
@@ -98,14 +95,4 @@
 [cmdk-item] {
   cursor: pointer !important;
   pointer-events: auto !important;
-}
-
-/* Ensure dialog overlays don't block clicks */
-[data-radix-portal] {
-  pointer-events: auto !important;
-}
-
-/* Override Radix portal defaults for our specific context */
-div[data-radix-popper-content-wrapper] {
-    pointer-events: auto !important;
 }

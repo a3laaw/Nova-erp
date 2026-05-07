@@ -66,7 +66,7 @@ import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Badge } from '../ui/badge';
-import { defaultDepartments, defaultGovernorates, defaultAreas, defaultJobs, defaultWorkStages } from '@/lib/default-reference-data';
+import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 
 function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean }) {
     return (
@@ -173,7 +173,7 @@ export function ReferenceDataManager() {
     const handleDelete = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
         
-        const path = itemToDelete.type === 'primary' ? primaryCollection : secondaryPath;
+        const path = itemToDelete.target === 'primary' ? primaryCollection : secondaryPath;
         if (!path) return;
 
         setIsSaving(true);
@@ -282,7 +282,7 @@ export function ReferenceDataManager() {
                                             <span className="font-black text-sm truncate">{item.name}</span>
                                             <div className={cn("flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity", selectedPrimaryId === item.id && "opacity-100")}>
                                                 <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-white/20 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setIsPrimaryDialogOpen(true); }}><Pencil className="h-3.5 w-3.5"/></Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-red-100/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, type: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3.5 w-3.5"/></Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-red-100/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3.5 w-3.5"/></Button>
                                             </div>
                                         </div>
                                     ))}
@@ -321,7 +321,7 @@ export function ReferenceDataManager() {
                                                     <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
                                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
-                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl text-red-600 border" onClick={() => { setItemToDelete({ id: item.id, name: item.name, type: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
+                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl text-red-600 border" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
                                                     </div>
                                                 </div>
                                             ))}
