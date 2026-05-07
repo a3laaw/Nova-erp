@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -72,21 +71,20 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     </Button>
                 </div>
 
-                {/* كبسولة الملف الشخصي الاحترافية */}
+                {/* كبسولة الملف الشخصي الاحترافية المرممة */}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
-                            <div className="absolute inset-0 rounded-full border border-primary/20 group-hover:border-primary/40 transition-colors" />
-                            <Avatar className="h-10 w-10 border-2 border-white shadow-xl">
+                            <Avatar className="h-11 w-11 border border-primary/20 shadow-[0_10px_25px_rgba(0,0,0,0.1)] ring-offset-background transition-all group-hover:ring-2 group-hover:ring-primary/40">
                                 <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} className="object-cover" />
                                 <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-xs">
-                                    {currentUser.fullName?.charAt(0) || <User className="h-4 w-4"/>}
+                                    {currentUser.fullName?.charAt(0) || 'N'}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="absolute -bottom-0.5 -left-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500 shadow-md" />
+                            <div className="absolute -bottom-0.5 -left-0.5 h-4 w-4 rounded-full border-2 border-white bg-green-500 shadow-md ring-1 ring-green-600/20" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-white/95 backdrop-blur-2xl border-white/40" align="end" forceMount dir="rtl">
+                    <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_25px_60px_rgba(0,0,0,0.2)] bg-white/95 backdrop-blur-2xl border-white/40" align="end" forceMount dir="rtl">
                         <DropdownMenuLabel className="font-normal p-5">
                             <div className="flex flex-col space-y-2 text-right">
                                 <p className="text-sm font-black text-[#1e1b4b] leading-none">{currentUser.fullName}</p>
