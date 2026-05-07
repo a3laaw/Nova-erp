@@ -28,7 +28,7 @@ import type { Client, Company, ClientTransaction, Account, Employee, Department,
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
+import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn } from '@/lib/utils'; // FIXED: Imported cn
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
@@ -281,8 +281,8 @@ export default function NewCashReceiptPage() {
             }
 
             const journalEntryData = {
-                entryNumber: `CRV-JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
-                narration: `[إشعار مالي] ${description} ${commissionAmount > 0 ? `(صافي المودع: ${formatCurrency(netBankDeposit)})` : ''}`,
+                entryNumber: `JE-${newVoucherNumber}`, date: newReceiptData.receiptDate,
+                narration: `[تحصيل مالي] ${description} ${commissionAmount > 0 ? `(صافي المودع: ${formatCurrency(netBankDeposit)})` : ''}`,
                 totalDebit: parseFloat(amount), totalCredit: parseFloat(amount), status: 'posted' as const,
                 lines: jeLines,
                 clientId: selectedClientId || null, transactionId: selectedProjectId || null,
