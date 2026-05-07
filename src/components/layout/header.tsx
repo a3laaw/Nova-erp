@@ -1,9 +1,8 @@
-
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Languages, LogOut, Sparkles, Bell, Globe, User, ChevronDown } from 'lucide-react';
+import { Sparkles, Globe, User } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -44,7 +43,6 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
             </div>
 
             <div className="ml-auto flex items-center gap-4">
-                {/* 🛡️ كبسولة الأدوات المركزية المحدثة */}
                 <div className="flex items-center bg-white/60 p-1.5 rounded-[1.8rem] border border-white/80 backdrop-blur-2xl gap-1.5 shadow-xl">
                     <Button 
                         variant="ghost" 
@@ -59,7 +57,6 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Notifications />
 
-                    {/* 🌐 زر تغيير اللغة العصري */}
                     <Button 
                         variant="ghost" 
                         size="icon" 
@@ -68,23 +65,21 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     >
                         <Globe className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform duration-500" />
                         <span className="text-[10px] font-black uppercase tracking-tighter border-r pr-2 border-primary/20">
-                            {language === 'ar' ? 'English' : 'العربية'}
+                            {language === 'ar' ? 'EN' : 'AD'}
                         </span>
                     </Button>
                 </div>
 
-                 {/* 👤 أيقونة الملف الشخصي الاحترافية المرممة */}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group">
-                            <div className="absolute inset-0 rounded-full border-2 border-primary/20 group-hover:border-primary/40 transition-colors" />
+                            <div className="absolute inset-0 rounded-full border-2 border-primary/10 group-hover:border-primary/30 transition-colors" />
                             <Avatar className="h-11 w-11 border-2 border-white shadow-2xl">
                                 <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} className="object-cover" />
                                 <AvatarFallback className="bg-gradient-to-br from-indigo-50 to-purple-100 text-[#1e1b4b] font-black text-xs">
                                     {currentUser.fullName?.charAt(0) || <User className="h-4 w-4"/>}
                                 </AvatarFallback>
                             </Avatar>
-                            {/* نقطة حالة نشطة */}
                             <div className="absolute bottom-0 left-0 h-3 w-3 rounded-full border-2 border-white bg-green-500 shadow-sm" />
                         </Button>
                     </DropdownMenuTrigger>
@@ -104,7 +99,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-slate-100 mx-2" />
                         <DropdownMenuItem onClick={onLogout} className="rounded-2xl py-3.5 font-black text-red-600 hover:text-white hover:bg-red-600 focus:bg-red-600 focus:text-white cursor-pointer mx-1 transition-all">
-                            <LogOut className="ml-2 h-4 w-4" />
+                            <User className="ml-2 h-4 w-4" />
                             <span>تسجيل الخروج الآمن</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
