@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -111,20 +110,7 @@ const navItems = {
       ]
     },
 
-    // 3. حجز المواعيد والتقويم
-    { 
-      label: 'حجز المواعيد والتقويم',
-      icon: CalendarDays,
-      roles: ['Developer', 'Admin', 'Engineer', 'Secretary'],
-      hrefPrefix: '/dashboard/appointments',
-      children: [
-        { href: '/dashboard/appointments', label: 'التقويم العام للمكتب', icon: CalendarDays },
-        { href: '/dashboard/appointments/new', label: 'حجز موعد معماري', icon: MapPin },
-        { href: '/dashboard/appointments/new-other', label: 'حجز قاعة اجتماعات', icon: Home },
-      ]
-    },
-
-    // 4. المقاولات والقياسات
+    // 3. المقاولات والقياسات
     { 
       label: 'المقاولات والقياسات',
       icon: PencilRuler,
@@ -135,6 +121,7 @@ const navItems = {
         { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
+        { href: '/dashboard/appointments', label: 'حجز المواعيد والتقويم', icon: CalendarDays },
         { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: Clock3 },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد المواقع', icon: Package },
         { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: History },
@@ -142,7 +129,7 @@ const navItems = {
       ]
     },
 
-    // 5. مقاولين الباطن
+    // 4. مقاولين الباطن
     { 
       label: 'مقاولين الباطن', 
       icon: HardHat, 
@@ -154,7 +141,7 @@ const navItems = {
       ]
     },
 
-    // 6. المطالبات المالية (Re-integrated per user request)
+    // 5. المطالبات المالية
     { 
       label: 'المطالبات المالية', 
       icon: Coins, 
@@ -166,7 +153,7 @@ const navItems = {
       ]
     },
 
-    // 7. إدارة المشتريات
+    // 6. إدارة المشتريات
     { 
       label: 'إدارة المشتريات', 
       icon: ShoppingBag, 
@@ -183,7 +170,7 @@ const navItems = {
       ]
     },
 
-    // 8. المخازن والمستودعات
+    // 7. المخازن والمستودعات
     { 
       label: 'المخازن والمستودعات', 
       icon: Box, 
@@ -199,7 +186,7 @@ const navItems = {
       ]
     },
 
-    // 9. المحاسبة والمالية (العميقة)
+    // 8. المحاسبة والمالية
     { 
       label: 'المحاسبة والمالية', 
       icon: Landmark, 
@@ -221,7 +208,7 @@ const navItems = {
       ]
     },
 
-    // 10. شؤون الموظفين (HR)
+    // 9. شؤون الموظفين (HR)
     { 
       label: 'شؤون الموظفين (HR)', 
       icon: Users, 
@@ -238,7 +225,7 @@ const navItems = {
       ]
     },
 
-    // 11. الإعدادات
+    // 10. الإعدادات
     { 
       label: 'الإعدادات', 
       icon: Settings2, 
