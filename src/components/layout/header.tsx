@@ -3,7 +3,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Globe, User, Languages, Bell } from 'lucide-react';
+import { Sparkles, User, Languages, Globe } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -58,35 +58,37 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Notifications />
 
+                    {/* زر اللغة العصري بتصميم Globe */}
                     <Button 
                         variant="ghost" 
-                        size="icon" 
                         onClick={toggleLanguage} 
-                        className="h-10 w-auto px-4 rounded-full text-[#1e1b4b] hover:bg-white/40 transition-all flex items-center gap-2 group relative overflow-hidden"
+                        className="h-10 px-4 rounded-full text-[#1e1b4b] hover:bg-primary/5 transition-all flex items-center gap-2 group relative overflow-hidden"
                     >
-                        <Languages className="h-4 w-4 opacity-70 group-hover:rotate-[360deg] transition-transform duration-700" />
-                        <span className="text-[10px] font-black uppercase tracking-tighter">
-                            {language === 'ar' ? 'EN' : 'AD'}
+                        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <Languages className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform" />
+                        <span className="text-[10px] font-black uppercase tracking-tighter relative z-10">
+                            {language === 'ar' ? 'English' : 'عربي'}
                         </span>
                     </Button>
                 </div>
 
+                {/* كبسولة الملف الشخصي الاحترافية */}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group">
-                            <div className="absolute inset-0 rounded-full border-2 border-[#1e1b4b]/10 group-hover:border-[#1e1b4b]/30 transition-colors" />
-                            <Avatar className="h-11 w-11 border-2 border-white shadow-xl">
+                        <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
+                            <div className="absolute inset-0 rounded-full border border-primary/20 group-hover:border-primary/40 transition-colors" />
+                            <Avatar className="h-10 w-10 border-2 border-white shadow-xl">
                                 <AvatarImage src={currentUser.avatarUrl} alt={`@${currentUser.fullName}`} className="object-cover" />
-                                <AvatarFallback className="bg-gradient-to-br from-indigo-100 to-purple-200 text-[#1e1b4b] font-black text-xs">
+                                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-xs">
                                     {currentUser.fullName?.charAt(0) || <User className="h-4 w-4"/>}
                                 </AvatarFallback>
                             </Avatar>
-                            <div className="absolute bottom-0 left-0 h-3 w-3 rounded-full border-2 border-white bg-green-500 shadow-sm" />
+                            <div className="absolute -bottom-0.5 -left-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500 shadow-md" />
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.15)] bg-white/95 backdrop-blur-2xl border-white/40" align="end" forceMount dir="rtl">
+                    <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-white/95 backdrop-blur-2xl border-white/40" align="end" forceMount dir="rtl">
                         <DropdownMenuLabel className="font-normal p-5">
-                            <div className="flex flex-col space-y-2">
+                            <div className="flex flex-col space-y-2 text-right">
                                 <p className="text-sm font-black text-[#1e1b4b] leading-none">{currentUser.fullName}</p>
                                 <p className="text-[9px] font-mono text-slate-400 bg-slate-50 p-1.5 rounded-lg border border-slate-100">{currentUser.email}</p>
                             </div>
