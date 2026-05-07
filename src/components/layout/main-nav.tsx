@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -136,13 +135,15 @@ const navItems = {
       ]
     },
     { 
-      label: 'المطالبات المالية', 
-      icon: Coins, 
+      label: 'المحاسبة', 
+      icon: Landmark, 
       roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/accounting/invoices',
+      hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/construction/payment-applications/new', label: 'إصدار مستخلص أعمال', icon: FileSignature },
-        { href: '/dashboard/accounting/client-statements', label: 'مديونيات العملاء', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
       ]
     },
     { 
@@ -155,9 +156,7 @@ const navItems = {
         { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileSignature },
         { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: Search },
         { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: CheckCircle2 },
-        { href: '/dashboard/purchasing/reports/price-history', label: 'تاريخ أسعار الأصناف', icon: History },
         { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: UsersRound },
-        { href: '/dashboard/purchasing/lc', label: 'اعتمادات مستندية', icon: Landmark },
       ]
     },
     { 
@@ -169,29 +168,19 @@ const navItems = {
         { href: '/dashboard/warehouse/grns', label: 'أذونات استلام البضاعة', icon: FileCheck },
         { href: '/dashboard/warehouse/items', label: 'دليل الأصناف والخدمات', icon: Box },
         { href: '/dashboard/warehouse/warehouses', label: 'المستودعات والأفرع', icon: Building2 },
-        { href: '/dashboard/warehouse/transfers', label: 'تحويلات بين المخازن', icon: RotateCcw },
         { href: '/dashboard/warehouse/adjustments', label: 'تسويات العجز والتلف', icon: Ban },
-        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: ListTree },
       ]
     },
     { 
-      label: 'المحاسبة والمالية', 
-      icon: Landmark, 
+      label: 'التقارير والمالية', 
+      icon: FileBarChart, 
       roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/accounting',
+      hrefPrefix: '/dashboard/accounting/reports',
       children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: BookOpen },
-        { href: '/dashboard/accounting/cost-center-ledger', label: 'كشف حركة مراكز التكلفة', icon: Target },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: FileText },
-        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/hr/custody-reconciliation', label: 'تسوية العهد النقدية', icon: Wallet },
-        { href: '/dashboard/accounting/recurring', label: 'أتمتة الالتزامات الدورية', icon: RotateCcw },
-        { href: '/dashboard/accounting/reconciliation', label: 'التسوية البنكية', icon: Scale },
         { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: FileBarChart },
         { href: '/dashboard/accounting/balance-sheet', label: 'قائمة المركز المالي', icon: Landmark },
-        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: BarChart3 },
+        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية والربحية', icon: BarChart3 },
+        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: BookOpen },
       ]
     },
     { 
@@ -201,12 +190,10 @@ const navItems = {
       hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
-        { href: '/dashboard/hr/custody-reconciliation/new', label: 'تقديم تسوية عهدة', icon: Wallet },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
         { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذانات', icon: Clock3 },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Landmark },
         { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة', icon: Calculator },
-        { href: '/dashboard/hr/reports', label: 'لوحة تقارير الموارد', icon: FileBarChart },
       ]
     },
     { 
@@ -218,10 +205,7 @@ const navItems = {
         { href: '/dashboard/settings/branding', label: 'الإعدادات العامة', icon: Globe },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
         { href: '/dashboard/settings/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
-        { href: '/dashboard/settings/companies', label: 'إدارة الشركات', icon: Building2 },
-        { href: '/dashboard/settings/classifications', label: 'الفئات والتصنيفات', icon: Tags },
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: ListTree },
-        { href: '/dashboard/settings/data-integrity', label: 'سلامة البيانات', icon: DatabaseZap },
       ]
     },
   ],
