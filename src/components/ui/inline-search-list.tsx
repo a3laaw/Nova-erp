@@ -48,12 +48,11 @@ export function InlineSearchList({
   , [options, value]);
 
   const handleSelect = React.useCallback((currentValue: string) => {
-    // 🛡️ Find the option value from the label (since cmdk passes label to onSelect)
+    // 🛡️ Match label to value for proper selection
     const option = options.find((opt) => opt.label.toLowerCase() === currentValue.toLowerCase());
     if (option) {
         onSelect(option.value === value ? "" : option.value);
     } else {
-        // Fallback for cases where value is already the ID
         onSelect(currentValue === value ? "" : currentValue);
     }
     setOpen(false);

@@ -100,7 +100,12 @@
   pointer-events: auto !important;
 }
 
-/* Ensure dialog overlays don't block clicks in portals */
+/* Ensure dialog overlays don't block clicks */
 [data-radix-portal] {
   pointer-events: auto !important;
+}
+
+/* Override Radix portal defaults for our specific context */
+div[data-radix-popper-content-wrapper] {
+    pointer-events: auto !important;
 }

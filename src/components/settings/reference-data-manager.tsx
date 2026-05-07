@@ -120,7 +120,7 @@ export function ReferenceDataManager() {
     const secondaryCollection = useMemo(() => {
         if (view === 'departments') return activeSubTab === 'jobs' ? 'jobs' : 'workStages';
         if (view === 'locations') return 'areas';
-        return '';
+        return ''; // Transactions don't have secondary items in this view
     }, [view, activeSubTab]);
 
     const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollection || null, [orderBy('name')]);
@@ -143,9 +143,15 @@ export function ReferenceDataManager() {
 
     const handleSave = async (type: 'primary' | 'secondary') => {
         if (!firestore || !tenantId || !itemName.trim()) return;
+        
+        const path = type === 'primary' ? primaryCollection : secondaryPath;
+        if (!path) {
+            toast({ variant: 'destructive', title: 'خطأ في المسار', description: 'لا يمكن الحفظ؛ المسار المرجعي غير معرّف.' });
+            return;
+        }
+
         setIsSaving(true);
         try {
-            const path = type === 'primary' ? primaryCollection : secondaryPath!;
             const dataToSave = cleanFirestoreData({
                 name: itemName,
                 companyId: tenantId,
@@ -164,15 +170,19 @@ export function ReferenceDataManager() {
             toast({ title: 'نجاح الحفظ' });
             closeDialog();
         } catch (e) {
+            console.error("Save Error:", e);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         } finally { setIsSaving(false); }
     };
 
     const handleDelete = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
+        
+        const path = itemToDelete.type === 'primary' ? primaryCollection : secondaryPath;
+        if (!path) return;
+
         setIsSaving(true);
         try {
-            const path = itemToDelete.type === 'primary' ? primaryCollection : secondaryPath!;
             await deleteDoc(doc(firestore, getTenantPath(path, tenantId), itemToDelete.id));
             toast({ title: 'تم الحذف' });
             setIsDeleteDialogOpen(false);
@@ -226,7 +236,7 @@ export function ReferenceDataManager() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <StatCard title="الأقسام والوظائف" count={primaryItems?.length || 0} icon={<Building2 className="h-6 w-6"/>} onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} colorClass="bg-blue-100 text-blue-600" loading={loadingPrimary} />
                     <StatCard title="المواقع والمناطق" count={primaryItems?.length || 0} icon={<Globe className="h-6 w-6"/>} onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} colorClass="bg-emerald-100 text-emerald-600" loading={loadingPrimary} />
-                    <StatCard title="أنواع المعاملات" count={primaryItems?.length || 0} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => setView('transactions')} colorClass="bg-purple-100 text-purple-600" loading={loadingPrimary} />
+                    <StatCard title="أنواع المعاملات" count={primaryItems?.length || 0} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} colorClass="bg-purple-100 text-purple-600" loading={loadingPrimary} />
                 </div>
             </div>
         );
@@ -247,9 +257,11 @@ export function ReferenceDataManager() {
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => setIsImportConfirmOpen(true)} className="text-white hover:bg-white/10 border border-white/20 rounded-xl">
-                                <DownloadCloud className="h-4 w-4 ml-2"/> استيراد الافتراضي
-                            </Button>
+                            {view !== 'transactions' && (
+                                <Button variant="ghost" onClick={() => setIsImportConfirmOpen(true)} className="text-white hover:bg-white/10 border border-white/20 rounded-xl">
+                                    <DownloadCloud className="h-4 w-4 ml-2"/> استيراد الافتراضي
+                                </Button>
+                            )}
                             <Button onClick={() => setView('main')} variant="ghost" className="text-white hover:bg-white/10 rounded-xl font-black gap-2">
                                 <ArrowRight className="h-4 w-4" /> العودة للملخص
                             </Button>
@@ -263,7 +275,7 @@ export function ReferenceDataManager() {
                     <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
                         <div className="md:col-span-4 border-l bg-slate-50/50 flex flex-col">
                             <div className="p-6 border-b flex justify-between items-center">
-                                <Label className="font-black text-[#1e1b4b] text-base">{view === 'departments' ? 'القسم الفني' : 'المحافظة'}</Label>
+                                <Label className="font-black text-[#1e1b4b] text-base">{view === 'departments' ? 'القسم الفني' : view === 'locations' ? 'المحافظة' : 'نوع المعاملة'}</Label>
                                 <Button size="icon" variant="ghost" onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-9 w-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"><Plus className="h-5 w-5" /></Button>
                             </div>
                             <ScrollArea className="flex-1 p-4">
@@ -284,7 +296,7 @@ export function ReferenceDataManager() {
                         </div>
 
                         <div className="md:col-span-8 flex flex-col">
-                            {selectedPrimaryId ? (
+                            {selectedPrimaryId && view !== 'transactions' ? (
                                 <>
                                     <div className="p-6 border-b bg-muted/5">
                                         <div className="flex justify-between items-center mb-4">
@@ -324,7 +336,10 @@ export function ReferenceDataManager() {
                             ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-20 grayscale">
                                     <ListTree className="h-24 w-24 mb-6 text-primary animate-pulse" />
-                                    <h3 className="text-2xl font-black text-[#1e1b4b]">اختر تصنيفاً</h3>
+                                    <h3 className="text-2xl font-black text-[#1e1b4b]">
+                                        {view === 'transactions' ? 'قائمة الخدمات الأساسية' : 'اختر تصنيفاً لإدارة تفاصيله'}
+                                    </h3>
+                                    {view === 'transactions' && <p className="text-sm font-bold mt-2">أنواع المعاملات يتم تعريفها كمستوى أول فقط وربطها بالأقسام لاحقاً.</p>}
                                 </div>
                             )}
                         </div>
@@ -341,16 +356,19 @@ export function ReferenceDataManager() {
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                        <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')} disabled={isSaving} className="rounded-xl font-black h-12 px-12">حفظ</Button>
+                        <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')} disabled={isSaving} className="rounded-xl font-black h-12 px-12">
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
+                        </Button>
                     </DialogFooter>
-                </DialogContent>
+                </form>
+            </DialogContent>
             </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-medium">سيتم مسح سجل "{itemToDelete?.name}" تماماً.</AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-medium">سيتم مسح سجل "{itemToDelete?.name}" تماماً من النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
