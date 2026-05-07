@@ -56,7 +56,7 @@ import {
 import { ScrollArea } from '../ui/scroll-area';
 import { 
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
-    DownloadCloud, Building, Globe, Workflow, 
+    DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
     MapPin, Briefcase, ChevronLeft, X
 } from 'lucide-react';
@@ -68,7 +68,6 @@ import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Badge } from '../ui/badge';
 import { defaultDepartments, defaultGovernorates, defaultAreas, defaultJobs, defaultWorkStages } from '@/lib/default-reference-data';
 
-// --- مساعدات العرض السيادي ---
 function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean }) {
     return (
         <Card 
@@ -169,7 +168,7 @@ export function ReferenceDataManager() {
         } finally { setIsSaving(false); }
     };
 
-    const handleDelete = async () => {
+    const handleDeleteAction = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
         setIsSaving(true);
         try {
@@ -225,9 +224,9 @@ export function ReferenceDataManager() {
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <StatCard title="الأقسام والوظائف" count={0} icon={<Building className="h-6 w-6"/>} onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} colorClass="bg-blue-100 text-blue-600" loading={false} />
-                    <StatCard title="المواقع والمناطق" count={0} icon={<Globe className="h-6 w-6"/>} onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} colorClass="bg-emerald-100 text-emerald-600" loading={false} />
-                    <StatCard title="أنواع المعاملات" count={0} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => setView('transactions')} colorClass="bg-purple-100 text-purple-600" loading={false} />
+                    <StatCard title="الأقسام والوظائف" count={primaryItems?.length || 0} icon={<Building2 className="h-6 w-6"/>} onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} colorClass="bg-blue-100 text-blue-600" loading={loadingPrimary} />
+                    <StatCard title="المواقع والمناطق" count={primaryItems?.length || 0} icon={<Globe className="h-6 w-6"/>} onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} colorClass="bg-emerald-100 text-emerald-600" loading={loadingPrimary} />
+                    <StatCard title="أنواع المعاملات" count={primaryItems?.length || 0} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => setView('transactions')} colorClass="bg-purple-100 text-purple-600" loading={loadingPrimary} />
                 </div>
             </div>
         );
@@ -240,7 +239,7 @@ export function ReferenceDataManager() {
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-white/10 rounded-2xl text-white border border-white/20">
-                                {view === 'departments' ? <Building className="h-8 w-8" /> : view === 'locations' ? <MapPin className="h-8 w-8" /> : <Workflow className="h-8 w-8" />}
+                                {view === 'departments' ? <Building2 className="h-8 w-8" /> : view === 'locations' ? <MapPin className="h-8 w-8" /> : <Workflow className="h-8 w-8" />}
                             </div>
                             <div className="text-white text-right">
                                 <CardTitle className="text-2xl font-black">{view === 'departments' ? 'الأقسام والوظائف' : view === 'locations' ? 'المحافظات والمناطق' : 'أنواع الخدمات'}</CardTitle>
@@ -336,17 +335,28 @@ export function ReferenceDataManager() {
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
                 <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] p-8 shadow-2xl border-none">
                     <DialogHeader><DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل' : 'إضافة'} سجل</DialogTitle></DialogHeader>
-                    <div className="py-8"><Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label><Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black" /></div>
-                    <DialogFooter><Button variant="ghost" onClick={closeDialog} className="rounded-xl font-bold">إلغاء</Button><Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')} disabled={isSaving} className="rounded-xl font-black h-12 px-12">حفظ</Button></DialogFooter>
+                    <div className="py-8">
+                        <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label>
+                        <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black" />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                        <Button onClick={() => handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary')} disabled={isSaving} className="rounded-xl font-black h-12 px-12">حفظ</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={() => setIsDeleteDialogOpen(false)}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
-                    <AlertDialogHeader><AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle><AlertDialogDescription className="text-base font-medium">سيتم مسح سجل "{itemToDelete?.name}" تماماً.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-medium">سيتم مسح سجل "{itemToDelete?.name}" تماماً.</AlertDialogDescription>
+                    </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 rounded-xl font-black px-10">{isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}</AlertDialogAction>
+                        <AlertDialogAction onClick={handleDeleteAction} disabled={isSaving} className="bg-red-600 rounded-xl font-black px-10">
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

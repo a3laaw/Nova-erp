@@ -102,7 +102,7 @@ export default function RegisterPage() {
                         <div className="grid gap-5">
                             <div className="grid gap-2">
                                 <Label className="text-[#1e1b4b] font-black text-xs">اسم المكتب / الشركة *</Label>
-                                <div className="relative"><Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" /><Input value={formData.companyName} onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-sm font-black text-[#1e1b4b]" required /></div>
+                                <div className="relative"><Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" /><Input value={formData.companyName} onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 shadow-inner font-black text-[#1e1b4b]" required /></div>
                             </div>
                             <div className="grid gap-2">
                                 <Label className="text-[#1e1b4b] font-black text-xs">نوع النشاط الرئيسي</Label>
@@ -132,6 +132,11 @@ export default function RegisterPage() {
                 </Button>
             </form>
         </CardContent>
+        <div className="bg-white/10 p-4 text-center border-t border-white/10">
+            <p className="text-[10px] font-black text-[#1e1b4b]/40 uppercase tracking-widest">
+                Nova ERP — Universal Autonomous Gateway
+            </p>
+        </div>
       </Card>
     </div>
   );
