@@ -2,7 +2,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sparkles, User, Languages, Globe } from 'lucide-react';
+import { Sparkles, User, Languages, Globe, Bell } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -57,21 +57,20 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <Notifications />
 
-                    {/* زر اللغة العصري بتصميم Globe */}
+                    {/* زر اللغة العصري بتصميم Glassmorphism */}
                     <Button 
                         variant="ghost" 
                         onClick={toggleLanguage} 
                         className="h-10 px-4 rounded-full text-[#1e1b4b] hover:bg-primary/5 transition-all flex items-center gap-2 group relative overflow-hidden"
                     >
-                        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                         <Languages className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform" />
-                        <span className="text-[10px] font-black uppercase tracking-tighter relative z-10">
+                        <span className="text-[10px] font-black uppercase tracking-tighter">
                             {language === 'ar' ? 'English' : 'عربي'}
                         </span>
                     </Button>
                 </div>
 
-                {/* كبسولة الملف الشخصي الاحترافية المرممة */}
+                {/* كبسولة الملف الشخصي الاحترافية بنقاء تام */}
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 transition-all hover:scale-105 active:scale-95 border-none group focus-visible:ring-0">
