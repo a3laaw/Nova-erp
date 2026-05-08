@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -33,7 +34,7 @@ const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => (
-  /* 🛡️ Sovereign Fix: Removed Portal to ensure clicks work in all cloud/preview environments */
+  /* 🛡️ Sovereign Fix: Removed Portal to ensure mouse clicks work in all cloud/preview environments */
   <SelectPrimitive.Content
     ref={ref}
     className={cn(

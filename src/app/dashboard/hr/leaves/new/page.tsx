@@ -28,8 +28,8 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Checkbox } from '../ui/checkbox';
-import { Separator } from '../ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, formatDistanceToNow, isBefore, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -49,7 +49,7 @@ export default function NewLeaveRequestPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const { data: employees, loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
+    const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     const { data: publicHolidays, loading: holidaysLoading } = useSubscription<Holiday>(firestore, 'holidays');
     const { branding, loading: brandingLoading } = useBranding();
 
@@ -76,19 +76,17 @@ export default function NewLeaveRequestPage() {
         }
     }, [currentUser, searchParams]);
 
-    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان قبل البداية
     useEffect(() => {
         if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
             setEndDate(undefined);
             toast({
                 variant: 'destructive',
                 title: 'خطأ منطقي',
-                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
+                description: 'تاريخ النهاية يجب أن يكون لاحقاً لتاريخ البداية.',
             });
         }
     }, [startDate, endDate, toast]);
 
-    // جلب سياق القرار الذكي (آخر إجازة)
     useEffect(() => {
         if (!firestore || !selectedEmployeeId) {
             setLastLeaveInfo(null);
@@ -137,7 +135,7 @@ export default function NewLeaveRequestPage() {
             return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
         }
         
-        const days = calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || branding?.work_hours?.holidays || [], publicHolidays);
+        const days = calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
         const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
         
         if (!selectedEmployee || leaveType !== 'Annual') {
@@ -159,12 +157,6 @@ export default function NewLeaveRequestPage() {
 
         if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
-            return;
-        }
-
-        // الرقابة المنطقية النهائية قبل الحفظ
-        if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.' });
             return;
         }
 
@@ -199,8 +191,7 @@ export default function NewLeaveRequestPage() {
         } catch (error) {
             savingRef.current = false;
             setIsSaving(false);
-            const message = error instanceof Error ? error.message : "فشل حفظ الطلب.";
-            toast({ variant: 'destructive', title: 'خطأ', description: message });
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         }
     };
     
@@ -277,6 +268,16 @@ export default function NewLeaveRequestPage() {
 
                     {leaveAnalysis.totalDays > 0 && (
                       <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
+                        {leaveType === 'Annual' && leaveAnalysis.totalDays < 30 && (
+                            <Alert className="bg-amber-50 border-amber-200 rounded-3xl border-2 animate-in slide-in-from-top-4 shadow-sm">
+                                <AlertCircle className="h-5 w-5 text-amber-600" />
+                                <AlertTitle className="text-amber-800 font-black text-base">تنبيه ودي (HR Guidance)</AlertTitle>
+                                <AlertDescription className="text-sm font-bold text-amber-700 leading-relaxed mt-1">
+                                    الإجازة السنوية عادةً ما تطلب كفترة راحة طويلة (شهر كامل). إذا كانت رغبتك في إجازة قصيرة جداً (أقل من شهر)، ربما تفضل اختيار نوع "طارئة" أو تقديم "طلب استئذان" من الميدان للحفاظ على رصيد إجازتك السنوية المجمعة.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
                         <div className="text-sm font-bold p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col sm:flex-row justify-around gap-4 text-center">
                             <div className="space-y-1">
                                 <p className="text-[10px] uppercase text-muted-foreground tracking-widest">إجمالي الأيام</p>
@@ -288,16 +289,6 @@ export default function NewLeaveRequestPage() {
                                 <p className="text-2xl font-black text-primary">{leaveAnalysis.workingDays} يوم</p>
                             </div>
                         </div>
-
-                        {leaveType === 'Annual' && leaveAnalysis.totalDays > 0 && leaveAnalysis.totalDays < 30 && (
-                            <Alert className="bg-amber-50 border-amber-200 rounded-2xl animate-in slide-in-from-top-2">
-                                <AlertCircle className="h-4 w-4 text-amber-600" />
-                                <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
-                                <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
-                                    الإجازة السنوية عادةً ما تُطلب كفترة راحة طويلة (شهر كامل). إذا كانت المدة قصيرة جداً، ربما تفضل اختيار نوع "طارئة" أو تقديم "استئذان" للحفاظ على رصيد إجازتك السنوية.
-                                </AlertDescription>
-                            </Alert>
-                        )}
 
                         {leaveType === 'Annual' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
