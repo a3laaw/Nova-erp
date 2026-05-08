@@ -80,7 +80,6 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { tit
 
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
-    const { user } = useAuth();
     const { toast } = useToast();
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
@@ -98,6 +97,13 @@ export function ReferenceDataManager() {
     const [editingItem, setEditingItem] = useState<any | null>(null);
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [itemName, setItemName] = useState('');
+
+    const closeDialog = useCallback(() => {
+        setIsPrimaryDialogOpen(false);
+        setIsSecondaryDialogOpen(false);
+        setEditingItem(null);
+        setItemName('');
+    }, []);
 
     const primaryCollection = useMemo(() => {
         if (view === 'departments') return 'departments';
@@ -134,7 +140,7 @@ export function ReferenceDataManager() {
             if (editingItem) await updateDoc(doc(firestore, path, editingItem.id), cleanFirestoreData(payload));
             else await addDoc(collection(firestore, path), { ...payload, createdAt: serverTimestamp() });
             toast({ title: 'نجاح الحفظ' });
-            setIsPrimaryDialogOpen(false); setIsSecondaryDialogOpen(false); setEditingItem(null); setItemName('');
+            closeDialog();
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsSaving(false); }
     };
 
