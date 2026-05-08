@@ -8,16 +8,17 @@ import type { Payslip, Employee } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowRight, CheckCircle2, Ban } from 'lucide-react';
-import { formatCurrency, numberToArabicWords } from '@/lib/utils';
+import { formatCurrency, numberToArabicWords, cn } from '@/lib/utils';
 import { useBranding } from '@/context/branding-context';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 const InfoRow = ({ label, value }: { label: string, value: string | number | undefined }) => (
     <div className="flex justify-between items-center py-2">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-black text-slate-900">{value}</span>
+        <span className="font-black text-[#1e1b4b]">{value}</span>
     </div>
 );
 
@@ -73,7 +74,7 @@ export default function PayslipPage() {
                 <div id="printable-area" className="p-8 sm:p-12">
                      <header className="flex justify-between items-start pb-6 border-b-4 border-primary/20">
                          <div className="text-right">
-                             <h2 className="text-3xl font-black text-slate-900 tracking-tighter">قسيمة راتب</h2>
+                             <h2 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">قسيمة راتب</h2>
                              <p className="text-muted-foreground font-bold">راتب شهر {payslip.month} / {payslip.year}</p>
                              <Badge variant="outline" className="mt-3 px-4 py-1 bg-primary/5 text-primary border-primary/20 font-black">
                                 {payslip.type === 'Leave' ? 'راتب إجازة' : 'راتب شهري رسمي'}
@@ -82,13 +83,13 @@ export default function PayslipPage() {
                          <div className="flex items-center gap-4">
                             <Logo className="h-20 w-20 !p-3 shadow-inner border" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
                              <div>
-                                <h1 className="font-black text-xl text-slate-900">{branding?.company_name || 'Nova ERP'}</h1>
+                                <h1 className="font-black text-xl text-[#1e1b4b]">{branding?.company_name || 'Nova ERP'}</h1>
                                 <p className="text-xs text-muted-foreground font-medium">{branding?.address}</p>
                              </div>
                          </div>
                     </header>
                     <main className="py-10 space-y-10">
-                        <div className="grid grid-cols-2 gap-x-10 gap-y-4 p-6 bg-muted/20 rounded-3xl border border-dashed">
+                        <div className="grid grid-cols-2 gap-x-10 gap-y-4 p-6 bg-muted/20 rounded-3xl border border-dashed text-black">
                            <InfoRow label="اسم الموظف" value={payslip.employeeName} />
                            <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} />
                            <InfoRow label="القسم الإداري" value={employee.department} />
