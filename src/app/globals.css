@@ -71,12 +71,18 @@
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* 🛡️ Sovereign Mouse Dominance Protocol 🛡️ */
+/* 🛡️ Sovereign Mouse Dominance & Layering Protocol 🛡️ */
+[data-radix-portal] {
+  z-index: 999999 !important;
+}
+
 [data-radix-popper-content-wrapper], 
 [role="listbox"], 
 [role="combobox"], 
 [data-radix-select-content],
-[data-radix-popover-content] {
+[data-radix-popover-content],
+.react-select__menu,
+.react-select__menu-portal {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }
@@ -88,6 +94,7 @@
   pointer-events: auto !important;
 }
 
+/* Force body to allow pointer events when dialogs are open if Radix locks it incorrectly */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }
