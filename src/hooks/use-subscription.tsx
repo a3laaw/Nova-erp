@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -16,7 +15,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف اشتراك لحظي مطور (Sovereign Real-time Hook):
- * تم تحصينه لمنع التحميل اللانهائي عبر معالجة دقيقة لمسارات المنشآت (Tenant Pathing).
+ * تم تحصينه لمنع التحميل اللانهائي وتكرار الاتصالات غير الضرورية.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -29,18 +28,17 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
-    // نستخدم useRef للحفاظ على مرجع القيود ومنع إعادة التشغيل اللانهائي بسبب مصفوفات القيود
+    // 🛡️ استخدام مرجع للقيود لمنع إعادة التشغيل بسبب مصفوفات القيود المنشأة داخلياً
+    const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
     useEffect(() => {
         constraintsRef.current = constraints;
-    }, [constraints]);
+    }, [constraintsHash]);
 
     useEffect(() => {
-        // التأكد من أن المنشأة المتقمصة لا تؤثر على قراءة الجداول السيادية (مثل قائمة المنشآت)
         const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
         const isMasterCollection = collectionPath && masterCollections.includes(collectionPath);
-        
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
         if (!firestore || !collectionPath) {
@@ -56,7 +54,6 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        // إذا كان الاستعلام مجمعاً (collectionGroup) ومعزولاً بـ tenantId
         if (isGroup && tenantId) {
             finalPath = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
@@ -83,7 +80,6 @@ export function useSubscription<T extends { id?: string }>(
                     });
                     setData(newData);
                     setLoading(false);
-                    setError(null);
                 },
                 (err) => {
                     console.error(`Firestore Subscription Error [${finalPath}]:`, err);
@@ -98,7 +94,7 @@ export function useSubscription<T extends { id?: string }>(
             setError(err);
             setLoading(false);
         }
-    }, [firestore, collectionPath, isGroup, user?.currentCompanyId]);
+    }, [firestore, collectionPath, isGroup, user?.currentCompanyId, constraintsHash]);
 
     return { data, loading, error };
 }

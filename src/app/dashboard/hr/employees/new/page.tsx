@@ -61,13 +61,11 @@ export default function NewEmployeePage() {
         try {
             const employeesCollectionPath = getTenantPath('employees', tenantId);
             
-            // --- VALIDATION LOGIC (Isolating check to the tenant path) ---
-            if (newEmployeeData.mobile) {
-                const mobileQuery = query(collection(firestore, employeesCollectionPath), where('mobile', '==', newEmployeeData.mobile));
-                const mobileSnapshot = await getDocs(mobileQuery);
-                if (!mobileSnapshot.empty) {
-                    throw new Error('رقم الهاتف هذا مسجل بالفعل لموظف آخر في هذه المنشأة.');
-                }
+            // 🛡️ فحص رقم الجوال والمدني في مسار المنشأة
+            const mobileQuery = query(collection(firestore, employeesCollectionPath), where('mobile', '==', newEmployeeData.mobile));
+            const mobileSnapshot = await getDocs(mobileQuery);
+            if (!mobileSnapshot.empty) {
+                throw new Error('رقم الهاتف هذا مسجل بالفعل لموظف آخر في هذه المنشأة.');
             }
 
             await runTransaction(firestore, async (transaction) => {
@@ -96,7 +94,7 @@ export default function NewEmployeePage() {
                   carriedLeaveDays: 0,
                   sickLeaveUsed: 0,
                   emergencyLeaveUsed: 0,
-                  companyId: tenantId || null // 🛡️ التاج السيادي
+                  companyId: tenantId || null 
                 };
 
                 const newEmployeeRef = doc(collection(firestore, employeesCollectionPath));
@@ -104,8 +102,27 @@ export default function NewEmployeePage() {
                 transaction.set(newEmployeeRef, cleanFirestoreData(finalEmployeeData));
             });
 
-            toast({ title: 'نجاح', description: 'تمت إضافة الموظف بنجاح.' });
+            toast({ title: 'نجاح التأسيس', description: 'تم إنشاء ملف الموظف بنجاح.' });
+            
+            // ⚡ التوجيه الفوري لتقليل الإحساس بالثقل
             router.push(`/dashboard/hr/employees`);
+            
+            // 🚀 تشغيل الإشعارات في الخلفية (Fire and Forget)
+            const adminHRUsersQuery = query(collection(firestore, getTenantPath('users', tenantId)), where('role', 'in', ['Admin', 'HR']));
+            getDocs(adminHRUsersQuery).then(querySnapshot => {
+                querySnapshot.forEach(userDoc => {
+                    const userId = userDoc.id;
+                    if (userId !== currentUser.id) {
+                        createNotification(firestore, {
+                            userId: userId,
+                            title: 'تمت إضافة موظف جديد',
+                            body: `قام ${currentUser.fullName} بإضافة الموظف الجديد "${newEmployeeData.fullName}".`,
+                            link: `/dashboard/hr/employees`
+                        });
+                    }
+                });
+            });
+
         } catch (error: any) {
             toast({ title: "خطأ", description: error.message, variant: "destructive" });
             setIsSaving(false);

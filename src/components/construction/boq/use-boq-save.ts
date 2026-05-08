@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -32,7 +31,33 @@ export const generateStableId = (): string => {
   return id;
 };
 
-const MAX_BATCH_OPS = 490;
+const MAX_BATCH_OPS = 450; // 🛡️ ترك هامش أمان للـ 500 المسموح بها
+
+/**
+ * محرك معالجة حزم البيانات بالتوازي:
+ * تم تغييره من النمط التسلسلي (البطيء) إلى التوازي الكامل لضمان سرعة الحفظ.
+ */
+async function commitInChunks(
+  firestore: any,
+  operations: Array<(batch: ReturnType<typeof writeBatch>) => void>
+) {
+  const chunks: Array<Array<(batch: any) => void>> = [];
+  for (let i = 0; i < operations.length; i += MAX_BATCH_OPS) {
+    chunks.push(operations.slice(i, i + MAX_BATCH_OPS));
+  }
+  
+  // ⚡ تشغيل كافة الحزم بالتوازي لسرعة البرق
+  await Promise.all(chunks.map(chunk => {
+    const batch = writeBatch(firestore);
+    chunk.forEach((op) => op(batch));
+    return batch.commit();
+  }));
+}
+
+interface UseBoqSaveOptions {
+  mode: 'create' | 'edit';
+  boqId?: string;
+}
 
 function processItemsHierarchy(items: BoqFormValues['items']): {
   finalItems: (BoqFormValues['items'][number] & {
@@ -67,23 +92,6 @@ function processItemsHierarchy(items: BoqFormValues['items']): {
   }, 0);
 
   return { finalItems, totalValue };
-}
-
-async function commitInChunks(
-  firestore: any,
-  operations: Array<(batch: ReturnType<typeof writeBatch>) => void>
-) {
-  for (let i = 0; i < operations.length; i += MAX_BATCH_OPS) {
-    const chunk = operations.slice(i, i + MAX_BATCH_OPS);
-    const batch = writeBatch(firestore);
-    chunk.forEach((op) => op(batch));
-    await batch.commit();
-  }
-}
-
-interface UseBoqSaveOptions {
-  mode: 'create' | 'edit';
-  boqId?: string;
 }
 
 export function useBoqSave({ mode, boqId }: UseBoqSaveOptions) {
