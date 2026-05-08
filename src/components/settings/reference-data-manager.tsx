@@ -334,7 +334,7 @@ export function ReferenceDataManager() {
                                     <h3 className="text-2xl font-black text-[#1e1b4b]">
                                         {view === 'transactions' ? 'قائمة الخدمات الأساسية' : 'اختر تصنيفاً لإدارة تفاصيله'}
                                     </h3>
-                                    {view === 'transactions' && <p className="text-sm font-bold mt-2">أنواع المعاملات يتم تعريفها كمستوى أول فقط وربطها بالأقسام لاحقاً.</p>}
+                                    {view === 'transactions' && <p className="text-sm font-bold mt-2 text-[#1e1b4b]">أنواع المعاملات يتم تعريفها كمستوى أول فقط وربطها بالأقسام لاحقاً.</p>}
                                 </div>
                             )}
                         </div>
@@ -348,11 +348,11 @@ export function ReferenceDataManager() {
                         <DialogHeader><DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل' : 'إضافة'} سجل</DialogTitle></DialogHeader>
                         <div className="py-8">
                             <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label>
-                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black" />
+                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black text-[#1e1b4b]" />
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                            <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12">
+                            <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 bg-[#1e1b4b] text-white hover:bg-black">
                                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
                             </Button>
                         </DialogFooter>

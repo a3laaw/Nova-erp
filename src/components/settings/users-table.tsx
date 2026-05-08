@@ -136,15 +136,17 @@ export function UsersTable() {
     }, [users, searchQuery]);
 
     const quotaInfo = useMemo(() => {
-        const totalLimit = currentCompany?.maxUsersLimit || 0;
+        // 🛡️ التعديل السيادي: المطور لا يخضع لقيود الحصة عند العرض
+        const isDev = currentUser?.role === 'Developer';
+        const totalLimit = currentCompany?.maxUsersLimit || (isDev ? 99 : 0);
         const usedCount = users.length;
         return {
             totalLimit,
             usedCount,
-            isFull: usedCount >= totalLimit,
+            isFull: !isDev && totalLimit > 0 && usedCount >= totalLimit,
             remaining: Math.max(0, totalLimit - usedCount)
         };
-    }, [currentCompany, users]);
+    }, [currentCompany, users, currentUser?.role]);
 
     const handleSaveUser = async (userData: Partial<UserProfile>) => {
         if (!firestore || !currentUser || !tenantId) return;
@@ -159,7 +161,6 @@ export function UsersTable() {
         }
 
         try {
-            // 🛡️ فحص توفر اسم المستخدم عالمياً لمنع التداخل
             const globalIndexQuery = query(collection(firestore, 'global_users'), where('username', '==', userData.username));
             const globalIndexSnap = await getDocs(globalIndexQuery);
             
@@ -179,14 +180,12 @@ export function UsersTable() {
                 companyId: tenantId
             });
 
-            // 1. حفظ في مجلد الشركة (العزل)
             batch.set(userTenantRef, {
                 ...cleanData,
                 isActive: selectedUser ? selectedUser.isActive : false,
                 createdAt: selectedUser ? selectedUser.createdAt : serverTimestamp(),
             }, { merge: true });
 
-            // 2. تحديث الفهرس العالمي (لسهولة الدخول)
             if (!selectedUser) {
                 const globalIndexRef = doc(collection(firestore, 'global_users'));
                 batch.set(globalIndexRef, {
@@ -229,15 +228,10 @@ export function UsersTable() {
         
         try {
             const batch = writeBatch(firestore);
-            
-            // 1. حذف من مجلد الشركة
             batch.delete(doc(firestore, `${basePrefix}users`, user.id!));
-            
-            // 2. حذف من الفهرس العالمي
             const globalIndexQuery = query(collection(firestore, 'global_users'), where('email', '==', user.email));
             const globalIndexSnap = await getDocs(globalIndexQuery);
             globalIndexSnap.forEach(d => batch.delete(d.ref));
-
             await batch.commit();
             toast({ title: 'تم الحذف', description: 'تم مسح الحساب بالكامل من المنصة.' });
             fetchUsersAndEmployees();
@@ -250,32 +244,32 @@ export function UsersTable() {
     <div className="space-y-8" dir="rtl">
         <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">
+                <div className="p-3 bg-indigo-600/10 rounded-2xl text-indigo-600 shadow-inner">
                     <ShieldCheck className="h-8 w-8" />
                 </div>
                 <div>
-                    <h2 className="text-2xl font-black text-slate-900">إدارة حسابات المستخدمين</h2>
-                    <p className="text-sm font-bold text-muted-foreground mt-1">تحكم في صلاحيات دخول الموظفين وتفعيل حساباتهم المعزولة.</p>
+                    <h2 className="text-2xl font-black text-[#1e1b4b]">إدارة حسابات المستخدمين</h2>
+                    <p className="text-sm font-bold text-slate-500 mt-1">تحكم في صلاحيات دخول الموظفين وتفعيل حساباتهم المعزولة.</p>
                 </div>
             </div>
 
             <div className="flex items-center gap-4 bg-white/50 p-2 rounded-2xl border shadow-inner">
                 <div className="px-6 py-1 border-l border-slate-200 text-center">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">تراخيص المستخدمين</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">تراخيص المستخدمين</p>
                     <div className="flex items-center justify-center gap-2">
                         <span className={cn("text-2xl font-black font-mono", quotaInfo.isFull ? "text-red-600" : "text-primary")}>
                             {quotaInfo.usedCount}
                         </span>
-                        <span className="text-muted-foreground font-black text-xl">/</span>
-                        <span className="text-slate-400 font-black text-2xl font-mono">
-                            {quotaInfo.totalLimit}
+                        <span className="text-slate-400 font-black text-xl">/</span>
+                        <span className="text-slate-500 font-black text-2xl font-mono">
+                            {quotaInfo.totalLimit || '...'}
                         </span>
                     </div>
                 </div>
                 <Button 
                     onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} 
-                    disabled={quotaInfo.isFull}
-                    className="h-12 rounded-xl font-black gap-2 shadow-lg"
+                    disabled={quotaInfo.isFull || loading}
+                    className="h-12 rounded-xl font-black gap-2 shadow-lg bg-[#1e1b4b] text-white hover:bg-black"
                 >
                     <PlusCircle className="h-5 w-5" /> إضافة مستخدم
                 </Button>
@@ -285,12 +279,12 @@ export function UsersTable() {
         <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-white">
             <CardHeader className="bg-muted/10 border-b p-8 px-10">
                 <div className="relative w-full max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#1e1b4b] opacity-40" />
                     <Input
                         placeholder="بحث بالاسم أو اسم المستخدم..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 h-12 rounded-2xl bg-white border-none shadow-inner font-bold"
+                        className="pl-10 h-12 rounded-2xl bg-white border-none shadow-inner font-black text-[#1e1b4b]"
                     />
                 </div>
             </CardHeader>
@@ -298,11 +292,11 @@ export function UsersTable() {
                 <Table>
                     <TableHeader className="bg-muted/50 h-14">
                         <TableRow className="border-none">
-                            <TableHead className="px-10 font-black text-gray-800">حساب الدخول (Username)</TableHead>
-                            <TableHead className="font-black text-gray-800">الموظف المرتبط</TableHead>
-                            <TableHead className="font-black text-gray-800">الدور</TableHead>
-                            <TableHead className="font-black text-gray-800 text-center">الحالة</TableHead>
-                            <TableHead className="w-[100px] text-center"><span className="sr-only">إجراء</span></TableHead>
+                            <TableHead className="px-10 font-black text-[#1e1b4b]">حساب الدخول (Username)</TableHead>
+                            <TableHead className="font-black text-[#1e1b4b]">الموظف المرتبط</TableHead>
+                            <TableHead className="font-black text-[#1e1b4b]">الدور</TableHead>
+                            <TableHead className="font-black text-[#1e1b4b] text-center">الحالة</TableHead>
+                            <TableHead className="w-[100px] text-center font-black text-[#1e1b4b]">إجراء</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -311,29 +305,29 @@ export function UsersTable() {
                                 <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl" /></TableCell></TableRow>
                             ))
                         ) : filteredUsers.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-muted-foreground italic font-bold">لا توجد حسابات مفعّلة حالياً.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-slate-300 font-black text-2xl uppercase italic">No Accounts Found</TableCell></TableRow>
                         ) : (
                             filteredUsers.map((user) => (
                                 <TableRow key={user.id} className="hover:bg-primary/5 transition-colors h-24 border-b last:border-0 group">
                                     <TableCell className="px-10">
                                         <div className="flex flex-col">
-                                            <span className="font-mono text-lg font-black text-primary">@{user.username}</span>
-                                            <span className="text-[9px] text-muted-foreground font-mono opacity-40">{user.email}</span>
+                                            <span className="font-mono text-lg font-black text-[#1e1b4b]">@{user.username}</span>
+                                            <span className="text-[9px] text-slate-400 font-mono opacity-60">{user.email}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex flex-col">
-                                            <span className="font-black text-gray-800">{user.employeeFullName || 'غير مرتبط بملف'}</span>
-                                            <span className="text-[10px] font-bold text-muted-foreground">{user.employeeCivilId}</span>
+                                            <span className="font-black text-slate-800">{user.employeeFullName || 'غير مرتبط بملف'}</span>
+                                            <span className="text-[10px] font-bold text-slate-400">{user.employeeCivilId}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <Badge variant="outline" className={cn("px-4 py-1 rounded-xl font-black text-[10px] border-2", roleColors[user.role])}>
+                                        <Badge variant="outline" className={cn("px-4 py-1 rounded-xl font-black text-[10px] border-2 shadow-sm", roleColors[user.role])}>
                                             {roleTranslations[user.role]}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant={user.isActive ? 'default' : 'secondary'} className={cn("px-4 py-1 rounded-xl font-black text-[10px]", user.isActive ? 'bg-green-600' : 'bg-gray-200 text-gray-600')}>
+                                        <Badge variant={user.isActive ? 'default' : 'secondary'} className={cn("px-4 py-1 rounded-xl font-black text-[10px] shadow-sm", user.isActive ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-500')}>
                                             {user.isActive ? 'نشط' : 'موقف'}
                                         </Badge>
                                     </TableCell>
@@ -341,19 +335,19 @@ export function UsersTable() {
                                        {currentUser?.id !== user.id && (
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl border bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-5 w-5" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl border bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-5 w-5 text-[#1e1b4b]" /></Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl border-none p-2">
-                                                <DropdownMenuLabel className="font-black px-3 py-2">إدارة الحساب</DropdownMenuLabel>
-                                                <DropdownMenuItem onClick={() => { setSelectedUser(user); setIsFormOpen(true); }} className="gap-2 rounded-xl py-3 font-bold">
+                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl border-none p-2 bg-white/95 backdrop-blur-xl">
+                                                <DropdownMenuLabel className="font-black px-3 py-2 text-[#1e1b4b]">إدارة الحساب</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => { setSelectedUser(user); setIsFormOpen(true); }} className="gap-2 rounded-xl py-3 font-bold text-[#1e1b4b]">
                                                     <Pencil className="h-4 w-4 text-primary" /> تعديل البيانات
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => { setUserToToggle(user); setIsAlertOpen(true); }} className={cn("gap-2 rounded-xl py-3 font-bold", user.isActive ? "text-orange-600" : "text-green-600")}>
                                                     {user.isActive ? <UserX className="h-4 w-4"/> : <UserCheck className="h-4 w-4"/>}
                                                     {user.isActive ? 'إيقاف الدخول' : 'تفعيل الدخول'}
                                                 </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem className="text-destructive gap-2 rounded-xl py-3 font-bold focus:bg-red-50" onClick={() => handleDeleteUser(user)}>
+                                                <DropdownMenuSeparator className="bg-slate-100" />
+                                                <DropdownMenuItem className="text-red-600 gap-2 rounded-xl py-3 font-bold focus:bg-red-50" onClick={() => handleDeleteUser(user)}>
                                                     <Trash2 className="h-4 w-4" /> حذف الحساب نهائياً
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
@@ -380,20 +374,20 @@ export function UsersTable() {
         )}
 
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl glass-effect">
                 <AlertDialogHeader>
                     <div className={cn("p-4 rounded-3xl w-fit mb-4 shadow-inner", userToToggle?.isActive ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600")}>
                         {userToToggle?.isActive ? <UserX className="h-10 w-10"/> : <UserCheck className="h-10 w-10"/>}
                     </div>
-                    <AlertDialogTitle className="text-2xl font-black">
+                    <AlertDialogTitle className="text-2xl font-black text-[#1e1b4b]">
                         {userToToggle?.isActive ? 'تأكيد إيقاف الدخول؟' : 'تأكيد تفعيل الدخول؟'}
                     </AlertDialogTitle>
-                    <AlertDialogDescription className="text-lg font-medium leading-relaxed">
-                        هل أنت متأكد من تغيير حالة حساب الموظف <strong>@{userToToggle?.username}</strong>؟ 
+                    <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed">
+                        هل أنت متأكد من تغيير حالة حساب الموظف <strong className="text-[#1e1b4b]">@{userToToggle?.username}</strong>؟ 
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">تراجع</AlertDialogCancel>
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
                     <AlertDialogAction onClick={handleToggleActivationConfirm} className={cn("rounded-xl font-black h-12 px-12 shadow-lg", userToToggle?.isActive ? "bg-orange-600 hover:bg-orange-700 shadow-orange-100" : "bg-green-600 hover:bg-green-700 shadow-green-100")}>
                         نعم، اعتماد الإجراء
                     </AlertDialogAction>

@@ -69,6 +69,7 @@ const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, position = "popper", ...props }, ref) => (
+  /* 🛡️ Sovereign Mouse Dominance: Removed Portal to ensure clicks work in all cloud environments */
   <SelectPrimitive.Content
     ref={ref}
     className={cn(
