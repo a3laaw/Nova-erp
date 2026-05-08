@@ -96,3 +96,8 @@
   cursor: pointer !important;
   pointer-events: auto !important;
 }
+
+/* 🛡️ Dialog & Popover Interaction Fix 🛡️ */
+body[style*="pointer-events: none"] {
+  pointer-events: auto !important;
+}

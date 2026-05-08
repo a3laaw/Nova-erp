@@ -1,24 +1,23 @@
-
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, PermissionRequest, LeaveRequest } from '@/lib/types';
-import { Loader2, Save, Upload, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, Upload, ShieldAlert, Info, User } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info } from 'lucide-react';
 import { toFirestoreDate } from '@/services/date-converter';
+import { cn } from '@/lib/utils';
 
 interface PermissionRequestFormProps {
   isOpen: boolean;
@@ -41,6 +40,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   const [isSaving, setIsSaving] = useState(false);
   
   const isEditing = !!permissionToEdit;
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
 
   useEffect(() => {
     if (isOpen) {
@@ -50,7 +50,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             setDate(toFirestoreDate(permissionToEdit.date) || undefined);
             setReason(permissionToEdit.reason);
         } else {
-             if (currentUser?.role !== 'Admin' && currentUser?.role !== 'HR') {
+             if (!isAdmin) {
               setSelectedEmployeeId(currentUser?.employeeId || '');
             } else {
               setSelectedEmployeeId('');
@@ -60,7 +60,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             setReason('');
         }
     }
-  }, [isOpen, isEditing, permissionToEdit, currentUser]);
+  }, [isOpen, isEditing, permissionToEdit, currentUser, isAdmin]);
 
   const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
   const employeeOptions = useMemo(() => activeEmployees.map(e => ({ value: e.id!, label: e.fullName })), [activeEmployees]);
@@ -74,11 +74,10 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     
     setIsSaving(true);
     try {
-      const selectedEmployee = activeEmployees.find(e => e.id === selectedEmployeeId);
+      const selectedEmployee = activeEmployees.find(e => e.id === selectedEmployeeId) || (selectedEmployeeId === currentUser?.employeeId ? { fullName: currentUser.fullName } : null);
       if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار أو أنه غير نشط.');
       
       const checkDateStart = startOfDay(date);
-      const checkDateEnd = endOfDay(date);
 
       // --- الدرع الرقابي: التحقق من وجود إجازة معتمدة في نفس التاريخ ---
       const leavesQuery = query(
@@ -121,7 +120,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         
         const sameDayRequest = allUserPermissions.some(p => {
             const pDate = toFirestoreDate(p.date);
-            return pDate && isSameDay(pDate, date);
+            return pDate && isSameDay(pDate, date) && p.status !== 'rejected';
         });
 
         if (sameDayRequest) {
@@ -165,7 +164,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="sm:max-w-md rounded-[2rem] shadow-2xl border-none" 
+        className="sm:max-w-md rounded-[2rem] shadow-2xl border-none p-0 overflow-hidden" 
         dir="rtl"
         onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;
@@ -175,34 +174,41 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         }}
       >
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="pb-4 border-b">
-            <DialogTitle className="text-xl font-black flex items-center gap-2">
-                <ShieldAlert className="text-primary h-5 w-5" />
+          <DialogHeader className="p-8 bg-primary/5 border-b">
+            <DialogTitle className="text-xl font-black flex items-center gap-2 text-[#1e1b4b]">
+                <ShieldAlert className="text-primary h-6 w-6" />
                 {isEditing ? 'تعديل طلب استئذان' : 'طلب استئذان جديد'}
             </DialogTitle>
-            <DialogDescription className="text-xs font-bold">
+            <DialogDescription className="text-xs font-bold text-slate-500 mt-1">
               سيخضع الطلب لرقابة التداخل مع الإجازات ومسيرة الرواتب.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-6">
-            {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
-              <div className="grid gap-2">
-                <Label htmlFor="employee" className="font-bold mr-1">الموظف المعني *</Label>
-                <InlineSearchList
-                    value={selectedEmployeeId}
-                    onSelect={setSelectedEmployeeId}
-                    options={employeeOptions}
-                    placeholder={loadingRefs ? 'جاري التحميل...' : 'اختر موظفاً...'}
-                    disabled={loadingRefs || isSaving}
-                    className="h-11 rounded-xl"
-                />
-              </div>
-            )}
+
+          <div className="p-8 space-y-6">
+            <div className="grid gap-2">
+                <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
+                {isAdmin ? (
+                    <InlineSearchList
+                        value={selectedEmployeeId}
+                        onSelect={setSelectedEmployeeId}
+                        options={employeeOptions}
+                        placeholder={loadingRefs ? 'جاري التحميل...' : 'اختر موظفاً من القائمة...'}
+                        disabled={loadingRefs || isSaving}
+                        className="h-12 rounded-xl border-2"
+                    />
+                ) : (
+                    <div className="h-12 rounded-xl border-2 bg-muted/20 px-4 flex items-center font-black text-[#1e1b4b] gap-2">
+                        <User className="h-4 w-4 opacity-40" />
+                        {currentUser?.fullName}
+                    </div>
+                )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="permissionType" className="font-bold mr-1">نوع الاستئذان *</Label>
+                <Label htmlFor="permissionType" className="font-bold text-gray-700 pr-1">نوع الاستئذان *</Label>
                 <Select value={permissionType} onValueChange={(v) => setPermissionType(v as any)} disabled={isSaving}>
-                    <SelectTrigger id="permissionType" className="h-11 rounded-xl border-2"><SelectValue/></SelectTrigger>
+                    <SelectTrigger id="permissionType" className="h-12 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                     <SelectContent dir="rtl">
                         <SelectItem value="late_arrival">تأخير صباحي</SelectItem>
                         <SelectItem value="early_departure">خروج مبكر</SelectItem>
@@ -210,27 +216,29 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="date" className="font-bold mr-1">تاريخ الاستئذان *</Label>
-                <DateInput value={date} onChange={setDate} className="h-11 rounded-xl" disabled={isSaving} />
+                <Label htmlFor="date" className="font-bold text-gray-700 pr-1">تاريخ الاستئذان *</Label>
+                <DateInput value={date} onChange={setDate} className="h-12 rounded-xl border-2" disabled={isSaving} />
               </div>
             </div>
+
              <div className="grid gap-2">
-              <Label htmlFor="reason" className="font-bold mr-1">السبب / مبرر الطلب *</Label>
-              <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} required rows={3} className="rounded-2xl border-2" placeholder="اشرح سبب الاستئذان..." disabled={isSaving} />
+              <Label htmlFor="reason" className="font-bold text-gray-700 pr-1">السبب / مبرر الطلب *</Label>
+              <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" placeholder="اشرح سبب الاستئذان..." disabled={isSaving} />
             </div>
             
             <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
                 <Info className="h-4 w-4 text-primary" />
                 <AlertTitle className="text-xs font-black text-primary uppercase">قواعد الرقابة</AlertTitle>
-                <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1">
+                <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1 leading-relaxed">
                     • الحد الأقصى: 3 استئذانات شهرياً. <br/>
                     • يُمنع الاستئذان في أيام الإجازات المعتمدة.
                 </AlertDescription>
             </Alert>
           </div>
-          <DialogFooter className="gap-2 border-t pt-6">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold">إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-10 shadow-lg shadow-primary/20">
+
+          <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+            <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white hover:bg-black transition-all">
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
               {isEditing ? 'حفظ التعديلات' : 'إرسال الطلب'}
             </Button>

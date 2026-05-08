@@ -22,6 +22,12 @@ const PopoverContent = React.forwardRef<
       className
     )}
     style={{ pointerEvents: 'auto' }}
+    onInteractOutside={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-inline-search-list-options]')) {
+            e.preventDefault();
+        }
+    }}
     {...props}
   />
 ))
