@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -14,23 +13,15 @@ import {
     writeBatch, 
     getDocs, 
     where, 
-    serverTimestamp
+    serverTimestamp,
+    collectionGroup
 } from 'firebase/firestore';
-import type { 
-    Department, 
-    Job, 
-    Governorate, 
-    Area, 
-    TransactionType, 
-    WorkStage,
-} from '@/lib/types';
 import { 
     Card, 
     CardHeader, 
     CardTitle, 
     CardContent, 
     CardDescription, 
-    CardFooter 
 } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -58,14 +49,13 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, Briefcase, ChevronLeft, X, LayoutGrid
+    MapPin, ChevronLeft, X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { Badge } from '../ui/badge';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 
 function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean }) {
@@ -80,7 +70,7 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { tit
             </CardHeader>
             <CardContent>
                 {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <div className="text-3xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
-                <div className="flex items-center gap-1 text-[10px] text-primary font-bold mt-2 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
+                <div className="flex items-center gap-1 text-[10px] text-primary font-black mt-2 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
                     فتح الإعدادات <ArrowRight className="h-2 w-2"/>
                 </div>
             </CardContent>
@@ -222,7 +212,7 @@ export function ReferenceDataManager() {
                             </div>
                             <div>
                                 <CardTitle className="text-3xl font-black text-[#1e1b4b]">إدارة البيانات المرجعية</CardTitle>
-                                <CardDescription className="text-base font-medium">تخصيص القوائم المنسدلة وهيكل العمل الفني للمنشأة.</CardDescription>
+                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم المنسدلة وهيكل العمل الفني للمنشأة.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -248,12 +238,12 @@ export function ReferenceDataManager() {
                             </div>
                             <div className="text-white text-right">
                                 <CardTitle className="text-2xl font-black">{view === 'departments' ? 'الأقسام والوظائف' : view === 'locations' ? 'المحافظات والمناطق' : 'أنواع الخدمات'}</CardTitle>
-                                <CardDescription className="text-white/60 font-bold">إدارة الهيكل المرجعي الداخلي للمنشأة.</CardDescription>
+                                <CardDescription className="text-white/60 font-black">إدارة الهيكل المرجعي الداخلي للمنشأة.</CardDescription>
                             </div>
                         </div>
                         <div className="flex gap-2">
                             {view !== 'transactions' && (
-                                <Button variant="ghost" onClick={() => setIsImportConfirmOpen(true)} className="text-white hover:bg-white/10 border border-white/20 rounded-xl">
+                                <Button variant="ghost" onClick={() => setIsImportConfirmOpen(true)} className="text-white hover:bg-white/10 border border-white/20 rounded-xl font-black">
                                     <DownloadCloud className="h-4 w-4 ml-2"/> استيراد الافتراضي
                                 </Button>
                             )}
@@ -269,13 +259,13 @@ export function ReferenceDataManager() {
                 <CardContent className="p-0">
                     <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
                         <div className="md:col-span-4 border-l bg-slate-50/50 flex flex-col">
-                            <div className="p-6 border-b flex justify-between items-center">
+                            <div className="p-6 border-b flex justify-between items-center bg-muted/20">
                                 <Label className="font-black text-[#1e1b4b] text-base">{view === 'departments' ? 'القسم الفني' : view === 'locations' ? 'المحافظة' : 'نوع المعاملة'}</Label>
                                 <Button size="icon" variant="ghost" onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-9 w-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"><Plus className="h-5 w-5" /></Button>
                             </div>
                             <ScrollArea className="flex-1 p-4">
                                 {loadingPrimary ? <div className="space-y-2 p-4"><Skeleton className="h-10 w-full rounded-xl"/><Skeleton className="h-10 w-full rounded-xl"/></div> : 
-                                primaryItems.length === 0 ? <p className="text-center p-10 text-muted-foreground italic text-xs font-bold">لا توجد سجلات بعد.</p> :
+                                primaryItems.length === 0 ? <p className="text-center p-10 text-muted-foreground italic text-xs font-black">لا توجد سجلات بعد.</p> :
                                 <div className="space-y-2">
                                     {primaryItems.map(item => (
                                         <div key={item.id} onClick={() => setSelectedPrimaryId(item.id)} className={cn("group flex items-center justify-between p-4 rounded-[1.5rem] cursor-pointer transition-all border-2", selectedPrimaryId === item.id ? "bg-primary border-primary text-white shadow-lg" : "hover:bg-muted/50 bg-white border-transparent")}>
@@ -290,7 +280,7 @@ export function ReferenceDataManager() {
                             </ScrollArea>
                         </div>
 
-                        <div className="md:col-span-8 flex flex-col">
+                        <div className="md:col-span-8 flex flex-col bg-white">
                             {selectedPrimaryId && view !== 'transactions' ? (
                                 <>
                                     <div className="p-6 border-b bg-muted/5">
@@ -305,9 +295,9 @@ export function ReferenceDataManager() {
                                         </div>
                                         {view === 'departments' && (
                                             <Tabs value={activeSubTab} onValueChange={(v: any) => setActiveSubTab(v)} className="w-full">
-                                                <TabsList className="bg-white/50 border h-11 p-1 rounded-xl">
-                                                    <TabsTrigger value="jobs" className="rounded-lg gap-2 font-bold px-8">الوظائف</TabsTrigger>
-                                                    <TabsTrigger value="stages" className="rounded-lg gap-2 font-bold px-8">مراحل العمل</TabsTrigger>
+                                                <TabsList className="bg-white border h-11 p-1 rounded-xl shadow-inner">
+                                                    <TabsTrigger value="jobs" className="rounded-lg gap-2 font-black px-8">الوظائف</TabsTrigger>
+                                                    <TabsTrigger value="stages" className="rounded-lg gap-2 font-black px-8">مراحل العمل</TabsTrigger>
                                                 </TabsList>
                                             </Tabs>
                                         )}
@@ -317,7 +307,7 @@ export function ReferenceDataManager() {
                                         secondaryItems.length === 0 ? <div className="h-64 flex flex-col items-center justify-center grayscale opacity-20"><PlusCircle className="h-16 w-16 mb-4"/><p className="font-black text-xl">لا توجد سجلات فرعية.</p></div> :
                                         <div className="grid gap-4">
                                             {secondaryItems.map(item => (
-                                                <div key={item.id} className="flex items-center justify-between p-6 border-2 border-slate-100 bg-white rounded-[1.8rem] hover:border-primary/20 transition-all group">
+                                                <div key={item.id} className="flex items-center justify-between p-6 border-2 border-slate-100 bg-white rounded-[1.8rem] hover:border-primary/20 transition-all group shadow-sm">
                                                     <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
                                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
@@ -334,7 +324,7 @@ export function ReferenceDataManager() {
                                     <h3 className="text-2xl font-black text-[#1e1b4b]">
                                         {view === 'transactions' ? 'قائمة الخدمات الأساسية' : 'اختر تصنيفاً لإدارة تفاصيله'}
                                     </h3>
-                                    {view === 'transactions' && <p className="text-sm font-bold mt-2 text-[#1e1b4b]">أنواع المعاملات يتم تعريفها كمستوى أول فقط وربطها بالأقسام لاحقاً.</p>}
+                                    {view === 'transactions' && <p className="text-sm font-black mt-2 text-[#1e1b4b]">أنواع المعاملات يتم تعريفها كمستوى أول فقط وربطها بالأقسام لاحقاً.</p>}
                                 </div>
                             )}
                         </div>
@@ -343,15 +333,15 @@ export function ReferenceDataManager() {
             </Card>
 
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] p-8 shadow-2xl border-none">
+                <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] p-8 shadow-2xl border-none bg-white">
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader><DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل' : 'إضافة'} سجل</DialogTitle></DialogHeader>
                         <div className="py-8">
                             <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label>
                             <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black text-[#1e1b4b]" />
                         </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                        <DialogFooter className="gap-3">
+                            <Button type="button" variant="outline" onClick={closeDialog} className="rounded-xl font-black h-12 px-8">إلغاء</Button>
                             <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 bg-[#1e1b4b] text-white hover:bg-black">
                                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
                             </Button>
@@ -361,14 +351,14 @@ export function ReferenceDataManager() {
             </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-medium">سيتم مسح سجل "{itemToDelete?.name}" تماماً من النظام.</AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيتم مسح سجل "{itemToDelete?.name}" تماماً من النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 rounded-xl font-black px-10">
+                        <AlertDialogCancel className="rounded-xl font-black">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-10">
                             {isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -376,14 +366,14 @@ export function ReferenceDataManager() {
             </AlertDialog>
 
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black">تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع القياسية لهذا النشاط آلياً.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع القياسية لهذا النشاط آلياً.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-xl font-black px-10">
+                        <AlertDialogCancel className="rounded-xl font-black">إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-xl font-black px-10 bg-[#1e1b4b]">
                             {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، ابدأ الاستيراد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>

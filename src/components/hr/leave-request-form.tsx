@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Upload, Info, User } from 'lucide-react';
+import { Loader2, Save, Upload, Info, User, AlertCircle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -17,6 +18,7 @@ import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -91,7 +93,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
 
   const leaveDuration = useMemo(() => {
     if (!startDate || !endDate) return { totalDays: 0, workingDays: 0 };
-    return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
+    return calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || branding?.work_hours?.holidays || [], publicHolidays);
   }, [startDate, endDate, branding, publicHolidays]);
 
   const employeeOptions = useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
@@ -201,9 +203,21 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
               </div>
             </div>
             {leaveDuration.totalDays > 0 && (
-              <div className="text-sm font-bold p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
-                <p>إجمالي الأيام: <span className="text-lg font-black">{leaveDuration.totalDays}</span></p>
-                <p>أيام العمل: <span className="text-lg font-black">{leaveDuration.workingDays}</span></p>
+              <div className="space-y-4">
+                <div className="text-sm font-black text-primary p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
+                    <p>إجمالي الأيام: <span className="text-lg">{leaveDuration.totalDays}</span></p>
+                    <p>أيام العمل: <span className="text-lg">{leaveDuration.workingDays}</span></p>
+                </div>
+
+                {leaveType === 'Annual' && leaveDuration.totalDays > 0 && leaveDuration.totalDays < 30 && (
+                    <Alert className="bg-amber-50 border-amber-200 rounded-2xl animate-in slide-in-from-top-2">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
+                        <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
+                            الإجازة السنوية مخصصة للفترات الطويلة (شهر فأكثر). إذا كانت المدة قصيرة، يرجى مراجعة النوع المختار.
+                        </AlertDescription>
+                    </Alert>
+                )}
               </div>
             )}
              <div className="grid gap-2">

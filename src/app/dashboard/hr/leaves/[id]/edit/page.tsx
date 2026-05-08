@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, X } from 'lucide-react';
+import { Loader2, Save, X, AlertCircle } from 'lucide-react';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -27,8 +27,9 @@ import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Checkbox } from '../ui/checkbox';
 import { isBefore, startOfDay } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function EditLeaveRequestPage() {
     const { firestore } = useFirebase();
@@ -82,7 +83,7 @@ export default function EditLeaveRequestPage() {
 
     const leaveAnalysis = useMemo(() => {
         if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) return { totalDays: 0, workingDays: 0 };
-        return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
+        return calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || branding?.work_hours?.holidays || [], publicHolidays);
     }, [startDate, endDate, branding, publicHolidays]);
 
     const employeeOptions = useMemo(() => (employees || []).map(e => ({ value: e.id!, label: e.fullName })), [employees]);
@@ -149,14 +150,14 @@ export default function EditLeaveRequestPage() {
             <form onSubmit={handleSubmit}>
                  <CardHeader className="bg-primary/5 pb-8 border-b">
                     <CardTitle className="text-2xl font-black">تعديل طلب إجازة</CardTitle>
-                    <CardDescription className="text-base">
+                    <CardDescription className="text-base font-medium">
                       تعديل بيانات طلب الإجازة للموظف: {leaveRequest.employeeName}.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
-                     {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
+                     {(currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer') && (
                       <div className="grid gap-2">
-                        <Label htmlFor="employee" className="font-bold">الموظف</Label>
+                        <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
@@ -169,9 +170,9 @@ export default function EditLeaveRequestPage() {
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType" className="font-bold">نوع الإجازة</Label>
+                        <Label htmlFor="leaveType" className="font-black text-gray-700 pr-1">نوع الإجازة *</Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
-                            <SelectTrigger id="leaveType" className="h-11 rounded-xl"><SelectValue/></SelectTrigger>
+                            <SelectTrigger id="leaveType" className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
                                 <SelectItem value="Sick">مرضية</SelectItem>
@@ -183,27 +184,39 @@ export default function EditLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-bold">من تاريخ</Label>
-                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
+                        <Label htmlFor="startDate" className="font-black text-gray-700 pr-1">من تاريخ *</Label>
+                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl border-2" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-bold">إلى تاريخ</Label>
-                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
+                        <Label htmlFor="endDate" className="font-black text-gray-700 pr-1">إلى تاريخ *</Label>
+                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl border-2" />
                       </div>
                     </div>
                     {leaveAnalysis.totalDays > 0 && (
-                      <div className="text-sm text-primary font-bold p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
-                        <p>إجمالي الأيام: <span className="text-lg font-black">{leaveAnalysis.totalDays}</span></p>
-                        <p>أيام العمل الفعلية: <span className="text-lg font-black">{leaveAnalysis.workingDays}</span></p>
+                      <div className="space-y-4">
+                        <div className="text-sm font-black text-primary p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
+                            <p>إجمالي الأيام: <span className="text-lg">{leaveAnalysis.totalDays}</span></p>
+                            <p>أيام العمل الفعلية: <span className="text-lg">{leaveAnalysis.workingDays}</span></p>
+                        </div>
+
+                        {leaveType === 'Annual' && leaveAnalysis.totalDays > 0 && leaveAnalysis.totalDays < 30 && (
+                            <Alert className="bg-amber-50 border-amber-200 rounded-2xl animate-in slide-in-from-top-2">
+                                <AlertCircle className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
+                                <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
+                                    الإجازة السنوية عادةً ما تُطلب كفترة راحة طويلة (شهر كامل). إذا كانت المدة قصيرة جداً، ربما تفضل اختيار نوع "طارئة" أو تقديم "استئذان" للحفاظ على رصيد إجازتك السنوية.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                       </div>
                     )}
                      <div className="grid gap-2">
-                      <Label htmlFor="notes" className="font-bold">السبب / ملاحظات</Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl" disabled={isSaving} />
+                      <Label htmlFor="notes" className="font-black text-gray-700 pr-1">السبب / ملاحظات *</Label>
+                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" disabled={isSaving} />
                     </div>
                     <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
                         <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
-                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer">تم استلام جواز السفر</Label>
+                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer text-gray-700">تم استلام جواز السفر</Label>
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">

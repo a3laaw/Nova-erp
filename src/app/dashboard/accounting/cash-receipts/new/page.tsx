@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -21,31 +20,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Printer, Save, X, Loader2, Target, UserCheck } from 'lucide-react';
+import { Save, Loader2, Target } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy, writeBatch, limit, collectionGroup, addDoc } from 'firebase/firestore';
-import type { Client, Company, ClientTransaction, Account, Employee, Department, TransactionStage, WorkStage, PaymentMethod } from '@/lib/types';
+import { collection, query, where, getDocs, doc, runTransaction, serverTimestamp, Timestamp, getDoc, orderBy } from 'firebase/firestore';
+import type { Client, ClientTransaction, Account, Employee, Department } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
 import { numberToArabicWords, formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format } from 'date-fns';
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
-import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
-import { useAppTheme } from '@/context/theme-context';
+import { format } from 'date-fns';
 
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { branding } = useBranding();
-  const { theme } = useAppTheme();
-  const isGlass = theme === 'glass';
   const { toast } = useToast();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -342,7 +335,7 @@ export default function NewCashReceiptPage() {
             <div className="flex justify-between items-start">
                 <div>
                     <CardTitle className="text-3xl font-black text-[#1e1b4b]">سـنـد قـبـض / Cash Receipt</CardTitle>
-                    <CardDescription className="font-bold text-[#1e1b4b]/60">{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
+                    <CardDescription className="font-black text-[#1e1b4b]/60">{isGeneratingVoucher ? <Skeleton className="h-4 w-32" /> : voucherNumber} : رقم السند</CardDescription>
                 </div>
             </div>
         </CardHeader>

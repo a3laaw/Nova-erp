@@ -47,13 +47,11 @@ export function InlineSearchList({
     options.find((option) => option.value === value)?.label
   , [options, value]);
 
-  const handleSelect = React.useCallback((currentValue: string) => {
+  const handleSelect = React.useCallback((currentLabel: string) => {
     // 🛡️ Match label to value for proper selection
-    const option = options.find((opt) => opt.label.toLowerCase() === currentValue.toLowerCase());
+    const option = options.find((opt) => opt.label.toLowerCase() === currentLabel.toLowerCase());
     if (option) {
         onSelect(option.value === value ? "" : option.value);
-    } else {
-        onSelect(currentValue === value ? "" : currentValue);
     }
     setOpen(false);
   }, [onSelect, options, value]);
@@ -66,7 +64,7 @@ export function InlineSearchList({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between font-normal h-11 rounded-xl border-2",
+            "w-full justify-between font-black h-11 rounded-xl border-2 text-slate-900",
             !value && "text-muted-foreground",
             className
           )}
@@ -77,13 +75,13 @@ export function InlineSearchList({
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-[--radix-popover-trigger-width] p-0 z-[99999]" 
+        className="w-[--radix-popover-trigger-width] p-0 z-[999999]" 
         align="start"
         dir="rtl"
         style={{ pointerEvents: 'auto' }}
       >
         <Command>
-          <CommandInput placeholder="ابحث..." className="h-9" />
+          <CommandInput placeholder="ابحث..." className="h-9 font-black" />
           <CommandList>
             <CommandEmpty>لا توجد نتائج.</CommandEmpty>
             <CommandGroup>
@@ -92,7 +90,7 @@ export function InlineSearchList({
                   key={option.value}
                   value={option.label}
                   onSelect={handleSelect}
-                  className="cursor-pointer"
+                  className="cursor-pointer font-black text-[#1e1b4b] py-2"
                 >
                   <Check
                     className={cn(

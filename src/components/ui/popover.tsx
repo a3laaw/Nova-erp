@@ -13,6 +13,7 @@ const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
 >(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  /* 🛡️ Sovereign Fix: Removed Portal to fix mouse click issues in preview frames */
   <PopoverPrimitive.Content
     ref={ref}
     align={align}
@@ -22,12 +23,6 @@ const PopoverContent = React.forwardRef<
       className
     )}
     style={{ pointerEvents: 'auto' }}
-    onInteractOutside={(e) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('[cmdk-root]') || target.closest('[role="listbox"]') || target.closest('[data-inline-search-list-options]')) {
-            e.preventDefault();
-        }
-    }}
     {...props}
   />
 ))

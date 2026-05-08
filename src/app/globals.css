@@ -32,7 +32,7 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background: linear-gradient(180deg, #f3e8ff 0%, #fce7f3 100%);
+    background: linear-gradient(135deg, #f3e8ff 0%, #fce7f3 50%, #f3e8ff 100%);
     background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
@@ -67,25 +67,16 @@
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
     @apply text-[#1e1b4b] font-bold hover:bg-white/60 transition-all duration-300;
   }
-  
-  .navy-text {
-    @apply text-[#1e1b4b] font-black;
-  }
-
-  .hover-lift { 
-    @apply transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl; 
-  }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* 🛡️ Sovereign Mouse Dominance Shield 🛡️ */
+/* 🛡️ Sovereign Mouse Dominance Protocol 🛡️ */
 [data-radix-popper-content-wrapper], 
 [role="listbox"], 
 [role="combobox"], 
 [data-radix-select-content],
-[data-radix-popover-content],
-[data-radix-portal] {
+[data-radix-popover-content] {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }
@@ -97,7 +88,6 @@
   pointer-events: auto !important;
 }
 
-/* 🛡️ Dialog & Popover Interaction Fix 🛡️ */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }

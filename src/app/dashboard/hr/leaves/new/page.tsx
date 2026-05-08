@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -28,8 +28,8 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '../ui/checkbox';
+import { Separator } from '../ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, formatDistanceToNow, isBefore, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -137,7 +137,7 @@ export default function NewLeaveRequestPage() {
             return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
         }
         
-        const days = calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
+        const days = calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || branding?.work_hours?.holidays || [], publicHolidays);
         const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
         
         if (!selectedEmployee || leaveType !== 'Annual') {
@@ -214,16 +214,16 @@ export default function NewLeaveRequestPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
-                     {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && (
+                     {(currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer') && (
                       <div className="grid gap-2">
-                        <Label htmlFor="employee" className="font-bold text-gray-700">الموظف <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
                             placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
                             disabled={loading || isSaving}
-                            className="h-12 rounded-xl"
+                            className="h-12 rounded-xl border-2"
                         />
                       </div>
                     )}
@@ -252,9 +252,9 @@ export default function NewLeaveRequestPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType" className="font-bold text-gray-700">نوع الإجازة <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="leaveType" className="font-black text-gray-700 pr-1">نوع الإجازة <span className="text-destructive">*</span></Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
-                            <SelectTrigger id="leaveType" className="h-12 rounded-xl"><SelectValue/></SelectTrigger>
+                            <SelectTrigger id="leaveType" className="h-12 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
                                 <SelectItem value="Sick">مرضية</SelectItem>
@@ -266,11 +266,11 @@ export default function NewLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-bold text-gray-700">من تاريخ <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="startDate" className="font-black text-gray-700 pr-1">من تاريخ <span className="text-destructive">*</span></Label>
                         <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-12 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-bold text-gray-700">إلى تاريخ <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="endDate" className="font-black text-gray-700 pr-1">إلى تاريخ <span className="text-destructive">*</span></Label>
                         <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-12 rounded-xl" />
                       </div>
                     </div>
@@ -288,6 +288,16 @@ export default function NewLeaveRequestPage() {
                                 <p className="text-2xl font-black text-primary">{leaveAnalysis.workingDays} يوم</p>
                             </div>
                         </div>
+
+                        {leaveType === 'Annual' && leaveAnalysis.totalDays > 0 && leaveAnalysis.totalDays < 30 && (
+                            <Alert className="bg-amber-50 border-amber-200 rounded-2xl animate-in slide-in-from-top-2">
+                                <AlertCircle className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
+                                <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
+                                    الإجازة السنوية عادةً ما تُطلب كفترة راحة طويلة (شهر كامل). إذا كانت المدة قصيرة جداً، ربما تفضل اختيار نوع "طارئة" أو تقديم "استئذان" للحفاظ على رصيد إجازتك السنوية.
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
                         {leaveType === 'Annual' && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -310,8 +320,8 @@ export default function NewLeaveRequestPage() {
                     )}
 
                      <div className="grid gap-2">
-                      <Label htmlFor="notes" className="font-bold text-gray-700">السبب / ملاحظات <span className="text-destructive">*</span></Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2" placeholder="اشرح سبب طلب الإجازة..." disabled={isSaving} />
+                      <Label htmlFor="notes" className="font-bold text-gray-700 pr-1">السبب / ملاحظات *</Label>
+                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" placeholder="اشرح سبب طلب الإجازة..." disabled={isSaving} />
                     </div>
                     <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-2xl border">
                         <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
