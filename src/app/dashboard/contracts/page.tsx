@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -15,7 +16,8 @@ import {
   Search, 
   PlusCircle,
   Construction,
-  Sparkles
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
@@ -54,12 +56,12 @@ export default function UnifiedContractsPage() {
         {/* --- Header --- */}
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-4">
             <div className="space-y-1 text-center lg:text-right">
-                <h1 className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3 text-primary">
-                    <FileSignature className="h-8 w-8" />
-                    عروض الأسعار والعقود
+                <h1 className="text-3xl font-black flex items-center justify-center lg:justify-start gap-3 text-[#1e1b4b]">
+                    <FileSignature className="h-8 w-8 text-primary" />
+                    إدارة المبيعات والتعاقدات
                 </h1>
-                <p className="text-base font-bold text-muted-foreground">
-                    إدارة المسارات التعاقدية والمالية للمشاريع النشطة والجديدة.
+                <p className="text-base font-bold text-slate-500">
+                    تحويل عروض الأسعار إلى عقود ملزمة وربطها بالمشاريع التشغيلية.
                 </p>
             </div>
         </div>
@@ -82,9 +84,9 @@ export default function UnifiedContractsPage() {
                         </div>
                         <Badge variant="outline" className="mb-2 bg-primary/10 text-primary border-primary/20 text-[10px] font-black">المسار القانوني</Badge>
                         <h3 className="text-xl font-black mb-1">العقود الموقعة</h3>
-                        <p className="text-xs font-bold text-muted-foreground mb-4">التعاقد المباشر وإثبات المديونيات المالية واللوجستية.</p>
+                        <p className="text-xs font-bold text-muted-foreground mb-4">إدارة العقود المبرمة ومتابعة دفعات الملاك.</p>
                         <Button asChild className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto">
-                            <Link href="/dashboard/contracts/new">توقيع عقد مباشر فوري +</Link>
+                            <Link href="/dashboard/contracts/new">توقيع عقد مباشر +</Link>
                         </Button>
                     </TabsTrigger>
 
@@ -100,7 +102,7 @@ export default function UnifiedContractsPage() {
                         </div>
                         <Badge variant="outline" className="mb-2 bg-indigo-50 text-indigo-700 border-indigo-100 text-[10px] font-black">المسار المالي</Badge>
                         <h3 className="text-xl font-black mb-1">عروض الأسعار</h3>
-                        <p className="text-xs font-bold text-muted-foreground mb-4">إدارة المسودات والمقترحات المالية للمشاريع الجديدة.</p>
+                        <p className="text-xs font-bold text-muted-foreground mb-4">إدارة المقترحات الفنية والمالية للعملاء المحتملين.</p>
                         <Button asChild variant="outline" className="w-full h-10 rounded-xl font-black text-xs gap-2 mt-auto border-primary/30 text-primary bg-primary/5">
                             <Link href="/dashboard/accounting/quotations/new">إنشاء عرض سعر جديد +</Link>
                         </Button>
@@ -108,7 +110,6 @@ export default function UnifiedContractsPage() {
                 </TabsList>
             </div>
 
-            {/* --- Filter Section & Table Content --- */}
             <div className="mt-6 space-y-6">
                 <Card className={cn(
                     "rounded-[2.5rem] border-none shadow-xl overflow-hidden",
@@ -126,7 +127,7 @@ export default function UnifiedContractsPage() {
                                 />
                             </div>
                             <Input 
-                                placeholder="رقم المستند..." 
+                                placeholder="رقم العقد..." 
                                 value={contractNo}
                                 onChange={(e) => setContractNo(e.target.value)}
                                 className="rounded-xl h-11 font-mono border-2 font-bold"

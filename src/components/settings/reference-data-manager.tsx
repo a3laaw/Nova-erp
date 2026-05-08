@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -13,8 +14,7 @@ import {
     writeBatch, 
     getDocs, 
     where, 
-    serverTimestamp,
-    collectionGroup
+    serverTimestamp
 } from 'firebase/firestore';
 import type { 
     Department, 
@@ -58,7 +58,7 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, Briefcase, ChevronLeft, X
+    MapPin, Briefcase, ChevronLeft, X, LayoutGrid
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -351,7 +351,7 @@ export function ReferenceDataManager() {
                             <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black text-[#1e1b4b]" />
                         </div>
                         <DialogFooter>
-                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                            <Button type="button" variant="outline" onClick={closeDialog} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                             <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 bg-[#1e1b4b] text-white hover:bg-black">
                                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
                             </Button>
@@ -370,6 +370,21 @@ export function ReferenceDataManager() {
                         <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 rounded-xl font-black px-10">
                             {isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-xl font-black">تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع القياسية لهذا النشاط آلياً.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-xl font-black px-10">
+                            {isImporting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، ابدأ الاستيراد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
