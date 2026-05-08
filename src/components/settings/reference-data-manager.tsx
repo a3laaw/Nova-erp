@@ -49,11 +49,11 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, ChevronLeft, X
+    MapPin, ChevronLeft, X, Layers, Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
-import { cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
@@ -62,16 +62,16 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { tit
     return (
         <Card 
             onClick={onNavigate} 
-            className="group cursor-pointer border-none shadow-sm rounded-3xl bg-white hover-lift overflow-hidden"
+            className="group cursor-pointer border-none shadow-sm rounded-[2.5rem] bg-white hover-lift overflow-hidden"
         >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-black text-slate-500 uppercase tracking-widest">{title}</CardTitle>
-                <div className={cn("p-2 rounded-xl transition-colors shadow-inner", colorClass)}>{icon}</div>
+                <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</CardTitle>
+                <div className={cn("p-2.5 rounded-2xl transition-colors shadow-inner", colorClass)}>{icon}</div>
             </CardHeader>
             <CardContent>
-                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <div className="text-3xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
-                <div className="flex items-center gap-1 text-[10px] text-primary font-black mt-2 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
-                    فتح الإعدادات <ArrowRight className="h-2 w-2"/>
+                {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <div className="text-4xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
+                <div className="flex items-center gap-1 text-[9px] text-primary font-black mt-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 uppercase tracking-widest">
+                    Open Settings <ArrowRight className="h-3 w-3"/>
                 </div>
             </CardContent>
         </Card>
@@ -82,7 +82,6 @@ export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
     const { toast } = useToast();
-    const tenantId = user?.currentCompanyId;
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
     const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas'>('jobs');
@@ -124,81 +123,47 @@ export function ReferenceDataManager() {
 
     const selectedPrimary = useMemo(() => primaryItems.find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
 
-    const closeDialog = () => {
-        setIsPrimaryDialogOpen(false);
-        setIsSecondaryDialogOpen(false);
-        setEditingItem(null);
-        setItemName('');
-    };
-
     const handleSave = async (type: 'primary' | 'secondary') => {
-        if (!firestore || !tenantId || !itemName.trim()) return;
-        
+        if (!firestore || !itemName.trim()) return;
         const path = type === 'primary' ? primaryCollection : secondaryPath;
         if (!path) return;
 
         setIsSaving(true);
         try {
-            const dataToSave = cleanFirestoreData({
-                name: itemName,
-                companyId: tenantId,
-                updatedAt: serverTimestamp()
-            });
-
-            if (editingItem) {
-                await updateDoc(doc(firestore, getTenantPath(path, tenantId), editingItem.id), dataToSave);
-            } else {
-                await addDoc(collection(firestore, getTenantPath(path, tenantId)), {
-                    ...dataToSave,
-                    createdAt: serverTimestamp(),
-                });
-            }
+            const payload = { name: itemName, updatedAt: serverTimestamp() };
+            if (editingItem) await updateDoc(doc(firestore, path, editingItem.id), cleanFirestoreData(payload));
+            else await addDoc(collection(firestore, path), { ...payload, createdAt: serverTimestamp() });
             toast({ title: 'نجاح الحفظ' });
-            closeDialog();
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
-        } finally { setIsSaving(false); }
+            setIsPrimaryDialogOpen(false); setIsSecondaryDialogOpen(false); setEditingItem(null); setItemName('');
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsSaving(false); }
     };
 
     const handleDelete = async () => {
-        if (!firestore || !itemToDelete || !tenantId) return;
-        
+        if (!firestore || !itemToDelete) return;
         const path = itemToDelete.target === 'primary' ? primaryCollection : secondaryPath;
         if (!path) return;
-
         setIsSaving(true);
         try {
-            await deleteDoc(doc(firestore, getTenantPath(path, tenantId), itemToDelete.id));
+            await deleteDoc(doc(firestore, path, itemToDelete.id));
             toast({ title: 'تم الحذف' });
-            setIsDeleteDialogOpen(false);
-            setItemToDelete(null);
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'فشل الحذف' });
-        } finally { setIsSaving(false); }
+            setIsDeleteDialogOpen(false); setItemToDelete(null);
+        } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
     };
 
     const handleImportDefaults = async () => {
-        if (!firestore || !tenantId) return;
+        if (!firestore) return;
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
             if (view === 'departments') {
-                for (const dept of defaultDepartments) {
-                    const deptRef = doc(collection(firestore, getTenantPath('departments', tenantId)));
-                    batch.set(deptRef, { ...dept, companyId: tenantId, createdAt: serverTimestamp() });
-                }
+                defaultDepartments.forEach(d => batch.set(doc(collection(firestore, 'departments')), { ...d, createdAt: serverTimestamp() }));
             } else if (view === 'locations') {
-                for (const gov of defaultGovernorates) {
-                    const govRef = doc(collection(firestore, getTenantPath('governorates', tenantId)));
-                    batch.set(govRef, { ...gov, companyId: tenantId, createdAt: serverTimestamp() });
-                }
+                defaultGovernorates.forEach(g => batch.set(doc(collection(firestore, 'governorates')), { ...g, createdAt: serverTimestamp() }));
             }
             await batch.commit();
             toast({ title: 'نجاح الاستيراد' });
             setIsImportConfirmOpen(false);
-        } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ في الاستيراد' });
-        } finally { setIsImporting(false); }
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsImporting(false); }
     };
 
     if (view === 'main') {
@@ -207,9 +172,7 @@ export function ReferenceDataManager() {
                 <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-purple-50">
                     <CardHeader className="pb-8 px-8 border-b">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
-                                <Settings2 className="h-8 w-8" />
-                            </div>
+                            <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Settings2 className="h-8 w-8" /></div>
                             <div>
                                 <CardTitle className="text-3xl font-black text-[#1e1b4b]">إدارة البيانات المرجعية</CardTitle>
                                 <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم المنسدلة وهيكل العمل الفني للمنشأة.</CardDescription>
@@ -296,8 +259,8 @@ export function ReferenceDataManager() {
                                         {view === 'departments' && (
                                             <Tabs value={activeSubTab} onValueChange={(v: any) => setActiveSubTab(v)} className="w-full">
                                                 <TabsList className="bg-white border h-11 p-1 rounded-xl shadow-inner">
-                                                    <TabsTrigger value="jobs" className="rounded-lg gap-2 font-black px-8">الوظائف</TabsTrigger>
-                                                    <TabsTrigger value="stages" className="rounded-lg gap-2 font-black px-8">مراحل العمل</TabsTrigger>
+                                                    <TabsTrigger value="jobs" className="rounded-lg gap-2 font-black px-8">الوظائف المهنية</TabsTrigger>
+                                                    <TabsTrigger value="stages" className="rounded-lg gap-2 font-black px-8">مراحل العمل الفنية</TabsTrigger>
                                                 </TabsList>
                                             </Tabs>
                                         )}
@@ -308,7 +271,10 @@ export function ReferenceDataManager() {
                                         <div className="grid gap-4">
                                             {secondaryItems.map(item => (
                                                 <div key={item.id} className="flex items-center justify-between p-6 border-2 border-slate-100 bg-white rounded-[1.8rem] hover:border-primary/20 transition-all group shadow-sm">
-                                                    <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="p-2 bg-muted rounded-xl"><Activity className="h-4 w-4 opacity-40"/></div>
+                                                        <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
+                                                    </div>
                                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
                                                         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl text-red-600 border" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
@@ -320,11 +286,11 @@ export function ReferenceDataManager() {
                                 </>
                             ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-20 grayscale">
-                                    <ListTree className="h-24 w-24 mb-6 text-primary animate-pulse" />
+                                    <Layers className="h-24 w-24 mb-6 text-primary animate-pulse" />
                                     <h3 className="text-2xl font-black text-[#1e1b4b]">
-                                        {view === 'transactions' ? 'قائمة الخدمات الأساسية' : 'اختر تصنيفاً لإدارة تفاصيله'}
+                                        {view === 'transactions' ? 'مصفوفة أنواع الخدمات' : 'اختر تصنيفاً لإدارة هيكله الداخلي'}
                                     </h3>
-                                    {view === 'transactions' && <p className="text-sm font-black mt-2 text-[#1e1b4b]">أنواع المعاملات يتم تعريفها كمستوى أول فقط وربطها بالأقسام لاحقاً.</p>}
+                                    {view === 'transactions' && <p className="text-sm font-black mt-2 text-[#1e1b4b]">أنواع المعاملات يتم تعريفها كمستوى رئيسي، ويتم ربطها بالأقسام والمراحل في موديول العقود.</p>}
                                 </div>
                             )}
                         </div>
@@ -337,8 +303,8 @@ export function ReferenceDataManager() {
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader><DialogTitle className="text-2xl font-black text-[#1e1b4b]">{editingItem ? 'تعديل' : 'إضافة'} سجل</DialogTitle></DialogHeader>
                         <div className="py-8">
-                            <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي *</Label>
-                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black text-[#1e1b4b]" />
+                            <Label className="font-black text-[#1e1b4b] pr-1 block mb-2">الاسم الرسمي للسجل *</Label>
+                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-12 rounded-2xl border-2 text-lg font-black text-[#1e1b4b]" placeholder="اكتب هنا..." />
                         </div>
                         <DialogFooter className="gap-3">
                             <Button type="button" variant="outline" onClick={closeDialog} className="rounded-xl font-black h-12 px-8">إلغاء</Button>
@@ -354,7 +320,7 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-black text-slate-500">سيتم مسح سجل "{itemToDelete?.name}" تماماً من النظام.</AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيتم مسح سجل "{itemToDelete?.name}" تماماً من النظام وكافة الارتباطات التابعة له.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-black">تراجع</AlertDialogCancel>
@@ -368,8 +334,8 @@ export function ReferenceDataManager() {
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد البيانات الافتراضية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع القياسية لهذا النشاط آلياً.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد البيانات القياسية؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية القياسية آلياً لتسريع عملية التهيئة.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-black">إلغاء</AlertDialogCancel>

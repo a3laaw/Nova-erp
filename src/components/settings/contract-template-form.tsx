@@ -1,9 +1,3 @@
-
-/**
- * @fileOverview نموذج إنشاء وتعديل قوالب العقود (استشارات ومقاولات).
- * يتميز بتصميم مكثف (Compact UI) وفصل بصري كامل بين الأقسام.
- */
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -19,7 +13,6 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { Separator } from '../ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '../ui/scroll-area';
 import { 
@@ -27,17 +20,11 @@ import {
   Trash2, 
   Save, 
   Loader2, 
-  LayoutGrid, 
-  ShoppingCart,
   Calculator,
   FileText,
   Briefcase,
   Construction,
   ShieldCheck,
-  AlertCircle,
-  X,
-  ArrowUp,
-  ArrowDown,
   AlertTriangle,
   FileSignature
 } from 'lucide-react';
@@ -80,262 +67,137 @@ export function ContractTemplateForm({ isOpen, onClose, onSaveSuccess, template,
   const [financials, setFinancials] = useState<ContractTemplate['financials']>({
     type: 'fixed',
     totalAmount: 0,
-    discount: 0,
     milestones: [],
   });
-  const [openClauses, setOpenClauses] = useState<ContractTerm[]>([]);
 
   const [allTransactionTypes, setAllTransactionTypes] = useState<MultiSelectOption[]>([]);
-  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
-  const [loadingRefData, setLoadingRefData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showValidationErrors, setShowValidationErrors] = useState(false);
 
   // جلب البيانات المرجعية للمقاولات
-  const { data: constructionTypes, loading: typesLoading } = useSubscription<ConstructionType>(firestore, 'construction_types', useMemo(() => [orderBy('name')], []));
+  const { data: constructionTypes } = useSubscription<ConstructionType>(firestore, 'construction_types', useMemo(() => [orderBy('name')], []));
   const [constructionStages, setConstructionStages] = useState<MultiSelectOption[]>([]);
-  const [loadingStages, setLoadingStages] = useState(false);
+  const [allWorkStages, setAllWorkStages] = useState<MultiSelectOption[]>([]);
 
-  // تعريف خيارات أنواع المقاولات للقائمة المنسدلة
-  const constructionTypeOptions = useMemo(() => 
-    constructionTypes.map(t => ({ value: t.id!, label: t.name })),
-    [constructionTypes]
-  );
-
-  // دالة جلب مراحل المقاولات بناءً على النوع المختار
-  const fetchConstructionStages = useCallback(async (typeId: string) => {
-    if (!firestore || !typeId) {
-        setConstructionStages([]);
-        return;
-    }
-    setLoadingStages(true);
-    try {
-        const q = query(collection(firestore, `construction_types/${typeId}/stages`), orderBy('order'));
-        const snap = await getDocs(q);
-        const stages = snap.docs.map(doc => ({
-            value: doc.data().name,
-            label: doc.data().name
-        }));
-        setConstructionStages(stages);
-    } catch (e) {
-        console.error("Error fetching construction stages:", e);
-    } finally {
-        setLoadingStages(false);
-    }
-  }, [firestore]);
+  const constructionTypeOptions = useMemo(() => constructionTypes.map(t => ({ value: t.id!, label: t.name })), [constructionTypes]);
 
   useEffect(() => {
-    if (templateType === 'Execution' && constructionTypeId) {
-        fetchConstructionStages(constructionTypeId);
-    }
-  }, [constructionTypeId, fetchConstructionStages, templateType]);
+    if (!firestore || !isOpen) return;
+    const fetchRefs = async () => {
+        try {
+            const typesSnap = await getDocs(query(collection(firestore, 'transactionTypes'), orderBy('name')));
+            setAllTransactionTypes(typesSnap.docs.map(d => ({ value: d.data().name, label: d.data().name })));
 
-  // جلب أنواع المعاملات المكتبية ومراحل العمل
-  useEffect(() => {
-    const fetchRefData = async () => {
-      if (!firestore) return;
-      setLoadingRefData(true);
-      try {
-        const types: MultiSelectOption[] = [];
-        const transTypesSnapshot = await getDocs(query(collection(firestore, 'transactionTypes')));
-        transTypesSnapshot.forEach(doc => {
-            const name = doc.data().name;
-            if (name) types.push({ value: name, label: name });
-        });
-        setAllTransactionTypes(types.sort((a,b) => a.label.localeCompare(b.label, 'ar')));
-        
-        const officeStagesSnapshot = await getDocs(query(collectionGroup(firestore, 'workStages')));
-        const uniqueStages = new Map<string, MultiSelectOption>();
-        officeStagesSnapshot.forEach(doc => {
-          const name = doc.data().name;
-          if (name && !uniqueStages.has(name)) uniqueStages.set(name, { value: name, label: name });
-        });
-        setAllWorkStages(Array.from(uniqueStages.values()).sort((a,b) => a.label.localeCompare(b.label, 'ar')));
-      } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ في جلب البيانات' });
-      } finally {
-        setLoadingRefData(false);
-      }
+            const stagesSnap = await getDocs(query(collectionGroup(firestore, 'workStages'), orderBy('order')));
+            const uniqueStages = new Map();
+            stagesSnap.forEach(d => {
+                const name = d.data().name;
+                if (name) uniqueStages.set(name, { value: name, label: name });
+            });
+            setAllWorkStages(Array.from(uniqueStages.values()));
+        } catch (e) { console.error(e); }
     };
-    if (isOpen) fetchRefData();
-  }, [firestore, toast, isOpen]);
-  
+    fetchRefs();
+  }, [firestore, isOpen]);
+
+  useEffect(() => {
+    if (templateType === 'Execution' && constructionTypeId && firestore) {
+        getDocs(query(collection(firestore, `construction_types/${constructionTypeId}/stages`), orderBy('order'))).then(snap => {
+            setConstructionStages(snap.docs.map(d => ({ value: d.data().name, label: d.data().name })));
+        });
+    }
+  }, [constructionTypeId, firestore, templateType]);
+
   useEffect(() => {
     if (template && isOpen) {
         setTitle(template.title);
         setDescription(template.description || '');
         setConstructionTypeId(template.constructionTypeId || '');
         setSelectedTransactionTypes(template.transactionTypes || []);
-        setScopeOfWork(template.scopeOfWork || []);
         setTermsAndConditions(template.termsAndConditions || []);
-        setFinancials(template.financials || { type: 'fixed', totalAmount: 0, discount: 0, milestones: [] });
-        setOpenClauses(template.openClauses || []);
+        setFinancials(template.financials || { type: 'fixed', totalAmount: 0, milestones: [] });
         setWorkNature(template.workNature || 'labor_only');
     }
   }, [template, isOpen]);
 
-  // تحديد خيارات شروط الدفع بناءً على المسار (ميداني أم مكتبي)
-  const conditionOptions = useMemo(() => {
-    return templateType === 'Execution' ? constructionStages : allWorkStages;
-  }, [templateType, constructionStages, allWorkStages]);
-
-  const addTerm = () => setTermsAndConditions(prev => [...prev, { id: generateId(), text: '' }]);
-  const updateTerm = (id: string, value: string) => {
-    setTermsAndConditions(prev => prev.map(term => term.id === id ? { ...term, text: value } : term));
-  };
-  const removeTerm = (id: string) => setTermsAndConditions(prev => prev.filter(term => term.id !== id));
+  const conditionOptions = useMemo(() => templateType === 'Execution' ? constructionStages : allWorkStages, [templateType, constructionStages, allWorkStages]);
 
   const addMilestone = () => {
-    setFinancials(prev => {
-      const newIndex = prev.milestones.length;
-      const newName = `الدفعة ${milestoneNames[newIndex] || `(${newIndex + 1})`}`;
-      return {
-        ...prev,
-        milestones: [...prev.milestones, { id: generateId(), name: newName, condition: '', value: 0 }]
-      };
-    });
+    setFinancials(prev => ({
+      ...prev,
+      milestones: [...prev.milestones, { id: generateId(), name: `الدفعة ${milestoneNames[prev.milestones.length] || ''}`, condition: '', value: 0 }]
+    }));
   };
-  const updateMilestone = (id: string, field: keyof ContractFinancialMilestone, value: string | number) => {
-    setFinancials(prev => ({ ...prev, milestones: prev.milestones.map(m => m.id === id ? { ...m, [field]: value } : m) }));
-  };
-  const removeMilestone = (id: string) => {
-    setFinancials(prev => ({ ...prev, milestones: prev.milestones.filter(m => m.id !== id) }));
-  };
-  
-  const totalMilestoneValue = useMemo(() => financials.milestones.reduce((sum, m) => sum + Number(m.value || 0), 0), [financials.milestones]);
-
-  const validationErrors = useMemo(() => {
-    const errors: string[] = [];
-    if (!title.trim()) errors.push("عنوان النموذج مطلوب.");
-    if (financials.milestones.length === 0) {
-        errors.push("يجب إضافة دفعة مالية واحدة على الأقل.");
-    } else {
-        if (financials.type === 'percentage' && totalMilestoneValue !== 100) {
-            errors.push(`إجمالي نسب الدفعات يجب أن يكون 100% (الحالي: ${totalMilestoneValue}%).`);
-        } else if (financials.type === 'fixed' && financials.totalAmount > 0 && Math.abs(totalMilestoneValue - financials.totalAmount) > 0.001) {
-            errors.push(`إجمالي مبالغ الدفعات (${formatCurrency(totalMilestoneValue)}) يجب أن يساوي إجمالي العقد (${formatCurrency(financials.totalAmount)}).`);
-        }
-    }
-    if (templateType === 'Execution' && !constructionTypeId) errors.push("يجب اختيار نوع المقاولات.");
-    if (templateType === 'Consulting' && selectedTransactionTypes.length === 0) errors.push("يجب اختيار نوع معاملة واحد على الأقل.");
-    return errors;
-  }, [title, financials, totalMilestoneValue, templateType, constructionTypeId, selectedTransactionTypes]);
 
   const handleSave = async () => {
-    if (!firestore || !user) return;
-    if (validationErrors.length > 0) {
-        setShowValidationErrors(true);
-        toast({ variant: 'destructive', title: 'خطأ في البيانات', description: 'يرجى مراجعة التنبيهات.' });
-        return;
-    }
-
+    if (!firestore || !user || !title.trim()) return;
     setIsSaving(true);
     try {
-        const templateData = {
+        const payload = {
             title, description, templateType, workNature,
             constructionTypeId: templateType === 'Execution' ? constructionTypeId : null,
             transactionTypes: templateType === 'Consulting' ? selectedTransactionTypes : [],
-            scopeOfWork, termsAndConditions, financials, openClauses,
-            createdAt: template?.createdAt || serverTimestamp(),
-            createdBy: template?.createdBy || user.id,
+            termsAndConditions, financials,
+            updatedAt: serverTimestamp(),
+            companyId: user.currentCompanyId
         };
-        
-        if (template?.id) {
-            await updateDoc(doc(firestore, 'contractTemplates', template.id), cleanFirestoreData(templateData));
-        } else {
-            await addDoc(collection(firestore, 'contractTemplates'), cleanFirestoreData(templateData));
-        }
-        onSaveSuccess();
-        onClose();
-        toast({ title: 'نجاح', description: 'تم حفظ القالب بنجاح.' });
-    } catch(e) {
-        toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
-    } finally {
-        setIsSaving(false);
-    }
+        if (template?.id) await updateDoc(doc(firestore, 'contractTemplates', template.id), cleanFirestoreData(payload));
+        else await addDoc(collection(firestore, 'contractTemplates'), cleanFirestoreData({ ...payload, createdAt: serverTimestamp() }));
+        onSaveSuccess(); onClose();
+        toast({ title: 'نجاح الحفظ' });
+    } catch(e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsSaving(false); }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent dir="rtl" className="max-w-5xl h-[95vh] flex flex-col p-0 rounded-xl overflow-hidden shadow-2xl">
-            <DialogHeader className={cn("p-4 border-b bg-card", templateType === 'Consulting' ? "border-primary/20" : "border-amber-600/20")}>
-                <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3">
-                        <div className={cn("p-2 rounded-lg", templateType === 'Consulting' ? "bg-primary text-white" : "bg-amber-600 text-white")}>
-                            {templateType === 'Execution' ? <Construction className="h-5 w-5" /> : <Briefcase className="h-5 w-5" />}
-                        </div>
+        <DialogContent dir="rtl" className="max-w-5xl h-[90vh] flex flex-col p-0 rounded-2xl border-none shadow-2xl overflow-hidden">
+            <DialogHeader className={cn("p-6 border-b text-white", templateType === 'Consulting' ? "bg-primary" : "bg-amber-600")}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <FileSignature className="h-10 w-10 opacity-40" />
                         <div>
-                            <DialogTitle className="text-lg font-black">{template ? 'تعديل' : 'إنشاء'} قالب {templateType === 'Execution' ? 'عقد مقاولات' : 'عقد استشارات'}</DialogTitle>
-                            <DialogDescription className="text-[10px]">برمجة بنود العقد وشروط استحقاق الدفعات.</DialogDescription>
+                            <DialogTitle className="text-2xl font-black">{template ? 'تعديل' : 'إنشاء'} قالب عقد {templateType === 'Execution' ? 'مقاولات' : 'استشارات'}</DialogTitle>
+                            <DialogDescription className="text-white/60 font-bold">تحديد بنود الصرف وشروط الاستحقاق الميدانية الموحدة.</DialogDescription>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3 bg-muted/30 p-2 rounded-xl border ml-8">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">طبيعة التعاقد:</Label>
-                        <Select value={workNature} onValueChange={(v: any) => setWorkNature(v)}>
-                            <SelectTrigger className="h-8 w-40 text-xs font-bold border-none bg-transparent shadow-none"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="labor_only">عقد مصنعية فقط</SelectItem>
-                                <SelectItem value="with_materials">عقد توريد وتنفيذ</SelectItem>
-                            </SelectContent>
-                        </Select>
                     </div>
                 </div>
             </DialogHeader>
 
-            <ScrollArea className="flex-grow bg-muted/5">
-                <div className="p-5 space-y-6 pb-20">
-                    {showValidationErrors && validationErrors.length > 0 && (
-                        <Alert variant="destructive" className="rounded-xl border-2 py-2"><AlertTriangle className="h-4 w-4" /><AlertTitle className="text-xs font-bold">تنبيه بالبيانات الناقصة</AlertTitle><AlertDescription><ul className="list-disc pr-4 text-[10px]">{validationErrors.map((err, i) => <li key={i}>{err}</li>)}</ul></AlertDescription></Alert>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-xl bg-card">
-                        <div className="grid gap-1"><Label className="text-[11px] font-bold opacity-60">عنوان النموذج *</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="اسم القالب..." className="h-9 text-sm" /></div>
+            <ScrollArea className="flex-1 bg-muted/5">
+                <div className="p-8 space-y-10">
+                    <section className="grid md:grid-cols-2 gap-8">
+                        <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">عنوان القالب *</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: عقد هيكل أسود مصنعية..." className="h-12 rounded-xl text-lg font-bold" /></div>
                         {templateType === 'Execution' ? (
-                            <div className="grid gap-1"><Label className="text-[11px] font-bold opacity-60">نوع المقاولات المرتبط</Label><InlineSearchList value={constructionTypeId} onSelect={setConstructionTypeId} options={constructionTypeOptions} placeholder="اختر النوع..." className="h-9"/></div>
+                            <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">نوع المقاولات المرتبط</Label><InlineSearchList value={constructionTypeId} onSelect={setConstructionTypeId} options={constructionTypeOptions} placeholder="اختر النوع..." className="h-12" /></div>
                         ) : (
-                            <div className="grid gap-1"><Label className="text-[11px] font-bold opacity-60">المعاملات المرتبطة</Label><MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع العمل..." className="h-9"/></div>
+                            <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">المعاملات المرتبطة</Label><MultiSelect options={allTransactionTypes} selected={selectedTransactionTypes} onChange={setSelectedTransactionTypes} placeholder="اختر أنواع العمل..." /></div>
                         )}
-                    </div>
+                    </section>
 
-                    <div className={cn("p-4 border rounded-xl bg-card", templateType === 'Consulting' ? "border-primary/10" : "border-amber-600/10")}>
-                        <div className="flex justify-between items-center mb-4"><h3 className="text-sm font-black flex items-center gap-2"><Calculator className="h-4 w-4" /> الدفعات المالية</h3><Button size="sm" variant="outline" onClick={addMilestone} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 ml-1"/> إضافة دفعة</Button></div>
-                        <div className="grid md:grid-cols-2 gap-4 mb-4">
-                            <div className="grid gap-1"><Label className="text-[10px] font-bold opacity-60">نوع العقد المالي</Label><Select value={financials.type} onValueChange={(v: 'fixed' | 'percentage') => setFinancials(p => ({...p, type: v, milestones: []}))}><SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">قيمة ثابتة</SelectItem><SelectItem value="percentage">نسبة مئوية</SelectItem></SelectContent></Select></div>
-                            <div className="grid gap-1"><Label className="text-[10px] font-bold opacity-60">إجمالي المبلغ (للتحقق)</Label><Input type="number" value={financials.totalAmount} onChange={e => setFinancials(p => ({...p, totalAmount: Number(e.target.value)}))} className="h-8 text-xs font-bold" /></div>
+                    <section className="space-y-6">
+                        <div className="flex justify-between items-center"><h3 className="text-xl font-black flex items-center gap-2"><Calculator className="h-6 w-6 text-primary"/> الدفعات المالية المبرمجة</h3><Button onClick={addMilestone} variant="outline" className="rounded-xl border-dashed border-2 font-bold gap-2"><PlusCircle className="h-4 w-4"/> إضافة دفعة</Button></div>
+                        <div className="grid md:grid-cols-2 gap-6 bg-white p-6 rounded-3xl border-2 border-primary/10 shadow-sm">
+                            <div className="grid gap-2"><Label className="text-xs font-bold opacity-60">نظام التسعير</Label><Select value={financials.type} onValueChange={(v: any) => setFinancials({...financials, type: v, milestones: []})}><SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">مبلغ ثابت</SelectItem><SelectItem value="percentage">نسب مئوية</SelectItem></SelectContent></Select></div>
+                            <div className="grid gap-2"><Label className="text-xs font-bold opacity-60">إجمالي المبلغ (للتحقق)</Label><Input type="number" value={financials.totalAmount} onChange={e => setFinancials({...financials, totalAmount: Number(e.target.value)})} className="h-11 rounded-xl font-black text-xl text-primary" /></div>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             {financials.milestones.map((m, i) => (
-                                <div key={m.id} className="grid grid-cols-12 gap-2 items-center p-2 border rounded-lg bg-muted/10">
-                                    <Input value={m.name} onChange={e => updateMilestone(m.id, 'name', e.target.value)} className="col-span-3 h-7 text-[11px] font-bold border-none" />
-                                    <div className="col-span-5"><InlineSearchList value={m.condition || ''} onSelect={v => updateMilestone(m.id, 'condition', v)} options={conditionOptions} placeholder="شرط الاستحقاق..." className="h-7 text-[10px]"/></div>
-                                    <div className="col-span-3 flex items-center gap-1"><Input type="number" value={m.value} onChange={e => updateMilestone(m.id, 'value', Number(e.target.value))} className="h-7 text-xs text-center"/><span className="text-[9px] font-bold">{financials.type === 'fixed' ? 'KD' : '%'}</span></div>
-                                    <Button variant="ghost" size="icon" onClick={() => removeMilestone(m.id)} className="col-span-1 h-6 w-6 text-destructive"><Trash2 className="h-3 w-3"/></Button>
+                                <div key={m.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center p-4 border-2 rounded-2xl bg-white hover:border-primary/30 transition-all group">
+                                    <div className="md:col-span-3"><Input value={m.name} onChange={e => setFinancials({...financials, milestones: financials.milestones.map(x => x.id === m.id ? {...x, name: e.target.value} : x)})} className="h-10 border-none font-bold text-base shadow-none" /></div>
+                                    <div className="md:col-span-6"><InlineSearchList value={m.condition} onSelect={v => setFinancials({...financials, milestones: financials.milestones.map(x => x.id === m.id ? {...x, condition: v} : x)})} options={conditionOptions} placeholder="اربط بمرحلة إنجاز..." className="h-10 border-dashed" /></div>
+                                    <div className="md:col-span-2 flex items-center gap-2"><Input type="number" value={m.value} onChange={e => setFinancials({...financials, milestones: financials.milestones.map(x => x.id === m.id ? {...x, value: Number(e.target.value)} : x)})} className="h-10 text-center font-black text-primary text-lg" /><span className="font-bold text-muted-foreground">{financials.type === 'fixed' ? 'د.ك' : '%'}</span></div>
+                                    <div className="md:col-span-1 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity"><Button variant="ghost" size="icon" onClick={() => setFinancials({...financials, milestones: financials.milestones.filter(x => x.id !== m.id)})} className="text-destructive"><Trash2 className="h-5 w-5"/></Button></div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center px-1"><h3 className="text-sm font-black flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> الشروط القانونية</h3><Button size="sm" variant="outline" onClick={addTerm} className="h-7 text-[10px] font-bold"><PlusCircle className="h-3.5 w-3.5 ml-1"/> إضافة مادة</Button></div>
-                        <div className="space-y-2">
-                            {termsAndConditions.map((term, index) => (
-                                <div key={term.id} className="flex items-start gap-2 group">
-                                    <Badge variant="secondary" className="mt-1 h-5 w-5 rounded flex items-center justify-center text-[9px] font-black">{index + 1}</Badge>
-                                    <Textarea value={term.text} onChange={(e) => updateTerm(term.id, e.target.value)} rows={1} className="flex-grow text-[11px] min-h-[38px]" placeholder="نص المادة..."/>
-                                    <Button variant="ghost" size="icon" onClick={() => removeTerm(term.id)} className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3.5 w-3.5"/></Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    </section>
                 </div>
             </ScrollArea>
 
-            <DialogFooter className="p-4 border-t bg-card flex-shrink-0">
-              <Button variant="ghost" onClick={onClose} disabled={isSaving} className="h-9 text-xs">إلغاء</Button>
-              <Button onClick={handleSave} disabled={isSaving} className="h-9 px-10 text-sm font-black shadow-lg">
-                {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
-                حفظ القالب
-              </Button>
+            <DialogFooter className="p-8 border-t bg-muted/10">
+                <Button variant="ghost" onClick={onClose} disabled={isSaving} className="font-bold">إلغاء</Button>
+                <Button onClick={handleSave} disabled={isSaving || !title} className="h-14 px-20 rounded-2xl font-black text-xl shadow-xl shadow-primary/20 gap-3">
+                    {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6"/>} حفظ القالب المرجعي
+                </Button>
             </DialogFooter>
         </DialogContent>
     </Dialog>
