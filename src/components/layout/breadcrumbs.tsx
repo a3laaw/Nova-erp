@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -89,6 +90,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'users': 'إدارة المستخدمين',
     'contract-templates': 'نماذج العقود',
     'work-hours': 'مواعيد العمل',
+    'crm': 'CRM و إدارة العملاء',
   },
   en: {
     dashboard: 'Dashboard',
@@ -153,6 +155,7 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'users': 'User Management',
     'contract-templates': 'Contract Templates',
     'work-hours': 'Work Hours',
+    'crm': 'CRM & Clients',
   },
 };
 

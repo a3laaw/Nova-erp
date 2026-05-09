@@ -63,7 +63,8 @@ import {
   UserCheck,
   Calculator,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  CheckCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -79,9 +80,9 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
     },
     { 
-      label: 'إدارة المبيعات والتعاقدات (CRM)',
+      label: 'CRM و إدارة العملاء',
       icon: FileSignature,
-      roles: ['Developer', 'Admin', 'Accountant', 'Secretary'],
+      roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
       hrefPrefix: '/dashboard/contracts',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
@@ -147,17 +148,40 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { 
+      label: 'CRM & Clients',
+      icon: FileSignature,
+      roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
+      hrefPrefix: '/dashboard/contracts',
+      children: [
+        { href: '/dashboard/clients?view=registered', label: 'Client Files', icon: UsersRound },
+        { href: '/dashboard/clients?view=prospective', label: 'Prospective Clients', icon: Search },
+        { href: '/dashboard/accounting/quotations', label: 'Quotations', icon: FileText },
+        { href: '/dashboard/contracts', label: 'Signed Contracts', icon: FileSignature },
+      ]
+    },
+    { 
+      label: 'Accounting', 
+      icon: Landmark, 
+      roles: ['Developer', 'Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/accounting',
+      children: [
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts', icon: ListTree },
+        { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers', icon: ArrowUpRight },
+      ]
+    },
   ]
 };
 
-// Helper components for the sidebar button to handle tooltips and collapsed state
 function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ...props }: any) {
   const { state, isMobile } = useSidebar();
   const button = (
     <BaseSidebarMenuButton
       isActive={isActive}
       className={cn(
-        "my-2 h-12 rounded-full transition-all duration-500 flex items-center w-full px-4",
+        "my-2 h-12 rounded-full transition-all duration-300 flex items-center w-full px-4",
         "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:!rounded-full",
         isActive ? "nav-capsule-active" : "nav-capsule",
         className
@@ -187,7 +211,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   if (!item.children && item.href) {
     return (
-      <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+      <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
             <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
@@ -204,7 +228,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (item.children) {
     if (state === 'collapsed') {
       return (
-        <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
+        <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0">
           <DropdownMenu>
             <TooltipProvider>
               <Tooltip>
@@ -213,7 +237,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <BaseSidebarMenuButton 
                       isActive={isActive} 
                       className={cn(
-                        "my-2 size-14 rounded-full flex items-center justify-center p-0 transition-all duration-500 group-data-[collapsible=icon]:mx-auto",
+                        "my-2 size-14 rounded-full flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto",
                         isActive ? "nav-capsule-active" : "nav-capsule"
                       )}
                     >
@@ -330,5 +354,3 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     </TooltipProvider>
   );
 }
-
-import { CheckCircle2 } from 'lucide-react';
