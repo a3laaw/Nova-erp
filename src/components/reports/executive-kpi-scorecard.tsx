@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { DateInput } from '@/components/ui/date-input';
+import { startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { toFirestoreDate } from '@/services/date-converter';
 
 /**
  * تقرير مؤشر أداء الأقسام (Executive Scorecard):
@@ -28,15 +31,24 @@ export function ExecutiveKpiScorecard() {
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportData, setReportResults] = useState<any[] | null>(null);
+  
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+  const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
 
   const handleGenerate = () => {
     setIsGenerating(true);
     setTimeout(() => {
+        const start = startOfDay(dateFrom || new Date());
+        const end = endOfDay(dateTo || new Date());
+
         const results = departments.map(dept => {
-            const deptTxs = transactions.filter(tx => 
-                (tx as any).assignedEngineer?.department === dept.name || 
-                tx.transactionType.includes(dept.name.replace('قسم ', ''))
-            );
+            const deptTxs = transactions.filter(tx => {
+                const createdAt = toFirestoreDate(tx.createdAt);
+                const matchesDate = !createdAt || isWithinInterval(createdAt, { start, end });
+                const matchesDept = (tx as any).assignedEngineer?.department === dept.name || 
+                                  tx.transactionType.includes(dept.name.replace('قسم ', ''));
+                return matchesDate && matchesDept;
+            });
 
             const total = deptTxs.length;
             const completed = deptTxs.filter(t => t.status === 'completed' || t.status === 'submitted').length;
@@ -51,7 +63,7 @@ export function ExecutiveKpiScorecard() {
                 completed,
                 stalled,
                 completionRate,
-                avgDuration: 12, // Calculated static estimate
+                avgDuration: 12,
                 performanceStatus: completionRate > 70 ? 'ممتاز' : completionRate > 40 ? 'جيد' : 'يحتاج متابعة'
             };
         });
@@ -64,9 +76,17 @@ export function ExecutiveKpiScorecard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-center bg-white p-6 rounded-[2rem] border shadow-sm no-print">
-        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-12 px-20 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/20">
-            {isGenerating ? <Loader2 className="animate-spin h-6 w-6" /> : <BarChart3 className="h-6 w-6" />} 
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
+        <div className="grid gap-2">
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ</Label>
+            <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />
+        </div>
+        <div className="grid gap-2">
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ</Label>
+            <DateInput value={dateTo} onChange={setDateTo} className="h-10 rounded-xl border-2" />
+        </div>
+        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-3 shadow-xl shadow-primary/20">
+            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <BarChart3 className="h-5 w-5" />} 
             تحليل مؤشرات كفاءة القطاعات
         </Button>
       </div>
@@ -121,9 +141,10 @@ export function ExecutiveKpiScorecard() {
       ) : (
         <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
             <Star className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black">تقرير الـ KPI القيادي بانتظار الاستخراج</p>
+            <p className="text-xl font-black text-slate-800">تقرير الـ KPI القيادي بانتظار الاستخراج</p>
         </div>
       )}
     </div>
   );
 }
+

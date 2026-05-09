@@ -16,10 +16,11 @@ import {
     Activity
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { differenceInDays, format } from 'date-fns';
+import { differenceInDays, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateInput } from '@/components/ui/date-input';
 
 /**
  * تقرير رادار نبض العمل والميدان:
@@ -34,22 +35,29 @@ export function UnifiedOperationalRadar() {
   // الفلاتر
   const [selectedDept, setSelectedDept] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [stagnationFilter, setStagnationFilter] = useState('all'); // 'all', 'stalled' (>14 days)
+  const [stagnationFilter, setStagnationFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
 
   const handleGenerate = () => {
     setIsGenerating(true);
     setTimeout(() => {
         const now = new Date();
-        const results = transactions.map(tx => {
+        const start = dateFrom ? startOfDay(dateFrom) : null;
+        const end = dateTo ? endOfDay(dateTo) : null;
+
+        const results = transactions.filter(tx => {
+            const createdAt = toFirestoreDate(tx.createdAt);
+            if (!createdAt) return true;
+            if (start && end) return isWithinInterval(createdAt, { start, end });
+            return true;
+        }).map(tx => {
             const client = clients.find(c => c.id === tx.clientId);
             const engineer = employees.find(e => e.id === tx.assignedEngineerId);
-            const dept = departments.find(d => d.name === (engineer?.department || ''));
             
-            // حساب أيام الركود (منذ آخر تحديث أو قيد)
             const lastUpdate = toFirestoreDate(tx.updatedAt) || toFirestoreDate(tx.createdAt) || now;
             const daysStalled = differenceInDays(now, lastUpdate);
             
-            // آخر زيارة ميدانية موثقة
             const visit = appointments
                 .filter(a => a.clientId === tx.clientId && a.status === 'confirmed')
                 .sort((a, b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0))[0];
@@ -84,24 +92,22 @@ export function UnifiedOperationalRadar() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">القسم / المكتب</Label>
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ</Label>
+            <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />
+        </div>
+        <div className="grid gap-2">
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ</Label>
+            <DateInput value={dateTo} onChange={setDateTo} className="h-10 rounded-xl border-2" />
+        </div>
+        <div className="grid gap-2">
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">القسم</Label>
             <Select value={selectedDept} onValueChange={setSelectedDept}>
                 <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
                     <SelectItem value="all">كل الأقسام</SelectItem>
                     {departments.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
-                </SelectContent>
-            </Select>
-        </div>
-        <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">فلتر الركود</Label>
-            <Select value={stagnationFilter} onValueChange={setStagnationFilter}>
-                <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
-                <SelectContent dir="rtl">
-                    <SelectItem value="all">كل الحركات</SelectItem>
-                    <SelectItem value="stalled">المتأخر (أكثر من 14 يوم)</SelectItem>
                 </SelectContent>
             </Select>
         </div>
@@ -179,7 +185,7 @@ export function UnifiedOperationalRadar() {
       ) : (
         <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
             <Activity className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black">رادار النبض بانتظار التفعيل</p>
+            <p className="text-xl font-black text-slate-800">رادار النبض بانتظار التفعيل</p>
         </div>
       )}
     </div>
