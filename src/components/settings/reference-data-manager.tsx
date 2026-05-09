@@ -49,7 +49,7 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, ChevronLeft, X, Layers, Activity
+    MapPin, ChevronLeft, X, Layers, Activity, FileSignature, Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
@@ -57,8 +57,13 @@ import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
+import { useRouter } from 'next/navigation';
 
-function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean }) {
+/**
+ * مكون البطاقة الإحصائية (Stat Card):
+ * تم تعزيزها باللون الأسود السيادي #1e1b4b لضمان التباين.
+ */
+function StatCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
     return (
         <Card 
             onClick={onNavigate} 
@@ -70,8 +75,9 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { tit
             </CardHeader>
             <CardContent>
                 {loading ? <Skeleton className="h-8 w-12 mt-1" /> : <div className="text-4xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
+                <p className="text-[10px] font-bold text-slate-400 mt-1">{description}</p>
                 <div className="flex items-center gap-1 text-[9px] text-primary font-black mt-3 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 uppercase tracking-widest">
-                    Open Settings <ArrowRight className="h-3 w-3"/>
+                    فتح الإعدادات <ArrowRight className="h-3 w-3"/>
                 </div>
             </CardContent>
         </Card>
@@ -81,6 +87,7 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading }: { tit
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
+    const router = useRouter();
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
     const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas'>('jobs');
@@ -98,6 +105,7 @@ export function ReferenceDataManager() {
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [itemName, setItemName] = useState('');
 
+    // ✅ القضاء على خطأ ReferenceError: closeDialog
     const closeDialog = useCallback(() => {
         setIsPrimaryDialogOpen(false);
         setIsSecondaryDialogOpen(false);
@@ -127,7 +135,7 @@ export function ReferenceDataManager() {
     
     const { data: secondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryPath, [orderBy('name')]);
 
-    const selectedPrimary = useMemo(() => primaryItems.find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
+    const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
 
     const handleSave = async (type: 'primary' | 'secondary') => {
         if (!firestore || !itemName.trim()) return;
@@ -174,23 +182,68 @@ export function ReferenceDataManager() {
 
     if (view === 'main') {
         return (
-            <div className="space-y-8" dir="rtl">
+            <div className="space-y-10" dir="rtl">
                 <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-purple-50">
                     <CardHeader className="pb-8 px-8 border-b">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Settings2 className="h-8 w-8" /></div>
                             <div>
-                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">إدارة البيانات المرجعية</CardTitle>
-                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم المنسدلة وهيكل العمل الفني للمنشأة.</CardDescription>
+                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">مركز البيانات المرجعية السيادي</CardTitle>
+                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم، هيكل العمل الفني، قواعد الدوام، ونماذج العقود.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <StatCard title="الأقسام والوظائف" count={primaryItems?.length || 0} icon={<Building2 className="h-6 w-6"/>} onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} colorClass="bg-blue-100 text-blue-600" loading={loadingPrimary} />
-                    <StatCard title="المواقع والمناطق" count={primaryItems?.length || 0} icon={<Globe className="h-6 w-6"/>} onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} colorClass="bg-emerald-100 text-emerald-600" loading={loadingPrimary} />
-                    <StatCard title="أنواع المعاملات" count={primaryItems?.length || 0} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} colorClass="bg-purple-100 text-purple-600" loading={loadingPrimary} />
+                    <StatCard 
+                        title="الأقسام والوظائف" 
+                        count={primaryItems?.length || 0} 
+                        icon={<Building2 className="h-6 w-6"/>} 
+                        onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
+                        colorClass="bg-blue-100 text-blue-600" 
+                        loading={loadingPrimary} 
+                        description="توزيع المهام والوظائف الفنية"
+                    />
+                    <StatCard 
+                        title="المواقع والمناطق" 
+                        count={primaryItems?.length || 0} 
+                        icon={<Globe className="h-6 w-6"/>} 
+                        onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
+                        colorClass="bg-emerald-100 text-emerald-600" 
+                        loading={loadingPrimary} 
+                        description="تخصيص النطاق الجغرافي للعمل"
+                    />
+                    <StatCard 
+                        title="أنواع المعاملات" 
+                        count={primaryItems?.length || 0} 
+                        icon={<Workflow className="h-6 w-6"/>} 
+                        onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} 
+                        colorClass="bg-purple-100 text-purple-600" 
+                        loading={loadingPrimary} 
+                        description="قائمة الخدمات الهندسية المقدمة"
+                    />
+                    
+                    <Separator className="col-span-full my-4" />
+
+                    <StatCard 
+                        title="نماذج العقود (Templates)" 
+                        count={0} 
+                        icon={<FileSignature className="h-6 w-6"/>} 
+                        onNavigate={() => router.push('/dashboard/settings/contract-templates')} 
+                        colorClass="bg-amber-100 text-amber-600" 
+                        loading={false} 
+                        description="إدارة دفعات وشروط العقود الموحدة"
+                    />
+                    <StatCard 
+                        title="أوقات الدوام ورمضان" 
+                        count={0} 
+                        icon={<Clock className="h-6 w-6"/>} 
+                        onNavigate={() => router.push('/dashboard/settings/work-hours')} 
+                        colorClass="bg-orange-100 text-orange-600" 
+                        loading={false} 
+                        description="تخصيص فترات العمل والعطل"
+                    />
                 </div>
             </div>
         );

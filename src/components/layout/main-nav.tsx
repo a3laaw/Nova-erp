@@ -96,6 +96,17 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
     },
     { 
+      label: 'إدارة المبيعات والتعاقدات',
+      icon: FileSignature,
+      roles: ['Developer', 'Admin', 'Accountant', 'Secretary'],
+      hrefPrefix: '/dashboard/contracts',
+      children: [
+        { href: '/dashboard/contracts', label: 'العقود الموقعة', icon: FileSignature },
+        { href: '/dashboard/contracts/new', label: 'توقيع عقد مباشر', icon: FileSignature },
+        { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
+      ]
+    },
+    { 
       label: 'علاقات العملاء (CRM)', 
       icon: UsersRound, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
@@ -104,7 +115,6 @@ const navItems = {
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserCheck },
-        { href: '/dashboard/reports/upsell-opportunities', label: 'فرص بيعية إضافية', icon: Sparkles },
       ]
     },
     { 
@@ -113,25 +123,12 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
       hrefPrefix: '/dashboard/construction',
       children: [
-        { href: '/dashboard/contracts', label: 'عروض الأسعار والعقود', icon: FileSignature },
         { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/appointments', label: 'حجز المواعيد والتقويم', icon: CalendarDays },
         { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: Clock3 },
-        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد المواقع', icon: Package },
         { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: History },
-        { href: '/dashboard/reports/stalled-stages', label: 'المراحل الخاملة', icon: AlertTriangle },
-      ]
-    },
-    { 
-      label: 'مقاولين الباطن', 
-      icon: HardHat, 
-      roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
-      hrefPrefix: '/dashboard/construction/subcontractors',
-      children: [
-        { href: '/dashboard/construction/subcontractors', label: 'سجل المقاولين', icon: UsersRound },
-        { href: '/dashboard/construction/subcontractors/certificates', label: 'شهادات إنجاز الأعمال', icon: FileCheck },
       ]
     },
     { 
@@ -147,43 +144,6 @@ const navItems = {
       ]
     },
     { 
-      label: 'إدارة المشتريات', 
-      icon: ShoppingBag, 
-      roles: ['Developer', 'Admin', 'Accountant', 'Purchasing'],
-      hrefPrefix: '/dashboard/purchasing',
-      children: [
-        { href: '/dashboard/purchasing/direct-invoice', label: 'فاتورة مشتريات مباشرة', icon: ShoppingBag },
-        { href: '/dashboard/purchasing/requests', label: 'طلب شراء داخلي (PR)', icon: FileSignature },
-        { href: '/dashboard/purchasing/rfqs', label: 'طلبات التسعير (RFQ)', icon: Search },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء المؤكدة', icon: CheckCircle2 },
-        { href: '/dashboard/purchasing/vendors', label: 'سجل الموردين', icon: UsersRound },
-      ]
-    },
-    { 
-      label: 'المخازن والمستودعات', 
-      icon: Box, 
-      roles: ['Developer', 'Admin', 'Accountant', 'Warehouse'],
-      hrefPrefix: '/dashboard/warehouse',
-      children: [
-        { href: '/dashboard/warehouse/grns', label: 'أذونات استلام البضاعة', icon: FileCheck },
-        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف والخدمات', icon: Box },
-        { href: '/dashboard/warehouse/warehouses', label: 'المستودعات والأفرع', icon: Building2 },
-        { href: '/dashboard/warehouse/adjustments', label: 'تسويات العجز والتلف', icon: Ban },
-      ]
-    },
-    { 
-      label: 'التقارير التحليلية', 
-      icon: FileBarChart, 
-      roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/accounting/reports',
-      children: [
-        { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: FileBarChart },
-        { href: '/dashboard/accounting/balance-sheet', label: 'قائمة المركز المالي', icon: Landmark },
-        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية والربحية', icon: BarChart3 },
-        { href: '/dashboard/accounting/general-ledger', label: 'دفتر الأستاذ العام', icon: BookOpen },
-      ]
-    },
-    { 
       label: 'شؤون الموظفين (HR)', 
       icon: Users, 
       roles: ['Developer', 'Admin', 'HR'],
@@ -191,9 +151,7 @@ const navItems = {
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
-        { href: '/dashboard/hr/permissions', label: 'طلبات الاستئذانات', icon: Clock3 },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Landmark },
-        { href: '/dashboard/hr/gratuity-calculator', label: 'حاسبة نهاية الخدمة', icon: Calculator },
       ]
     },
     { 
@@ -202,10 +160,10 @@ const navItems = {
       roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
-        { href: '/dashboard/settings/branding', label: 'الإعدادات العامة', icon: Globe },
+        { href: '/dashboard/settings/branding', label: 'الهوية والبيانات المرجعية', icon: Globe },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
-        { href: '/dashboard/settings/roles', label: 'الأدوار والصلاحيات', icon: ShieldCheck },
-        { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: ListTree },
+        { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
+        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل ورمضان', icon: Clock3 },
       ]
     },
   ],
