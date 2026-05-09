@@ -152,6 +152,7 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { label: 'CRM & Clients', icon: FileSignature, roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'], hrefPrefix: '/dashboard/contracts', children: [{ href: '/dashboard/clients?view=registered', label: 'Client Files', icon: UsersRound }, { href: '/dashboard/clients?view=prospective', label: 'Prospective Clients', icon: Search }, { href: '/dashboard/accounting/quotations', label: 'Quotations', icon: FileText }, { href: '/dashboard/contracts', label: 'Signed Contracts', icon: FileSignature }] },
   ]
 };
 
