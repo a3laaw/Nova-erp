@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -13,9 +12,7 @@ import {
     deleteDoc, 
     writeBatch, 
     getDocs, 
-    where, 
     serverTimestamp,
-    collectionGroup
 } from 'firebase/firestore';
 import { 
     Card, 

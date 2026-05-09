@@ -39,48 +39,24 @@ import {
   UsersRound,
   Search,
   UserCheck,
-  Sparkles,
-  PencilRuler,
   FileSignature,
   ClipboardList,
   Briefcase,
   MapPin,
   Clock3,
-  Package,
-  History,
-  AlertTriangle,
-  HardHat,
-  FileCheck,
-  Coins,
-  ArrowDownLeft,
-  ShoppingBag,
-  CheckCircle2,
-  Landmark,
-  Box,
-  Building2,
-  RotateCcw,
-  Ban,
   ListTree,
   BookOpen,
-  Target,
   FileText,
   ArrowUpRight,
-  Wallet,
-  Scale,
-  FileBarChart,
-  BarChart3,
+  Landmark,
   Users,
   CalendarCheck,
-  Calculator,
   Settings2,
   Globe,
-  ShieldCheck,
-  Tags,
-  DatabaseZap,
   ChevronLeft,
   CalendarDays,
-  Home,
-  UserPlus
+  Palette,
+  Network
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -128,7 +104,6 @@ const navItems = {
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/appointments', label: 'حجز المواعيد والتقويم', icon: CalendarDays },
         { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: Clock3 },
-        { href: '/dashboard/reports/delayed-stages', label: 'المهام المتأخرة', icon: History },
       ]
     },
     { 
@@ -155,12 +130,13 @@ const navItems = {
       ]
     },
     { 
-      label: 'الإعدادات', 
+      label: 'الإعدادات والبيانات', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',
       children: [
-        { href: '/dashboard/settings/branding', label: 'الهوية والبيانات المرجعية', icon: Globe },
+        { href: '/dashboard/settings/branding', label: 'الهوية البصرية', icon: Palette },
+        { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
         { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
         { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل ورمضان', icon: Clock3 },
@@ -171,6 +147,8 @@ const navItems = {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
   ]
 };
+
+import { PencilRuler, ArrowDownLeft } from 'lucide-react';
 
 function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ...props }: any) {
   const { state, isMobile } = useSidebar();
