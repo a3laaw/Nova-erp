@@ -18,8 +18,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * تقرير الموقف المالي والإنجاز:
+ * تقرير الموقف المالي والإنجاز (The Revenue Pipeline):
  * يربط (الموقف المالي + الإنجاز الفني للمراحل).
+ * تم تحديث المسميات لتناسب البيئة العربية المحترفة.
  */
 export function FinancialAchievementPipeline() {
   const { transactions, clients, journalEntries, accounts, loading } = useAnalyticalData();
@@ -101,7 +102,8 @@ export function FinancialAchievementPipeline() {
             </Select>
         </div>
         <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700">
-            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Coins className="h-5 w-5" />} تحديث أنابيب التدفق المالي
+            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Coins className="h-5 w-5" />} 
+            تحديث ميزان التدفق والتحصيل
         </Button>
       </div>
 
@@ -118,7 +120,9 @@ export function FinancialAchievementPipeline() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredData.map(item => (
+                    {filteredData.length === 0 ? (
+                         <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-black italic">لا توجد حركات مطابقة للفلتر.</TableCell></TableRow>
+                    ) : filteredData.map(item => (
                         <TableRow key={item.id} className="h-20 hover:bg-muted/5 transition-colors border-b">
                             <TableCell className="px-8">
                                 <p className="font-black text-slate-900 leading-tight">{item.clientName}</p>
@@ -151,7 +155,7 @@ export function FinancialAchievementPipeline() {
       ) : (
         <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
             <Coins className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black">تحصيل المستحقات بانتظار التدقيق</p>
+            <p className="text-xl font-black">ميزان التحصيل بانتظار التدقيق</p>
         </div>
       )}
     </div>

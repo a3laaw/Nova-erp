@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -14,7 +13,7 @@ import { useAppTheme } from '@/context/theme-context';
 /**
  * مركز الذكاء العملياتي (Operational Intelligence Hub):
  * مجمع التقارير السيادي المدمج لتقليل التشتت الإداري.
- * يدمج 5 تقارير سابقة في 3 محركات تحليلية كبرى مع فلاتر ديناميكية.
+ * تم تعريب المسميات لتكون احترافية ومناسبة للبيئة العربية (ميزان التدفق بدلاً من أنابيب التدفق).
  */
 export default function OperationalIntelligenceHub() {
   const { theme } = useAppTheme();
@@ -34,7 +33,7 @@ export default function OperationalIntelligenceHub() {
                     <div>
                         <CardTitle className="text-2xl font-black text-[#1e1b4b]">مركز الذكاء العملياتي (Sovereign Intelligence)</CardTitle>
                         <CardDescription className="text-base font-medium">
-                            رؤية شاملة تربط الإنجاز الفني بالتدفق المالي وكفاءة الأقسام في واجهة واحدة.
+                            رؤية شاملة تربط الإنجاز الفني بمسارات التدفق المالي وكفاءة الأقسام في واجهة واحدة.
                         </CardDescription>
                     </div>
                 </div>
@@ -51,7 +50,7 @@ export default function OperationalIntelligenceHub() {
                         <ShieldCheck className="h-5 w-5"/> رادار "نبض العمل والميدان"
                     </TabsTrigger>
                     <TabsTrigger value="finance" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <Coins className="h-5 w-5"/> ميزان "التدفق والتحصيل"
+                        <Coins className="h-5 w-5"/> ميزان "التدفق والتحصيل المالي"
                     </TabsTrigger>
                     <TabsTrigger value="kpi" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
                         <BarChart3 className="h-5 w-5"/> لوحة "كفاءة القطاعات - KPIs"

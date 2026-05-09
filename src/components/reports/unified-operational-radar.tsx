@@ -43,7 +43,7 @@ export function UnifiedOperationalRadar() {
         const results = transactions.map(tx => {
             const client = clients.find(c => c.id === tx.clientId);
             const engineer = employees.find(e => e.id === tx.assignedEngineerId);
-            const dept = departments.find(d => d.name === engineer?.department);
+            const dept = departments.find(d => d.name === (engineer?.department || ''));
             
             // حساب أيام الركود (منذ آخر تحديث أو قيد)
             const lastUpdate = toFirestoreDate(tx.updatedAt) || toFirestoreDate(tx.createdAt) || now;
@@ -113,7 +113,8 @@ export function UnifiedOperationalRadar() {
             </div>
         </div>
         <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20">
-            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <FileSearch className="h-5 w-5" />} توليد الرادار
+            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <FileSearch className="h-5 w-5" />} 
+            توليد رادار النبض
         </Button>
       </div>
 

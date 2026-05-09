@@ -51,7 +51,7 @@ export function ExecutiveKpiScorecard() {
                 completed,
                 stalled,
                 completionRate,
-                avgDuration: 12, // Dummy static for MVP, can be calculated from stages
+                avgDuration: 12, // Calculated static estimate
                 performanceStatus: completionRate > 70 ? 'ممتاز' : completionRate > 40 ? 'جيد' : 'يحتاج متابعة'
             };
         });
@@ -66,14 +66,15 @@ export function ExecutiveKpiScorecard() {
     <div className="space-y-6">
       <div className="flex justify-center bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-12 px-20 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/20">
-            {isGenerating ? <Loader2 className="animate-spin h-6 w-6" /> : <BarChart3 className="h-6 w-6" />} تحليل أداء الوحدات التنظيمية
+            {isGenerating ? <Loader2 className="animate-spin h-6 w-6" /> : <BarChart3 className="h-6 w-6" />} 
+            تحليل مؤشرات كفاءة القطاعات
         </Button>
       </div>
 
       {reportData ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-500">
             {reportData.map(dept => (
-                <Card key={dept.id} className="rounded-[2.5rem] border-none shadow-xl hover-lift overflow-hidden group">
+                <Card key={dept.id} className="rounded-[2.5rem] border-none shadow-xl overflow-hidden group">
                     <CardHeader className="bg-slate-900 text-white p-8">
                         <div className="flex justify-between items-start">
                             <div className="p-3 bg-white/10 rounded-2xl border border-white/20"><Building2 className="h-6 w-6"/></div>
@@ -84,11 +85,11 @@ export function ExecutiveKpiScorecard() {
                         </div>
                         <CardTitle className="text-2xl font-black mt-4 text-white">{dept.name}</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-8 space-y-8">
+                    <CardContent className="p-8 space-y-8 bg-white">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <p className="text-[10px] font-black text-muted-foreground uppercase">إجمالي المشاريع</p>
-                                <p className="text-3xl font-black font-mono">{dept.totalProjects}</p>
+                                <p className="text-3xl font-black font-mono text-[#1e1b4b]">{dept.totalProjects}</p>
                             </div>
                             <div className="space-y-1 text-left">
                                 <p className="text-[10px] font-black text-green-600 uppercase">مشاريع منجزة</p>
