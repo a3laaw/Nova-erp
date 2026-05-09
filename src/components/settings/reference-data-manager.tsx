@@ -26,6 +26,8 @@ import {
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -59,7 +61,6 @@ import { useRouter } from 'next/navigation';
 
 /**
  * مكون البطاقة الإحصائية (Stat Card):
- * تم تعزيزها باللون الأسود السيادي #1e1b4b لضمان التباين.
  */
 function StatCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
     return (
