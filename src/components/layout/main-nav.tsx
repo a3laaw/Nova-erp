@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -65,6 +66,8 @@ import {
   CheckCircle2,
   Scale,
   TrendingUp,
+  Activity,
+  BarChart3,
   Banknote as CashFlowIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -90,7 +93,6 @@ const navItems = {
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
         { href: '/dashboard/contracts', label: 'العقود الموقعة', icon: FileSignature },
-        { href: '/dashboard/contracts/new', label: 'توقيع عقد مباشر', icon: CheckCircle2 },
       ]
     },
     { 
@@ -103,12 +105,30 @@ const navItems = {
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
-        { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: TrendingUp },
-        { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
-        { href: '/dashboard/accounting/cash-flow', label: 'التدفقات النقدية', icon: CashFlowIcon },
         { href: '/dashboard/accounting/reports', label: 'التحليلات والربحية', icon: PieChart },
         { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
+      ]
+    },
+    { 
+      label: 'تقارير الأداء الفني',
+      icon: BarChart3,
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
+      hrefPrefix: '/dashboard/reports/operational-hub',
+      children: [
+        { href: '/dashboard/reports/operational-hub', label: 'الذكاء العملياتي (COO)', icon: Activity },
+        { href: '/dashboard/construction/field-visits/reports', label: 'الأداء الميداني', icon: MapPin },
+      ]
+    },
+    { 
+      label: 'المقاولات والقياسات',
+      icon: PencilRuler,
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
+      hrefPrefix: '/dashboard/construction',
+      children: [
+        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
+        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
+        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
+        { href: '/dashboard/construction/subcontractors/certificates', label: 'مستخلصات المقاولين', icon: Calculator },
       ]
     },
     { 
@@ -122,18 +142,6 @@ const navItems = {
         { href: '/dashboard/hr/permissions', label: 'إدارة الاستئذانات', icon: Clock },
         { href: '/dashboard/hr/payroll', label: 'رواتب الموظفين', icon: Banknote },
         { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية', icon: FileText },
-      ]
-    },
-    { 
-      label: 'المقاولات والقياسات',
-      icon: PencilRuler,
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
-      hrefPrefix: '/dashboard/construction',
-      children: [
-        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
-        { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
-        { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { href: '/dashboard/construction/subcontractors/certificates', label: 'مستخلصات المقاولين', icon: Calculator },
       ]
     },
     { 
@@ -152,7 +160,6 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { label: 'CRM & Clients', icon: FileSignature, roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'], hrefPrefix: '/dashboard/contracts', children: [{ href: '/dashboard/clients?view=registered', label: 'Client Files', icon: UsersRound }, { href: '/dashboard/clients?view=prospective', label: 'Prospective Clients', icon: Search }, { href: '/dashboard/accounting/quotations', label: 'Quotations', icon: FileText }, { href: '/dashboard/contracts', label: 'Signed Contracts', icon: FileSignature }] },
   ]
 };
 
