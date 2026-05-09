@@ -24,9 +24,10 @@ import {
     Activity,
     Calculator,
     Stethoscope,
-    AlertCircle
+    AlertCircle,
+    HandCoins
 } from 'lucide-react';
-import { format, startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import { format, startOfDay, endOfDay, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -96,9 +97,9 @@ export function EmployeeDossierReport() {
                 // 2. جلب الحضور والغياب
                 const attSnap = await getDocs(query(
                     collection(firestore, 'attendance'),
-                    where('employeeId', '==', emp.id),
-                    where('updatedAt', '>=', start)
+                    where('employeeId', '==', emp.id)
                 ));
+                
                 let absentDays = 0;
                 let lateMinutes = 0;
                 let presentDays = 0;
@@ -110,7 +111,6 @@ export function EmployeeDossierReport() {
                         if (rDate && isWithinInterval(rDate, { start, end })) {
                             if (r.status === 'absent' && r.auditStatus !== 'waived') absentDays += (r.manualDeductionDays || 1);
                             if (r.status === 'present') presentDays++;
-                            // Simple late calculation for dossier
                             if (r.status === 'late' && r.auditStatus !== 'waived') lateMinutes += 30; 
                         }
                     });
@@ -164,14 +164,14 @@ export function EmployeeDossierReport() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Card className="no-print rounded-[2rem] border-none shadow-sm bg-gradient-to-l from-white to-blue-50">
+            <Card className="no-print rounded-[2rem] border-none shadow-sm bg-gradient-to-l from-white to-indigo-50">
                 <CardHeader>
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
                             <History className="h-8 w-8" />
                         </div>
                         <div>
-                            <CardTitle className="text-2xl font-black">وثيقة ملف متغيرات الموظف</CardTitle>
+                            <CardTitle className="text-2xl font-black">وثيقة ملف متغيرات الموظف الشاملة</CardTitle>
                             <CardDescription className="text-base font-bold text-slate-500">جرد شامل لكافة التغيرات المالية، الحضور، الإجازات، والجزاءات في فترة محددة.</CardDescription>
                         </div>
                     </div>
@@ -190,9 +190,9 @@ export function EmployeeDossierReport() {
                             <Label className="font-bold mr-1">إلى تاريخ</Label>
                             <DateInput value={dateTo} onChange={setDateTo} />
                         </div>
-                        <Button onClick={handleGenerate} disabled={isGenerating} className="h-11 rounded-xl font-black text-lg gap-2 shadow-lg shadow-primary/20">
+                        <Button onClick={handleGenerate} disabled={isGenerating} className="h-11 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20">
                             {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <FileSearch className="h-5 w-5" />}
-                            توليد الوثيقة التوثيقية
+                            توليد الوثائق التوثيقية
                         </Button>
                     </div>
                 </CardContent>
@@ -219,7 +219,6 @@ export function EmployeeDossierReport() {
                                 </div>
                             </CardHeader>
                             <CardContent className="p-10 space-y-10">
-                                {/* القسم الأول: الحضور والالتزام */}
                                 <section className="space-y-6">
                                     <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-primary pr-4">
                                         <Clock className="text-primary" /> ملخص الالتزام والانضباط
@@ -246,7 +245,6 @@ export function EmployeeDossierReport() {
 
                                 <Separator />
 
-                                {/* القسم الثاني: سجل التغييرات الإدارية والمالية */}
                                 <section className="space-y-6">
                                     <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4">
                                         <Activity className="text-indigo-600" /> سجل المتغيرات والقرارات الإدارية
@@ -283,7 +281,6 @@ export function EmployeeDossierReport() {
 
                                 <Separator />
 
-                                {/* القسم الثالث: تحليلات الإجازات */}
                                 <section className="space-y-6">
                                     <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-pink-600 pr-4">
                                         <CalendarX className="text-pink-600" /> تحليل استهلاك الإجازات
@@ -339,12 +336,4 @@ export function EmployeeDossierReport() {
             )}
         </div>
     );
-}
-
-function startOfMonth(date: Date) {
-    return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date: Date) {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0);
 }

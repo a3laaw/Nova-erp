@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Card,
   CardContent,
@@ -36,8 +38,18 @@ const RoomBookingCalendar = dynamic(
 );
 
 export default function AppointmentsPage() {
+    const searchParams = useSearchParams();
     const { theme } = useAppTheme();
     const isGlass = theme === 'glass';
+    
+    // محرك التبديل اللحظي بناءً على رادار الملاحة
+    const [activeTab, setActiveTab] = useState('architectural');
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'rooms') setActiveTab('rooms');
+        else if (tab === 'architectural') setActiveTab('architectural');
+    }, [searchParams]);
 
     return (
         <div className="space-y-6" dir="rtl">
@@ -60,7 +72,7 @@ export default function AppointmentsPage() {
                 </CardHeader>
             </Card>
 
-            <Tabs defaultValue="architectural" dir="rtl">
+            <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
                 <div className={cn(isGlass ? "tabs-frame-secondary" : "mb-8 bg-white rounded-3xl shadow-sm p-4")}>
                     <TabsList className={cn(
                         "grid w-full grid-cols-2 h-auto p-0 gap-4 bg-transparent",

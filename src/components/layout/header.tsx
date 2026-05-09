@@ -2,7 +2,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sparkles, User, Globe, Bell, Languages, CalendarDays } from 'lucide-react';
+import { Sparkles, User, Globe, Bell, CalendarDays, Home, Users } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -56,11 +56,34 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     
                     <Separator orientation="vertical" className="h-6 bg-[#1e1b4b]/10 mx-1" />
 
-                    <Button asChild variant="ghost" size="icon" className="rounded-full h-10 w-10 text-[#1e1b4b] hover:bg-white/40 transition-all active:scale-90">
-                        <Link href="/dashboard/appointments" title="المواعيد والتقويم">
-                            <CalendarDays className="h-5 w-5" />
-                        </Link>
-                    </Button>
+                    {/* --- رادار المواعيد المطور --- */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-[#1e1b4b] hover:bg-white/40 transition-all active:scale-90">
+                                <CalendarDays className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="w-56 rounded-[1.5rem] p-2 shadow-2xl bg-white/95 backdrop-blur-xl border-white/20" dir="rtl">
+                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2">مركز المواعيد والتقويم</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                                <Link href="/dashboard/appointments?tab=architectural" className="flex items-center gap-3">
+                                    <div className="p-1.5 bg-primary/10 rounded-lg text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                                        <Users className="h-4 w-4" />
+                                    </div>
+                                    <span>القسم المعماري</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                                <Link href="/dashboard/appointments?tab=rooms" className="flex items-center gap-3">
+                                    <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                        <Home className="h-4 w-4" />
+                                    </div>
+                                    <span>حجوزات القاعات</span>
+                                </Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                     <Notifications />
 

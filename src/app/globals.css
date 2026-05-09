@@ -94,7 +94,6 @@
   pointer-events: auto !important;
 }
 
-/* Force body to allow pointer events when dialogs are open if Radix locks it incorrectly */
 body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }
