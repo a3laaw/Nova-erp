@@ -13,6 +13,7 @@ import {
     writeBatch, 
     getDocs, 
     serverTimestamp,
+    collectionGroup
 } from 'firebase/firestore';
 import { 
     Card, 
@@ -21,9 +22,9 @@ import {
     CardContent, 
     CardDescription, 
 } from '@/components/ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -44,8 +45,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from '../ui/scroll-area';
-import { Skeleton } from '../ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
@@ -341,7 +342,7 @@ export function ReferenceDataManager() {
                         <DialogFooter className="gap-3">
                             <Button type="button" variant="outline" onClick={closeDialog} className="rounded-xl font-black h-12 px-8">إلغاء</Button>
                             <Button type="submit" disabled={isSaving} className="rounded-xl font-black h-12 px-12 bg-[#1e1b4b] text-white hover:bg-black">
-                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="h-4 w-4 ml-2"/>} حفظ البيانات
+                                {isSaving ? <Loader2 className="h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4 ml-2"/>} حفظ البيانات
                             </Button>
                         </DialogFooter>
                     </form>
