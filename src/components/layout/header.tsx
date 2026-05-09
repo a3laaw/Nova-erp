@@ -2,7 +2,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sparkles, User, Globe, Bell, Languages } from 'lucide-react';
+import { Sparkles, User, Globe, Bell, Languages, CalendarDays } from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -49,11 +49,18 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         size="icon" 
                         onClick={toggleTheme} 
                         className="rounded-full h-10 w-10 text-[#1e1b4b] hover:bg-white/40 transition-all active:scale-90"
+                        title="تبديل المظهر"
                     >
                         <Sparkles className="h-5 w-5" />
                     </Button>
                     
                     <Separator orientation="vertical" className="h-6 bg-[#1e1b4b]/10 mx-1" />
+
+                    <Button asChild variant="ghost" size="icon" className="rounded-full h-10 w-10 text-[#1e1b4b] hover:bg-white/40 transition-all active:scale-90">
+                        <Link href="/dashboard/appointments" title="المواعيد والتقويم">
+                            <CalendarDays className="h-5 w-5" />
+                        </Link>
+                    </Button>
 
                     <Notifications />
 

@@ -56,7 +56,6 @@ import {
   ClipboardList,
   Briefcase,
   MapPin,
-  CalendarDays,
   Palette,
   Network,
   UserCheck,
@@ -66,7 +65,6 @@ import {
   CheckCircle2,
   Scale,
   TrendingUp,
-  Activity,
   Banknote as CashFlowIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -135,7 +133,6 @@ const navItems = {
         { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { href: '/dashboard/appointments', label: 'حجز المواعيد والتقويم', icon: CalendarDays },
         { href: '/dashboard/construction/subcontractors/certificates', label: 'مستخلصات المقاولين', icon: Calculator },
       ]
     },
@@ -155,31 +152,6 @@ const navItems = {
   ],
   en: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
-    { 
-      label: 'CRM & Clients',
-      icon: FileSignature,
-      roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
-      hrefPrefix: '/dashboard/contracts',
-      children: [
-        { href: '/dashboard/clients?view=registered', label: 'Client Files', icon: UsersRound },
-        { href: '/dashboard/clients?view=prospective', label: 'Prospective Clients', icon: Search },
-        { href: '/dashboard/accounting/quotations', label: 'Quotations', icon: FileText },
-        { href: '/dashboard/contracts', label: 'Signed Contracts', icon: FileSignature },
-      ]
-    },
-    { 
-      label: 'Accounting', 
-      icon: Landmark, 
-      roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/accounting',
-      children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts', icon: ListTree },
-        { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries', icon: BookOpen },
-        { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance', icon: Scale },
-        { href: '/dashboard/accounting/income-statement', label: 'Income Statement', icon: TrendingUp },
-        { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet', icon: Landmark },
-      ]
-    },
   ]
 };
 

@@ -1,11 +1,17 @@
-
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator, Wallet, UserX, BarChart3, FileBarChart } from 'lucide-react';
+import { Users, CalendarCheck, UserCheck, FileSpreadsheet, HandCoins, Calculator, Wallet, UserX, BarChart3, FileBarChart, History, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const reportList = [
+    { 
+        title: 'ملف متغيرات الموظف (وثيقة توثيقية)', 
+        description: 'تقرير شامل لكل ما تغير في ملف الموظف (رواتب، إجازات، غيابات) في فترة محددة.', 
+        href: '/dashboard/hr/reports/employee-dossier', 
+        icon: History,
+        color: 'bg-indigo-600 text-white shadow-indigo-100'
+    },
     { 
         title: 'الإحصائيات العامة', 
         description: 'نظرة عامة سريعة على أهم مؤشرات أداء الموارد البشرية.', 
@@ -47,13 +53,6 @@ const reportList = [
         href: '/dashboard/hr/gratuity-calculator', 
         icon: Calculator,
         color: 'bg-cyan-100 text-cyan-600'
-    },
-    { 
-        title: 'السلف والاستقطاعات', 
-        description: 'تتبع السلف المالية المقدمة للموظفين.', 
-        href: '/dashboard/hr/reports/advances', 
-        icon: HandCoins,
-        color: 'bg-amber-100 text-amber-600'
     },
     { 
         title: 'التكاليف والمصروفات السنوية', 

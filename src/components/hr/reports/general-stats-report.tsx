@@ -95,9 +95,9 @@ export function GeneralStatsReport() {
 
         const totalLeaveBalance = activeEmployees.reduce((sum, e) => sum + calculateAnnualLeaveBalance(e, today), 0);
 
-        // 🛡️ FIXED: Added optional chaining to prevent "reading properties of undefined"
-        const totalPresent = monthlyAttendance.reduce((sum, a) => sum + (a.summary?.presentDays || 0), 0);
-        const totalAbsent = monthlyAttendance.reduce((sum, a) => sum + (a.summary?.absentDays || 0), 0);
+        // 🛡️ FIXED: Enhanced protection with optional chaining and nullish coalescing
+        const totalPresent = monthlyAttendance.reduce((sum, a) => sum + (a.summary?.presentDays ?? 0), 0);
+        const totalAbsent = monthlyAttendance.reduce((sum, a) => sum + (a.summary?.absentDays ?? 0), 0);
         const totalWorkingDays = totalPresent + totalAbsent;
         const attendancePercentage = totalWorkingDays > 0 ? (totalPresent / totalWorkingDays) * 100 : 0;
 
