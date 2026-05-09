@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -17,7 +16,11 @@ import {
     ShieldCheck,
     Scale,
     FileSpreadsheet,
-    Banknote
+    Banknote,
+    Waves,
+    BookOpen,
+    ListTree,
+    RotateCcw
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -49,16 +52,22 @@ export default function AccountingDashboardPage() {
     const stats = useMemo(() => {
         if (loading) return null;
         const postedEntries = journalEntries.filter(e => e.status === 'posted');
-        const liquidAccountIds = accounts.filter(a => (a.code.startsWith('1101')) && a.isPayable).map(a => a.id);
+        
+        // حساب السيولة المتاحة (الصناديق والبنوك 1101)
+        const liquidAccountIds = accounts.filter(a => a.code.startsWith('1101') && a.isPayable).map(a => a.id);
         const cashBalance = postedEntries.flatMap(e => e.lines).filter(l => liquidAccountIds.includes(l.accountId)).reduce((sum, l) => sum + (l.debit || 0) - (l.credit || 0), 0);
+        
+        // حساب مديونية العملاء (1102)
         const arAccountIds = accounts.filter(a => a.code.startsWith('1102')).map(a => a.id);
         const totalAR = postedEntries.flatMap(e => e.lines).filter(l => arAccountIds.includes(l.accountId)).reduce((sum, l) => sum + (l.debit || 0) - (l.credit || 0), 0);
+        
         let totalIncome = 0, totalExpense = 0;
         postedEntries.flatMap(e => e.lines).forEach(l => {
             const acc = accounts.find(a => a.id === l.accountId);
             if (acc?.type === 'income') totalIncome += (l.credit || 0) - (l.debit || 0);
             if (acc?.type === 'expense') totalExpense += (l.debit || 0) - (l.credit || 0);
         });
+        
         const draftCount = journalEntries.filter(e => e.status === 'draft').length;
         return { cashBalance, totalAR, totalIncome, totalExpense, netProfit: totalIncome - totalExpense, draftCount };
     }, [journalEntries, accounts, loading]);
@@ -101,25 +110,27 @@ export default function AccountingDashboardPage() {
                 <Card className={cn("rounded-[2rem] border-none shadow-sm", isGlass ? "glass-effect" : "bg-white")}>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="text-lg font-black flex items-center gap-2"><FileSpreadsheet className="text-primary h-5 w-5"/> القوائم المالية الرسمية (IFRS)</CardTitle>
+                        <CardDescription>التقارير الختامية المعتمدة للمنشأة.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 pt-6">
+                        <QuickLink href="/dashboard/accounting/trial-balance" label="ميزان المراجعة" icon={<Scale className="h-4 w-4"/>} isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/income-statement" label="قائمة الدخل (P&L)" icon={<TrendingUp className="h-4 w-4"/>} isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/balance-sheet" label="المركز المالي" icon={<Landmark className="h-4 w-4"/>} isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/trial-balance" label="ميزان المراجعة" icon={<Scale className="h-4 w-4"/>} isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/cash-flow" label="التدفقات النقدية" icon={<Banknote className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/cash-flow" label="التدفقات النقدية" icon={<Waves className="h-4 w-4"/>} isGlass={isGlass} />
                     </CardContent>
                 </Card>
 
-                {/* قسم التحليلات والرقابة */}
+                {/* قسم العمليات والتحليلات */}
                 <Card className={cn("rounded-[2rem] border-none shadow-sm", isGlass ? "glass-effect" : "bg-white")}>
                     <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="text-lg font-black flex items-center gap-2"><ShieldCheck className="text-primary h-5 w-5"/> التحليلات والرقابة</CardTitle>
+                        <CardTitle className="text-lg font-black flex items-center gap-2"><ShieldCheck className="text-primary h-5 w-5"/> العمليات والرقابة</CardTitle>
+                        <CardDescription>إدارة الحسابات اليومية والتحصيل.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 pt-6">
                         <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ العام" icon={<ListTree className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/journal-entries" label="قيود اليومية" icon={<BookOpen className="h-4 w-4"/>} isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/reports" label="ربحية المشاريع" icon={<PieChart className="h-4 w-4"/>} isGlass={isGlass} />
                         <QuickLink href="/dashboard/accounting/reconciliation" label="التسوية البنكية" icon={<RotateCcw className="h-4 w-4"/>} isGlass={isGlass} />
-                        <QuickLink href="/dashboard/hr/custody-reconciliation" label="تسوية العهد" icon={<Wallet className="h-4 w-4"/>} isGlass={isGlass} />
                     </CardContent>
                 </Card>
             </div>

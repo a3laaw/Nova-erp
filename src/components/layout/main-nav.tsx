@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -63,12 +62,11 @@ import {
   Calculator,
   ShieldCheck,
   RotateCcw,
-  CheckCircle2,
   Scale,
   TrendingUp,
   Activity,
   BarChart3,
-  Banknote as CashFlowIcon
+  Waves
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -105,6 +103,10 @@ const navItems = {
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
+        { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: TrendingUp },
+        { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
+        { href: '/dashboard/accounting/cash-flow', label: 'التدفقات النقدية', icon: Waves },
         { href: '/dashboard/accounting/reports', label: 'التحليلات والربحية', icon: PieChart },
         { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
       ]
@@ -182,10 +184,12 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
   );
   if (state === "collapsed" && !isMobile && tooltip) {
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side="left" align="center" className="font-black bg-[#1e1b4b] text-white border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent side="left" align="center" className="font-black bg-[#1e1b4b] text-white border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
   return button;
@@ -305,7 +309,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
   const currentNavItems = navItems[language] || navItems.ar;
 
   return (
-    <TooltipProvider>
+    <>
       <SidebarHeader className="p-8 mb-6 group-data-[collapsible=icon]:p-4 group-data-[collapsible=icon]:mb-2">
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-lg">Nova</span>
@@ -339,6 +343,6 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
             </div>
         </div>
       </SidebarFooter>
-    </TooltipProvider>
+    </>
   );
 }
