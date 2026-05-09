@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Coins, FileSearch, Loader2, Wallet, 
-    ArrowDownLeft, CheckCircle2, TrendingUp, Filter 
+    ArrowDownLeft, CheckCircle2, TrendingUp, Filter, Building2, User
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -20,11 +20,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
-/**
- * تقرير الموقف المالي والإنجاز (The Revenue Pipeline):
- * يربط (الموقف المالي + الإنجاز الفني للمراحل).
- * تم تحديث المسميات لتناسب البيئة العربية المحترفة.
- */
 export function FinancialAchievementPipeline() {
   const { transactions, clients, journalEntries, accounts, loading } = useAnalyticalData();
   const { toast } = useToast();
@@ -100,7 +95,7 @@ export function FinancialAchievementPipeline() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2">
             <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ العقد</Label>
             <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />

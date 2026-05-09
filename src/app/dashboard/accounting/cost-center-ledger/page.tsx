@@ -76,7 +76,6 @@ export default function CostCenterLedgerPage() {
         netBalance: number;
     } | null>(null);
 
-    // جلب كافة البيانات المرجعية المطلوبة لبناء محرك البحث
     useEffect(() => {
         if (!firestore) return;
         const fetchData = async () => {
@@ -151,7 +150,7 @@ export default function CostCenterLedgerPage() {
                             accountName: line.accountName,
                             debit,
                             credit,
-                            balance: 0, // Calculated after sorting
+                            balance: 0, 
                             entryId: docSnap.id
                         });
                         totalDebit += debit;
@@ -160,7 +159,6 @@ export default function CostCenterLedgerPage() {
                 });
             });
 
-            // الترتيب الزمني وحساب الرصيد المتدفق
             lines.sort((a, b) => a.date.getTime() - b.date.getTime());
             
             let runningBalance = 0;
@@ -226,7 +224,7 @@ export default function CostCenterLedgerPage() {
                                     onSelect={setSelectedCenterId}
                                     options={centerOptions}
                                     placeholder={loading ? "جاري التحميل..." : "ابحث واختر..."}
-                                    className="h-12 rounded-2xl bg-white border-2 soft-shadow-input"
+                                    className="h-12 rounded-2xl bg-white border-2"
                                 />
                             </div>
                             <div className="md:col-span-2 grid gap-2">
@@ -256,7 +254,6 @@ export default function CostCenterLedgerPage() {
                 <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
                     <Card id="printable-area" className="bg-white dark:bg-card shadow-2xl rounded-[2.5rem] overflow-hidden border-none">
                         <div className="p-8 sm:p-12">
-                            {/* Header Section */}
                             <div className="flex justify-between items-start border-b-4 border-primary pb-8 mb-10">
                                 <div className="text-left space-y-1">
                                     <h2 className="text-3xl font-black text-primary tracking-tighter">كشف حركة مالي مخصص</h2>

@@ -64,13 +64,11 @@ export default function GeneralLedgerPage() {
     const [loading, setLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     
-    // --- الفلاتر ---
     const [selectedAccountId, setSelectedAccountId] = useState('');
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
     const [statusFilter, setStatusFilter] = useState<'posted' | 'all'>('posted');
 
-    // --- نتائج الكشف المثبتة ---
     const [ledgerData, setLedgerData] = useState<{
         openingBalance: number;
         lines: StatementLine[];
@@ -79,7 +77,6 @@ export default function GeneralLedgerPage() {
         finalBalance: number;
     } | null>(null);
 
-    // جلب البيانات المرجعية
     useEffect(() => {
         if (!firestore) return;
         const fetchData = async () => {
@@ -112,7 +109,6 @@ export default function GeneralLedgerPage() {
     const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p.projectName])), [projects]);
     const deptMap = useMemo(() => new Map(departments.map(d => [d.id, d.name])), [departments]);
 
-    // محرك استخراج الكشف (The Ledger Engine)
     const handleGenerateLedger = async () => {
         if (!firestore || !selectedAccountId || !dateFrom || !dateTo) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار الحساب والفترة الزمنية.' });
@@ -122,8 +118,6 @@ export default function GeneralLedgerPage() {
         setIsGenerating(true);
         try {
             const selectedAccount = accounts.find(a => a.id === selectedAccountId)!;
-            
-            // 1. تحديد كافة الحسابات المستهدفة (الحساب نفسه + كافة الحسابات الفرعية التابعة له)
             const targetAccountIds = new Set<string>([selectedAccountId]);
             
             const findChildren = (parentCode: string) => {
@@ -136,7 +130,6 @@ export default function GeneralLedgerPage() {
             };
             findChildren(selectedAccount.code);
 
-            // 2. جلب الحركات التاريخية للرصيد الافتتاحي
             const startDate = startOfDay(dateFrom);
             const endDate = endOfDay(dateTo);
 
@@ -160,13 +153,11 @@ export default function GeneralLedgerPage() {
                     if (targetAccountIds.has(line.accountId)) {
                         const amount = (line.debit || 0) - (line.credit || 0);
                         
-                        // الرصيد الافتتاحي دائماً من القيود المرحلة فقط لضمان سلامة الأرصدة التراكمية
                         if (entryDate < startDate) {
                             if (isPosted) {
                                 openingBalance += amount;
                             }
                         } else if (entryDate <= endDate) {
-                            // الحركات داخل الفترة تخضع لفلتر الحالة المختار
                             if (matchesStatus) {
                                 transactionsInPeriod.push({
                                     date: entryDate,
@@ -185,7 +176,6 @@ export default function GeneralLedgerPage() {
                 });
             });
 
-            // 3. ترتيب الحركات زمنياً وحساب الرصيد المتدفق
             transactionsInPeriod.sort((a, b) => a.date.getTime() - b.date.getTime());
             
             let runningBalance = openingBalance;
@@ -219,7 +209,6 @@ export default function GeneralLedgerPage() {
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-            {/* واجهة التحكم - مخفية عند الطباعة */}
             <Card className="mb-6 no-print rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white">
                 <CardHeader className="bg-primary/5 pb-6 border-b">
                     <CardTitle className="text-xl font-black flex items-center gap-2">
@@ -276,11 +265,9 @@ export default function GeneralLedgerPage() {
                 </CardContent>
             </Card>
 
-            {/* عرض الكشف المستخرج */}
             {ledgerData ? (
                 <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
                     <Card id="printable-area" className="bg-white dark:bg-card shadow-2xl rounded-[2.5rem] overflow-hidden print:shadow-none print:border-none border-none">
-                        {/* ترويسة الطباعة */}
                         <div className="p-8 sm:p-12">
                             {branding?.letterhead_image_url ? (
                                 <img src={branding.letterhead_image_url} alt="Letterhead" className="w-full h-auto mb-10" />
@@ -301,7 +288,6 @@ export default function GeneralLedgerPage() {
                                 </div>
                             )}
 
-                            {/* ملخص الحساب المختار */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10 p-8 bg-muted/30 rounded-[2rem] border-2 border-dashed border-primary/10">
                                 <div className="space-y-4">
                                     <div>
@@ -323,7 +309,6 @@ export default function GeneralLedgerPage() {
                                 </div>
                             </div>
 
-                            {/* جدول الحركات */}
                             <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                                 <Table>
                                     <TableHeader className="bg-muted/80">
@@ -399,7 +384,6 @@ export default function GeneralLedgerPage() {
                                 </Table>
                             </div>
 
-                            {/* تذييل الطباعة والاعتمادات */}
                             <div className="hidden print:grid grid-cols-2 gap-20 mt-32 text-center text-xs font-black uppercase text-muted-foreground">
                                 <div className="space-y-16">
                                     <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">إعداد المحاسب</p>

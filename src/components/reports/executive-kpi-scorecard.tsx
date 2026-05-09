@@ -21,10 +21,6 @@ import { DateInput } from '@/components/ui/date-input';
 import { startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
-/**
- * تقرير مؤشر أداء الأقسام (Executive Scorecard):
- * يحلل كفاءة الأقسام والوقت المستغرق للإنجاز.
- */
 export function ExecutiveKpiScorecard() {
   const { transactions, departments, loading } = useAnalyticalData();
   const { toast } = useToast();
@@ -147,4 +143,3 @@ export function ExecutiveKpiScorecard() {
     </div>
   );
 }
-

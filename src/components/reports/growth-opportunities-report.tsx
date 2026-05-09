@@ -25,21 +25,16 @@ const LICENSING_KEYWORDS = ['بلدية', 'رخصة', 'تراخيص'];
 const DESIGN_KEYWORDS = ['معماري', 'تصميم'];
 const ALL_SERVICES = ['إشراف', 'واجهات', 'صحي', 'كهرباء', 'إنشائي'];
 
-/**
- * تقرير فرص النمو والتحول (Growth Intelligence Report):
- * 1. يحدد من أنهوا التراخيص لعرض المقاولات عليهم.
- * 2. يحدد من أنهوا التصميم لبيع خدمات الإشراف والصحي والكهرباء.
- */
 export function GrowthOpportunitiesReport() {
   const { transactions, clients, loading } = useAnalyticalData();
   const { toast } = useToast();
   
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [reportResults, setReportResults] = useState<any[] | null>(null);
+  
   const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
   const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [reportResults, setReportResults] = useState<any[] | null>(null);
 
   const handleGenerate = () => {
     setIsGenerating(true);
@@ -61,14 +56,12 @@ export function GrowthOpportunitiesReport() {
             const client = clientMap.get(cid);
             if (!client) return;
 
-            // 🛡️ فحص اكتمال التراخيص (مدخل للمقاولات)
             const completedLicenses = txs.filter(tx => 
                 (tx.status === 'completed' || tx.status === 'submitted') &&
                 LICENSING_KEYWORDS.some(k => tx.transactionType.includes(k)) &&
                 isWithinInterval(toFirestoreDate(tx.updatedAt || tx.createdAt) || new Date(), { start, end })
             );
 
-            // 🛡️ فحص اكتمال التصميم (مدخل للبيع الإضافي)
             const completedDesigns = txs.filter(tx => 
                 (tx.status === 'completed' || tx.status === 'submitted') &&
                 DESIGN_KEYWORDS.some(k => tx.transactionType.includes(k)) &&
@@ -192,9 +185,7 @@ export function GrowthOpportunitiesReport() {
                                     <Badge className={cn(
                                         "px-4 py-1 rounded-full font-black text-[10px]",
                                         item.severity === 'high' ? "bg-red-600" : "bg-blue-600"
-                                    )}>
-                                        {item.severity === 'high' ? 'فرصة مقاولات (عالية)' : 'بيع إضافي (متوسط)'}
-                                    </Badge>
+                                    )}>{item.severity === 'high' ? 'فرصة مقاولات (عالية)' : 'بيع إضافي (متوسط)'}</Badge>
                                 </TableCell>
                             </TableRow>
                         ))

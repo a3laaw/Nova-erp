@@ -15,8 +15,9 @@ import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
 import { format, endOfYear } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User } from 'lucide-react';
+import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User, Building2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
@@ -104,7 +105,6 @@ export default function BalanceSheetPage() {
             accounts.forEach(acc => {
                 let balance = accountBalances.get(acc.id!) || 0;
                 
-                // إضافة صافي الربح للأرباح المبقاة آلياً
                 if (acc.name.includes('أرباح')) balance += netIncome;
                 
                 if (balance === 0 && acc.type !== 'equity') return;
@@ -180,7 +180,6 @@ export default function BalanceSheetPage() {
                             )}
 
                             <div className="grid lg:grid-cols-2 gap-16">
-                                {/* جانب الأصول */}
                                 <div className="space-y-8">
                                     <div className="space-y-4">
                                         <h4 className="font-black text-primary border-r-4 border-primary pr-3 text-lg flex items-center gap-2">
@@ -204,7 +203,6 @@ export default function BalanceSheetPage() {
                                     </div>
                                 </div>
 
-                                {/* جانب الالتزامات وحقوق الملكية */}
                                 <div className="space-y-8">
                                     <div className="space-y-4">
                                         <h4 className="font-black text-orange-600 border-r-4 border-orange-600 pr-3 text-lg flex items-center gap-2">

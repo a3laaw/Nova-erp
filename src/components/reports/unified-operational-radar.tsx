@@ -22,17 +22,12 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 
-/**
- * تقرير رادار نبض العمل والميدان:
- * يدمج (الحالة التشغيلية + الركود + الزيارات الميدانية).
- */
 export function UnifiedOperationalRadar() {
   const { transactions, clients, employees, departments, appointments, loading } = useAnalyticalData();
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [reportData, setReportResults] = useState<any[] | null>(null);
   
-  // الفلاتر
   const [selectedDept, setSelectedDept] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [stagnationFilter, setStagnationFilter] = useState('all');
