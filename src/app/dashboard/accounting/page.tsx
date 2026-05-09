@@ -8,18 +8,16 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { 
     Wallet, 
     ArrowDownLeft, 
-    ArrowUpRight, 
-    Scale, 
     TrendingUp, 
     FileText,
     PieChart,
     ArrowRight,
     PlusCircle,
-    Banknote,
-    RotateCcw,
-    ListTree,
     Landmark,
-    ShieldCheck
+    ShieldCheck,
+    Scale,
+    FileSpreadsheet,
+    Banknote
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -99,33 +97,29 @@ export default function AccountingDashboardPage() {
             </div>
 
             <div className="grid gap-8 md:grid-cols-2">
+                {/* قسم القوائم المالية الرسمي */}
                 <Card className={cn("rounded-[2rem] border-none shadow-sm", isGlass ? "glass-effect" : "bg-white")}>
                     <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="text-lg font-black flex items-center gap-2"><PieChart className="text-primary h-5 w-5"/> القوائم المالية والتحليلات</CardTitle>
+                        <CardTitle className="text-lg font-black flex items-center gap-2"><FileSpreadsheet className="text-primary h-5 w-5"/> القوائم المالية الرسمية (IFRS)</CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-2 gap-4 pt-6">
-                        <QuickLink href="/dashboard/accounting/income-statement" label="قائمة الدخل (P&L)" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/balance-sheet" label="المركز المالي" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/trial-balance" label="ميزان المراجعة" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ العام" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/reports" label="تحليلات ربحية المشاريع" isGlass={isGlass} />
-                        <QuickLink href="/dashboard/accounting/cost-center-ledger" label="كشف حركة مركز تكلفة" isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/income-statement" label="قائمة الدخل (P&L)" icon={<TrendingUp className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/balance-sheet" label="المركز المالي" icon={<Landmark className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/trial-balance" label="ميزان المراجعة" icon={<Scale className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/cash-flow" label="التدفقات النقدية" icon={<Banknote className="h-4 w-4"/>} isGlass={isGlass} />
                     </CardContent>
                 </Card>
 
+                {/* قسم التحليلات والرقابة */}
                 <Card className={cn("rounded-[2rem] border-none shadow-sm", isGlass ? "glass-effect" : "bg-white")}>
                     <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="text-lg font-black flex items-center gap-2"><ShieldCheck className="text-primary h-5 w-5"/> الرقابة والتدقيق</CardTitle>
+                        <CardTitle className="text-lg font-black flex items-center gap-2"><ShieldCheck className="text-primary h-5 w-5"/> التحليلات والرقابة</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-6">
-                        <div className={cn("p-5 rounded-2xl border-2 border-dashed flex items-center justify-between", isGlass ? "bg-white/5 border-white/20" : "bg-muted/30")}>
-                            <div className="space-y-1"><p className="text-sm font-black">التسوية البنكية الذكية</p><p className="text-[10px] text-muted-foreground font-bold">مطابقة الكشوف مع النظام</p></div>
-                            <Button asChild size="sm" className="rounded-xl font-bold"><Link href="/dashboard/accounting/reconciliation">بدء التسوية</Link></Button>
-                        </div>
-                        <div className={cn("p-5 rounded-2xl border-2 border-dashed flex items-center justify-between", isGlass ? "bg-white/5 border-white/20" : "bg-muted/30")}>
-                            <div className="space-y-1"><p className="text-sm font-black">مراجعة تسويات العهد</p><p className="text-[10px] text-muted-foreground font-bold">اعتماد مصاريف الميدان</p></div>
-                            <Button asChild size="sm" className="rounded-xl font-bold"><Link href="/dashboard/hr/custody-reconciliation">مراجعة</Link></Button>
-                        </div>
+                    <CardContent className="grid grid-cols-2 gap-4 pt-6">
+                        <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ العام" icon={<ListTree className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/reports" label="ربحية المشاريع" icon={<PieChart className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/accounting/reconciliation" label="التسوية البنكية" icon={<RotateCcw className="h-4 w-4"/>} isGlass={isGlass} />
+                        <QuickLink href="/dashboard/hr/custody-reconciliation" label="تسوية العهد" icon={<Wallet className="h-4 w-4"/>} isGlass={isGlass} />
                     </CardContent>
                 </Card>
             </div>
@@ -133,10 +127,13 @@ export default function AccountingDashboardPage() {
     );
 }
 
-function QuickLink({ href, label, isGlass }: { href: string, label: string, isGlass: boolean }) {
+function QuickLink({ href, label, icon, isGlass }: { href: string, label: string, icon: React.ReactNode, isGlass: boolean }) {
     return (
-        <Link href={href} className={cn("p-4 border-2 border-transparent rounded-2xl hover:shadow-md transition-all text-sm font-black flex items-center justify-between group", isGlass ? "bg-white/10 hover:bg-white/20 text-slate-900" : "bg-muted/20 hover:bg-white hover:border-primary/20 text-foreground/80")}>
-            {label}
+        <Link href={href} className={cn("p-4 border-2 border-transparent rounded-2xl hover:shadow-md transition-all text-sm font-black flex items-center justify-between group", isGlass ? "bg-white/10 hover:bg-white/20 text-[#1e1b4b]" : "bg-muted/20 hover:bg-white hover:border-primary/20 text-foreground/80")}>
+            <div className="flex items-center gap-3">
+                <div className="opacity-40 group-hover:opacity-100 transition-opacity">{icon}</div>
+                {label}
+            </div>
             <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all text-primary"/>
         </Link>
     );

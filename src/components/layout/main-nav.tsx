@@ -64,7 +64,10 @@ import {
   Calculator,
   ShieldCheck,
   RotateCcw,
-  CheckCircle2
+  CheckCircle2,
+  Scale,
+  TrendingUp,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -102,7 +105,10 @@ const navItems = {
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/accounting/reports', label: 'التقارير والتحليلات', icon: PieChart },
+        { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
+        { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: TrendingUp },
+        { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
+        { href: '/dashboard/accounting/reports', label: 'التحليلات والربحية', icon: PieChart },
         { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
       ]
     },
@@ -168,8 +174,9 @@ const navItems = {
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'Chart of Accounts', icon: ListTree },
         { href: '/dashboard/accounting/journal-entries', label: 'Journal Entries', icon: BookOpen },
-        { href: '/dashboard/accounting/cash-receipts', label: 'Cash Receipts', icon: ArrowDownLeft },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'Payment Vouchers', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/trial-balance', label: 'Trial Balance', icon: Scale },
+        { href: '/dashboard/accounting/income-statement', label: 'Income Statement', icon: TrendingUp },
+        { href: '/dashboard/accounting/balance-sheet', label: 'Balance Sheet', icon: Landmark },
       ]
     },
   ]
