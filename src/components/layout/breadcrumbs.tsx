@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -50,7 +49,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'equity-statement': 'قائمة التغير في حقوق الملكية',
     'financial-statement-notes': 'الإيضاحات المتممة',
     'trial-balance': 'ميزان المراجعة',
-    statement: 'كشف حساب',
+    statement: 'كشف حساب مالي',
+    'works-statement': 'كشف أعمال العميل',
     'bank-reconciliation': 'التسوية البنكية',
     'classifications': 'الفئات',
     'balances': 'أرصدة الأصناف',
@@ -134,7 +134,8 @@ const breadcrumbNameMap: Record<string, Record<string, string>> = {
     'equity-statement': 'Statement of Equity',
     'financial-statement-notes': 'Notes to Financial Statements',
     'trial-balance': 'Trial Balance',
-    statement: 'Statement',
+    statement: 'Financial Statement',
+    'works-statement': 'Statement of Works',
     'bank-reconciliation': 'Bank Reconciliation',
     'classifications': 'Categories',
     'balances': 'Stock Balances',

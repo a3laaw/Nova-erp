@@ -1,5 +1,4 @@
-
-      'use client';
+'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
@@ -27,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar } from 'lucide-react';
+import { ArrowRight, Pencil, User, Phone, Home, Hash, BadgeInfo, Files, PlusCircle, History, ChevronDown, Trash2, MoreHorizontal, Eye, FolderLock, FolderOpen, Loader2, Printer, FileText, Calendar, ListChecks } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ClientTransactionForm } from '@/components/clients/client-transaction-form';
@@ -90,14 +89,12 @@ const transactionStatusColors: Record<string, string> = {
   'on-hold': 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
-// --- Quotations List Component ---
 function ClientQuotationsList({ clientId, clientName }: { clientId: string, clientName: string }) {
   const { firestore } = useFirebase();
   const router = useRouter();
 
   const quotationsQuery = useMemo(() => {
     if (!firestore || !clientId) return null;
-    // Removed orderBy to avoid needing a composite index. Sorting is now done client-side.
     return [where('clientId', '==', clientId)];
   }, [firestore, clientId]);
 
@@ -105,7 +102,6 @@ function ClientQuotationsList({ clientId, clientName }: { clientId: string, clie
   
   const sortedQuotations = useMemo(() => {
     if (!quotations) return [];
-    // Sort descending by date on the client side
     return [...quotations].sort((a,b) => {
         const dateB = toFirestoreDate(b.date);
         const dateA = toFirestoreDate(a.date);
@@ -239,7 +235,6 @@ export default function ClientProfilePage() {
   const [transactionToDelete, setTransactionToDelete] = useState<ClientTransaction | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- Data Fetching ---
   const clientPath = useMemo(() => (firestore && id ? `clients/${id}` : null), [firestore, id]);
   const { data: client, loading: clientLoading, error: clientError } = useDocument<Client>(firestore, clientPath);
 
@@ -274,7 +269,6 @@ export default function ClientProfilePage() {
         const batch = writeBatch(firestore);
         const transactionRef = doc(firestore, 'clients', client.id, 'transactions', transactionToCancel.id!);
 
-        // Revert contract signing stage
         const currentStages = [...(transactionToCancel.stages || [])];
         const contractStageIndex = currentStages.findIndex(s => s.name === 'توقيع العقد');
         let stagesUpdated = false;
@@ -296,7 +290,6 @@ export default function ClientProfilePage() {
         
         batch.update(transactionRef, updateData);
 
-        // Log the event in both timelines
         const historyCollectionRef = collection(firestore, `clients/${client.id}/history`);
         const transactionTimelineRef = collection(firestore, `clients/${client.id}/transactions/${transactionToCancel.id}/timelineEvents`);
         
@@ -308,7 +301,6 @@ export default function ClientProfilePage() {
         const commentData = { type: 'comment', content: commentContent, userId: currentUser.id, userName: currentUser.fullName, userAvatar: currentUser.avatarUrl, createdAt: serverTimestamp() };
         batch.set(doc(transactionTimelineRef), commentData);
 
-        // Check if this is the last contract to potentially revert client status
         const otherTransactions = transactions.filter(tx => tx.id !== transactionToCancel.id!);
         const hasOtherContracts = otherTransactions.some(tx => !!tx.contract);
 
@@ -324,7 +316,6 @@ export default function ClientProfilePage() {
         await batch.commit();
         toast({ title: 'نجاح', description: 'تم إلغاء العقد وتحديث المراحل بنجاح.' });
 
-        // --- Notification Logic ---
         const engineerId = transactionToCancel.assignedEngineerId;
         if (engineerId && currentUser.employeeId !== engineerId) {
             const targetUserId = await findUserIdByEmployeeId(firestore, engineerId);
@@ -505,10 +496,16 @@ export default function ClientProfilePage() {
                             <CardDescription>جميع المعاملات والخدمات المقدمة للعميل.</CardDescription>
                         </div>
                          <div className="flex gap-2">
-                             <Button asChild variant="outline">
+                             <Button asChild variant="outline" className="gap-2">
+                                <Link href={`/dashboard/clients/${id}/works-statement`}>
+                                    <ListChecks className="h-4 w-4" />
+                                    كشف الأعمال الفني
+                                </Link>
+                            </Button>
+                             <Button asChild variant="outline" className="gap-2">
                                 <Link href={`/dashboard/clients/${id}/statement`}>
-                                    <Printer className="ml-2 h-4 w-4" />
-                                    كشف الحساب
+                                    <Printer className="h-4 w-4" />
+                                    كشف الحساب المالي
                                 </Link>
                             </Button>
                             <Button onClick={() => setIsFormOpen(true)}>
@@ -641,6 +638,3 @@ export default function ClientProfilePage() {
   );
 }
 
-
-
-    
