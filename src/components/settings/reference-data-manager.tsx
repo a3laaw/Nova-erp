@@ -49,13 +49,11 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, ChevronLeft, X, Layers, Activity, FileSignature, Clock
+    MapPin, X, Layers, Activity, FileSignature, Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '../ui/skeleton';
 import { cn, cleanFirestoreData } from '@/lib/utils';
-import { useAuth } from '@/context/auth-context';
-import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
 
@@ -105,7 +103,6 @@ export function ReferenceDataManager() {
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [itemName, setItemName] = useState('');
 
-    // ✅ القضاء على خطأ ReferenceError: closeDialog
     const closeDialog = useCallback(() => {
         setIsPrimaryDialogOpen(false);
         setIsSecondaryDialogOpen(false);
@@ -270,7 +267,7 @@ export function ReferenceDataManager() {
                                 </Button>
                             )}
                             <Button onClick={() => setView('main')} variant="ghost" className="text-white hover:bg-white/10 rounded-xl font-black gap-2">
-                                <ArrowRight className="h-4 w-4" /> العودة للملخص
+                                <X className="h-4 w-4" /> العودة للملخص
                             </Button>
                         </div>
                     </div>
@@ -315,14 +312,6 @@ export function ReferenceDataManager() {
                                                 <PlusCircle className="ml-2 h-4 w-4" /> إضافة جديد
                                             </Button>
                                         </div>
-                                        {view === 'departments' && (
-                                            <Tabs value={activeSubTab} onValueChange={(v: any) => setActiveSubTab(v)} className="w-full">
-                                                <TabsList className="bg-white border h-11 p-1 rounded-xl shadow-inner">
-                                                    <TabsTrigger value="jobs" className="rounded-lg gap-2 font-black px-8">الوظائف المهنية</TabsTrigger>
-                                                    <TabsTrigger value="stages" className="rounded-lg gap-2 font-black px-8">مراحل العمل الفنية</TabsTrigger>
-                                                </TabsList>
-                                            </Tabs>
-                                        )}
                                     </div>
                                     <ScrollArea className="flex-1 p-8">
                                         {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-2xl"/></div> :
