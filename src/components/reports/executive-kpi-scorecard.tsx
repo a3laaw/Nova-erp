@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { 
     BarChart3, FileSearch, Loader2, TrendingUp, 
     Zap, Clock, Target, Building2, Star 
@@ -64,7 +65,7 @@ export function ExecutiveKpiScorecard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-center bg-white p-6 rounded-[2rem] border shadow-sm no-print">
-        <Button onClick={handleGenerate} disabled={isGenerating} className="h-12 px-20 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/20">
+        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-12 px-20 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/20">
             {isGenerating ? <Loader2 className="animate-spin h-6 w-6" /> : <BarChart3 className="h-6 w-6" />} تحليل أداء الوحدات التنظيمية
         </Button>
       </div>

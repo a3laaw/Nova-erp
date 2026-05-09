@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -10,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Search, FileSearch, Loader2, Clock, MapPin, 
-    AlertTriangle, CheckCircle2, User, Building2, Filter 
+    AlertTriangle, CheckCircle2, User, Building2, Filter,
+    Activity
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { differenceInDays, format } from 'date-fns';
@@ -85,9 +86,9 @@ export function UnifiedOperationalRadar() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1">القسم / المكتب</Label>
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">القسم / المكتب</Label>
             <Select value={selectedDept} onValueChange={setSelectedDept}>
-                <SelectTrigger className="h-10 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
                     <SelectItem value="all">كل الأقسام</SelectItem>
                     {departments.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
@@ -95,9 +96,9 @@ export function UnifiedOperationalRadar() {
             </Select>
         </div>
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1">فلتر الركود</Label>
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">فلتر الركود</Label>
             <Select value={stagnationFilter} onValueChange={setStagnationFilter}>
-                <SelectTrigger className="h-10 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
                     <SelectItem value="all">كل الحركات</SelectItem>
                     <SelectItem value="stalled">المتأخر (أكثر من 14 يوم)</SelectItem>
@@ -105,13 +106,13 @@ export function UnifiedOperationalRadar() {
             </Select>
         </div>
         <div className="grid gap-2 lg:col-span-2">
-            <Label className="font-black text-xs pr-1">بحث سريع</Label>
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">بحث سريع</Label>
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="اسم العميل أو المعاملة..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-2" />
+                <Input placeholder="اسم العميل أو المعاملة..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-2 font-bold text-[#1e1b4b]" />
             </div>
         </div>
-        <Button onClick={handleGenerate} disabled={isGenerating} className="h-10 rounded-xl font-black text-base gap-2 shadow-lg shadow-primary/20">
+        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20">
             {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <FileSearch className="h-5 w-5" />} توليد الرادار
         </Button>
       </div>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -9,6 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Coins, FileSearch, Loader2, Wallet, 
     ArrowDownLeft, CheckCircle2, TrendingUp, Filter 
@@ -90,9 +90,9 @@ export function FinancialAchievementPipeline() {
     <div className="space-y-6">
       <div className="flex justify-between items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2 w-64">
-            <Label className="font-black text-xs pr-1">فلتر حالة التحصيل</Label>
+            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">فلتر حالة التحصيل</Label>
             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
-                <SelectTrigger className="h-10 rounded-xl border-2"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
                     <SelectItem value="all">كل العقود</SelectItem>
                     <SelectItem value="pending">بانتظار التحصيل (دفعات مستحقة)</SelectItem>
@@ -100,7 +100,7 @@ export function FinancialAchievementPipeline() {
                 </SelectContent>
             </Select>
         </div>
-        <Button onClick={handleGenerate} disabled={isGenerating} className="h-10 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700">
+        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 px-12 rounded-xl font-black text-lg gap-2 shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700">
             {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Coins className="h-5 w-5" />} تحديث أنابيب التدفق المالي
         </Button>
       </div>
