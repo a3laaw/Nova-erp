@@ -218,27 +218,6 @@ export function ReferenceDataManager() {
                         loading={loadingPrimary} 
                         description="قائمة الخدمات الهندسية المقدمة"
                     />
-                    
-                    <Separator className="col-span-full my-4" />
-
-                    <StatCard 
-                        title="نماذج العقود" 
-                        count={0} 
-                        icon={<FileSignature className="h-6 w-6"/>} 
-                        onNavigate={() => router.push('/dashboard/settings/contract-templates')} 
-                        colorClass="bg-amber-100 text-amber-600" 
-                        loading={false} 
-                        description="إدارة قوالب العقود الموحدة"
-                    />
-                    <StatCard 
-                        title="مواعيد العمل" 
-                        count={0} 
-                        icon={<Clock className="h-6 w-6"/>} 
-                        onNavigate={() => router.push('/dashboard/settings/work-hours')} 
-                        colorClass="bg-indigo-100 text-indigo-600" 
-                        loading={false} 
-                        description="تخصيص ساعات العمل ورمضان"
-                    />
                 </div>
             </div>
         );
@@ -399,3 +378,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+

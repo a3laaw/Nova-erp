@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -93,7 +94,7 @@ export default function PayslipPage() {
                            <InfoRow label="اسم الموظف" value={payslip.employeeName} />
                            <InfoRow label="الرقم الوظيفي" value={employee.employeeNumber} />
                            <InfoRow label="القسم الإداري" value={employee.department} />
-                           <InfoRow label="المسمى الوظيفي" value={employee.jobTitle} />
+                           <InfoRow label="المطلب الوظيفي" value={employee.jobTitle} />
                         </div>
                         
                         <div className="grid md:grid-cols-2 gap-10">
@@ -153,3 +154,4 @@ export default function PayslipPage() {
         </div>
     );
 }
+

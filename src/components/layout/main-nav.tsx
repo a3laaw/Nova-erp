@@ -37,32 +37,33 @@ import {
 } from '@/components/ui/tooltip';
 import {
   LayoutGrid,
+  FileSignature,
+  Landmark,
+  Users,
+  PencilRuler,
+  Settings2,
+  ChevronLeft,
   UsersRound,
   Search,
-  UserCheck,
-  FileSignature,
+  FileText,
+  ListTree,
+  BookOpen,
+  ArrowDownLeft,
+  ArrowUpRight,
+  PieChart,
+  CalendarCheck,
+  Clock,
+  Banknote,
   ClipboardList,
   Briefcase,
   MapPin,
-  Clock3,
-  ListTree,
-  BookOpen,
-  FileText,
-  ArrowUpRight,
-  Landmark,
-  Users,
-  CalendarCheck,
-  Settings2,
-  Globe,
-  ChevronLeft,
   CalendarDays,
   Palette,
   Network,
-  PencilRuler,
-  ArrowDownLeft,
-  PieChart,
-  Clock,
-  Banknote
+  UserCheck,
+  Calculator,
+  ShieldCheck,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -78,14 +79,16 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
     },
     { 
-      label: 'إدارة المبيعات والتعاقدات',
+      label: 'إدارة المبيعات والتعاقدات (CRM)',
       icon: FileSignature,
       roles: ['Developer', 'Admin', 'Accountant', 'Secretary'],
       hrefPrefix: '/dashboard/contracts',
       children: [
-        { href: '/dashboard/contracts', label: 'العقود الموقعة', icon: FileSignature },
-        { href: '/dashboard/contracts/new', label: 'توقيع عقد مباشر', icon: FileSignature },
+        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
+        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
+        { href: '/dashboard/contracts', label: 'العقود الموقعة', icon: FileSignature },
+        { href: '/dashboard/contracts/new', label: 'توقيع عقد مباشر', icon: CheckCircle2 },
       ]
     },
     { 
@@ -99,6 +102,7 @@ const navItems = {
         { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
         { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
         { href: '/dashboard/accounting/reports', label: 'التقارير والتحليلات', icon: PieChart },
+        { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
       ]
     },
     { 
@@ -109,7 +113,7 @@ const navItems = {
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
-        { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
+        { href: '/dashboard/hr/permissions', label: 'إدارة الاستئذانات', icon: Clock },
         { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
         { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية', icon: FileText },
       ]
@@ -124,6 +128,7 @@ const navItems = {
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/appointments', label: 'حجز المواعيد والتقويم', icon: CalendarDays },
+        { href: '/dashboard/construction/subcontractors/certificates', label: 'مستخلصات المقاولين', icon: Calculator },
       ]
     },
     { 
@@ -136,7 +141,7 @@ const navItems = {
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
         { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
-        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل', icon: Clock3 },
+        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل', icon: Clock },
       ]
     },
   ],
@@ -145,6 +150,7 @@ const navItems = {
   ]
 };
 
+// Helper components for the sidebar button to handle tooltips and collapsed state
 function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ...props }: any) {
   const { state, isMobile } = useSidebar();
   const button = (
@@ -324,3 +330,5 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     </TooltipProvider>
   );
 }
+
+import { CheckCircle2 } from 'lucide-react';
