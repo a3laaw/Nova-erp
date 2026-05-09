@@ -95,19 +95,20 @@ export function GeneralStatsReport() {
 
         const totalLeaveBalance = activeEmployees.reduce((sum, e) => sum + calculateAnnualLeaveBalance(e, today), 0);
 
-        const totalPresent = monthlyAttendance.reduce((sum, a) => sum + (a.summary.presentDays || 0), 0);
-        const totalAbsent = monthlyAttendance.reduce((sum, a) => sum + (a.summary.absentDays || 0), 0);
+        // 🛡️ FIXED: Added optional chaining to prevent "reading properties of undefined"
+        const totalPresent = monthlyAttendance.reduce((sum, a) => sum + (a.summary?.presentDays || 0), 0);
+        const totalAbsent = monthlyAttendance.reduce((sum, a) => sum + (a.summary?.absentDays || 0), 0);
         const totalWorkingDays = totalPresent + totalAbsent;
         const attendancePercentage = totalWorkingDays > 0 ? (totalPresent / totalWorkingDays) * 100 : 0;
 
-        const totalSalaryCost = monthlyPayslips.reduce((sum, p) => sum + p.netSalary, 0);
+        const totalSalaryCost = monthlyPayslips.reduce((sum, p) => sum + (p.netSalary || 0), 0);
 
         const separationsThisYear = employees.filter(e => {
             const termDate = toFirestoreDate(e.terminationDate);
             return e.status === 'terminated' && termDate && termDate.getFullYear() === selectedYear;
         }).length;
         
-        const ongoingLeaves = allLeaves.filter(l => {
+        const ongoingLeaves = (allLeaves || []).filter(l => {
              const leaveStart = toFirestoreDate(l.startDate);
              const leaveEnd = toFirestoreDate(l.endDate);
              return l.status === 'approved' && leaveStart && leaveEnd && isWithinInterval(today, { start: leaveStart, end: leaveEnd });
@@ -130,15 +131,15 @@ export function GeneralStatsReport() {
     const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
     return (
-        <Card>
+        <Card dir="rtl">
             <CardHeader>
                 <CardTitle>الإحصائيات العامة للموارد البشرية</CardTitle>
                 <CardDescription>نظرة عامة سريعة على أهم مؤشرات الأداء.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex flex-wrap gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
-                    <div className="grid gap-2"><Label>السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="grid gap-2"><Label>الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="grid gap-2"><Label>السنة</Label><Select value={year} onValueChange={setYear}><SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger><SelectContent>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="grid gap-2"><Label>الشهر</Label><Select value={month} onValueChange={setMonth}><SelectTrigger className="w-[120px] bg-white"><SelectValue /></SelectTrigger><SelectContent>{months.map(m => <SelectItem key={m} value={String(m)}>{m}</SelectItem>)}</SelectContent></Select></div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <StatCard loading={loading} title="إجمالي الموظفين النشطين" value={stats?.totalActiveEmployees || 0} icon={<Users />} />

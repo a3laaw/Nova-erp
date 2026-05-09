@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -67,7 +66,8 @@ import {
   CheckCircle2,
   Scale,
   TrendingUp,
-  Activity
+  Activity,
+  Banknote as CashFlowIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -108,6 +108,7 @@ const navItems = {
         { href: '/dashboard/accounting/trial-balance', label: 'ميزان المراجعة', icon: Scale },
         { href: '/dashboard/accounting/income-statement', label: 'قائمة الدخل (P&L)', icon: TrendingUp },
         { href: '/dashboard/accounting/balance-sheet', label: 'المركز المالي', icon: Landmark },
+        { href: '/dashboard/accounting/cash-flow', label: 'التدفقات النقدية', icon: CashFlowIcon },
         { href: '/dashboard/accounting/reports', label: 'التحليلات والربحية', icon: PieChart },
         { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
       ]
@@ -121,7 +122,7 @@ const navItems = {
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
         { href: '/dashboard/hr/permissions', label: 'إدارة الاستئذانات', icon: Clock },
-        { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/payroll', label: 'رواتب الموظفين', icon: Banknote },
         { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية', icon: FileText },
       ]
     },
