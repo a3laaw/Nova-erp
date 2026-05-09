@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -58,7 +59,10 @@ import {
   Palette,
   Network,
   PencilRuler,
-  ArrowDownLeft
+  ArrowDownLeft,
+  PieChart,
+  Clock,
+  Banknote
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -85,14 +89,29 @@ const navItems = {
       ]
     },
     { 
-      label: 'علاقات العملاء (CRM)', 
-      icon: UsersRound, 
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'HR', 'Secretary'],
-      hrefPrefix: '/dashboard/clients',
+      label: 'المحاسبة والمالية', 
+      icon: Landmark, 
+      roles: ['Developer', 'Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/accounting',
       children: [
-        { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
-        { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
-        { href: '/dashboard/reports/prospective-clients', label: 'تحليل المحتملين', icon: UserCheck },
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/reports', label: 'التقارير والتحليلات', icon: PieChart },
+      ]
+    },
+    { 
+      label: 'شؤون الموظفين (HR)', 
+      icon: Users, 
+      roles: ['Developer', 'Admin', 'HR'],
+      hrefPrefix: '/dashboard/hr',
+      children: [
+        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
+        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
+        { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
+        { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية', icon: FileText },
       ]
     },
     { 
@@ -105,30 +124,6 @@ const navItems = {
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/appointments', label: 'حجز المواعيد والتقويم', icon: CalendarDays },
-        { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: Clock3 },
-      ]
-    },
-    { 
-      label: 'المحاسبة والمالية', 
-      icon: Landmark, 
-      roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/accounting',
-      children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
-        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-      ]
-    },
-    { 
-      label: 'شؤون الموظفين (HR)', 
-      icon: Users, 
-      roles: ['Developer', 'Admin', 'HR'],
-      hrefPrefix: '/dashboard/hr',
-      children: [
-        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
-        { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
-        { href: '/dashboard/hr/payroll', label: 'مسيرات الرواتب', icon: Landmark },
       ]
     },
     { 

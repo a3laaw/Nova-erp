@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -16,7 +17,6 @@ import {
     ArrowRight, 
     Loader2, 
     CheckCircle2, 
-    AlertCircle,
     Calculator,
     LayoutGrid,
     Trash2
@@ -27,6 +27,8 @@ import { formatCurrency, cleanFirestoreData, cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -47,7 +49,6 @@ export default function DirectContractPage() {
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
-    // بنود العقد الحالي
     const [clauses, setClauses] = useState<any[]>([]);
     const [financialsType, setFinancialsType] = useState<'fixed' | 'percentage'>('fixed');
     const [totalContractValue, setTotalContractValue] = useState(0);
@@ -162,11 +163,11 @@ export default function DirectContractPage() {
                 }
             });
 
-            toast({ title: 'نجاح الربط المالي', description: 'تم إنشاء العقد والقيد المحاسبي. سننتقل الآن لتأسيس هيكل المشروع.' });
+            toast({ title: 'نجاح الربط المالي', description: 'تم إنشاء العقد والقيد المحاسبي بنجاح.' });
             router.push(`/dashboard/construction/projects/new?clientId=${selectedClientId}&transactionId=${selectedTxId}`);
 
         } catch (e) {
-            toast({ variant: 'destructive', title: 'خطأ في الترحيل' });
+            toast({ variant: 'destructive', title: 'خطأ في الربط المالي' });
         } finally {
             setIsSaving(false);
         }
@@ -175,14 +176,14 @@ export default function DirectContractPage() {
     return (
         <div className="max-w-4xl mx-auto space-y-6" dir="rtl">
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-[#14453D]/10">
-                <CardHeader className="pb-8">
+                <CardHeader className="pb-8 px-8">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-[#14453D]/10 rounded-2xl text-[#14453D] shadow-inner">
                             <FileSignature className="h-8 w-8" />
                         </div>
                         <div>
                             <CardTitle className="text-3xl font-black text-[#14453D]">توقيع عقد مباشر</CardTitle>
-                            <CardDescription className="text-base font-medium">ربط مالي وقانوني فوري للمعاملات المعتمدة بدون الحاجة لمسودة عرض سعر.</CardDescription>
+                            <CardDescription className="text-base font-medium">ربط مالي وقانوني فوري للمعاملات المعتمدة.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -232,7 +233,7 @@ export default function DirectContractPage() {
                                     <Badge variant="outline" className="bg-[#14453D]/10 text-[#14453D] border-[#14453D]/20 font-black">نظام المبالغ الثابتة</Badge>
                                 ) : (
                                     <div className="flex items-center gap-3 bg-[#14453D]/5 p-2 rounded-xl border border-[#14453D]/10">
-                                        <Label className="text-xs font-black text-[#14453D]">إجمالي العقد التقديري:</Label>
+                                        <Label className="text-xs font-black text-[#14453D]">إجمالي العقد:</Label>
                                         <Input 
                                             type="number" 
                                             value={totalContractValue} 
@@ -247,7 +248,7 @@ export default function DirectContractPage() {
                                 <Table>
                                     <TableHeader className="bg-muted/50">
                                         <TableRow className="h-12 border-b-2">
-                                            <TableHead className="px-6 font-bold">بيان الدفعة</TableHead>
+                                            <TableHead className="px-6 font-bold text-right">بيان الدفعة</TableHead>
                                             <TableHead className="text-center w-40 font-bold">{financialsType === 'percentage' ? 'النسبة (%)' : 'المبلغ (د.ك)'}</TableHead>
                                             <TableHead className="w-12"></TableHead>
                                         </TableRow>
@@ -255,7 +256,9 @@ export default function DirectContractPage() {
                                     <TableBody>
                                         {clauses.map((c, i) => (
                                             <TableRow key={c.id} className="h-14 bg-white border-b last:border-0">
-                                                <TableCell className="px-4"><Input value={c.name} onChange={e => { const newC = [...clauses]; newC[i].name = e.target.value; setClauses(newC); }} className="border-none shadow-none font-bold" /></TableCell>
+                                                <TableCell className="px-4">
+                                                  <Input value={c.name} onChange={e => { const newC = [...clauses]; newC[i].name = e.target.value; setClauses(newC); }} className="border-none shadow-none font-bold" />
+                                                </TableCell>
                                                 <TableCell>
                                                     <Input 
                                                         type="number" 
@@ -269,7 +272,7 @@ export default function DirectContractPage() {
                                                         className="text-center font-black text-xl text-[#14453D] border-none shadow-none"
                                                     />
                                                 </TableCell>
-                                                <TableCell>
+                                                <TableCell className="text-center">
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => setClauses(clauses.filter(x => x.id !== c.id))} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
                                                 </TableCell>
                                             </TableRow>
@@ -291,7 +294,7 @@ export default function DirectContractPage() {
                                 <Alert variant="destructive" className="rounded-2xl border-2">
                                     <AlertCircle className="h-4 w-4" />
                                     <AlertTitle>خلل في النسب</AlertTitle>
-                                    <AlertDescription>يجب أن يكون مجموع نسب الدفعات 100% ليتمكن النظام من توزيع مديونية العقد بدقة.</AlertDescription>
+                                    <AlertDescription>يجب أن يكون مجموع نسب الدفعات 100%.</AlertDescription>
                                 </Alert>
                             )}
                         </div>
@@ -304,7 +307,7 @@ export default function DirectContractPage() {
                     <Button 
                         onClick={handleSaveContract} 
                         disabled={isSaving || !selectedTxId || (financialsType === 'percentage' && currentTotal !== 100)}
-                        className="h-14 px-16 rounded-2xl font-black text-xl text-white shadow-2xl bg-[#14453D] hover:bg-[#0d2e29] gap-3 min-w-[300px] transition-all"
+                        className="h-14 px-16 rounded-2xl font-black text-xl text-white shadow-2xl bg-[#14453D] hover:bg-[#0d2e29] gap-3 min-w-[300px]"
                     >
                         {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <CheckCircle2 className="h-6 w-6" />}
                         اعتماد العقد المباشر

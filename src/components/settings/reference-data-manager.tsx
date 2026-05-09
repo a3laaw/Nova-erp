@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -51,16 +52,13 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, X, Layers, Activity
+    MapPin, X, Layers, Activity, FileSignature, Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
 
-/**
- * مكون البطاقة الإحصائية (Stat Card):
- */
 function StatCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
     return (
         <Card 
@@ -220,6 +218,27 @@ export function ReferenceDataManager() {
                         loading={loadingPrimary} 
                         description="قائمة الخدمات الهندسية المقدمة"
                     />
+                    
+                    <Separator className="col-span-full my-4" />
+
+                    <StatCard 
+                        title="نماذج العقود" 
+                        count={0} 
+                        icon={<FileSignature className="h-6 w-6"/>} 
+                        onNavigate={() => router.push('/dashboard/settings/contract-templates')} 
+                        colorClass="bg-amber-100 text-amber-600" 
+                        loading={false} 
+                        description="إدارة قوالب العقود الموحدة"
+                    />
+                    <StatCard 
+                        title="مواعيد العمل" 
+                        count={0} 
+                        icon={<Clock className="h-6 w-6"/>} 
+                        onNavigate={() => router.push('/dashboard/settings/work-hours')} 
+                        colorClass="bg-indigo-100 text-indigo-600" 
+                        loading={false} 
+                        description="تخصيص ساعات العمل ورمضان"
+                    />
                 </div>
             </div>
         );
@@ -323,7 +342,6 @@ export function ReferenceDataManager() {
                                     <h3 className="text-2xl font-black text-[#1e1b4b]">
                                         {view === 'transactions' ? 'مصفوفة أنواع الخدمات' : 'اختر تصنيفاً لإدارة هيكله الداخلي'}
                                     </h3>
-                                    {view === 'transactions' && <p className="text-sm font-black mt-2 text-[#1e1b4b]">أنواع المعاملات يتم تعريفها كمستوى رئيسي، ويتم ربطها بالأقسام والمراحل في موديول العقود.</p>}
                                 </div>
                             )}
                         </div>
@@ -368,7 +386,7 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد البيانات القياسية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية القياسية آلياً لتسريع عملية التهيئة.</AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية القياسية آلياً.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-black">إلغاء</AlertDialogCancel>
