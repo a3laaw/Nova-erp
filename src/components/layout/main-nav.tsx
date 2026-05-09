@@ -56,7 +56,9 @@ import {
   ChevronLeft,
   CalendarDays,
   Palette,
-  Network
+  Network,
+  PencilRuler,
+  ArrowDownLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -139,7 +141,7 @@ const navItems = {
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
         { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
         { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
-        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل ورمضان', icon: Clock3 },
+        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل', icon: Clock3 },
       ]
     },
   ],
@@ -147,8 +149,6 @@ const navItems = {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
   ]
 };
-
-import { PencilRuler, ArrowDownLeft } from 'lucide-react';
 
 function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ...props }: any) {
   const { state, isMobile } = useSidebar();

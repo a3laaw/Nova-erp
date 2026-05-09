@@ -39,7 +39,7 @@ const settingsFeatures = [
         color: 'bg-green-100 text-green-600'
     },
     {
-        title: 'الدوام والمواعيد',
+        title: 'مواعيد العمل',
         description: 'تحديد أوقات العمل الرسمية وأيام العطل والورديات.',
         href: '/dashboard/settings/work-hours',
         icon: Clock,

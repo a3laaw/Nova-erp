@@ -45,14 +45,14 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '../ui/scroll-area';
+import { Skeleton } from '../ui/skeleton';
 import { 
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, X, Layers, Activity, FileSignature, Clock
+    MapPin, X, Layers, Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '../ui/skeleton';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
@@ -185,7 +185,7 @@ export function ReferenceDataManager() {
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Settings2 className="h-8 w-8" /></div>
                             <div>
                                 <CardTitle className="text-3xl font-black text-[#1e1b4b]">مركز البيانات المرجعية السيادي</CardTitle>
-                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم، هيكل العمل الفني، قواعد الدوام، ونماذج العقود.</CardDescription>
+                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم، هيكل العمل الفني، وقواعد التنظيم الداخلي.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -218,27 +218,6 @@ export function ReferenceDataManager() {
                         colorClass="bg-purple-100 text-purple-600" 
                         loading={loadingPrimary} 
                         description="قائمة الخدمات الهندسية المقدمة"
-                    />
-                    
-                    <Separator className="col-span-full my-4" />
-
-                    <StatCard 
-                        title="نماذج العقود (Templates)" 
-                        count={0} 
-                        icon={<FileSignature className="h-6 w-6"/>} 
-                        onNavigate={() => router.push('/dashboard/settings/contract-templates')} 
-                        colorClass="bg-amber-100 text-amber-600" 
-                        loading={false} 
-                        description="إدارة دفعات وشروط العقود الموحدة"
-                    />
-                    <StatCard 
-                        title="أوقات الدوام ورمضان" 
-                        count={0} 
-                        icon={<Clock className="h-6 w-6"/>} 
-                        onNavigate={() => router.push('/dashboard/settings/work-hours')} 
-                        colorClass="bg-orange-100 text-orange-600" 
-                        loading={false} 
-                        description="تخصيص فترات العمل والعطل"
                     />
                 </div>
             </div>
@@ -311,6 +290,12 @@ export function ReferenceDataManager() {
                                                 <PlusCircle className="ml-2 h-4 w-4" /> إضافة جديد
                                             </Button>
                                         </div>
+                                        {view === 'departments' && (
+                                            <div className="flex bg-white/40 p-1 rounded-xl border w-fit">
+                                                <Button variant={activeSubTab === 'jobs' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('jobs')} className="rounded-lg font-black text-[10px]">الوظائف</Button>
+                                                <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-lg font-black text-[10px]">مراحل العمل</Button>
+                                            </div>
+                                        )}
                                     </div>
                                     <ScrollArea className="flex-1 p-8">
                                         {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-2xl"/></div> :
