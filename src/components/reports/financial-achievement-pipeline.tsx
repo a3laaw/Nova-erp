@@ -136,7 +136,7 @@ export function FinancialAchievementPipeline() {
                 </TableHeader>
                 <TableBody>
                     {filteredData.length === 0 ? (
-                         <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-black italic">لا توجد حركات مطابقة للفلتر.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-black italic">لا توجد حركات مطابقة للفلتر.</TableCell></TableRow>
                     ) : filteredData.map(item => (
                         <TableRow key={item.id} className="h-20 hover:bg-muted/5 transition-colors border-b">
                             <TableCell className="px-8">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -27,7 +26,7 @@ import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '../ui/checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import { isBefore, startOfDay } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -67,7 +66,6 @@ export default function EditLeaveRequestPage() {
         }
     }, [leaveRequest]);
 
-    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان قبل البداية
     useEffect(() => {
         if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
             setEndDate(undefined);
@@ -98,7 +96,6 @@ export default function EditLeaveRequestPage() {
             return;
         }
 
-        // الرقابة النهائية
         if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
             toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.' });
             return;
@@ -146,7 +143,7 @@ export default function EditLeaveRequestPage() {
     }
 
     return (
-        <Card className="max-w-2xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
                  <CardHeader className="bg-primary/5 pb-8 border-b">
                     <CardTitle className="text-2xl font-black">تعديل طلب إجازة</CardTitle>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -212,7 +211,7 @@ export default function NewLeaveRequestPage() {
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
-                            placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
+                            placeholder={loading ? 'جاري التحميل...' : 'اختر موظفاً من القائمة...'}
                             disabled={loading || isSaving}
                             className="h-12 rounded-xl border-2"
                         />
