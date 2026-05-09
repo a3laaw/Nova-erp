@@ -66,7 +66,13 @@ import {
   TrendingUp,
   Activity,
   BarChart3,
-  Waves
+  Waves,
+  Package,
+  ShoppingCart,
+  FileCheck,
+  ArrowUpFromLine,
+  ArrowLeftRight,
+  RotateCcw as ReturnIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -112,16 +118,6 @@ const navItems = {
       ]
     },
     { 
-      label: 'تقارير الأداء الفني',
-      icon: BarChart3,
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
-      hrefPrefix: '/dashboard/reports/operational-hub',
-      children: [
-        { href: '/dashboard/reports/operational-hub', label: 'الذكاء العملياتي (COO)', icon: Activity },
-        { href: '/dashboard/construction/field-visits/reports', label: 'الأداء الميداني', icon: MapPin },
-      ]
-    },
-    { 
       label: 'المقاولات والقياسات',
       icon: PencilRuler,
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
@@ -131,6 +127,31 @@ const navItems = {
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
         { href: '/dashboard/construction/subcontractors/certificates', label: 'مستخلصات المقاولين', icon: Calculator },
+      ]
+    },
+    { 
+      label: 'المخازن والمشتريات',
+      icon: Package,
+      roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
+      hrefPrefix: '/dashboard/warehouse',
+      children: [
+        { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Package },
+        { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام (GRN)', icon: FileCheck },
+        { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد المشاريع', icon: ArrowUpFromLine },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
+        { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية', icon: ArrowLeftRight },
+        { href: '/dashboard/warehouse/adjustments', label: 'المردودات والتسويات', icon: ReturnIcon },
+        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: PieChart },
+      ]
+    },
+    { 
+      label: 'تقارير الأداء الفني',
+      icon: BarChart3,
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
+      hrefPrefix: '/dashboard/reports/operational-hub',
+      children: [
+        { href: '/dashboard/reports/operational-hub', label: 'الذكاء العملياتي (COO)', icon: Activity },
+        { href: '/dashboard/construction/field-visits/reports', label: 'الأداء الميداني', icon: MapPin },
       ]
     },
     { 

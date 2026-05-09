@@ -1,98 +1,118 @@
-
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, BarChart3, ArrowUpFromLine, History, Building2, FileCheck, ArrowLeftRight, Ban } from 'lucide-react';
+import { Package, BarChart3, ArrowUpFromLine, History, Building2, FileCheck, ArrowLeftRight, Ban, ShoppingCart, SearchCode, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppTheme } from '@/context/theme-context';
 
 const warehouseFeatures = [
     {
-        title: 'إدارة المستودعات والأفرع',
-        description: 'تعريف المخازن الرئيسية، المستودعات، ومخازن المواقع التابعة للمشاريع.',
-        href: '/dashboard/warehouse/warehouses',
-        icon: Building2,
-        color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300'
-    },
-    {
-        title: 'إدارة الأصناف',
-        description: 'إضافة وتعديل ومتابعة جميع الأصناف في المخزون.',
+        title: 'دليل الأصناف والخدمات',
+        description: 'إدارة وتصنيف المواد المخزنية والخدمات الفنية بأسعارها المرجعية.',
         href: '/dashboard/warehouse/items',
         icon: Package,
-        color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+        color: 'bg-blue-100 text-blue-600'
     },
     {
         title: 'استلام بضاعة (GRN)',
-        description: 'تأكيد وصول المواد من الموردين وتحديث الأرصدة.',
+        description: 'تأكيد وصول المواد من الموردين وتحديث أرصدة المخازن آلياً.',
         href: '/dashboard/warehouse/grns',
         icon: FileCheck,
-        color: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-300'
+        color: 'bg-green-100 text-green-600'
     },
     {
-        title: 'صرف مواد للمشاريع',
-        description: 'إذن صرف مواد ذكي مرتبط ببنود المقايسة (BOQ).',
+        title: 'صرف مواد المشاريع',
+        description: 'تحميل تكلفة المواد على بنود المقايسة (BOQ) في المواقع الإنشائية.',
         href: '/dashboard/warehouse/material-issue',
         icon: ArrowUpFromLine,
-        color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300'
+        color: 'bg-orange-100 text-orange-600'
+    },
+    {
+        title: 'أوامر الشراء (POs)',
+        description: 'إنشاء وتتبع أوامر الشراء الرسمية المعتمدة للموردين.',
+        href: '/dashboard/purchasing/purchase-orders',
+        icon: ShoppingCart,
+        color: 'bg-indigo-100 text-indigo-600'
     },
     {
         title: 'التحويلات المخزنية',
-        description: 'نقل المواد بين المستودعات والمواقع المختلفة.',
+        description: 'نقل المواد والعهدة بين المستودعات الرئيسية ومخازن المواقع.',
         href: '/dashboard/warehouse/transfers',
         icon: ArrowLeftRight,
-        color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300'
+        color: 'bg-cyan-100 text-cyan-600'
     },
     {
-        title: 'تسويات المخزون (تلف/فقد)',
-        description: 'معالجة النقص في المخزون الناتج عن التلف أو الفقد.',
+        title: 'المردودات والتسويات',
+        description: 'معالجة إرجاع المواد للموردين وحالات التلف أو العجز المكتشف.',
         href: '/dashboard/warehouse/adjustments',
         icon: Ban,
-        color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300'
+        color: 'bg-red-100 text-red-600'
     },
     {
-        title: 'أرصدة افتتاحية',
-        description: 'إدخال الكميات الأولية عند بدء استخدام النظام.',
-        href: '/dashboard/warehouse/opening-balances',
-        icon: History,
-        color: 'bg-muted dark:bg-muted text-foreground'
-    },
-    {
-        title: 'تقارير المخزون',
-        description: 'تحليل الكميات والقيم وحركة الأصناف.',
+        title: 'تقارير المخزون وذكاء الشراء',
+        description: 'تحليل الأرصدة، تاريخ الأسعار، والكفالات النشطة للأصناف.',
         href: '/dashboard/warehouse/reports',
         icon: BarChart3,
-        color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'
+        color: 'bg-purple-100 text-purple-600'
+    },
+    {
+        title: 'إدارة المستودعات',
+        description: 'تعريف المخازن، عهد المقاولين، ومخازن المواقع التابعة للفروع.',
+        href: '/dashboard/warehouse/warehouses',
+        icon: Building2,
+        color: 'bg-slate-100 text-slate-600'
     },
 ];
 
 export default function WarehouseDashboardPage() {
+  const { theme } = useAppTheme();
+  const isGlass = theme === 'glass';
+
   return (
-    <Card dir="rtl">
-        <CardHeader>
-            <CardTitle>لوحة معلومات المخازن والمشتريات</CardTitle>
-            <CardDescription>إدارة المخزون، التوريدات، وصرف المواد للمشاريع (مراكز التكلفة).</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div className="space-y-8" dir="rtl">
+        <Card className={cn(
+            "rounded-[2.5rem] border-none shadow-sm overflow-hidden",
+            isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-blue-50 shadow-sm"
+        )}>
+            <CardHeader className="pb-8 px-8 border-b">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">
+                        <Package className="h-8 w-8" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-3xl font-black">المخازن وسلسلة التوريد</CardTitle>
+                        <CardDescription className="text-base font-medium">إدارة تدفق المواد، الرقابة على المخزون، وتحميل التكاليف المباشرة على المشاريع.</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
             {warehouseFeatures.map((feature) => {
                 const Icon = feature.icon;
                 return (
-                    <Link href={feature.href} key={feature.href} className="group block [perspective:1000px]">
-                        <Card className="h-full transition-all duration-300 ease-out [transform-style:preserve-3d] group-hover:shadow-2xl group-hover:[transform:rotateY(-10deg)_rotateX(2deg)]">
-                            <CardHeader>
-                                <div className="flex items-center gap-4">
-                                    <div className={cn("flex-shrink-0 p-3 rounded-lg", feature.color)}>
-                                        <Icon className="h-7 w-7" />
+                    <Link href={feature.href} key={feature.href} className="group block">
+                        <Card className={cn(
+                            "h-full border-none shadow-sm rounded-[2rem] hover:shadow-xl hover:-translate-y-1 transition-all duration-300",
+                            isGlass ? "bg-white/10 hover:bg-white/20 text-[#1e1b4b]" : "bg-white"
+                        )}>
+                            <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                     <div className={cn("flex-shrink-0 p-3 rounded-2xl transition-colors shadow-sm", feature.color)}>
+                                        <Icon className="h-6 w-6" />
                                     </div>
-                                    <CardTitle className="text-base font-bold">{feature.title}</CardTitle>
+                                    <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-all font-black text-[9px] uppercase tracking-tighter">فتح القسم</Badge>
                                 </div>
+                                <CardTitle className="text-xl font-black mt-4 text-gray-800">{feature.title}</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <CardDescription>{feature.description}</CardDescription>
+                                <CardDescription className="text-sm font-medium leading-relaxed">{feature.description}</CardDescription>
                             </CardContent>
                         </Card>
                     </Link>
                 );
             })}
-        </CardContent>
-    </Card>
+        </div>
+    </div>
   );
 }
