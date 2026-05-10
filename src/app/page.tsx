@@ -6,14 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, AlertCircle, RefreshCcw, Lock } from 'lucide-react';
+import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, AlertCircle, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية (Sovereign Gate v7.0):
- * تم استعادة الألوان الأصلية والأبعاد الرشيقة مع تحصين ضد التعليق.
+ * بوابة الدخول السيادية المرممة:
+ * تم إعادة الأبعاد الأصلية (max-w-md) واستعادة استقرار الدخول بالإيميل الفني.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -27,11 +27,14 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // التوجيه التلقائي المستقر
   useEffect(() => {
     if (!authLoading && user) {
-        const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-        router.replace(targetPath);
+        // تأخير بسيط لضمان ثبات الكوكيز في المتصفح قبل التوجيه
+        const timer = setTimeout(() => {
+            const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
+            router.replace(targetPath);
+        }, 100);
+        return () => clearTimeout(timer);
     }
   }, [user, authLoading, router]);
 
@@ -44,8 +47,8 @@ export default function UnifiedLoginPage() {
 
     try {
         await login(formData.email, formData.password);
-        // في حال النجاح، سيقوم الـ useEffect أعلاه بالتوجيه
     } catch (error: any) {
+        console.error("Login failed:", error);
         setErrorMessage("بيانات الدخول غير صحيحة أو الحساب يحتاج لمزامنة.");
         setIsLoading(false); 
     }

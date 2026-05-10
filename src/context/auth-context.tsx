@@ -18,8 +18,9 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * سياق الأمان السيادي (Stability Core v7.0):
- * تم تحصينه لضمان دخول حسابات الـ .local إلى الشركات المخصصة بدلاً من غرفة المطور.
+ * سياق الأمان السيادي المستقر:
+ * تم تعديله ليعطي الأولوية القصوى للفهرس العالمي (الشركات) 
+ * لضمان دخول حسابات مثل nova1 لشركاتهم مباشرة وتجنب اللوب.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -28,7 +29,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // زرع الكوكيز لفتح أقفال الـ Middleware
   const setAuthCookies = (uid: string, role: string) => {
     const expiry = 60 * 60 * 24 * 7;
     document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
@@ -65,6 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         // 🛡️ 1. البحث في الفهرس العالمي أولاً (الأولوية لدخول الشركات)
+        // هذا يحل مشكلة حسابات .local التي تتبع لشركة محددة
         const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -78,14 +79,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (tenantUserDoc.exists()) {
                 const userData = tenantUserDoc.data() as UserProfile;
-                setUser({ 
+                const authUser = { 
                     ...userData, 
                     uid: firebaseUser.uid, 
                     id: tenantUserDoc.id,
                     currentCompanyId: companyId,
                     companyName: indexData.companyName || 'Nova Client'
-                });
+                };
+                
+                // زرع الكوكيز قبل تحديث الحالة لضمان عبور الـ Middleware
                 setAuthCookies(firebaseUser.uid, userData.role);
+                setUser(authUser);
                 
                 const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                 if (companyDoc.exists()) {
@@ -96,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 🛡️ 2. حالة المطور (فقط إذا لم يكن مرتبطاً بشركة)
+        // 🛡️ 2. فحص صلاحية المطور (فقط إذا لم يكن مرتبطاً بشركة)
         const idToken = await firebaseUser.getIdTokenResult();
         if (idToken.claims.role === 'Developer' || userEmail === 'dev@nova-erp.local') {
             const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
@@ -111,17 +115,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 isSuperAdmin: true,
             });
             setAuthCookies(firebaseUser.uid, 'Developer');
-        } else {
-            // مستخدم غير معرّف في الفهرس
-            await signOut(masterAuth);
-            setUser(null);
-            removeAuthCookies();
+            setLoading(false);
+            return;
         }
-      } catch (error) {
-        console.error("Auth Guard Loop Prevention:", error);
+
+        // إذا وصلنا هنا، يعني المستخدم دخل بيانات صحيحة لكن ليس له سجل في القاعدة
+        console.warn("User authenticated but not found in indexes.");
         setUser(null);
-      } finally {
-        setLoading(false); // ⚡ ضمان تحرير التحميل دائماً
+        setLoading(false);
+      } catch (error) {
+        console.error("Auth Loop Protection Error:", error);
+        setUser(null);
+        setLoading(false);
       }
     });
 
@@ -130,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error("تعذر الاتصال بخادم الأمان.");
-    removeAuthCookies();
+    setLoading(true);
     await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
   }, [masterAuth]);
 
