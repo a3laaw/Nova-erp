@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -45,7 +44,7 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        // التوجيه سيتم عبر الـ useEffect
+        // التوجيه سيتم عبر الـ useEffect في الأعلى
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -75,7 +74,7 @@ export default function UnifiedLoginPage() {
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">خطأ في الدخول</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تنبيه أمني</AlertTitle>
                     <AlertDescription className="text-[11px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
@@ -93,7 +92,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-bold text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="أدخل اسمك هنا..."
+                        placeholder="أدخل اسمك هنا (مثلاً: ali)"
                         disabled={isLoading}
                     />
                 </div>

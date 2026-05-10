@@ -14,7 +14,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
     MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
     Activity, Users, Clock, CheckCircle2, ShieldAlert, 
-    FileStack, Rocket, Key, Copy, AlertCircle, Settings, RefreshCcw
+    FileStack, Rocket, Key, Copy, AlertCircle, Settings, RefreshCcw, X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,14 @@ import { CompanyRegistrationForm } from '@/components/developer/company-registra
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
+
+// 🛡️ قاموس الترجمة السيادي للأنشطة
+const activityTranslations: Record<string, string> = {
+    general: 'نشاط تجاري عام',
+    food_delivery: 'مطاعم وتوصيل أغذية',
+    construction: 'مقاولات وبناء إنسائي',
+    consulting: 'استشارات هندسية',
+};
 
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
@@ -326,7 +334,7 @@ export default function DeveloperDashboard() {
                                         <TableCell className="px-12">
                                             <div className="flex flex-col">
                                                 <span className="font-black text-2xl tracking-tight">{req.companyName}</span>
-                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge>
+                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general'] || 'نشاط عام'}</Badge>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center">
