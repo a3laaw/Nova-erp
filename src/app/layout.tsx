@@ -4,11 +4,6 @@ import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 
-/**
- * @fileOverview Root layout for Nova ERP.
- * تم التأكد من مسارات الاستيراد لضمان استقرار التحميل.
- */
-
 const tajawal = Tajawal({ 
     subsets: ['arabic', 'latin'],
     weight: ['400', '500', '700', '800'],
@@ -16,12 +11,8 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "Nova ERP",
-    template: "Nova ERP - %s",
-  },
-  description: "Nova ERP - نظام إدارة الأعمال المتكامل للشركات الكويتية",
-  keywords: ["Nova ERP", "نظام محاسبي", "ERP كويتي", "إدارة عملاء", "عقود", "رواتب"],
+  title: "Nova ERP",
+  description: "نظام إدارة الأعمال المتكامل",
 };
 
 export default function RootLayout({

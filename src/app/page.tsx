@@ -6,58 +6,39 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, AlertCircle, Lock } from 'lucide-react';
+import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, Lock, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-/**
- * بوابة الدخول السيادية (Sovereign Gateway):
- * مجهزة بمعالج أخطاء متطور ونظام حماية ضد التعليق.
- */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading, error: contextError } = useAuth();
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  
-  const [formData, setFormData] = useState({
-    email: '', 
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
 
-  // التوجيه التلقائي للمستخدمين الموثقين
   useEffect(() => {
     if (!authLoading && user) {
-        const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-        router.replace(targetPath);
+        router.replace(user.role === 'Developer' ? '/developer' : '/dashboard');
     }
   }, [user, authLoading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
-
     setIsLoading(true);
-    setErrorMessage(null);
 
     try {
         await login(formData.email, formData.password);
-        // التوجيه يتم عبر الـ useEffect أعلاه لضمان اكتمال تحميل السياق
-    } catch (error: any) {
-        console.error("Login failed:", error);
-        setErrorMessage(error.message || "بيانات الدخول غير صحيحة.");
-        setIsLoading(true); 
-        // نترك isLoading صحيحاً لثانية ليعالج الـ useEffect حالة الانتقال أو يحرره الصمام
-        setTimeout(() => setIsLoading(false), 1500);
+    } catch (error) {
+        setIsLoading(false);
     }
   };
 
-  const currentError = errorMessage || contextError;
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
+      {/* التدرج اللؤلؤي الأصلي */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
       
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
@@ -73,13 +54,11 @@ export default function UnifiedLoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {currentError && (
+            {(contextError) && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake-in duration-300">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
-                    <AlertDescription className="text-[11px] font-bold mt-1">
-                        {currentError}
-                    </AlertDescription>
+                    <AlertDescription className="text-[11px] font-bold mt-1">{contextError}</AlertDescription>
                 </Alert>
             )}
 
@@ -143,10 +122,6 @@ export default function UnifiedLoginPage() {
                 </Button>
             </div>
         </CardContent>
-        
-        <div className="bg-[#1e1b4b]/5 py-3 text-center">
-            <p className="text-[9px] font-black text-[#1e1b4b]/40 uppercase tracking-[0.4em]">Nova ERP — Sovereign Identity v3.0</p>
-        </div>
       </Card>
     </div>
   );

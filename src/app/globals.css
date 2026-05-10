@@ -67,15 +67,6 @@
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
     @apply text-white font-bold hover:bg-white/40 hover:text-white transition-all duration-300;
   }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-5px); }
-    75% { transform: translateX(5px); }
-  }
-  .shake-in {
-    animation: shake 0.3s ease-in-out;
-  }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
@@ -89,9 +80,7 @@
 [role="listbox"], 
 [role="combobox"], 
 [data-radix-select-content],
-[data-radix-popover-content],
-.react-select__menu,
-.react-select__menu-portal {
+[data-radix-popover-content] {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }
@@ -100,9 +89,5 @@
 [role="menuitem"], 
 [cmdk-item] {
   cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-body[style*="pointer-events: none"] {
   pointer-events: auto !important;
 }
