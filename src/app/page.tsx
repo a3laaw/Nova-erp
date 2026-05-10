@@ -11,6 +11,10 @@ import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
+/**
+ * بوابة الدخول الموحدة (The Unified Gateway):
+ * تم إعادة تصميمها لتكون رشيقة ومستقرة، وتعتمد على "البريد الفني" للعبور.
+ */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -22,7 +26,6 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // توجيه فوري عند التعرف على الجلسة
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -38,6 +41,7 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.email, formData.password);
+        // التوجيه سيتم عبر الـ useEffect عند التعرف على الجلسة
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -48,7 +52,6 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* دوائر خلفية جمالية */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
 
@@ -121,11 +124,12 @@ export default function UnifiedLoginPage() {
                 </Button>
             </form>
 
-            <div className="pt-6 border-t border-white/10">
+            <div className="pt-6 border-t border-white/10 text-center">
+                <p className="text-[10px] font-bold text-slate-500 mb-4">ليس لديك منشأة مسجلة؟</p>
                 <Button asChild variant="outline" className="w-full h-14 rounded-3xl border-white/40 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2" disabled={isLoading}>
                     <Link href="/register">
                         <Building2 className="h-5 w-5" />
-                        سجل منشأتك الآن في Nova
+                        سجل منشأتك الآن
                     </Link>
                 </Button>
             </div>

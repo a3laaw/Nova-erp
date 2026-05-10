@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // 2. حالة مستخدم المنشأة (SaaS User)
         if (userEmail) {
-          // البحث في الفهرس العالمي
+          // البحث في الفهرس العالمي لجلب معرّف الشركة
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -93,21 +93,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
               }
             } else {
-                // الحساب موجود أمنياً ولكن ملف الموظف مفقود - نحتاج لإصلاح
-                console.warn("Tenant user doc missing - Repair needed.");
+                console.warn("Tenant profile missing for authenticated user.");
                 setUser(null);
             }
           } else {
-              // الحساب موجود أمنياً ولكن غير مفهرس عالمياً
-              console.warn("User not found in Global Index.");
+              console.warn("User not indexed in Global Directory.");
               setUser(null);
           }
         }
       } catch (error: any) {
-        console.error("Auth Sync Error:", error);
+        console.error("Auth System Error:", error);
         setUser(null);
       } finally {
-        setLoading(false);
+        setLoading(false); // 🛡️ صمام أمان: دائماً ننهي التحميل
       }
     });
 
