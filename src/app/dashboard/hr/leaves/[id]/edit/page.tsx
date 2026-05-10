@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -201,7 +202,7 @@ export default function EditLeaveRequestPage() {
                                 <AlertCircle className="h-4 w-4 text-amber-600" />
                                 <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
                                 <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
-                                    الإجازة السنوية عادةً ما تُطلب كفترة راحة طويلة (شهر كامل). إذا كانت المدة قصيرة جداً، ربما تفضل اختيار نوع "طارئة" أو تقديم "استئذان" للحفاظ على رصيد إجازتك السنوية.
+                                    الإجازة السنوية عادةً ما تُطلب كفترة راحة طويلة (شهر كامل). إذا كانت المدة قصيرة جداً، ربما تفضل اختيار نوع "طارئة" أو تقديم "استئذان" للحفاظ على رصيد إجازتك السنوية المجمعة.
                                 </AlertDescription>
                             </Alert>
                         )}

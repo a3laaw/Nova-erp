@@ -90,10 +90,16 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
     try {
+        // 🛡️ بروتوكول الهوية الافتراضية
+        // نقوم بإنشاء إيميل وهمي للنظام بناءً على اسم المستخدم المدخل في الطلب
+        const username = request.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+        const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
+        const internalEmail = `${username}@${companyId}.nova`;
+
         const authResponse = await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({
-                email: request.email,
+                email: internalEmail,
                 password: request.adminPassword,
                 displayName: request.contactName,
                 action: 'create'
@@ -102,7 +108,6 @@ export default function DeveloperDashboard() {
         const authResult = await authResponse.json();
         if (!authResult.success && !authResult.simulated) throw new Error(authResult.error);
 
-        const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
         const trialEndDate = addDays(new Date(), 14);
 
         await runTransaction(firestore, async (transaction) => {
@@ -110,7 +115,7 @@ export default function DeveloperDashboard() {
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity,
-                adminEmail: request.email.toLowerCase().trim(),
+                adminEmail: internalEmail,
                 adminPassword: request.adminPassword,
                 subscriptionType: 'trial',
                 trialEndDate: Timestamp.fromDate(trialEndDate),
@@ -126,12 +131,12 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            // إنشاء ملف المستخدم المعزول
+            // إنشاء ملف المستخدم المعزول (مدير نظام افتراضي)
             const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid || 'simulated-uid');
             transaction.set(tenantUserRef, {
                 uid: authResult.uid || 'simulated-uid',
-                email: request.email.toLowerCase().trim(),
-                username: request.email.split('@')[0],
+                email: internalEmail,
+                username: username,
                 fullName: request.contactName,
                 role: 'Admin',
                 isActive: true,
@@ -139,10 +144,11 @@ export default function DeveloperDashboard() {
                 createdAt: serverTimestamp()
             });
 
+            // تحديث الفهرس العالمي لتمكين الدخول باسم المستخدم
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
-                email: request.email.toLowerCase().trim(),
-                username: request.email.split('@')[0],
+                email: internalEmail,
+                username: username,
                 companyId: companyId,
                 role: 'Admin'
             });
@@ -151,7 +157,7 @@ export default function DeveloperDashboard() {
         
         toast({ 
             title: authResult.simulated ? 'نجاح المحاكاة' : 'تم التفعيل المباشر', 
-            description: `تم تأسيس منشأة "${request.companyName}" بنجاح ${authResult.simulated ? '(وضع الحماية)' : ''}.` 
+            description: `تم تأسيس منشأة "${request.companyName}" بنجاح. بيانات الدخول: ${username} / ${request.adminPassword}` 
         });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
@@ -212,7 +218,7 @@ export default function DeveloperDashboard() {
         <div className="p-4 bg-amber-500/10 border-2 border-amber-500/20 rounded-3xl flex items-center gap-4 animate-in fade-in duration-700">
             <div className="p-2 bg-amber-500 rounded-xl text-white shadow-lg"><AlertCircle className="h-5 w-5" /></div>
             <p className="text-xs font-black text-amber-500 uppercase tracking-widest leading-relaxed">
-                تنبيه: محرك الأمان في وضع المحاكاة (ملف الاعتماد مفرغ لحماية GitHub). يمكنك التعديل والحفظ في قاعدة البيانات، ولكن لن يتم تحديث الصلاحيات الحقيقية على خادم الأمان.
+                تنبيه: محرك الأمان في وضع المحاكاة. يمكنك التعديل والحفظ في قاعدة البيانات، ولكن لن يتم تحديث الصلاحيات الحقيقية على خادم الأمان.
             </p>
         </div>
 
@@ -266,10 +272,10 @@ export default function DeveloperDashboard() {
                                                             <div className="flex flex-col gap-1 mt-2">
                                                                 <div className="flex items-center gap-2 bg-indigo-50/50 px-3 py-1 rounded-xl border border-indigo-100 w-fit">
                                                                     <Key className="h-3 w-3 text-indigo-600" />
-                                                                    <span className="text-[10px] font-black text-indigo-900">{company.adminEmail}</span>
+                                                                    <span className="text-[10px] font-black text-indigo-900">{company.adminEmail?.split('@')[0]}</span>
                                                                     <Separator orientation="vertical" className="h-3 bg-indigo-200" />
                                                                     <span className="text-[10px] font-black text-indigo-600 font-mono">{company.adminPassword || '****'}</span>
-                                                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-indigo-100" onClick={() => copyToClipboard(`Email: ${company.adminEmail}\nPassword: ${company.adminPassword}`)}><Copy className="h-3 w-3" /></Button>
+                                                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-indigo-100" onClick={() => copyToClipboard(`Username: ${company.adminEmail?.split('@')[0]}\nPassword: ${company.adminPassword}`)}><Copy className="h-3 w-3" /></Button>
                                                                 </div>
                                                                 <Badge variant="outline" className="bg-white text-indigo-700 font-bold text-[9px] w-fit">{activityTranslations[company.activityType || 'general']}</Badge>
                                                             </div>
@@ -311,7 +317,7 @@ export default function DeveloperDashboard() {
                 </Card>
             </TabsContent>
 
-            <TabsContent value="requests"><Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95"><Table><TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-base text-right">الطلب والمنشأة</TableHead><TableHead className="font-black text-indigo-100 text-base text-center">التاريخ</TableHead><TableHead className="font-black text-indigo-100 text-base text-center">البيانات</TableHead><TableHead className="text-left px-12 font-black text-indigo-100 text-base">القرار</TableHead></TableRow></TableHeader><TableBody>{requestsLoading ? (<TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>) : requests.length === 0 ? (<TableRow><TableCell colSpan={4} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Pending Requests</TableCell></TableRow>) : (requests.map(req => (<TableRow key={req.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all"><TableCell className="px-12"><div className="flex items-center gap-6"><div className="p-4 bg-orange-100 rounded-3xl text-orange-600"><Rocket className="h-8 w-8" /></div><div className="flex flex-col"><span className="font-black text-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></div></TableCell><TableCell className="text-center font-bold text-muted-foreground">{req.createdAt ? format(toFirestoreDate(req.createdAt)!, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell><TableCell className="text-center"><p className="font-black text-indigo-900">{req.contactName}</p><p className="text-xs font-mono">{req.email}</p><div className="flex items-center justify-center gap-2 mt-1"><Badge variant="secondary" className="font-mono text-[9px]">{req.adminPassword}</Badge></div></TableCell><TableCell className="text-left px-12"><div className="flex justify-end gap-3">{req.status === 'pending' ? (<Button onClick={() => handleApproveRequest(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-xl shadow-green-100 border-b-4 border-green-900">{isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} اعتماد وتفعيل باقة Demo</Button>) : (<Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full border-2 border-green-200">STRUCTURE ESTABLISHED</Badge>)}</div></TableCell></TableRow>)))}</TableBody></Table></Card></TabsContent>
+            <TabsContent value="requests"><Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95"><Table><TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-base text-right">الطلب والمنشأة</TableHead><TableHead className="font-black text-indigo-100 text-base text-center">التاريخ</TableHead><TableHead className="font-black text-indigo-100 text-base text-center">البيانات</TableHead><TableHead className="text-left px-12 font-black text-indigo-100 text-base">القرار</TableHead></TableRow></TableHeader><TableBody>{requestsLoading ? (<TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>) : requests.length === 0 ? (<TableRow><TableCell colSpan={4} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Pending Requests</TableCell></TableRow>) : (requests.map(req => (<TableRow key={req.id} className="h-32 hover:bg-indigo-50/50 border-slate-100 group transition-all"><TableCell className="px-12"><div className="flex items-center gap-6"><div className="p-4 bg-orange-100 rounded-3xl text-orange-600"><Rocket className="h-8 w-8" /></div><div className="flex flex-col"><span className="font-black text-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></div></TableCell><TableCell className="text-center font-bold text-muted-foreground">{req.createdAt ? format(toFirestoreDate(req.createdAt)!, 'dd/MM/yyyy', { locale: ar }) : '-'}</TableCell><TableCell className="text-center"><p className="font-black text-indigo-900">{req.contactName}</p><p className="text-xs font-mono">{req.email.split('@')[0]}</p><div className="flex items-center justify-center gap-2 mt-1"><Badge variant="secondary" className="font-mono text-[9px]">{req.adminPassword}</Badge></div></TableCell><TableCell className="text-left px-12"><div className="flex justify-end gap-3">{req.status === 'pending' ? (<Button onClick={() => handleApproveRequest(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-xl shadow-green-100 border-b-4 border-green-900">{isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} اعتماد وتفعيل باقة Demo</Button>) : (<Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full border-2 border-green-200">STRUCTURE ESTABLISHED</Badge>)}</div></TableCell></TableRow>)))}</TableBody></Table></Card></TabsContent>
         </Tabs>
 
         <CompanyRegistrationForm isOpen={isRegistrationOpen} onClose={() => setIsRegistrationOpen(false)} company={selectedCompanyForEdit} />

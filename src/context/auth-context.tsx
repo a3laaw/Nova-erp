@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!userIndexSnap.empty) {
             companyId = userIndexSnap.docs[0].data().companyId;
           } else {
-            // 🛡️ خط دفاع إضافي: إذا لم يكن في الفهرس، نبحث في قائمة الشركات عن البريد الإداري (Gmail Support)
+            // 🛡️ خط دفاع إضافي: إذا لم يكن في الفهرس، نبحث في قائمة الشركات عن البريد الإداري
             const companyAdminQuery = query(collection(masterFirestore, 'companies'), where('adminEmail', '==', userEmail), limit(1));
             const companySnap = await getDocs(companyAdminQuery);
             if (!companySnap.empty) {
@@ -126,8 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
               });
             } else {
-                // إذا وجد في الفهرس ولكن ملفه الداخلي مفقود (حالة نادرة)
-                // نعتبره مديراً مؤقتاً بالبيانات المتاحة
+                // إذا وجد في الفهرس ولكن ملفه الداخلي مفقود
                 setUser({
                     id: firebaseUser.uid, uid: firebaseUser.uid, email: userEmail,
                     username: userEmail.split('@')[0], role: 'Admin', isActive: true,
@@ -154,7 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let email = identifier.toLowerCase().trim();
 
-    // دعم الدخول باسم المستخدم المباشر
+    // 🛡️ دعم الدخول باسم المستخدم المباشر
     if (!email.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 

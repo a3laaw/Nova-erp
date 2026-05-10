@@ -37,7 +37,7 @@ export default function RegisterPage() {
     companyName: '',
     activity: 'consulting',
     contactName: '',
-    email: '',
+    email: '', // internal username
     phone: '',
     adminPassword: '',
     message: ''
@@ -136,14 +136,14 @@ export default function RegisterPage() {
                                 </div>
                             </div>
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b] font-black text-xs pr-1">البريد الإلكتروني *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs pr-1">اسم المستخدم المطلوب (Login ID) *</Label>
                                 <div className="relative">
                                     <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
-                                    <Input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b] dir-ltr" required placeholder="admin@example.com" />
+                                    <Input value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b] dir-ltr" required placeholder="example: ahmed_ali" />
                                 </div>
                             </div>
                             <div className="grid gap-2">
-                                <Label className="text-[#1e1b4b] font-black text-xs pr-1">كلمة المرور المطلوبة *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-xs pr-1">كلمة المرور السيادية *</Label>
                                 <div className="relative">
                                     <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-600" />
                                     <Input type="password" value={formData.adminPassword} onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} className="pr-10 h-12 rounded-xl bg-white border-2 border-slate-200 font-black text-[#1e1b4b]" required placeholder="********" />

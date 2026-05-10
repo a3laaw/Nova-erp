@@ -42,7 +42,7 @@ export interface Company extends BaseEntity {
   };
   isActive: boolean;
   adminEmail: string;
-  adminPassword?: string; // 🛡️ تخزين كلمة المرور التأسيسية للمطور
+  adminPassword?: string; 
   logoUrl?: string;
   address?: string;
   phone?: string;
@@ -60,7 +60,7 @@ export interface CompanyRequest extends BaseEntity {
     companyName: string;
     activity: string;
     contactName: string;
-    email: string;
+    email: string; // This is now used as username internally
     phone: string;
     adminPassword?: string;
     message?: string;
@@ -69,6 +69,7 @@ export interface CompanyRequest extends BaseEntity {
 
 export interface GlobalUserIndex {
     email: string;
+    username: string;
     companyId: string;
     role: string;
 }

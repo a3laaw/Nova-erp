@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
  * بوابة الدخول السيادية الموحدة لـ Nova ERP.
- * تم تحديثها لضمان التوجيه اللحظي ومنع التعليق عند الدخول.
+ * تم تحديثها لضمان التوجيه اللحظي ودعم الدخول باسم المستخدم فقط.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -31,7 +32,6 @@ export default function UnifiedLoginPage() {
   // --- محرك التوجيه اللحظي (Immediate Redirection Engine) ---
   useEffect(() => {
     if (!authLoading && user) {
-        // توجيه فوري بناءً على الدور
         const targetPath = user.role === 'Developer' 
             ? '/developer'
             : '/dashboard';
@@ -48,7 +48,6 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        // التوجيه سيتم آلياً عبر الـ useEffect بمجرد تحديث حالة المستخدم
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
