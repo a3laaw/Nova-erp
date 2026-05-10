@@ -12,40 +12,29 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from '@/hooks/use-subscription';
-import { collection, query, orderBy, doc, deleteDoc, writeBatch, getDoc, updateDoc, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, orderBy, doc, deleteDoc, writeBatch, where, getDocs, updateDoc } from 'firebase/firestore';
 import type { CashReceipt } from '@/lib/types';
 import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
-import { MoreHorizontal, Eye, Pencil, Trash2, Loader2, Search } from 'lucide-react';
-import { Badge } from '../ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { Button } from '../ui/button';
+import { MoreHorizontal, Eye, Pencil, Trash2, Search, ArrowDownLeft } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import { Input } from '@/components/ui/input';
 import { searchCashReceipts } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
-import { DateInput } from '../ui/date-input';
+import { DateInput } from '@/components/ui/date-input';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
     'Cheque': 'شيك',
     'Bank Transfer': 'تحويل بنكي',
     'K-Net': 'كي-نت'
-};
-
-const getTotalPaidForProject = async (projectId: string, db: any, excludeReceiptId?: string) => {
-    let total = 0;
-    if (!projectId || !db) return total;
-    const receiptsQuery = query(collection(db, 'cashReceipts'), where('projectId', '==', projectId));
-    const receiptsSnap = await getDocs(receiptsQuery);
-    receiptsSnap.forEach(doc => {
-        if (doc.id !== excludeReceiptId) total += doc.data().amount || 0;
-    });
-    return total;
 };
 
 export function CashReceiptsList() {
@@ -86,13 +75,20 @@ export function CashReceiptsList() {
         const batch = writeBatch(firestore);
         const receiptRef = doc(firestore, 'cashReceipts', receiptToDelete.id!);
         batch.delete(receiptRef);
-        if (receiptToDelete.journalEntryId) batch.delete(doc(firestore, 'journalEntries', receiptToDelete.journalEntryId));
+        if (receiptToDelete.journalEntryId) {
+            batch.delete(doc(firestore, 'journalEntries', receiptToDelete.journalEntryId));
+        }
         await batch.commit();
-        toast({ title: 'نجاح', description: 'تم حذف سند القبض والقيد المرتبط به.' });
-    } finally { setIsDeleting(false); setReceiptToDelete(null); }
-  }
+        toast({ title: 'نجاح التطهير', description: 'تم حذف سند القبض والقيد المحاسبي المرتبط به نهائياً.' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+    } finally { 
+        setIsDeleting(false); 
+        setReceiptToDelete(null); 
+    }
+  };
 
-  if (loading) return <Skeleton className="h-64 w-full rounded-2xl" />;
+  if (loading) return <div className="space-y-4"><Skeleton className="h-20 w-full rounded-2xl" /><Skeleton className="h-64 w-full rounded-2xl" /></div>;
 
   return (
     <div className="space-y-6">
@@ -100,15 +96,15 @@ export function CashReceiptsList() {
             <div className="relative w-full lg:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
                 <Input
-                    placeholder="رقم السند أو العميل..."
+                    placeholder="رقم السند أو اسم العميل..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-bold"
+                    className="pl-10 h-11 rounded-xl bg-white border-none shadow-sm font-black"
                 />
             </div>
             <div className="flex flex-wrap gap-2 items-center">
-                <DateInput value={dateFrom} onChange={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')} className="w-40 h-9 text-xs" placeholder="من تاريخ"/>
-                <DateInput value={dateTo} onChange={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')} className="w-40 h-9 text-xs" placeholder="إلى تاريخ"/>
+                <DateInput value={dateFrom ? new Date(dateFrom) : undefined} onChange={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')} className="w-40 h-9 text-xs" placeholder="من تاريخ"/>
+                <DateInput value={dateTo ? new Date(dateTo) : undefined} onChange={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')} className="w-40 h-9 text-xs" placeholder="إلى تاريخ"/>
             </div>
         </div>
 
@@ -117,36 +113,51 @@ export function CashReceiptsList() {
             <TableHeader className="bg-[#F8F9FE]">
               <TableRow className="border-none">
                 <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم السند</TableHead>
-                <TableHead className="font-black text-[#7209B7]">العميل</TableHead>
-                <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
-                <TableHead className="font-black text-[#7209B7]">الطريقة</TableHead>
-                <TableHead className="text-left font-black text-[#7209B7]">المبلغ</TableHead>
-                <TableHead className="text-center font-black text-[#7209B7]">إجراء</TableHead>
+                <TableHead className="font-black text-[#7209B7]">الطرف المسدد</TableHead>
+                <TableHead className="font-black text-[#7209B7]">تاريخ التحصيل</TableHead>
+                <TableHead className="font-black text-[#7209B7]">طريقة الدفع</TableHead>
+                <TableHead className="text-left font-black text-[#7209B7]">القيمة الإجمالية</TableHead>
+                <TableHead className="text-center font-black text-[#7209B7]">تحكم</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
                 {filteredReceipts.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold">لا توجد سندات قبض مسجلة.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-black italic">لا توجد سندات قبض مسجلة للفترة المحددة.</TableCell></TableRow>
                 ) : (
                     filteredReceipts.map((receipt) => (
-                        <TableRow key={receipt.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
+                        <TableRow key={receipt.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16 border-b last:border-0">
                             <TableCell className="px-8 font-mono font-black text-primary">
                                 <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}`} className="hover:underline">{receipt.voucherNumber}</Link>
                             </TableCell>
                             <TableCell className="font-black text-gray-800">{receipt.clientNameAr}</TableCell>
                             <TableCell className="font-bold text-xs opacity-60">{formatDate(receipt.receiptDate)}</TableCell>
-                            <TableCell><Badge variant="outline" className="px-3 font-black text-[10px] bg-sky-50 text-sky-700">{paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod}</Badge></TableCell>
+                            <TableCell>
+                                <Badge variant="outline" className="px-3 font-black text-[10px] bg-white border-primary/20 text-primary">
+                                    {paymentMethodTranslations[receipt.paymentMethod] || receipt.paymentMethod}
+                                </Badge>
+                            </TableCell>
                             <TableCell className="text-left font-mono font-black text-[#2E5BCC] text-lg">{formatCurrency(receipt.amount)}</TableCell>
                             <TableCell className="text-center">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}`)}><Eye className="ml-2 h-4 w-4" /> عرض</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => router.push(`/dashboard/accounting/cash-receipts/${receipt.id}/edit`)}><Pencil className="ml-2 h-4 w-4" /> تعديل</DropdownMenuItem>
+                                    <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none">
+                                        <DropdownMenuLabel className="font-black px-3 py-2">خيارات السند</DropdownMenuLabel>
+                                        <DropdownMenuItem asChild className="rounded-xl py-3 cursor-pointer">
+                                            <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}`} className="flex items-center gap-2">
+                                                <Eye className="h-4 w-4" /> عرض السند والطباعة
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem asChild className="rounded-xl py-3 cursor-pointer">
+                                            <Link href={`/dashboard/accounting/cash-receipts/${receipt.id}/edit`} className="flex items-center gap-2">
+                                                <Pencil className="h-4 w-4" /> تعديل البيانات
+                                            </Link>
+                                        </DropdownMenuItem>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setReceiptToDelete(receipt)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4" /> حذف</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setReceiptToDelete(receipt)} className="text-red-600 font-black rounded-xl py-3 cursor-pointer focus:bg-red-50">
+                                            <Trash2 className="ml-2 h-4 w-4" /> حذف السند نهائياً
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </TableCell>
@@ -158,11 +169,19 @@ export function CashReceiptsList() {
         </div>
         
          <AlertDialog open={!!receiptToDelete} onOpenChange={() => setReceiptToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-3xl">
-                <AlertDialogHeader><AlertDialogTitle>تأكيد الحذف؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف السند رقم "{receiptToDelete?.voucherNumber}" نهائياً.</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter className="gap-2">
-                    <AlertDialogCancel className="rounded-xl">إلغاء</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive rounded-xl">نعم، حذف</AlertDialogAction>
+            <AlertDialogContent dir="rtl" className="rounded-[2rem] p-10 border-none shadow-2xl">
+                <AlertDialogHeader>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><Trash2 className="h-8 w-8"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف السيادي؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed">
+                        سيتم حذف السند رقم <strong className="text-foreground">"{receiptToDelete?.voucherNumber}"</strong> وكافة قيوده المحاسبية المرتبطة. هذا الإجراء سيؤثر على ميزان المراجعة ومديونية العميل.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-6 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12">
+                        {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف نهائي'}
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

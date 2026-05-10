@@ -1,4 +1,5 @@
 'use client';
+
 import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useFirebase, useDocument } from '@/firebase';
@@ -7,9 +8,13 @@ import type { RequestForQuotation } from '@/lib/types';
 import { RfqComparisonView } from '@/components/purchasing/rfq-comparison-view';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, BarChart, Printer } from 'lucide-react';
+import { ArrowRight, BarChart3, Printer, Sparkles } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
+/**
+ * صفحة مصفوفة مقارنة عروض الأسعار (Sovereign RFQ Analysis):
+ * تم تحصينها لضمان استقرار البناء البرمجي وتوافر كافة المراجع البصرية.
+ */
 export default function CompareRfqPage() {
     const params = useParams();
     const router = useRouter();
@@ -23,44 +28,44 @@ export default function CompareRfqPage() {
         window.print();
     };
 
-    if (loading) return <div className="p-8"><Skeleton className="h-[500px] w-full rounded-2xl" /></div>;
+    if (loading) return <div className="p-8 max-w-6xl mx-auto"><Skeleton className="h-[600px] w-full rounded-[2.5rem]" /></div>;
     
-    if (!rfq) return <div className="text-center py-20">لم يتم العثور على طلب التسعير.</div>;
+    if (!rfq) return <div className="text-center py-20 font-black opacity-40">لم يتم العثور على طلب التسعير المطلوب.</div>;
 
     return (
-        <div className="space-y-6" dir="rtl">
-            <Card className="rounded-2xl border-none shadow-sm overflow-hidden print:shadow-none print:border-none print:bg-transparent">
-                <CardHeader className="flex flex-col md:flex-row justify-between items-center bg-muted/30 px-8 py-6 gap-4 no-print">
-                    <div className="space-y-1">
-                        <CardTitle className="text-2xl font-black flex items-center gap-3">
-                            <BarChart className="text-primary h-7 w-7" />
-                            مصفوفة مقارنة عروض الأسعار
-                        </CardTitle>
-                        <CardDescription>تحليل العروض لطلب رقم: <span className="font-mono font-bold text-foreground">{rfq.rfqNumber}</span></CardDescription>
+        <div className="space-y-6 max-w-[1600px] mx-auto" dir="rtl">
+            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden print:shadow-none print:border-none print:bg-transparent">
+                <CardHeader className="flex flex-col md:flex-row justify-between items-center bg-muted/30 px-10 py-8 gap-6 no-print">
+                    <div className="flex items-center gap-5">
+                        <div className="p-4 bg-primary/10 rounded-3xl text-primary shadow-inner">
+                            <Sparkles className="h-8 w-8" />
+                        </div>
+                        <div className="space-y-1">
+                            <CardTitle className="text-3xl font-black tracking-tighter">مصفوفة المقارنة والترسية الذكية</CardTitle>
+                            <CardDescription className="text-base font-bold">تحليل العروض المالية لطلب رقم: <span className="font-mono font-black text-primary px-2 bg-primary/5 rounded-lg border border-primary/10">{rfq.rfqNumber}</span></CardDescription>
+                        </div>
                     </div>
                     
-                    <div className="flex items-center gap-3">
-                        <Button className="gap-2 rounded-xl font-bold shadow-lg" onClick={handlePrint}>
-                            <Printer className="h-4 w-4"/> 
-                            طباعة التحليل
+                    <div className="flex items-center gap-4">
+                        <Button className="h-12 px-10 rounded-2xl font-black text-lg gap-3 shadow-xl shadow-primary/20" onClick={handlePrint}>
+                            <Printer className="h-6 w-6"/> 
+                            طباعة مصفوفة التحليل
                         </Button>
                         
-                        <Button variant="ghost" className="gap-2 rounded-xl" onClick={() => router.back()}>
-                            <ArrowRight className="h-4 w-4"/> 
-                            العودة
+                        <Button variant="ghost" className="h-12 rounded-2xl font-bold gap-2 text-slate-500 hover:bg-white" onClick={() => router.back()}>
+                            <ArrowRight className="h-5 w-5"/> 
+                            العودة للطلب
                         </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0 print:p-0">
-                    <div className="bg-white p-4 print:p-0">
+                    <div className="bg-white p-6 lg:p-10 print:p-0">
                         <RfqComparisonView rfq={rfq} />
                     </div>
                 </CardContent>
-                <CardFooter className="p-6 border-t bg-muted/10 no-print">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground italic">
-                        <div className="h-3 w-3 rounded-full bg-green-500/20 border border-green-500" />
-                        يتم تمييز أفضل سعر مقدم لكل صنف باللون الأخضر. البنود المختارة للترسية تظهر بإطار ملون واضح.
-                    </div>
+                <CardFooter className="p-8 border-t bg-muted/10 no-print flex items-center gap-3 text-xs font-black text-slate-400 uppercase tracking-widest">
+                    <BarChart3 className="h-4 w-4 opacity-40" />
+                    Nova ERP — Smart Procurement & Split-Award Engine
                 </CardFooter>
             </Card>
         </div>
