@@ -1,18 +1,26 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, collection, query, where, getDocs, limit, Firestore } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
-import type { UserProfile, AuthenticatedUser, Company } from '@/lib/types';
 import { useCompany } from './company-context';
+import { AuthenticatedUser, Company } from '@/lib/types/auth';
+import { mapFirebaseAuthError, validateUserProfile, getUserRole, logAuthEvent, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
-interface AuthContextType {
+interface AuthState {
   user: AuthenticatedUser | null;
+  company: Company | null;
   loading: boolean;
+  error: string | null;
+  loadingStage?: 'initializing' | 'checking_global' | 'fetching_tenant' | 'validating_role' | 'complete';
+}
+
+interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,134 +29,201 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { auth: masterAuth, firestore: masterFirestore } = useFirebase();
   const { setCurrentCompany } = useCompany();
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const isMounted = useRef(true);
+  
+  const [state, setState] = useState<AuthState>({
+    user: null, company: null, loading: true, error: null, loadingStage: 'initializing'
+  });
 
-  // 🛡️ دالة زرع الكوكيز السيادية لفتح أقفال الـ Middleware
-  const setAuthCookies = (uid: string, role: string) => {
-    const expiry = 60 * 60 * 24 * 7;
-    document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
-    if (role === 'Developer') {
-        document.cookie = `nova-dev-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
+  const updateState = useCallback((next: Partial<AuthState>) => {
+    if (isMounted.current) {
+        setState(prev => ({ ...prev, ...next }));
     }
-  };
+  }, []);
 
-  const removeAuthCookies = () => {
-    document.cookie = 'nova-user-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-  };
+  // 🔍 محرك جلب بيانات المستخدم وسياق المنشأة
+  const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
+    try {
+        updateState({ loadingStage: 'checking_global' });
+        
+        // 1. البحث في الفهرس العالمي (Global Index)
+        const globalSnap = await getDocs(query(collection(firestore, 'global_users'), where('email', '==', email), limit(1)));
+        
+        if (!globalSnap.empty) {
+            const idx = globalSnap.docs[0].data();
+            updateState({ loadingStage: 'fetching_tenant' });
+            
+            // 2. جلب ملف المستخدم المعزول داخل المنشأة
+            const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users`, user.uid));
+            
+            if (!tenantDoc.exists()) {
+                logAuthEvent('USER_NOT_FOUND_IN_TENANT', { uid: user.uid, companyId: idx.companyId });
+                return { user: null, company: null };
+            }
 
+            const profileData = tenantDoc.data();
+            if (!profileData.isActive) {
+                return { user: null, company: null, error: 'حسابك غير مفعل، يرجى مراجعة الإدارة.' };
+            }
+
+            updateState({ loadingStage: 'validating_role' });
+            const profile = validateUserProfile(profileData);
+            const role = await getUserRole(user);
+            
+            const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
+            const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+
+            return {
+                user: { 
+                    ...profile, 
+                    uid: user.uid, 
+                    id: tenantDoc.id, 
+                    currentCompanyId: idx.companyId, 
+                    companyName: idx.companyName || company?.name || 'Nova Client', 
+                    isSuperAdmin: role === 'Developer' 
+                } as AuthenticatedUser,
+                company
+            };
+        }
+
+        // 🛠️ فحص صلاحية المطور السيادي (Root Access)
+        updateState({ loadingStage: 'validating_role' });
+        const idToken = await user.getIdTokenResult();
+        const role = idToken.claims.role;
+
+        if (role === 'Developer' || email.endsWith('@nova-erp.local')) {
+            const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
+            return {
+                user: { 
+                    id: user.uid, 
+                    uid: user.uid, 
+                    email: user.email!, 
+                    role: 'Developer', 
+                    isActive: true, 
+                    fullName: devDoc.data()?.fullName || 'Sovereign Developer', 
+                    isSuperAdmin: true, 
+                    currentCompanyId: idToken.claims.currentCompanyId || null, 
+                    companyName: idToken.claims.companyName || 'Nova ERP Platform' 
+                } as AuthenticatedUser,
+                company: null
+            };
+        }
+
+        logAuthEvent('USER_NOT_REGISTERED', { uid: user.uid, email });
+        return { user: null, company: null };
+    } catch (error) {
+        console.error("Fetch context failed:", error);
+        return { user: null, company: null };
+    }
+  }, [updateState]);
+
+  // 🔄 مراقبة حالة Firebase الحية
   useEffect(() => {
+    isMounted.current = true;
     if (!masterAuth || !masterFirestore) {
-      setLoading(false);
+      updateState({ loading: false, loadingStage: 'complete' });
       return;
     }
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
       try {
         if (!firebaseUser) {
-          setUser(null);
+          updateState({ user: null, company: null, loading: false, error: null, loadingStage: 'complete' });
           setCurrentCompany(null);
-          removeAuthCookies();
-          setLoading(false);
+          clearSessionIndicators();
           return;
         }
 
-        const userEmail = firebaseUser.email?.toLowerCase();
-        if (!userEmail) {
-            setLoading(false);
-            return;
+        const email = firebaseUser.email?.toLowerCase();
+        if (!email) {
+            updateState({ loading: false, loadingStage: 'complete' }); 
+            return; 
         }
 
-        // 🛡️ الأولوية القصوى للفهرس العالمي (لحل مشكلة حسابات .local)
-        const userIndexSnap = await getDocs(query(
-            collection(masterFirestore, 'global_users'), 
-            where('email', '==', userEmail),
-            limit(1)
-        ));
+        logAuthEvent('AUTH_STATE_CHANGED', { uid: firebaseUser.uid, email });
+        const result = await fetchUserWithContext(masterFirestore, firebaseUser, email);
 
-        if (!userIndexSnap.empty) {
-            const indexData = userIndexSnap.docs[0].data();
-            const companyId = indexData.companyId;
-            const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
-
-            if (tenantUserDoc.exists()) {
-                const userData = tenantUserDoc.data() as UserProfile;
-                const authUser = { 
-                    ...userData, 
-                    uid: firebaseUser.uid, 
-                    id: tenantUserDoc.id,
-                    currentCompanyId: companyId,
-                    companyName: indexData.companyName || 'Nova Client'
-                };
-                
-                setAuthCookies(firebaseUser.uid, userData.role);
-                setUser(authUser);
-                
-                const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
-                if (companyDoc.exists()) {
-                    setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
-                }
-                setLoading(false);
-                return;
-            }
+        if (isMounted.current) {
+          if (result.user?.isActive) {
+            setSessionIndicators(firebaseUser.uid, result.user.role);
+            updateState({ user: result.user, company: result.company, loading: false, error: null, loadingStage: 'complete' });
+            if (result.company) setCurrentCompany(result.company);
+            logAuthEvent('LOGIN_SUCCESS', { uid: firebaseUser.uid, role: result.user.role });
+          } else {
+            const errorMsg = (result as any).error || 'الحساب غير مصرح له بالدخول حالياً.';
+            updateState({ user: null, company: null, loading: false, error: errorMsg, loadingStage: 'complete' });
+            clearSessionIndicators();
+            await signOut(masterAuth);
+          }
         }
-
-        // 🛡️ فحص صلاحية المطور (إذا لم يكن مرتبطاً بشركة)
-        const idToken = await firebaseUser.getIdTokenResult();
-        if (idToken.claims.role === 'Developer' || userEmail.endsWith('@nova-erp.local')) {
-            const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
-            setUser({
-                id: firebaseUser.uid,
-                uid: firebaseUser.uid,
-                email: firebaseUser.email!,
-                username: 'root',
-                role: 'Developer',
-                isActive: true,
-                fullName: devDoc.exists() ? devDoc.data().fullName : 'Master Developer',
-                isSuperAdmin: true,
-            });
-            setAuthCookies(firebaseUser.uid, 'Developer');
-            setLoading(false);
-            return;
+      } catch (err: any) {
+        console.error('Auth Context Loop Error:', err);
+        if (isMounted.current) {
+            updateState({ user: null, company: null, loading: false, error: 'فشل تحميل الملف الشخصي، يرجى إعادة المحاولة.', loadingStage: 'complete' });
         }
-
-        // تحرير التحميل في حال عدم العثور على البيانات
-        setUser(null);
-        setLoading(false);
-      } catch (error) {
-        console.error("Auth Loop Protection Error:", error);
-        setUser(null);
-        setLoading(false);
+        clearSessionIndicators();
       }
     });
 
-    return () => unsubscribe();
-  }, [masterAuth, masterFirestore, setCurrentCompany]);
+    return () => { 
+        isMounted.current = false; 
+        unsubscribe(); 
+    };
+  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext, updateState]);
 
+  // 🔐 إجراء تسجيل الدخول
   const login = useCallback(async (email: string, password: string) => {
-    if (!masterAuth) throw new Error("تعذر الاتصال بخادم الأمان.");
-    setLoading(true);
-    await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
-  }, [masterAuth]);
+    if (!masterAuth) throw new Error('خدمة المصادقة غير متصلة.');
+    updateState({ loading: true, error: null, loadingStage: 'initializing' });
+    try {
+      await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
+    } catch (err: any) {
+      updateState({ loading: false, loadingStage: 'complete' });
+      const msg = mapFirebaseAuthError(err.code);
+      logAuthEvent('LOGIN_FAILED', { email, code: err.code });
+      throw new Error(msg);
+    }
+  }, [masterAuth, updateState]);
 
+  // 🚪 إجراء تسجيل الخروج
   const logout = useCallback(async () => {
-    if (masterAuth) await signOut(masterAuth);
-    setUser(null);
-    setCurrentCompany(null);
-    removeAuthCookies();
-    router.replace('/');
-  }, [masterAuth, setCurrentCompany, router]);
+    if (!masterAuth) return;
+    try { 
+        await signOut(masterAuth); 
+    } catch (e) { 
+        console.error('Logout err:', e); 
+    } finally {
+      updateState({ user: null, company: null, loading: false, error: null, loadingStage: 'complete' });
+      setCurrentCompany(null);
+      clearSessionIndicators();
+      router.replace('/');
+    }
+  }, [masterAuth, router, setCurrentCompany, updateState]);
 
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  // 🔄 تحديث البيانات يدوياً دون خروج
+  const refreshUserData = useCallback(async () => {
+    if (!state.user || !masterFirestore) return;
+    updateState({ loading: true });
+    try {
+      const result = await fetchUserWithContext(
+        masterFirestore, 
+        { uid: state.user.uid, email: state.user.email } as FirebaseUser, 
+        state.user.email
+      );
+      updateState({ user: result.user, company: result.company, loading: false });
+      if (result.company) setCurrentCompany(result.company);
+    } catch (e) {
+      updateState({ loading: false, error: 'فشل تحديث البيانات اللحظية.' });
+    }
+  }, [state.user, masterFirestore, fetchUserWithContext, updateState, setCurrentCompany]);
+
+  const ctx = useMemo(() => ({ ...state, login, logout, refreshUserData }), [state, login, logout, refreshUserData]);
+
+  return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  return ctx;
 };

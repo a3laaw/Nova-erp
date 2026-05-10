@@ -12,11 +12,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية المرممة:
- * تم الالتزام بالأبعاد (max-w-md) والتدرج اللؤلؤي الأصلي.
+ * بوابة الدخول السيادية (Sovereign Gateway):
+ * مجهزة بمعالج أخطاء متطور ونظام حماية ضد التعليق.
  */
 export default function UnifiedLoginPage() {
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, user, loading: authLoading, error: contextError } = useAuth();
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +27,7 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // صمام أمان لإعادة توجيه المستخدم إذا كان مسجلاً للدخول بالفعل
+  // التوجيه التلقائي للمستخدمين الموثقين
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -44,17 +44,20 @@ export default function UnifiedLoginPage() {
 
     try {
         await login(formData.email, formData.password);
-        // التوجيه يتم عبر الـ useEffect أعلاه عند تحديث حالة المستخدم
+        // التوجيه يتم عبر الـ useEffect أعلاه لضمان اكتمال تحميل السياق
     } catch (error: any) {
         console.error("Login failed:", error);
-        setErrorMessage("بيانات الدخول غير صحيحة أو الحساب يحتاج لمزامنة.");
-        setIsLoading(false); 
+        setErrorMessage(error.message || "بيانات الدخول غير صحيحة.");
+        setIsLoading(true); 
+        // نترك isLoading صحيحاً لثانية ليعالج الـ useEffect حالة الانتقال أو يحرره الصمام
+        setTimeout(() => setIsLoading(false), 1500);
     }
   };
 
+  const currentError = errorMessage || contextError;
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      {/* عناصر جمالية في الخلفية */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
       
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
@@ -70,12 +73,12 @@ export default function UnifiedLoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {errorMessage && (
-                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
+            {currentError && (
+                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake-in duration-300">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
                     <AlertDescription className="text-[11px] font-bold mt-1">
-                        {errorMessage}
+                        {currentError}
                     </AlertDescription>
                 </Alert>
             )}
@@ -92,7 +95,7 @@ export default function UnifiedLoginPage() {
                         className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md dir-ltr font-black text-base text-[#1e1b4b] shadow-inner border-2" 
                         required 
                         placeholder="user@company.nova"
-                        disabled={isLoading}
+                        disabled={isLoading || authLoading}
                     />
                 </div>
 
@@ -107,15 +110,19 @@ export default function UnifiedLoginPage() {
                         className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner border-2 text-center" 
                         required 
                         placeholder="********"
-                        disabled={isLoading}
+                        disabled={isLoading || authLoading}
                     />
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white hover:bg-black transition-all active:scale-95 border-b-4 border-black/30 mt-2">
-                    {isLoading ? (
+                <Button 
+                    type="submit" 
+                    disabled={isLoading || authLoading} 
+                    className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white hover:bg-black transition-all active:scale-95 border-b-4 border-black/30 mt-2"
+                >
+                    {isLoading || authLoading ? (
                         <>
                             <Loader2 className="animate-spin h-6 w-6" />
-                            <span>جاري العبور...</span>
+                            <span>جاري التحقق...</span>
                         </>
                     ) : (
                         <>
@@ -128,7 +135,7 @@ export default function UnifiedLoginPage() {
 
             <div className="pt-6 border-t border-black/5 text-center">
                 <p className="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-tighter">ليس لديك منشأة مسجلة؟</p>
-                <Button asChild variant="ghost" className="w-full h-12 rounded-2xl border-2 border-white/60 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2" disabled={isLoading}>
+                <Button asChild variant="ghost" className="w-full h-12 rounded-2xl border-2 border-white/60 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2">
                     <Link href="/register">
                         <Building2 className="h-4 w-4" />
                         سجل منشأتك الآن
@@ -138,7 +145,7 @@ export default function UnifiedLoginPage() {
         </CardContent>
         
         <div className="bg-[#1e1b4b]/5 py-3 text-center">
-            <p className="text-[9px] font-black text-[#1e1b4b]/40 uppercase tracking-[0.4em]">Nova ERP — Sovereign Suite 2026</p>
+            <p className="text-[9px] font-black text-[#1e1b4b]/40 uppercase tracking-[0.4em]">Nova ERP — Sovereign Identity v3.0</p>
         </div>
       </Card>
     </div>
