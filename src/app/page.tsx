@@ -15,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
  * بوابة الدخول الموحدة لـ Nova ERP.
- * تدعم الدخول بـ "اسم المستخدم" المباشر لتبسيط تجربة الموظفين والعملاء.
+ * تم تصحيح الحجم ليكون max-w-md لضمان مظهر متناسق واحترافي.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -58,7 +58,8 @@ export default function UnifiedLoginPage() {
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
-      <Card className="w-full max-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
+      {/* 🛡️ الحجم المثالي للبطاقة هو max-w-md 🛡️ */}
+      <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
         <CardHeader className="py-12 px-8 text-center relative border-b border-white/20">
             <div className="bg-white/40 p-5 rounded-[2.2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl transition-transform hover:scale-110 duration-500">
                 <ShieldCheck className="h-12 w-12 text-[#1e1b4b]" />
@@ -92,7 +93,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
                         className="h-14 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-lg text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="مثال: naser (بدون @)"
+                        placeholder="مثال: alaa"
                         disabled={isLoading}
                     />
                 </div>

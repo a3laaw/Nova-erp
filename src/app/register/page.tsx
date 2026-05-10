@@ -27,7 +27,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة طلب انضمام شركة جديدة.
- * تم إلزام العميل بإدخال الهاتف والإيميل الحقيقي لبناء قاعدة بيانات التواصل.
+ * تم تصحيح الحجم ليكون max-w-xl لضمان مظهر متناسق.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -57,7 +57,6 @@ export default function RegisterPage() {
 
     setIsSaving(true);
     try {
-        // إرسال الطلب للمراجعة من قبل الإدارة (Developer Console)
         await addDoc(collection(firestore, 'company_requests'), {
             ...formData,
             status: 'pending',
@@ -71,9 +70,11 @@ export default function RegisterPage() {
     }
   };
 
+  const vibrantGlassBackground = "linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%)";
+
   if (isSuccess) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: vibrantGlassBackground }}>
             <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
                 <div className="bg-green-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-green-500/40">
                     <CheckCircle2 className="h-16 w-16 text-green-600" />
@@ -91,8 +92,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      <Card className="w-full max-w-2xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
+      {/* 🛡️ الحجم المثالي لنموذج التسجيل هو max-w-xl 🛡️ */}
+      <Card className="w-full max-w-xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect">
         <CardHeader className="py-12 px-10 border-b border-black/5 bg-white/20">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-5">
@@ -172,7 +174,7 @@ export default function RegisterPage() {
 
                 <div className="space-y-6">
                     <h3 className="font-black text-[#1e1b4b] text-xs border-r-4 border-purple-600 pr-3 uppercase">إعدادات حساب الدخول</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-1.5">
                             <Label className="text-[#1e1b4b] font-black text-xs pr-1">اسم المستخدم (Login ID) *</Label>
                             <Input 
@@ -180,18 +182,7 @@ export default function RegisterPage() {
                                 onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
                                 className="h-11 rounded-xl bg-white border-2 font-black text-primary dir-ltr" 
                                 required 
-                                placeholder="example: naser" 
-                            />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-[#1e1b4b] font-black text-xs pr-1">كلمة المرور *</Label>
-                            <Input 
-                                type="password" 
-                                value={formData.adminPassword} 
-                                onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
-                                className="h-11 rounded-xl bg-white border-2 font-bold" 
-                                required 
-                                placeholder="********" 
+                                placeholder="example: alaa" 
                             />
                         </div>
                         <div className="grid gap-1.5">
@@ -202,6 +193,17 @@ export default function RegisterPage() {
                                 className="h-11 rounded-xl bg-white border-2 font-black dir-ltr" 
                                 required 
                                 placeholder="+965 XXXX XXXX" 
+                            />
+                        </div>
+                        <div className="grid gap-1.5 md:col-span-2">
+                            <Label className="text-[#1e1b4b] font-black text-xs pr-1">كلمة المرور *</Label>
+                            <Input 
+                                type="password" 
+                                value={formData.adminPassword} 
+                                onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
+                                className="h-11 rounded-xl bg-white border-2 font-bold" 
+                                required 
+                                placeholder="********" 
                             />
                         </div>
                     </div>
