@@ -12,8 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية (The Sovereign Gate v6.0):
- * تم تحصين العرض ليكون رشيقاً (max-w-md) والالتزام بالألوان الأصلية.
+ * بوابة الدخول السيادية (Sovereign Gate v7.0):
+ * تم استعادة الألوان الأصلية والأبعاد الرشيقة مع تحصين ضد التعليق.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -21,34 +21,17 @@ export default function UnifiedLoginPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showEmergencyExit, setShowEmergencyExit] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '', 
     password: '',
   });
 
-  // صمام أمان التحرير التلقائي
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (isLoading) {
-        timer = setTimeout(() => {
-            setShowEmergencyExit(true);
-            setIsLoading(false);
-            setErrorMessage("تنبيه: تعثرت المزامنة اللحظية. يرجى تحديث الصفحة أو مراجعة بيانات الدخول.");
-        }, 6000);
-    }
-    return () => clearTimeout(timer);
-  }, [isLoading]);
-
-  // التوجيه التلقائي مع تأخير الاستقرار
+  // التوجيه التلقائي المستقر
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-        const timer = setTimeout(() => {
-            router.replace(targetPath);
-        }, 150);
-        return () => clearTimeout(timer);
+        router.replace(targetPath);
     }
   }, [user, authLoading, router]);
 
@@ -58,12 +41,12 @@ export default function UnifiedLoginPage() {
 
     setIsLoading(true);
     setErrorMessage(null);
-    setShowEmergencyExit(false);
 
     try {
         await login(formData.email, formData.password);
+        // في حال النجاح، سيقوم الـ useEffect أعلاه بالتوجيه
     } catch (error: any) {
-        setErrorMessage("بيانات الدخول غير صحيحة أو الحساب غير نشط.");
+        setErrorMessage("بيانات الدخول غير صحيحة أو الحساب يحتاج لمزامنة.");
         setIsLoading(false); 
     }
   };
@@ -87,26 +70,13 @@ export default function UnifiedLoginPage() {
         
         <CardContent className="p-8 space-y-6">
             {errorMessage && (
-                <div className="space-y-3 animate-in shake-100">
-                    <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
-                        <AlertDescription className="text-[11px] font-bold mt-1">
-                            {errorMessage}
-                        </AlertDescription>
-                    </Alert>
-                    
-                    {showEmergencyExit && (
-                        <Button 
-                            variant="outline" 
-                            type="button"
-                            onClick={() => window.location.reload()} 
-                            className="w-full h-11 rounded-xl font-black gap-2 text-indigo-900 border-indigo-200 bg-white hover:bg-indigo-50"
-                        >
-                            <RefreshCcw className="h-4 w-4" /> تحديث الصفحة والمحاولة مجدداً
-                        </Button>
-                    )}
-                </div>
+                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
+                    <AlertDescription className="text-[11px] font-bold mt-1">
+                        {errorMessage}
+                    </AlertDescription>
+                </Alert>
             )}
 
             <form onSubmit={handleLogin} className="space-y-5">
@@ -118,7 +88,7 @@ export default function UnifiedLoginPage() {
                         type="email" 
                         value={formData.email} 
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                        className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md dir-ltr font-black text-base text-[#1e1b4b] shadow-inner focus:bg-white/80 transition-all border-2" 
+                        className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md dir-ltr font-black text-base text-[#1e1b4b] shadow-inner border-2" 
                         required 
                         placeholder="user@company.nova"
                         disabled={isLoading}
@@ -133,7 +103,7 @@ export default function UnifiedLoginPage() {
                         type="password" 
                         value={formData.password} 
                         onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
-                        className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner focus:bg-white/80 transition-all border-2 text-center" 
+                        className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner border-2 text-center" 
                         required 
                         placeholder="********"
                         disabled={isLoading}

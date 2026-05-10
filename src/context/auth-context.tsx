@@ -18,8 +18,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * سياق الأمان السيادي المستقر (Stability Core v6.0):
- * تم تحصينه لضمان دخول حسابات الـ .local إلى المنشآت بدلاً من غرفة المطور.
+ * سياق الأمان السيادي (Stability Core v7.0):
+ * تم تحصينه لضمان دخول حسابات الـ .local إلى الشركات المخصصة بدلاً من غرفة المطور.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
 
-        // 🛡️ فحص الفهرس العالمي أولاً (لأنه قد يكون مستخدماً عادياً بإيميل خاص)
+        // 🛡️ 1. البحث في الفهرس العالمي أولاً (الأولوية لدخول الشركات)
         const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -86,6 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     companyName: indexData.companyName || 'Nova Client'
                 });
                 setAuthCookies(firebaseUser.uid, userData.role);
+                
                 const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                 if (companyDoc.exists()) {
                     setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
@@ -95,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 🛡️ حالة المطور (إذا لم يكن مسجلاً كمستخدم منشأة)
+        // 🛡️ 2. حالة المطور (فقط إذا لم يكن مرتبطاً بشركة)
         const idToken = await firebaseUser.getIdTokenResult();
         if (idToken.claims.role === 'Developer' || userEmail === 'dev@nova-erp.local') {
             const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
@@ -111,16 +112,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
             setAuthCookies(firebaseUser.uid, 'Developer');
         } else {
-            // مستخدم مجهول أو غير مفعل
+            // مستخدم غير معرّف في الفهرس
             await signOut(masterAuth);
             setUser(null);
             removeAuthCookies();
         }
       } catch (error) {
-        console.error("Auth Loop Prevention:", error);
+        console.error("Auth Guard Loop Prevention:", error);
         setUser(null);
       } finally {
-        setLoading(false);
+        setLoading(false); // ⚡ ضمان تحرير التحميل دائماً
       }
     });
 

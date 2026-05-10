@@ -32,7 +32,7 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background: linear-gradient(135deg, #f3e8ff 0%, #fce7f3 50%, #f3e8ff 100%);
+    background: linear-gradient(135deg, #a5f3fc 0%, #818cf8 40%, #c084fc 70%, #f472b6 100%);
     background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
@@ -51,27 +51,27 @@
   }
   
   .sidebar-glass {
-    background: linear-gradient(180deg, #e9e4ff 0%, #f5d0fe 100%) !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
     border: none !important;
-    box-shadow: -10px 0 30px rgba(0,0,0,0.05) !important;
   }
 
   .nav-capsule-active {
-    background: linear-gradient(to left, #ffffff 0%, #d8b4fe 100%) !important;
-    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.15) !important;
+    background: #ffffff !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     @apply text-[#1e1b4b] font-black scale-[1.02] border-none;
   }
 
   .nav-capsule {
-    background: linear-gradient(to left, rgba(255, 255, 255, 0.5) 0%, rgba(168, 85, 247, 0.15) 100%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    @apply text-[#1e1b4b] font-bold hover:bg-white/60 transition-all duration-300;
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    @apply text-white font-bold hover:bg-white/40 hover:text-white transition-all duration-300;
   }
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* 🛡️ Sovereign Mouse Dominance & UI Safety Layer 🛡️ */
+/* 🛡️ Sovereign UI Safety Layer 🛡️ */
 [data-radix-portal] {
   z-index: 999999 !important;
 }

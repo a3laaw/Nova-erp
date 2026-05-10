@@ -4,20 +4,19 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, updateDoc, collection, orderBy, query, getDocs, where, addDoc, serverTimestamp, runTransaction, Timestamp, deleteField, writeBatch } from 'firebase/firestore';
+import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from 'firebase/firestore';
 import type { Company, CompanyRequest, UserProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-    PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
-    MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
-    Activity, Users, Clock, CheckCircle2, ShieldAlert, 
-    FileStack, Rocket, Key, Copy, AlertCircle, Settings, RefreshCcw, X
+    PlusCircle, Building2, Search, Loader2, Terminal, 
+    MoreHorizontal, DatabaseZap, ArrowRightLeft, 
+    FileStack, Settings, RefreshCcw, X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import {
@@ -78,7 +77,6 @@ export default function DeveloperDashboard() {
             method: 'POST',
             body: JSON.stringify({ uid: currentUser.id, companyId: company.id, companyName: company.name })
         });
-        const result = await response.json();
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
         toast({ title: 'تم التقمص السيادي بنجاح' });
         router.push('/dashboard');
@@ -89,11 +87,10 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(company.id!);
     try {
-        const response = await fetch('/api/manage-tenant-user', {
+        await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({ email: company.adminEmail, password: company.adminPassword, displayName: company.name, action: 'repair' })
         });
-        const result = await response.json();
         const batch = writeBatch(firestore);
         const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail));
         const globalSnap = await getDocs(globalQuery);
@@ -121,7 +118,7 @@ export default function DeveloperDashboard() {
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والحماية السحابية.</CardDescription>
                         </div>
                     </div>
-                    <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 transition-all active:translate-y-1">
+                    <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700">
                         <PlusCircle className="h-6 w-6" /> تأسيس منشأة جديدة
                     </Button>
                 </div>
@@ -129,7 +126,7 @@ export default function DeveloperDashboard() {
         </Card>
 
         <Tabs defaultValue="companies" className="space-y-8">
-            <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 backdrop-blur-xl h-16 w-fit mx-auto flex gap-4">
+            <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 h-16 w-fit mx-auto flex gap-4">
                 <TabsTrigger value="companies" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><Building2 className="h-5 w-5"/> المنظمات</TabsTrigger>
                 <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><FileStack className="h-5 w-5"/> طلبات الانضمام</TabsTrigger>
             </TabsList>
