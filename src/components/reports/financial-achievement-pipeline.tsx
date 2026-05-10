@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -21,8 +22,8 @@ import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
 /**
- * تقرير ميزان التحصيل والتدفق المالي (Revenue Pipeline):
- * يربط الإنجاز الفني بالدفعات المستحقة بناءً على مراحل العقد.
+ * تقرير ميزان التحصيل والتدفق المالي.
+ * تم تعريب المسميات لتناسب الثقافة الإدارية العربية.
  */
 export function FinancialAchievementPipeline() {
   const { transactions, clients, journalEntries, accounts, loading } = useAnalyticalData();
@@ -68,14 +69,14 @@ export function FinancialAchievementPipeline() {
                 contractValue: totalContractValue,
                 collected,
                 pendingAmount: Math.max(0, totalContractValue - collected),
-                currentMilestone: activeMilestone ? activeMilestone.name : 'لا توجد دفعات معلقة',
+                currentMilestone: activeMilestone ? activeMilestone.name : 'لا توجد دفعات مستحقة',
                 dueNow: activeMilestone ? activeMilestone.amount : 0,
             };
         });
 
         setReportResults(results);
         setIsGenerating(false);
-        toast({ title: 'تم جرد الموقف المالي', description: 'تم تحديث ميزان التدفق والتحصيل للمشاريع.' });
+        toast({ title: 'نجاح', description: 'تم تحديث ميزان التحصيل المالي.' });
     }, 800);
   };
 
@@ -101,59 +102,59 @@ export function FinancialAchievementPipeline() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ العقد</Label>
+            <Label className="font-bold text-xs text-slate-500 uppercase">من تاريخ</Label>
             <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />
         </div>
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ العقد</Label>
+            <Label className="font-bold text-xs text-slate-500 uppercase">إلى تاريخ</Label>
             <DateInput value={dateTo} onChange={setDateTo} className="h-10 rounded-xl border-2" />
         </div>
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">فلتر حالة التحصيل</Label>
+            <Label className="font-bold text-xs text-slate-500 uppercase">حالة السداد</Label>
             <Select value={paymentFilter} onValueChange={setPaymentFilter}>
                 <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
-                    <SelectItem value="all">كل العقود</SelectItem>
+                    <SelectItem value="all">الكل</SelectItem>
                     <SelectItem value="pending">بانتظار التحصيل</SelectItem>
                     <SelectItem value="paid">مسدد بالكامل</SelectItem>
                 </SelectContent>
             </Select>
         </div>
         <div className="lg:col-span-1" />
-        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20 bg-green-600 hover:bg-green-700 text-white">
+        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-bold text-base gap-2 shadow-lg bg-green-600 hover:bg-green-700 text-white">
             {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Coins className="h-5 w-5" />} 
             تحديث ميزان التحصيل
         </Button>
       </div>
 
       {reportData ? (
-        <div className="border-2 rounded-[2.5rem] overflow-hidden shadow-2xl bg-white animate-in fade-in zoom-in-95 duration-500">
+        <Card className="rounded-[2.5rem] overflow-hidden border-none shadow-xl bg-white animate-in fade-in zoom-in-95 duration-500">
             <Table>
                 <TableHeader className="bg-slate-900 text-white">
-                    <TableRow className="h-14 border-none">
+                    <TableRow className="h-14">
                         <TableHead className="px-8 font-black text-white text-right">العميل والمعاملة</TableHead>
                         <TableHead className="text-left font-black text-white">قيمة العقد</TableHead>
-                        <TableHead className="text-left font-black text-white">المحصل فعلياً</TableHead>
-                        <TableHead className="text-left font-black text-white bg-green-600/20">المطلوب حالياً</TableHead>
-                        <TableHead className="font-black text-white px-8">شرط استحقاق الدفعة</TableHead>
+                        <TableHead className="text-left font-black text-white">المحصل</TableHead>
+                        <TableHead className="text-left font-black text-white bg-green-600/20">المطلوب تحصيله</TableHead>
+                        <TableHead className="font-black text-white px-8">شرط الدفعة</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {filteredData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-black italic">لا توجد حركات مطابقة للفلتر.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد نتائج مطابقة.</TableCell></TableRow>
                     ) : filteredData.map(item => (
-                        <TableRow key={item.id} className="h-20 hover:bg-muted/5 transition-colors border-b">
+                        <TableRow key={item.id} className="h-20 hover:bg-muted/5 border-b">
                             <TableCell className="px-8">
-                                <p className="font-black text-slate-900 leading-tight">{item.clientName}</p>
+                                <p className="font-bold text-slate-900">{item.clientName}</p>
                                 <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">{item.txType}</p>
                             </TableCell>
-                            <TableCell className="text-left font-mono font-bold text-slate-600">{formatCurrency(item.contractValue)}</TableCell>
+                            <TableCell className="text-left font-mono font-bold">{formatCurrency(item.contractValue)}</TableCell>
                             <TableCell className="text-left font-mono font-black text-green-600">{formatCurrency(item.collected)}</TableCell>
                             <TableCell className="text-left font-mono font-black text-xl text-blue-700 bg-blue-50/30 border-r border-blue-100">
-                                {item.dueNow > 0 ? formatCurrency(item.dueNow) : <span className="text-xs text-muted-foreground font-bold italic">لا يوجد مطالبة</span>}
+                                {item.dueNow > 0 ? formatCurrency(item.dueNow) : <span className="text-xs text-muted-foreground italic">لا يوجد مطالبة</span>}
                             </TableCell>
                             <TableCell className="px-8">
-                                <Badge variant="secondary" className={cn("px-4 font-black rounded-full", item.dueNow > 0 ? "bg-orange-100 text-orange-700 border-orange-200" : "opacity-30")}>
+                                <Badge variant="secondary" className={cn("px-4 font-bold rounded-full", item.dueNow > 0 ? "bg-orange-100 text-orange-700 border-orange-200" : "opacity-30")}>
                                     {item.currentMilestone}
                                 </Badge>
                             </TableCell>
@@ -161,20 +162,20 @@ export function FinancialAchievementPipeline() {
                     ))}
                 </TableBody>
                 <TableFooter className="bg-slate-50 h-24">
-                    <TableRow className="border-t-4 border-slate-200">
-                        <TableCell className="px-12 font-black text-xl text-slate-900">إجمالي الموقف المالي:</TableCell>
-                        <TableCell className="text-left font-mono text-lg font-black">{formatCurrency(totals.total)}</TableCell>
-                        <TableCell className="text-left font-mono text-lg font-black text-green-700">{formatCurrency(totals.collected)}</TableCell>
-                        <TableCell className="text-left font-mono text-2xl font-black text-blue-700 bg-blue-100/50 border-r border-blue-200">{formatCurrency(totals.due)}</TableCell>
+                    <TableRow className="border-t-4">
+                        <TableCell className="px-12 font-black text-xl">الإجمالي:</TableCell>
+                        <TableCell className="text-left font-mono text-lg">{formatCurrency(totals.total)}</TableCell>
+                        <TableCell className="text-left font-mono text-lg text-green-700">{formatCurrency(totals.collected)}</TableCell>
+                        <TableCell className="text-left font-mono text-2xl font-black text-blue-700 border-r border-blue-200">{formatCurrency(totals.due)}</TableCell>
                         <TableCell />
                     </TableRow>
                 </TableFooter>
             </Table>
-        </div>
+        </Card>
       ) : (
-        <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
+        <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30">
             <Coins className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black text-slate-800">ميزان التحصيل بانتظار التدقيق</p>
+            <p className="text-xl font-bold">بانتظار تحديث ميزان التحصيل</p>
         </div>
       )}
     </div>

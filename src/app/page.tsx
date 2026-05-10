@@ -14,8 +14,8 @@ import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
- * بوابة الدخول السيادية الموحدة لـ Nova ERP.
- * تم تحديثها لضمان التوجيه اللحظي ودعم الدخول باسم المستخدم فقط.
+ * بوابة الدخول الموحدة لـ Nova ERP.
+ * تم تبسيط اللغة ودعم الدخول المباشر باسم المستخدم.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -29,13 +29,10 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // --- محرك التوجيه اللحظي (Immediate Redirection Engine) ---
+  // توجيه تلقائي عند وجود جلسة نشطة
   useEffect(() => {
     if (!authLoading && user) {
-        const targetPath = user.role === 'Developer' 
-            ? '/developer'
-            : '/dashboard';
-        
+        const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(targetPath);
     }
   }, [user, authLoading, router]);
@@ -58,7 +55,6 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* عناصر الإضاءة المحيطية */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
@@ -71,14 +67,14 @@ export default function UnifiedLoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-black mt-2 text-sm uppercase tracking-[0.3em]">بوابة الدخول الذكية الموحدة</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">نظام الإدارة المتكامل للأعمال</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تنبيه بالخطأ</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تنبيه</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
@@ -87,29 +83,29 @@ export default function UnifiedLoginPage() {
 
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
-                    <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
+                    <Label className="font-bold text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
                         <User className="h-3 w-3" /> اسم المستخدم أو البريد الإلكتروني
                     </Label>
                     <Input 
                         type="text" 
                         value={formData.identifier} 
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
-                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
+                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-bold text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="username or email..."
+                        placeholder="اسم المستخدم..."
                         disabled={isLoading}
                     />
                 </div>
 
                 <div className="grid gap-2">
-                    <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <Lock className="h-3 w-3" /> كلمة المرور السيادية
+                    <Label className="font-bold text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
+                        <Lock className="h-3 w-3" /> كلمة المرور
                     </Label>
                     <Input 
                         type="password" 
                         value={formData.password} 
                         onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
-                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
+                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-bold text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
                         placeholder="********"
                         disabled={isLoading}
@@ -125,28 +121,23 @@ export default function UnifiedLoginPage() {
                     ) : (
                         <>
                             <LogIn className="h-6 w-6" />
-                            دخول المنصة
+                            دخول للنظام
                         </>
                     )}
                 </Button>
             </form>
 
             <div className="pt-4 border-t border-white/10 flex flex-col gap-4">
-                <p className="text-center text-xs font-bold text-[#1e1b4b]/60 uppercase tracking-widest">— هل تملك مكتباً هندسياً؟ —</p>
+                <p className="text-center text-xs font-bold text-[#1e1b4b]/60 uppercase tracking-widest">— هل تملك شركة أو مكتباً؟ —</p>
                 <Button asChild variant="outline" className="h-12 rounded-2xl border-white/40 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2" disabled={isLoading}>
                     <Link href={isLoading ? '#' : '/register'}>
                         <Building2 className="h-4 w-4" />
-                        سجل شركتك الآن في Nova
+                        سجل منشأتك الآن في Nova
                         <ArrowLeft className="h-4 w-4 mr-auto" />
                     </Link>
                 </Button>
             </div>
         </CardContent>
-        <div className="bg-white/10 p-4 text-center border-t border-white/10">
-            <p className="text-[10px] font-black text-[#1e1b4b]/40 uppercase tracking-widest">
-                Nova ERP — Universal Autonomous Gateway
-            </p>
-        </div>
       </Card>
     </div>
   );

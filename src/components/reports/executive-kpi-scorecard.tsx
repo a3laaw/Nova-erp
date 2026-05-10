@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -22,8 +23,8 @@ import { startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from
 import { toFirestoreDate } from '@/services/date-converter';
 
 /**
- * لوحة مؤشرات الأداء (Executive KPI Scorecard):
- * تعطي لقطة مثبتة لكفاءة كل قسم هندسي ومعدلات الإنجاز.
+ * لوحة مؤشرات الأداء (KPIs).
+ * تم تبسيط اللغة وضمان استيراد كافة المكونات.
  */
 export function ExecutiveKpiScorecard() {
   const { transactions, departments, loading } = useAnalyticalData();
@@ -52,7 +53,6 @@ export function ExecutiveKpiScorecard() {
 
             const total = deptTxs.length;
             const completed = deptTxs.filter(t => t.status === 'completed' || t.status === 'submitted').length;
-            const stalled = deptTxs.filter(t => t.status === 'on-hold').length;
             
             const completionRate = total > 0 ? (completed / total) * 100 : 0;
 
@@ -61,7 +61,6 @@ export function ExecutiveKpiScorecard() {
                 name: dept.name,
                 totalProjects: total,
                 completed,
-                stalled,
                 completionRate,
                 avgDuration: 12,
                 performanceStatus: completionRate > 70 ? 'ممتاز' : completionRate > 40 ? 'جيد' : 'يحتاج متابعة'
@@ -70,7 +69,7 @@ export function ExecutiveKpiScorecard() {
 
         setReportResults(results.sort((a, b) => b.completionRate - a.completionRate));
         setIsGenerating(false);
-        toast({ title: 'تم تحديث الـ KPIs', description: 'تم جرد معدلات إنجاز الأقسام والقطاعات.' });
+        toast({ title: 'نجاح', description: 'تم تحديث مؤشرات الأداء.' });
     }, 800);
   };
 
@@ -78,41 +77,41 @@ export function ExecutiveKpiScorecard() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ</Label>
+            <Label className="font-bold text-xs text-slate-500 uppercase">من تاريخ</Label>
             <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />
         </div>
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ</Label>
+            <Label className="font-bold text-xs text-slate-500 uppercase">إلى تاريخ</Label>
             <DateInput value={dateTo} onChange={setDateTo} className="h-10 rounded-xl border-2" />
         </div>
-        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-3 shadow-xl shadow-primary/20">
+        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-bold text-base gap-2 shadow-lg shadow-primary/20">
             {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <BarChart3 className="h-5 w-5" />} 
-            تحليل مؤشرات كفاءة القطاعات
+            تحليل كفاءة الأقسام
         </Button>
       </div>
 
       {reportData ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-500">
             {reportData.map(dept => (
-                <Card key={dept.id} className="rounded-[2.5rem] border-none shadow-xl overflow-hidden group">
+                <Card key={dept.id} className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
                     <CardHeader className="bg-slate-900 text-white p-8">
                         <div className="flex justify-between items-start">
                             <div className="p-3 bg-white/10 rounded-2xl border border-white/20"><Building2 className="h-6 w-6"/></div>
                             <Badge className={cn(
-                                "px-4 py-1 rounded-full font-black text-[10px]",
+                                "px-4 py-1 rounded-full font-bold text-xs",
                                 dept.performanceStatus === 'ممتاز' ? "bg-green-500" : "bg-orange-500"
                             )}>{dept.performanceStatus}</Badge>
                         </div>
                         <CardTitle className="text-2xl font-black mt-4 text-white">{dept.name}</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-8 space-y-8 bg-white">
+                    <CardContent className="p-8 space-y-8">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <p className="text-[10px] font-black text-muted-foreground uppercase">إجمالي المشاريع</p>
-                                <p className="text-3xl font-black font-mono text-[#1e1b4b]">{dept.totalProjects}</p>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase">إجمالي العمليات</p>
+                                <p className="text-3xl font-black font-mono">{dept.totalProjects}</p>
                             </div>
                             <div className="space-y-1 text-left">
-                                <p className="text-[10px] font-black text-green-600 uppercase">مشاريع منجزة</p>
+                                <p className="text-[10px] font-bold text-green-600 uppercase">منجزة</p>
                                 <p className="text-3xl font-black font-mono text-green-600">{dept.completed}</p>
                             </div>
                         </div>
@@ -120,28 +119,20 @@ export function ExecutiveKpiScorecard() {
                         <Separator className="border-dashed" />
 
                         <div className="space-y-4">
-                            <div className="flex justify-between text-xs font-black uppercase">
-                                <span className="text-slate-500">معدل الإنجاز (Efficiency)</span>
+                            <div className="flex justify-between text-xs font-bold uppercase">
+                                <span className="text-slate-500">معدل الإنجاز</span>
                                 <span className="text-primary">{dept.completionRate.toFixed(1)}%</span>
                             </div>
-                            <Progress value={dept.completionRate} className="h-3" />
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-2xl border">
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-primary opacity-40"/>
-                                <span className="text-[10px] font-bold text-muted-foreground">متوسط زمن المرحلة:</span>
-                            </div>
-                            <span className="font-black text-slate-800">{dept.avgDuration} يوم</span>
+                            <Progress value={dept.completionRate} className="h-2" />
                         </div>
                     </CardContent>
                 </Card>
             ))}
         </div>
       ) : (
-        <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
-            <Star className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black text-slate-800">تقرير الـ KPI القيادي بانتظار الاستخراج</p>
+        <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30">
+            <BarChart3 className="h-20 w-20 text-muted-foreground mb-4" />
+            <p className="text-xl font-bold">بانتظار تحليل الأداء</p>
         </div>
       )}
     </div>

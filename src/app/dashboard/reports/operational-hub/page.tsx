@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -12,9 +13,8 @@ import { cn } from '@/lib/utils';
 import { useAppTheme } from '@/context/theme-context';
 
 /**
- * مركز الذكاء العملياتي (Operational Intelligence Hub):
- * مجمع التقارير السيادي المدمج.
- * تم إضافة مديول "فرص النمو" لتحويل من أنهوا التراخيص إلى المقاولات.
+ * مركز تقارير الأداء الموحد.
+ * تم تبسيط المسميات وإزالة الألفاظ المعقدة.
  */
 export default function OperationalIntelligenceHub() {
   const { theme } = useAppTheme();
@@ -32,9 +32,9 @@ export default function OperationalIntelligenceHub() {
                         <Activity className="h-8 w-8" />
                     </div>
                     <div>
-                        <CardTitle className="text-2xl font-black text-[#1e1b4b]">مركز الذكاء العملياتي (Sovereign Intelligence)</CardTitle>
+                        <CardTitle className="text-2xl font-black text-[#1e1b4b]">مركز تقارير الأداء الفني</CardTitle>
                         <CardDescription className="text-base font-medium">
-                            رؤية شاملة تربط الإنجاز الفني بمسارات التدفق المالي وفرص التوسع في المقاولات.
+                            رؤية شاملة تربط الإنجاز الميداني بالموقف المالي وفرص التوسع.
                         </CardDescription>
                     </div>
                 </div>
@@ -48,16 +48,16 @@ export default function OperationalIntelligenceHub() {
                     isGlass ? "" : ""
                 )}>
                     <TabsTrigger value="radar" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <ShieldCheck className="h-5 w-5"/> رادار "نبض العمل"
+                        <ShieldCheck className="h-5 w-5"/> رادار متابعة العمل
                     </TabsTrigger>
                     <TabsTrigger value="finance" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <Coins className="h-5 w-5"/> ميزان "التحصيل"
+                        <Coins className="h-5 w-5"/> ميزان التحصيل
                     </TabsTrigger>
                     <TabsTrigger value="growth" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <Sparkles className="h-5 w-5 text-amber-500 animate-pulse"/> فرص "النمو والمقاولات"
+                        <Sparkles className="h-5 w-5 text-amber-500 animate-pulse"/> فرص النمو
                     </TabsTrigger>
                     <TabsTrigger value="kpi" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <BarChart3 className="h-5 w-5"/> لوحة "الأداء - KPIs"
+                        <BarChart3 className="h-5 w-5"/> مؤشرات الأداء
                     </TabsTrigger>
                 </TabsList>
             </div>

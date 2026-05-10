@@ -72,8 +72,8 @@ export default function EditLeaveRequestPage() {
             setEndDate(undefined);
             toast({
                 variant: 'destructive',
-                title: 'خطأ منطقي',
-                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
+                title: 'خطأ',
+                description: 'تاريخ النهاية يجب أن يكون لاحقاً لتاريخ البداية.',
             });
         }
     }, [startDate, endDate, toast]);
@@ -89,7 +89,6 @@ export default function EditLeaveRequestPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
         if (savingRef.current) return;
 
         if (!firestore || !currentUser || !id || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
@@ -97,14 +96,9 @@ export default function EditLeaveRequestPage() {
             return;
         }
 
-        if (isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.' });
-            return;
-        }
-
         const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
         if (!selectedEmployee) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموظف.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'الموظف المختار غير موجود.' });
             return;
         }
 
@@ -125,52 +119,44 @@ export default function EditLeaveRequestPage() {
                 passportReceived: passportReceived
             });
             
-            toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
+            toast({ title: 'نجاح', description: 'تم تحديث طلب الإجازة بنجاح.' });
             router.push('/dashboard/hr/leaves');
         } catch (error) {
             savingRef.current = false;
             setIsSaving(false);
-            const message = error instanceof Error ? error.message : "فشل تعديل الطلب.";
+            const message = error instanceof Error ? error.message : "فشل التحديث.";
             toast({ variant: 'destructive', title: 'خطأ', description: message });
         }
     };
     
     if (loading) {
-        return <Card className="max-w-2xl mx-auto"><CardContent className="p-8"><Skeleton className="h-96 w-full rounded-2xl" /></CardContent></Card>
-    }
-
-    if (!leaveRequest) {
-        return <div className="text-center p-10">لم يتم العثور على طلب الإجازة.</div>
+        return <div className="p-8"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
     }
 
     return (
         <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
                  <CardHeader className="bg-primary/5 pb-8 border-b">
-                    <CardTitle className="text-2xl font-black">تعديل طلب إجازة</CardTitle>
-                    <CardDescription className="text-base font-medium">
-                      تعديل بيانات طلب الإجازة للموظف: {leaveRequest.employeeName}.
-                    </CardDescription>
+                    <CardTitle className="text-2xl font-black text-[#1e1b4b]">تعديل طلب إجازة</CardTitle>
+                    <CardDescription className="text-base font-medium">تعديل بيانات طلب الإجازة للموظف: {leaveRequest?.employeeName}.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
-                     {(currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer') && (
-                      <div className="grid gap-2">
-                        <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
+                    <div className="grid gap-2">
+                        <Label className="font-bold text-gray-700 pr-1">الموظف المعني *</Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
-                            placeholder={loading ? 'جاري التحميل...' : 'اختر موظفًا...'}
-                            disabled={loading || isSaving}
+                            placeholder="اختر موظفاً..."
+                            disabled={isSaving}
                             className="h-11 rounded-xl"
                         />
-                      </div>
-                    )}
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType" className="font-black text-gray-700 pr-1">نوع الإجازة *</Label>
+                        <Label className="font-bold text-gray-700 pr-1">نوع الإجازة *</Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
-                            <SelectTrigger id="leaveType" className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
+                            <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
                                 <SelectItem value="Annual">سنوية</SelectItem>
                                 <SelectItem value="Sick">مرضية</SelectItem>
@@ -182,35 +168,17 @@ export default function EditLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-black text-gray-700 pr-1">من تاريخ *</Label>
-                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl border-2" />
+                        <Label className="font-bold text-gray-700 pr-1">من تاريخ *</Label>
+                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-black text-gray-700 pr-1">إلى تاريخ *</Label>
-                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl border-2" />
+                        <Label className="font-bold text-gray-700 pr-1">إلى تاريخ *</Label>
+                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                     </div>
-                    {leaveAnalysis.totalDays > 0 && (
-                      <div className="space-y-4">
-                        <div className="text-sm font-black text-primary p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
-                            <p>إجمالي الأيام: <span className="text-lg">{leaveAnalysis.totalDays}</span></p>
-                            <p>أيام العمل الفعلية: <span className="text-lg">{leaveAnalysis.workingDays}</span></p>
-                        </div>
-
-                        {leaveType === 'Annual' && leaveAnalysis.totalDays > 0 && leaveAnalysis.totalDays < 30 && (
-                            <Alert className="bg-amber-50 border-amber-200 rounded-2xl animate-in slide-in-from-top-2">
-                                <AlertCircle className="h-4 w-4 text-amber-600" />
-                                <AlertTitle className="text-amber-800 font-black text-xs">تنبيه ودي</AlertTitle>
-                                <AlertDescription className="text-[10px] font-bold text-amber-700 leading-relaxed">
-                                    الإجازة السنوية عادةً ما تُطلب كفترة راحة طويلة (شهر كامل). إذا كانت المدة قصيرة جداً، ربما تفضل اختيار نوع "طارئة" أو تقديم "استئذان" للحفاظ على رصيد إجازتك السنوية المجمعة.
-                                </AlertDescription>
-                            </Alert>
-                        )}
-                      </div>
-                    )}
-                     <div className="grid gap-2">
-                      <Label htmlFor="notes" className="font-black text-gray-700 pr-1">السبب / ملاحظات *</Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" disabled={isSaving} />
+                    <div className="grid gap-2">
+                      <Label className="font-bold text-gray-700 pr-1">السبب / ملاحظات *</Label>
+                      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4" disabled={isSaving} />
                     </div>
                     <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
                         <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
@@ -218,10 +186,9 @@ export default function EditLeaveRequestPage() {
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
-                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
-                        {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-                        {isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+                    <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving}>إلغاء</Button>
+                    <Button type="submit" disabled={isSaving} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/20 gap-2">
+                        {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />} حفظ التعديلات
                     </Button>
                 </CardFooter>
             </form>

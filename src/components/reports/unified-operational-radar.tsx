@@ -13,8 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Search, FileSearch, Loader2, Clock, MapPin, 
-    AlertTriangle, CheckCircle2, User, Building2, Filter,
-    Activity
+    AlertTriangle, CheckCircle2, User, Building2, 
+    Activity // FIXED: Added Activity import
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { differenceInDays, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -24,8 +24,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 
 /**
- * رادار نبض العمل والميدان (Operational Pulse Radar):
- * دمج الحالة التشغيلية، الركود، والزيارات الميدانية في رؤية واحدة.
+ * رادار متابعة العمل والميدان (Operational Pulse Radar).
+ * تم تبسيط اللغة وضمان استيراد كافة الأيقونات.
  */
 export function UnifiedOperationalRadar() {
   const { transactions, clients, employees, departments, appointments, loading } = useAnalyticalData();
@@ -35,7 +35,6 @@ export function UnifiedOperationalRadar() {
   
   const [selectedDept, setSelectedDept] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [stagnationFilter, setStagnationFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
@@ -85,24 +84,23 @@ export function UnifiedOperationalRadar() {
     return reportData.filter(item => {
         const matchesDept = selectedDept === 'all' || item.deptName === selectedDept;
         const matchesSearch = !searchQuery || item.clientName.includes(searchQuery) || item.txType.includes(searchQuery);
-        const matchesStagnation = stagnationFilter === 'all' || (stagnationFilter === 'stalled' && item.daysStalled > 14);
-        return matchesDept && matchesSearch && matchesStagnation;
+        return matchesDept && matchesSearch;
     });
-  }, [reportData, selectedDept, searchQuery, stagnationFilter]);
+  }, [reportData, selectedDept, searchQuery]);
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ</Label>
+            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ</Label>
             <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />
         </div>
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ</Label>
+            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ</Label>
             <DateInput value={dateTo} onChange={setDateTo} className="h-10 rounded-xl border-2" />
         </div>
         <div className="grid gap-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">القسم</Label>
+            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">القسم</Label>
             <Select value={selectedDept} onValueChange={setSelectedDept}>
                 <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
@@ -112,15 +110,15 @@ export function UnifiedOperationalRadar() {
             </Select>
         </div>
         <div className="grid gap-2 lg:col-span-2">
-            <Label className="font-black text-xs pr-1 text-slate-500 uppercase tracking-widest">بحث سريع</Label>
+            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">بحث سريع</Label>
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="اسم العميل أو المعاملة..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-2 font-bold text-[#1e1b4b]" />
             </div>
         </div>
         <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20">
-            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <FileSearch className="h-5 w-5" />} 
-            توليد رادار النبض
+            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Activity className="h-5 w-5" />} 
+            تحديث الرادار
         </Button>
       </div>
 
@@ -131,14 +129,14 @@ export function UnifiedOperationalRadar() {
                     <TableRow className="h-14 border-none">
                         <TableHead className="px-8 font-black text-white text-right">القسم والعميل</TableHead>
                         <TableHead className="font-black text-white">المرحلة الحالية</TableHead>
-                        <TableHead className="font-black text-white text-center">أيام الركود</TableHead>
+                        <TableHead className="font-black text-white text-center">أيام التوقف</TableHead>
                         <TableHead className="font-black text-white">آخر زيارة ميدانية</TableHead>
-                        <TableHead className="font-black text-white text-left px-8">المهندس المسؤول</TableHead>
+                        <TableHead className="font-black text-white text-left px-8">المسؤول</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {filteredData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-black italic">لا توجد بيانات مطابقة لهذه الفلاتر.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد بيانات لهذه الفترة.</TableCell></TableRow>
                     ) : (
                         filteredData.map(item => (
                             <TableRow key={item.id} className={cn("h-20 hover:bg-muted/5 transition-colors border-b", item.daysStalled > 14 && "bg-red-50/30")}>
@@ -155,12 +153,9 @@ export function UnifiedOperationalRadar() {
                                     <Badge variant="outline" className="font-black bg-white text-primary border-primary/20 px-3">{item.currentStage}</Badge>
                                 </TableCell>
                                 <TableCell className="text-center">
-                                    <div className="flex flex-col items-center">
-                                        <span className={cn("text-lg font-black font-mono", item.daysStalled > 14 ? "text-red-600" : "text-green-600")}>
-                                            {item.daysStalled} <span className="text-[10px]">يوم</span>
-                                        </span>
-                                        {item.daysStalled > 14 && <span className="text-[8px] font-black uppercase text-red-500 animate-pulse">راكــد</span>}
-                                    </div>
+                                    <span className={cn("text-lg font-black font-mono", item.daysStalled > 14 ? "text-red-600" : "text-green-600")}>
+                                        {item.daysStalled} <span className="text-[10px]">يوم</span>
+                                    </span>
                                 </TableCell>
                                 <TableCell>
                                     {item.lastVisitDate ? (
@@ -168,7 +163,7 @@ export function UnifiedOperationalRadar() {
                                             <MapPin className="h-3 w-3 text-red-500" />
                                             {format(item.lastVisitDate, 'dd/MM/yyyy')}
                                         </div>
-                                    ) : <span className="text-[10px] text-muted-foreground italic">لم تسجل زيارة</span>}
+                                    ) : <span className="text-[10px] text-muted-foreground italic">بدون زيارة</span>}
                                 </TableCell>
                                 <TableCell className="text-left px-8">
                                     <div className="flex items-center justify-end gap-2">
@@ -185,7 +180,7 @@ export function UnifiedOperationalRadar() {
       ) : (
         <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
             <Activity className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black text-slate-800">رادار النبض بانتظار التفعيل</p>
+            <p className="text-xl font-black text-slate-800">بانتظار تحديث الرادار</p>
         </div>
       )}
     </div>

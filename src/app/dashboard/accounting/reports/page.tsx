@@ -1,3 +1,4 @@
+
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,8 +11,8 @@ import { useAppTheme } from '@/context/theme-context';
 import { cn } from '@/lib/utils';
 
 /**
- * لوحة التقارير التحليلية والربحية (مركز السيادة المالية):
- * تقوم بتجميع كافة أبعاد مراكز التكلفة والربحية الموزعة في القيود والسندات.
+ * لوحة التقارير التحليلية والربحية.
+ * تم تبسيط المسميات لسهولة الاستخدام المكتبي.
  */
 export default function AnalyticalReportsPage() {
   const { theme } = useAppTheme();
@@ -29,9 +30,9 @@ export default function AnalyticalReportsPage() {
                         <BarChart3 className="h-8 w-8" />
                     </div>
                     <div>
-                        <CardTitle className="text-2xl font-black">التقارير التحليلية والربحية (النتائج المثبتة)</CardTitle>
+                        <CardTitle className="text-2xl font-black">تقارير الربحية والأداء</CardTitle>
                         <CardDescription className="text-base font-medium">
-                            تحليل أداء مراكز الربحية (المشاريع)، إنتاجية المهندسين، وكفاءة الأقسام التشغيلية.
+                            تحليل أرباح المشاريع، إنتاجية الموظفين، وكفاءة الأقسام الفنية.
                         </CardDescription>
                     </div>
                 </div>
@@ -48,7 +49,7 @@ export default function AnalyticalReportsPage() {
                         <TrendingUp className="h-4 w-4"/> ربحية المشاريع
                     </TabsTrigger>
                     <TabsTrigger value="resources" className={cn("py-3 rounded-xl font-black h-12 gap-2", isGlass && "tabs-trigger-card justify-center items-center")}>
-                        <Users className="h-4 w-4"/> إنتاجية المهندسين
+                        <Users className="h-4 w-4"/> إنتاجية الموظفين
                     </TabsTrigger>
                     <TabsTrigger value="departments" className={cn("py-3 rounded-xl font-black h-12 gap-2", isGlass && "tabs-trigger-card justify-center items-center")}>
                         <Building2 className="h-4 w-4"/> أداء الأقسام
