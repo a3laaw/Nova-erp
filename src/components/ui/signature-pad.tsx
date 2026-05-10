@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Button } from './button';
-import { Eraser, Check, Undo2, MousePointer2 } from 'lucide-react';
+import { Eraser, Check, MousePointer2 } from 'lucide-react';
 
 interface SignaturePadProps {
   onSave: (signatureDataUrl: string) => void;
@@ -12,6 +11,10 @@ interface SignaturePadProps {
   height?: number;
 }
 
+/**
+ * مكوّن بصمة التوقيع الرقمي السيادي:
+ * يستخدم لرسم التوقيع الحي على المستندات الرسمية (كشف الأعمال، العقود).
+ */
 export function SignaturePad({ onSave, onClear, width = 400, height = 200 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -24,28 +27,22 @@ export function SignaturePad({ onSave, onClear, width = 400, height = 200 }: Sig
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set drawing styles
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = '#1e1b4b';
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Handle high DPI screens
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    canvas.width = canvas.offsetWidth * dpr;
+    canvas.height = canvas.offsetHeight * dpr;
     ctx.scale(dpr, dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-  }, [width, height]);
+  }, []);
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
-
     const rect = canvas.getBoundingClientRect();
     let clientX, clientY;
-
     if ('touches' in e) {
       clientX = e.touches[0].clientX;
       clientY = e.touches[0].clientY;
@@ -53,11 +50,7 @@ export function SignaturePad({ onSave, onClear, width = 400, height = 200 }: Sig
       clientX = e.clientX;
       clientY = e.clientY;
     }
-
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
+    return { x: clientX - rect.left, y: clientY - rect.top };
   };
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
@@ -81,9 +74,7 @@ export function SignaturePad({ onSave, onClear, width = 400, height = 200 }: Sig
     }
   };
 
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
+  const stopDrawing = () => setIsDrawing(false);
 
   const clearCanvas = () => {
     const canvas = canvasRef.current;
@@ -91,19 +82,13 @@ export function SignaturePad({ onSave, onClear, width = 400, height = 200 }: Sig
     if (canvas && ctx) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       setHasSignature(false);
-      if (onClear) onClear();
+      onClear?.();
     }
-  };
-
-  const saveSignature = () => {
-    if (!canvasRef.current || !hasSignature) return;
-    const dataUrl = canvasRef.current.toDataURL('image/png');
-    onSave(dataUrl);
   };
 
   return (
     <div className="space-y-4">
-      <div className="relative border-2 border-dashed border-muted-foreground/30 rounded-2xl bg-white overflow-hidden touch-none">
+      <div className="relative border-4 border-dashed border-primary/20 rounded-[2rem] bg-slate-50 overflow-hidden touch-none h-48">
         <canvas
           ref={canvasRef}
           onMouseDown={startDrawing}
@@ -113,34 +98,28 @@ export function SignaturePad({ onSave, onClear, width = 400, height = 200 }: Sig
           onTouchStart={startDrawing}
           onTouchMove={draw}
           onTouchEnd={stopDrawing}
-          className="cursor-crosshair w-full"
+          className="cursor-crosshair w-full h-full"
         />
         {!hasSignature && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
-            <MousePointer2 className="h-10 w-10 mb-2" />
-            <p className="font-bold text-sm">وقع هنا باستخدام الإصبع أو الماوس</p>
+            <MousePointer2 className="h-10 w-10 mb-2 text-primary" />
+            <p className="font-black text-sm">وقع هنا (بالإصبع أو الماوس)</p>
           </div>
         )}
       </div>
       
       <div className="flex justify-between gap-3">
-        <Button 
-          type="button" 
-          variant="outline" 
-          size="sm" 
-          onClick={clearCanvas}
-          className="rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold gap-2"
-        >
+        <Button type="button" variant="outline" size="sm" onClick={clearCanvas} className="rounded-xl border-red-200 text-red-600 font-bold gap-2">
           <Eraser className="h-4 w-4" /> مسح التوقيع
         </Button>
         <Button 
           type="button" 
           size="sm" 
-          onClick={saveSignature} 
+          onClick={() => canvasRef.current && onSave(canvasRef.current.toDataURL())} 
           disabled={!hasSignature}
-          className="rounded-xl font-bold gap-2"
+          className="rounded-xl font-black gap-2 px-8"
         >
-          <Check className="h-4 w-4" /> اعتماد التوقيع
+          <Check className="h-4 w-4" /> اعتماد التوقيع الرقمي
         </Button>
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
 @import "react-day-picker/dist/style.css";
 @tailwind base;
@@ -72,7 +71,7 @@
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* 🛡️ Sovereign Mouse Dominance & Layering Protocol 🛡️ */
+/* 🛡️ Sovereign Mouse Dominance & UI Safety Layer 🛡️ */
 [data-radix-portal] {
   z-index: 999999 !important;
 }
@@ -83,7 +82,8 @@
 [data-radix-select-content],
 [data-radix-popover-content],
 .react-select__menu,
-.react-select__menu-portal {
+.react-select__menu-portal,
+canvas {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }

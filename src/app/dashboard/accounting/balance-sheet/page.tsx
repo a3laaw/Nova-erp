@@ -17,7 +17,7 @@ import type { Account, JournalEntry } from '@/lib/types';
 import { format, endOfYear } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User, Building2 } from 'lucide-react';
+import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User, Building2, TrendingUp, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
@@ -42,6 +42,11 @@ interface BalanceSheetData {
         total: number;
     };
     isBalanced: boolean;
+    ratios: {
+        currentRatio: number;
+        debtToEquity: number;
+        workingCapital: number;
+    }
 }
 
 const AccountRow = ({ name, balance, className }: { name: string, balance: number, className?: string }) => (
@@ -100,13 +105,12 @@ export default function BalanceSheetPage() {
                 assets: { current: [], nonCurrent: [], totalCurrent: 0, totalNonCurrent: 0, total: 0 },
                 liabilitiesAndEquity: { currentLiabilities: [], nonCurrentLiabilities: [], equity: [], totalCurrentLiabilities: 0, totalNonCurrentLiabilities: 0, totalEquity: 0, total: 0 },
                 isBalanced: false,
+                ratios: { currentRatio: 0, debtToEquity: 0, workingCapital: 0 }
             };
             
             accounts.forEach(acc => {
                 let balance = accountBalances.get(acc.id!) || 0;
-                
                 if (acc.name.includes('أرباح')) balance += netIncome;
-                
                 if (balance === 0 && acc.type !== 'equity') return;
 
                 const item = { name: acc.name, balance };
@@ -118,8 +122,16 @@ export default function BalanceSheetPage() {
             });
             
             data.assets.total = data.assets.totalCurrent + data.assets.totalNonCurrent;
-            data.liabilitiesAndEquity.total = data.liabilitiesAndEquity.totalCurrentLiabilities + data.liabilitiesAndEquity.totalNonCurrentLiabilities + data.liabilitiesAndEquity.totalEquity;
+            const totalLiabilities = data.liabilitiesAndEquity.totalCurrentLiabilities + data.liabilitiesAndEquity.totalNonCurrentLiabilities;
+            data.liabilitiesAndEquity.total = totalLiabilities + data.liabilitiesAndEquity.totalEquity;
             data.isBalanced = Math.abs(data.assets.total - data.liabilitiesAndEquity.total) < 0.01;
+
+            // ✨ حساب مؤشرات الصحة المالية السيادية ✨
+            data.ratios = {
+                currentRatio: data.liabilitiesAndEquity.totalCurrentLiabilities > 0 ? data.assets.totalCurrent / data.liabilitiesAndEquity.totalCurrentLiabilities : 0,
+                debtToEquity: data.liabilitiesAndEquity.totalEquity > 0 ? totalLiabilities / data.liabilitiesAndEquity.totalEquity : 0,
+                workingCapital: data.assets.totalCurrent - data.liabilitiesAndEquity.totalCurrentLiabilities
+            };
 
             setReportData(data);
         } catch (e) {
@@ -153,7 +165,36 @@ export default function BalanceSheetPage() {
             </Card>
 
             {reportData ? (
-                 <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+                 <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
+                    
+                    {/* ✨ لوحة مؤشرات الصحة المالية (Dashboard Insight) ✨ */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
+                        <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
+                            <div className="p-3 bg-blue-100 rounded-2xl text-blue-700"><TrendingUp className="h-6 w-6"/></div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">رأس المال العامل</p>
+                                <p className="text-2xl font-black font-mono">{formatCurrency(reportData.ratios.workingCapital)}</p>
+                                <p className="text-[9px] font-bold text-blue-600 mt-1">السيولة المتاحة لتشغيل اليوميات</p>
+                            </div>
+                        </Card>
+                        <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
+                            <div className="p-3 bg-green-100 rounded-2xl text-green-700"><ShieldCheck className="h-6 w-6"/></div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">نسبة التداول (Current Ratio)</p>
+                                <p className="text-2xl font-black font-mono">{reportData.ratios.currentRatio.toFixed(2)}</p>
+                                <p className="text-[9px] font-bold text-green-600 mt-1">المعيار الآمن هو أعلى من 1.5</p>
+                            </div>
+                        </Card>
+                        <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
+                            <div className="p-3 bg-orange-100 rounded-2xl text-orange-700"><AlertCircle className="h-6 w-6"/></div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">نسبة الدين (D/E Ratio)</p>
+                                <p className="text-2xl font-black font-mono">{reportData.ratios.debtToEquity.toFixed(2)}</p>
+                                <p className="text-[9px] font-bold text-orange-600 mt-1">مدى اعتمادك على الديون مقابل رأس مالك</p>
+                            </div>
+                        </Card>
+                    </div>
+
                     <div id="printable-area" className="bg-white dark:bg-card shadow-2xl rounded-[2.5rem] overflow-hidden p-8 sm:p-12 print:shadow-none print:border-none">
                         <header className="flex justify-between items-start border-b-4 border-primary pb-8 mb-10">
                             <div className="text-left space-y-1">
