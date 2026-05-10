@@ -177,10 +177,13 @@ export default function DeveloperDashboard() {
           if (!result.success && !result.simulated) throw new Error(result.error);
           
           // 🛡️ إعادة بناء الفهرس العالمي لضمان الربط بالاسم
+          const batch = writeBatch(firestore);
           const globalQuery = query(collection(firestore, 'global_users'), where('username', '==', username));
           const globalSnap = await getDocs(globalQuery);
+          
           if (globalSnap.empty) {
-              await addDoc(collection(firestore, 'global_users'), {
+              const globalIndexRef = doc(collection(firestore, 'global_users'));
+              batch.set(globalIndexRef, {
                   username: username,
                   email: company.adminEmail,
                   companyId: company.id,
@@ -188,7 +191,21 @@ export default function DeveloperDashboard() {
               });
           }
 
-          toast({ title: 'نجاح المزامنة', description: `تم تفعيل حساب دخول "${company.name}" وربط الفهرس العالمي.` });
+          // التأكد من وجود ملف المستخدم داخل مجلد الشركة
+          const tenantUserRef = doc(firestore, `companies/${company.id}/users`, result.uid || 'manual-repair');
+          batch.set(tenantUserRef, {
+              uid: result.uid || 'manual-repair',
+              email: company.adminEmail,
+              username: username,
+              fullName: company.name,
+              role: 'Admin',
+              isActive: true,
+              companyId: company.id,
+              createdAt: serverTimestamp()
+          }, { merge: true });
+
+          await batch.commit();
+          toast({ title: 'نجاح المزامنة الجبّارة', description: `تم ترميم حساب "${company.name}" وإعادة بناء الفهرس العالمي.` });
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'خطأ في الإصلاح', description: e.message });
       } finally { setIsProcessing(null); }

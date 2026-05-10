@@ -76,6 +76,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (tenantUserDoc.exists()) {
               const userData = tenantUserDoc.data() as UserProfile;
+              if (!userData.isActive) {
+                  throw new Error("هذا الحساب معلق حالياً. يرجى مراجعة الإدارة.");
+              }
               setUser({ 
                 ...userData, 
                 uid: firebaseUser.uid, 
@@ -87,13 +90,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (companyDoc.exists()) {
                   setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
               }
+            } else {
+                // الموظف موجود في Auth ولكن ملفه محذوف من الداتا
+                await signOut(masterAuth);
+                throw new Error("لم يتم العثور على ملف الموظف. يرجى إجراء 'إصلاح حساب' من غرفة التحكم.");
             }
+          } else {
+              // الموظف موجود في Auth ولكن ليس له فهرس عالمي (Global Index)
+              await signOut(masterAuth);
+              throw new Error("نقص في بيانات المزامنة العالمية. يرجى إجراء 'إصلاح حساب' من قبل المطور.");
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Auth Sync Error:", error);
+        setUser(null);
       } finally {
-        // 🛡️ صمام الأمان النهائي: ضمان توقف حالة التحميل مهما كانت النتيجة
         setLoading(false);
       }
     });
@@ -106,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let loginEmail = identifier.toLowerCase().trim();
 
-    // 🛡️ جسر الهوية: إذا أدخل اسم مستخدم بدون @، نبحث عنه في الفهرس العالمي
+    // 🛡️ جسر الهوية السيادي: تحويل الاسم البسيط إلى إيميل فني
     if (!loginEmail.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 
@@ -115,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ));
       
       if (userIndexSnap.empty) {
-          throw new Error('اسم المستخدم هذا غير مسجل. يرجى التأكد من كتابته بشكل صحيح (مثال: alaa).');
+          throw new Error('اسم المستخدم هذا غير مسجل. تأكد من كتابته بشكل صحيح (مثال: alaa).');
       }
       loginEmail = userIndexSnap.docs[0].data().email;
     }
@@ -123,14 +134,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signInWithEmailAndPassword(masterAuth, loginEmail, password);
     } catch (e: any) {
-      console.error("Login Error Code:", e.code);
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
-          throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+          throw new Error('بيانات الدخول غير صحيحة.');
       }
-      if (e.code === 'auth/network-request-failed') {
-          throw new Error('تعذر الاتصال بالخادم. تأكد من اتصال الإنترنت.');
-      }
-      throw new Error('فشل تسجيل الدخول. قد يحتاج حسابك لـ "إصلاح ومزامنة" من غرفة التحكم.');
+      throw new Error('تعذر العبور السحابي. قد يحتاج حسابك لمزامنة (Repair).');
     }
   }, [masterAuth, masterFirestore]);
 

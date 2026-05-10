@@ -25,11 +25,16 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // توجيه تلقائي عند وجود جلسة نشطة
+  // 🛡️ مراقبة حالة التحميل السيادية
   useEffect(() => {
-    if (!authLoading && user) {
-        const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-        router.replace(targetPath);
+    if (!authLoading) {
+        if (user) {
+            const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
+            router.replace(targetPath);
+        } else {
+            // إذا توقف تحميل الـ Auth ولم نجد مستخدم، نحرر زر الدخول
+            setIsLoading(false);
+        }
     }
   }, [user, authLoading, router]);
 
@@ -41,8 +46,7 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        // في حال النجاح، سيقوم الـ AuthContext بتحديث الحالة وسيتم التوجيه عبر الـ useEffect
-        // نترك isLoading مفعلة حتى يحدث التوجيه لإعطاء انطباع بالاستجابة
+        // النجاح سيتم معالجته عبر useEffect أعلاه
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -72,7 +76,7 @@ export default function UnifiedLoginPage() {
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تعذر الدخول</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
                     <AlertDescription className="text-[11px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
@@ -114,7 +118,7 @@ export default function UnifiedLoginPage() {
                     {isLoading ? (
                         <>
                             <Loader2 className="animate-spin h-8 w-8" />
-                            <span>جاري الدخول...</span>
+                            <span>جاري التحقق...</span>
                         </>
                     ) : (
                         <>
