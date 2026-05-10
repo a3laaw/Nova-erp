@@ -34,7 +34,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-// 🛡️ قاموس الترجمة السيادي للأنشطة
+// 🛡️ قاموس الترجمة المرجعي للأنشطة
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -53,6 +53,7 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
+  // اشتراك لحظي في قائمة الشركات وطلبات الانضمام
   const { data: rawCompanies, loading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
@@ -73,12 +74,13 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
+  // دالة تفعيل طلب شركة جديد (أتمتة الحسابات)
   const handleApproveRequest = async (request: any) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
     try {
         const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
-        const username = request.username; 
+        const username = request.username || request.email.split('@')[0]; 
         const internalEmail = `${username}@${companyId}.nova`; 
 
         const authResponse = await fetch('/api/manage-tenant-user', {
@@ -99,7 +101,7 @@ export default function DeveloperDashboard() {
             const companyRef = doc(firestore, 'companies', companyId);
             transaction.set(companyRef, {
                 name: request.companyName,
-                activityType: request.activity,
+                activityType: request.activity || 'general',
                 adminEmail: internalEmail,
                 adminPassword: request.adminPassword,
                 contactPhone: request.phone,
@@ -147,6 +149,7 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
+  // دالة إصلاح الحساب المفقود (لشركة علاء وغيرهم)
   const handleRepairAccount = async (company: Company) => {
       if (!firestore || isProcessing) return;
       setIsProcessing(company.id!);
@@ -163,7 +166,7 @@ export default function DeveloperDashboard() {
           const result = await response.json();
           if (!result.success && !result.simulated) throw new Error(result.error);
           
-          toast({ title: 'نجاح المزامنة', description: `تم إصلاح وتفعيل حساب دخول "${company.name}" بنجاح.` });
+          toast({ title: 'نجاح المزامنة', description: `تم تفعيل حساب دخول "${company.name}" أمنياً. يمكنهم الدخول الآن.` });
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'خطأ في الإصلاح', description: e.message });
       } finally { setIsProcessing(null); }
@@ -197,7 +200,7 @@ export default function DeveloperDashboard() {
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم والسيادة</CardTitle>
+                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم</CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">تأسيس المنظمات، إدارة التراخيص، والرقابة العليا على المنصة.</CardDescription>
                         </div>
                     </div>
@@ -242,7 +245,7 @@ export default function DeveloperDashboard() {
                                     <TableHead className="font-black text-indigo-100 text-base text-center">التواصل</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">الحصة (Users)</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">الحالة</TableHead>
-                                    <TableHead className="text-left px-12 font-black text-indigo-100 text-base">إجراءات السيادة</TableHead>
+                                    <TableHead className="text-left px-12 font-black text-indigo-100 text-base">إجراءات الإدارة</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -334,7 +337,9 @@ export default function DeveloperDashboard() {
                                         <TableCell className="px-12">
                                             <div className="flex flex-col">
                                                 <span className="font-black text-2xl tracking-tight">{req.companyName}</span>
-                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general'] || 'نشاط عام'}</Badge>
+                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">
+                                                    {activityTranslations[req.activity || 'general'] || 'نشاط عام'}
+                                                </Badge>
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center">

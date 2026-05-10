@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!userIndexSnap.empty) {
             const companyId = userIndexSnap.docs[0].data().companyId;
             
-            // جلب ملف المستخدم المعزول
+            // جلب ملف المستخدم المعزول من مسار الشركة
             const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
 
             if (tenantUserDoc.exists()) {
@@ -104,15 +104,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
   /**
-   * محرك الدخول الذكي: 
-   * تم تحصينه للتعامل مع أخطاء الحسابات التي لم تُزامن بعد (وضع المحاكاة).
+   * محرك الدخول الموحد (Username Bridge):
+   * يقوم بتحويل اسم المستخدم البسيط (مثل alaa) إلى الهوية الفنية المعزولة آلياً.
    */
   const login = useCallback(async (identifier: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("تعذر الاتصال بخادم الأمان.");
 
     let email = identifier.toLowerCase().trim();
 
-    // 🛡️ إذا أدخل اسم مستخدم فقط (بدون @)، نبحث عن إيميله الحقيقي في الفهرس
+    // 🛡️ إذا أدخل اسم مستخدم فقط (بدون @)، نبحث عن إيميله الحقيقي في الفهرس العالمي
     if (!email.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 
@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ));
       
       if (userIndexSnap.empty) {
-          throw new Error('اسم المستخدم هذا غير موجود في أي منشأة.');
+          throw new Error('اسم المستخدم هذا غير مسجل في أي منشأة. يرجى التأكد من الاسم.');
       }
       email = userIndexSnap.docs[0].data().email;
     }
@@ -129,10 +129,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signInWithEmailAndPassword(masterAuth, email, password);
     } catch (e: any) {
-      if (e.code === 'auth/user-not-found') {
-          throw new Error('حسابك مسجل في قاعدة البيانات ولكن لم يتم تفعيله أمنياً بعد. يرجى مراجعة المسؤول لإجراء "إصلاح ومزامنة الحساب".');
+      console.error("Login Error Details:", e.code, e.message);
+      
+      // التعامل مع حالة الحسابات التي أُنشئت في وضع المحاكاة ولم تُفعل أمنياً
+      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+          throw new Error('بيانات الدخول غير صحيحة، أو أن الحساب لم يُفعل أمنياً بعد. يرجى مراجعة الإدارة لإجراء "إصلاح ومزامنة الحساب".');
       }
-      throw new Error('بيانات الدخول غير صحيحة. يرجى التأكد من اسم المستخدم وكلمة المرور.');
+      
+      throw new Error('حدث خطأ أثناء تسجيل الدخول. يرجى التأكد من اسم المستخدم وكلمة المرور.');
     }
   }, [masterAuth, masterFirestore]);
 
