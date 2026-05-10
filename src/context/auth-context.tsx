@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
@@ -29,13 +29,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 🔍 محرك العبور السيادي: يبحث في الفهرس العالمي أولاً لضمان توجيه nova1 لشركته
   const fetchUserWithContext = useCallback(async (email: string, uid: string) => {
     if (!masterFirestore) return { userProfile: null, companyData: null };
     
     try {
         const lowerEmail = email.toLowerCase().trim();
         
-        // 1. البحث في الفهرس العالمي (أولوية المنشأة لضمان دخول nova1 لشركته)
+        // 1. الأولوية القصوى: البحث في الفهرس العالمي للشركات
         const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
 
@@ -58,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 2. فحص وضع المطور (إذا لم يكن مرتبطاً بشركة في الفهرس العالمي)
+        // 2. البحث في سجل المطورين (فقط إذا لم يكن مرتبطاً بشركة)
         const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
         if (devDoc.exists()) {
             return {
@@ -73,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return { userProfile: null, companyData: null };
     } catch (e) {
-        console.error("Context Fetch Error:", e);
+        console.error("Critical: Context Fetch Error:", e);
         return { userProfile: null, companyData: null };
     }
   }, [masterFirestore]);
@@ -88,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { userProfile, companyData } = await fetchUserWithContext(firebaseUser.email, firebaseUser.uid);
           
           if (userProfile && userProfile.isActive) {
-            // زرع كوكيز الجلسة فوراً لفتح أقفال الـ Middleware
+            // زرع كوكيز الجلسة فوراً لفتح أقفال الـ Middleware ومنع اللوب
             document.cookie = `nova-user-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
             if (userProfile.role === 'Developer') {
                 document.cookie = `nova-dev-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
@@ -109,9 +110,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         }
       } catch (err) {
-          console.error("Auth State Sync Error:", err);
+          console.error("Auth Sync Error:", err);
       } finally {
-        setLoading(false); // 🛡️ الإنهاء القاطع لحماية الشاشة من التعليق
+        setLoading(false); // 🛡️ ضمان تحرير الشاشة تحت أي ظرف
       }
     });
 
