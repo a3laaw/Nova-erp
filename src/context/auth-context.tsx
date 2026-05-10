@@ -18,8 +18,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * سياق الأمان السيادي (Sovereign Auth Core):
- * تم تحديثه لزرع الكوكيز المطلوبة للـ Middleware لإنهاء حلقة التحميل اللانهائية.
+ * سياق الأمان السيادي المطور (Sovereign Auth Core v3.0):
+ * تم تحصينه ببروتوكول "الإنهاء القاطع" لمنع حلقة التحميل اللانهائية (Loading Loop).
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -30,9 +30,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
-  // مساعد زرع الكوكيز لفتح أقفال الـ Middleware
-  const setAuthCookie = (name: string, value: string) => {
-    document.cookie = `${name}=${value}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+  // مساعد زرع الكوكيز السيادي: يفتح أقفال الـ Middleware فوراً
+  const setAuthCookies = (uid: string, isDev: boolean) => {
+    const expiry = 60 * 60 * 24 * 7; // 7 days
+    document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
+    if (isDev) {
+        document.cookie = `nova-dev-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
+    }
   };
 
   const removeAuthCookies = () => {
@@ -58,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const userEmail = firebaseUser.email?.toLowerCase();
         
-        // 1. حالة المطور (Root Access)
+        // 1. حالة المطور (Sovereign Root)
         if (userEmail === MASTER_DEV_EMAIL) {
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
           const devData: AuthenticatedUser = {
@@ -72,12 +76,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isSuperAdmin: true,
           };
           setUser(devData);
-          setAuthCookie('nova-dev-session', firebaseUser.uid);
+          setAuthCookies(firebaseUser.uid, true);
           setLoading(false);
           return;
         }
 
-        // 2. حالة مستخدم المنشأة (SaaS User)
+        // 2. حالة الموظف (SaaS Tenant User)
         if (userEmail) {
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
@@ -101,8 +105,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   uid: firebaseUser.uid, 
                   id: tenantUserDoc.id,
                   currentCompanyId: companyId,
+                  companyName: userIndexSnap.docs[0].data().companyName || 'Nova Client'
                 });
-                setAuthCookie('nova-user-session', firebaseUser.uid);
+                setAuthCookies(firebaseUser.uid, false);
 
                 const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                 if (companyDoc.exists()) {
@@ -110,20 +115,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
               }
             } else {
+                // إذا وجدنا الإيميل ولكن لم نجد ملف المستخدم في الشركة (نقص مزامنة)
                 setUser(null);
                 removeAuthCookies();
             }
           } else {
+              // إذا لم يجد الإيميل في الفهرس العالمي (مستخدم مجهول)
               setUser(null);
               removeAuthCookies();
           }
         }
-      } catch (error: any) {
-        console.error("Critical Auth Sync Error:", error);
+      } catch (error) {
+        console.error("Auth Listener Error:", error);
         setUser(null);
         removeAuthCookies();
       } finally {
-        setLoading(false); // 🛡️ ضمان إنهاء وضع التحميل مهما حدث
+        // 🛡️ صمام الأمان الأهم: إنهاء وضع التحميل تحت أي ظرف
+        setLoading(false);
       }
     });
 

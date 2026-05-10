@@ -51,7 +51,7 @@ export default function DeveloperDashboard() {
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
   
-  // اشتراك مجمع للمستخدمين لحساب الحصص
+  // اشتراك مجمع للمستخدمين لحساب الحصص اللحظية
   const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
 
   const userCountsByCompany = useMemo(() => {
@@ -108,10 +108,10 @@ export default function DeveloperDashboard() {
             transaction.set(tenantUserRef, { uid: authResult.uid || 'simulated-uid', email: internalEmail, username: username, fullName: request.contactName, role: 'Admin', isActive: true, companyId: companyId, createdAt: serverTimestamp() });
 
             const globalUserRef = doc(collection(firestore, 'global_users'));
-            transaction.set(globalUserRef, { email: internalEmail, username: username, companyId: companyId, role: 'Admin' });
+            transaction.set(globalUserRef, { email: internalEmail, username: username, companyId: companyId, role: 'Admin', companyName: request.companyName });
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
-        toast({ title: 'تم التفعيل بنجاح' });
+        toast({ title: 'تم تفعيل المنشأة بنجاح' });
     } catch (e: any) { 
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message }); 
     } finally { 
@@ -128,15 +128,34 @@ export default function DeveloperDashboard() {
               body: JSON.stringify({ email: company.adminEmail, password: company.adminPassword, displayName: company.name, action: 'repair' })
           });
           const result = await response.json();
+          
           const batch = writeBatch(firestore);
           const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail));
           const globalSnap = await getDocs(globalQuery);
+          
           if (globalSnap.empty) {
-              batch.set(doc(collection(firestore, 'global_users')), { username: company.adminEmail.split('@')[0], email: company.adminEmail, companyId: company.id, role: 'Admin' });
+              batch.set(doc(collection(firestore, 'global_users')), { 
+                  username: company.adminEmail.split('@')[0], 
+                  email: company.adminEmail, 
+                  companyId: company.id, 
+                  role: 'Admin',
+                  companyName: company.name
+              });
           }
-          batch.set(doc(firestore, `companies/${company.id}/users`, result.uid || 'manual-repair'), { uid: result.uid || 'manual-repair', email: company.adminEmail, username: company.adminEmail.split('@')[0], fullName: company.name, role: 'Admin', isActive: true, companyId: company.id, createdAt: serverTimestamp() }, { merge: true });
+          
+          batch.set(doc(firestore, `companies/${company.id}/users`, result.uid || 'manual-repair'), { 
+              uid: result.uid || 'manual-repair', 
+              email: company.adminEmail, 
+              username: company.adminEmail.split('@')[0], 
+              fullName: company.name, 
+              role: 'Admin', 
+              isActive: true, 
+              companyId: company.id, 
+              createdAt: serverTimestamp() 
+          }, { merge: true });
+          
           await batch.commit();
-          toast({ title: 'تم الإصلاح والمزامنة الجبارة' });
+          toast({ title: 'نجحت المزامنة الجبارة' });
       } finally { setIsProcessing(null); }
   };
 
@@ -144,11 +163,10 @@ export default function DeveloperDashboard() {
     if (!firestore || !currentUser || isProcessing) return;
     setIsProcessing(company.id!);
     try {
-        const response = await fetch('/api/switch-company', {
+        await fetch('/api/switch-company', {
             method: 'POST',
             body: JSON.stringify({ uid: currentUser.id, companyId: company.id, companyName: company.name })
         });
-        const result = await response.json();
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
         toast({ title: 'تم التقمص السيادي بنجاح' });
         router.push('/dashboard');
@@ -167,7 +185,7 @@ export default function DeveloperDashboard() {
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والحماية السحابية.</CardDescription>
                         </div>
                     </div>
-                    <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700">
+                    <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 transition-all active:translate-y-1">
                         <PlusCircle className="h-6 w-6" /> تأسيس منشأة جديدة
                     </Button>
                 </div>

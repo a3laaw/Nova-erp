@@ -6,14 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ShieldCheck, Mail, Sparkles, LogIn, Building2, AlertCircle } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, Mail, Sparkles, LogIn, Building2, AlertCircle, RefreshCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول الموحدة (The Unified Gateway):
- * تم تحصينها بصمام أمان لمنع حلقة التحميل اللانهائية وتصحيح التوازن البصري.
+ * بوابة الدخول السيادية المحدثة (The Sovereign Gate v3.5):
+ * - علاج حلقة التحميل اللانهائية عبر "صمام الأمان الزمني".
+ * - توفير زر "إصلاح المزامنة" فوراً عند تعليق الجلسة.
+ * - دعم العبور الفوري بالبريد الفني (Technical Email).
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -21,16 +23,34 @@ export default function UnifiedLoginPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showEmergencyExit, setShowEmergencyExit] = useState(false);
+  
   const [formData, setFormData] = useState({
     email: '', 
     password: '',
   });
 
-  // التوجيه التلقائي عند نجاح التحميل والتعرف على الجلسة
+  // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 6 ثوانٍ، نعيد السيطرة للمستخدم
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoading) {
+        timer = setTimeout(() => {
+            setShowEmergencyExit(true);
+            setIsLoading(false);
+            setErrorMessage("استغرقت الاستجابة وقتاً طويلاً. قد يحتاج حسابك لمزامنة (Repair).");
+        }, 6000);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  // التوجيه التلقائي الآمن
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-        router.replace(targetPath);
+        // 🚀 تأخير طفيف لضمان استقرار الكوكيز في المتصفح قبل التوجيه
+        setTimeout(() => {
+            router.replace(targetPath);
+        }, 100);
     }
   }, [user, authLoading, router]);
 
@@ -40,14 +60,7 @@ export default function UnifiedLoginPage() {
 
     setIsLoading(true);
     setErrorMessage(null);
-
-    // صمام أمان: تحرير الزر في حال حدوث تعليق غير متوقع
-    const safetyTimeout = setTimeout(() => {
-        if (isLoading) {
-            setIsLoading(false);
-            setErrorMessage("استغرقت العملية وقتاً أطول من المعتاد، يرجى تحديث الصفحة.");
-        }
-    }, 10000);
+    setShowEmergencyExit(false);
 
     try {
         await login(formData.email, formData.password);
@@ -55,8 +68,6 @@ export default function UnifiedLoginPage() {
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
-    } finally {
-        clearTimeout(safetyTimeout);
     }
   };
 
@@ -80,19 +91,31 @@ export default function UnifiedLoginPage() {
         
         <CardContent className="p-10 space-y-8">
             {errorMessage && (
-                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake-100">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تعذر الدخول</AlertTitle>
-                    <AlertDescription className="text-[11px] font-bold mt-1">
-                        {errorMessage}
-                    </AlertDescription>
-                </Alert>
+                <div className="space-y-4 animate-in shake-100">
+                    <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
+                        <AlertDescription className="text-[11px] font-bold mt-1">
+                            {errorMessage}
+                        </AlertDescription>
+                    </Alert>
+                    
+                    {showEmergencyExit && (
+                        <Button 
+                            variant="outline" 
+                            onClick={() => window.location.reload()} 
+                            className="w-full h-11 rounded-xl font-black gap-2 text-indigo-900 border-indigo-200 bg-white hover:bg-indigo-50"
+                        >
+                            <RefreshCcw className="h-4 w-4" /> تحديث الصفحة والمحاولة مجدداً
+                        </Button>
+                    )}
+                </div>
             )}
 
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <Mail className="h-3 w-3" /> البريد الإلكتروني الفني *
+                        <Mail className="h-3 w-3" /> البريد الفني المعتمد *
                     </Label>
                     <Input 
                         type="email" 
@@ -100,7 +123,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                         className="h-14 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-lg text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="user@company.nova"
+                        placeholder="alaa@company.nova"
                         disabled={isLoading}
                     />
                 </div>
