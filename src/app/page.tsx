@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 /**
  * بوابة الدخول الموحدة (The Unified Gateway):
- * تم إعادة تصميمها لتكون رشيقة ومستقرة، وتعتمد على "البريد الفني" للعبور.
+ * تم تحصينها بصمام أمان لمنع حلقة التحميل اللانهائية وتصحيح التوازن البصري.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -26,6 +26,7 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
+  // التوجيه التلقائي عند نجاح التحميل والتعرف على الجلسة
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -39,12 +40,23 @@ export default function UnifiedLoginPage() {
 
     setIsLoading(true);
     setErrorMessage(null);
+
+    // صمام أمان: تحرير الزر في حال حدوث تعليق غير متوقع
+    const safetyTimeout = setTimeout(() => {
+        if (isLoading) {
+            setIsLoading(false);
+            setErrorMessage("استغرقت العملية وقتاً أطول من المعتاد، يرجى تحديث الصفحة.");
+        }
+    }, 10000);
+
     try {
         await login(formData.email, formData.password);
-        // التوجيه سيتم عبر الـ useEffect عند التعرف على الجلسة
+        // التوجيه سيحدث عبر useEffect بمجرد تحديث حالة المستخدم في السياق
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
+    } finally {
+        clearTimeout(safetyTimeout);
     }
   };
 
@@ -53,8 +65,7 @@ export default function UnifiedLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
-
+      
       <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700 relative z-10">
         <CardHeader className="py-12 px-8 text-center border-b border-white/20">
             <div className="bg-white/40 p-5 rounded-[2.2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl">

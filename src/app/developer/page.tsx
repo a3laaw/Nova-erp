@@ -111,8 +111,12 @@ export default function DeveloperDashboard() {
             transaction.set(globalUserRef, { email: internalEmail, username: username, companyId: companyId, role: 'Admin' });
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
-        toast({ title: 'تم التفعيل' });
-    } catch (e: any) { toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message }); } finally { setIsProcessing(null); }
+        toast({ title: 'تم التفعيل بنجاح' });
+    } catch (e: any) { 
+        toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message }); 
+    } finally { 
+        setIsProcessing(null); 
+    }
   };
 
   const handleRepairAccount = async (company: Company) => {
@@ -132,7 +136,7 @@ export default function DeveloperDashboard() {
           }
           batch.set(doc(firestore, `companies/${company.id}/users`, result.uid || 'manual-repair'), { uid: result.uid || 'manual-repair', email: company.adminEmail, username: company.adminEmail.split('@')[0], fullName: company.name, role: 'Admin', isActive: true, companyId: company.id, createdAt: serverTimestamp() }, { merge: true });
           await batch.commit();
-          toast({ title: 'تم الإصلاح والمزامنة' });
+          toast({ title: 'تم الإصلاح والمزامنة الجبارة' });
       } finally { setIsProcessing(null); }
   };
 
@@ -146,7 +150,7 @@ export default function DeveloperDashboard() {
         });
         const result = await response.json();
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
-        toast({ title: 'تم التقمص السيادي' });
+        toast({ title: 'تم التقمص السيادي بنجاح' });
         router.push('/dashboard');
     } finally { setIsProcessing(null); }
   };
@@ -160,7 +164,7 @@ export default function DeveloperDashboard() {
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم السيادية</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات والتراخيص.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والحماية السحابية.</CardDescription>
                         </div>
                     </div>
                     <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700">
@@ -173,7 +177,7 @@ export default function DeveloperDashboard() {
         <Tabs defaultValue="companies" className="space-y-8">
             <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 backdrop-blur-xl h-16 w-fit mx-auto flex gap-4">
                 <TabsTrigger value="companies" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><Building2 className="h-5 w-5"/> المنظمات</TabsTrigger>
-                <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><FileStack className="h-5 w-5"/> الطلبات</TabsTrigger>
+                <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><FileStack className="h-5 w-5"/> طلبات الانضمام</TabsTrigger>
             </TabsList>
 
             <TabsContent value="companies">
@@ -183,7 +187,7 @@ export default function DeveloperDashboard() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">التواصل</TableHead><TableHead className="font-black text-indigo-100 text-center">الحصة</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">التواصل</TableHead><TableHead className="font-black text-indigo-100 text-center">الحصة (مستخدمين)</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={5} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (

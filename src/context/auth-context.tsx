@@ -17,6 +17,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * سياق الأمان السيادي (Sovereign Auth Core):
+ * تم تحديثه لزرع الكوكيز المطلوبة للـ Middleware لإنهاء حلقة التحميل اللانهائية.
+ */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { auth: masterAuth, firestore: masterFirestore } = useFirebase();
@@ -25,6 +29,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
+
+  // مساعد زرع الكوكيز لفتح أقفال الـ Middleware
+  const setAuthCookie = (name: string, value: string) => {
+    document.cookie = `${name}=${value}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
+  };
+
+  const removeAuthCookies = () => {
+    document.cookie = 'nova-user-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  };
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -37,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!firebaseUser) {
           setUser(null);
           setCurrentCompany(null);
+          removeAuthCookies();
           setLoading(false);
           return;
         }
@@ -57,13 +72,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isSuperAdmin: true,
           };
           setUser(devData);
+          setAuthCookie('nova-dev-session', firebaseUser.uid);
           setLoading(false);
           return;
         }
 
         // 2. حالة مستخدم المنشأة (SaaS User)
         if (userEmail) {
-          // البحث في الفهرس العالمي لجلب معرّف الشركة
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -79,6 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (!userData.isActive) {
                   await signOut(masterAuth);
                   setUser(null);
+                  removeAuthCookies();
               } else {
                 setUser({ 
                   ...userData, 
@@ -86,6 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   id: tenantUserDoc.id,
                   currentCompanyId: companyId,
                 });
+                setAuthCookie('nova-user-session', firebaseUser.uid);
 
                 const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                 if (companyDoc.exists()) {
@@ -93,19 +110,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
               }
             } else {
-                console.warn("Tenant profile missing for authenticated user.");
                 setUser(null);
+                removeAuthCookies();
             }
           } else {
-              console.warn("User not indexed in Global Directory.");
               setUser(null);
+              removeAuthCookies();
           }
         }
       } catch (error: any) {
-        console.error("Auth System Error:", error);
+        console.error("Critical Auth Sync Error:", error);
         setUser(null);
+        removeAuthCookies();
       } finally {
-        setLoading(false); // 🛡️ صمام أمان: دائماً ننهي التحميل
+        setLoading(false); // 🛡️ ضمان إنهاء وضع التحميل مهما حدث
       }
     });
 
@@ -118,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (e: any) {
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
-          throw new Error('بيانات الدخول غير صحيحة.');
+          throw new Error('بيانات العبور غير صحيحة.');
       }
       throw new Error('فشل تسجيل الدخول. يرجى المحاولة لاحقاً.');
     }
@@ -128,6 +146,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (masterAuth) await signOut(masterAuth);
     setUser(null);
     setCurrentCompany(null);
+    removeAuthCookies();
     router.replace('/');
   }, [masterAuth, setCurrentCompany, router]);
 
