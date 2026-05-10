@@ -18,9 +18,13 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
 
+  // 🛡️ محرك التوجيه السيادي
   useEffect(() => {
     if (!authLoading && user) {
-        router.replace(user.role === 'Developer' ? '/developer' : '/dashboard');
+        const timer = setTimeout(() => {
+            router.replace(user.role === 'Developer' ? '/developer' : '/dashboard');
+        }, 100); // تأخير بسيط لضمان ثبات الجلسة
+        return () => clearTimeout(timer);
     }
   }, [user, authLoading, router]);
 
@@ -38,9 +42,6 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      {/* التدرج اللؤلؤي الأصلي */}
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
-      
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40">
             <div className="bg-white/60 p-4 rounded-3xl w-fit mx-auto mb-4 backdrop-blur-xl border border-white shadow-lg">
