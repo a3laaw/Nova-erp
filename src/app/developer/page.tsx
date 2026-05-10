@@ -31,7 +31,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
-// 🛡️ تعريف قاموس التراجم السيادي لإنهاء خطأ ReferenceError
+/**
+ * قاموس ترجمة الأنشطة - ثابت لضمان عدم حدوث خطأ ReferenceError
+ */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -50,6 +52,7 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
+  // اشتراكات لحظية بالبيانات السيادية
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
   const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
@@ -111,7 +114,7 @@ export default function DeveloperDashboard() {
                 contactPhone: request.phone,
                 contactEmail: request.email,
                 subscriptionType: 'trial',
-                trialEndDate: Timestamp.fromDate(addDays(new Date(), 14)),
+                trialEndDate: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
                 maxUsersLimit: 5,
                 isActive: true,
                 firebaseConfig: {
@@ -171,7 +174,8 @@ export default function DeveloperDashboard() {
           if (!result.success && !result.simulated) throw new Error(result.error);
           
           const batch = writeBatch(firestore);
-          const globalQuery = query(collection(firestore, 'global_users'), where('username', '==', username));
+          // إعادة بناء الفهرس العالمي
+          const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail));
           const globalSnap = await getDocs(globalQuery);
           
           if (globalSnap.empty) {
@@ -231,7 +235,7 @@ export default function DeveloperDashboard() {
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم</CardTitle>
+                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم السيادية</CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والرقابة العليا.</CardDescription>
                         </div>
                     </div>
@@ -319,6 +323,7 @@ export default function DeveloperDashboard() {
                                                             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border"><MoreHorizontal className="h-5 w-5" /></Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl">
+                                                            <DropdownMenuLabel className="font-black px-3 py-2">خيارات المنشأة</DropdownMenuLabel>
                                                             <DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3">
                                                                 <Settings className="h-4 w-4 text-indigo-600" /> تعديل الترخيص
                                                             </DropdownMenuItem>
@@ -406,10 +411,4 @@ export default function DeveloperDashboard() {
         />
     </div>
   );
-}
-
-function addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
 }

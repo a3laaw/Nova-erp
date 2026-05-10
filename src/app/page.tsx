@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Lock, ShieldCheck, User, Sparkles, LogIn, Building2, ArrowLeft, AlertCircle } from 'lucide-react';
+import { Loader2, Lock, ShieldCheck, Mail, Sparkles, LogIn, Building2, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
@@ -19,11 +19,11 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', 
+    email: '', 
     password: '',
   });
 
-  // 🛡️ توجيه سيادي فوري عند اكتمال التحقق
+  // توجيه سيادي فوري عند اكتمال التحقق من الجلسة
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -38,7 +38,7 @@ export default function UnifiedLoginPage() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-        await login(formData.identifier, formData.password);
+        await login(formData.email, formData.password);
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -49,7 +49,11 @@ export default function UnifiedLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
+      {/* دوائر خلفية جمالية */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
+
+      <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700 relative z-10">
         <CardHeader className="py-12 px-8 text-center border-b border-white/20">
             <div className="bg-white/40 p-5 rounded-[2.2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl">
                 <ShieldCheck className="h-12 w-12 text-[#1e1b4b]" />
@@ -63,7 +67,7 @@ export default function UnifiedLoginPage() {
         
         <CardContent className="p-10 space-y-8">
             {errorMessage && (
-                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
+                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake-100">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="font-black text-xs">تعذر الدخول</AlertTitle>
                     <AlertDescription className="text-[11px] font-bold mt-1">
@@ -75,15 +79,15 @@ export default function UnifiedLoginPage() {
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> اسم المستخدم أو البريد (الوهمي)
+                        <Mail className="h-3 w-3" /> البريد الإلكتروني الفني *
                     </Label>
                     <Input 
-                        type="text" 
-                        value={formData.identifier} 
-                        onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
+                        type="email" 
+                        value={formData.email} 
+                        onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                         className="h-14 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-lg text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="alaa OR alaa@comp_123.nova"
+                        placeholder="user@company.nova"
                         disabled={isLoading}
                     />
                 </div>
@@ -107,7 +111,7 @@ export default function UnifiedLoginPage() {
                     {isLoading ? (
                         <>
                             <Loader2 className="animate-spin h-8 w-8" />
-                            <span>جاري التحقق...</span>
+                            <span>جاري العبور...</span>
                         </>
                     ) : (
                         <>

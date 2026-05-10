@@ -12,7 +12,7 @@ import { useCompany } from './company-context';
 interface AuthContextType {
   user: AuthenticatedUser | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -64,6 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // 2. حالة مستخدم المنشأة (SaaS User)
         if (userEmail) {
+          // نبحث في الفهرس العالمي عن الشركة التابعة
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -79,29 +80,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (!userData.isActive) {
                   await signOut(masterAuth);
                   setUser(null);
-                  setLoading(false);
-                  return;
-              }
-              setUser({ 
-                ...userData, 
-                uid: firebaseUser.uid, 
-                id: tenantUserDoc.id,
-                currentCompanyId: companyId,
-              });
+              } else {
+                setUser({ 
+                  ...userData, 
+                  uid: firebaseUser.uid, 
+                  id: tenantUserDoc.id,
+                  currentCompanyId: companyId,
+                });
 
-              const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
-              if (companyDoc.exists()) {
-                  setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
+                if (companyDoc.exists()) {
+                    setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
+                }
               }
             } else {
-                // الموظف موجود في الفهرس ولكن ملفه داخل المنظمة مفقود أو معزول
-                console.warn("Tenant profile not found for authenticated user.");
                 await signOut(masterAuth);
                 setUser(null);
             }
           } else {
-              // مستخدم مجهول أو لم تتم مزامنته بالفهرس العالمي
-              console.warn("Global Index entry not found.");
               await signOut(masterAuth);
               setUser(null);
           }
@@ -110,6 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Auth Sync Error:", error);
         setUser(null);
       } finally {
+        // نضمن دائماً إنهاء وضع التحميل لمنع تعليق الشاشة
         setLoading(false);
       }
     });
@@ -117,34 +114,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
-  const login = useCallback(async (identifier: string, password: string) => {
-    if (!masterAuth || !masterFirestore) throw new Error("تعذر الاتصال بخادم الأمان.");
-
-    let loginEmail = identifier.toLowerCase().trim();
-
-    // 🛡️ جسر الهوية: إذا أدخل يوزراً بسيطاً (بدون @)، نبحث في الفهرس
-    if (!loginEmail.includes('@')) {
-      const userIndexSnap = await getDocs(query(
-        collection(masterFirestore, 'global_users'), 
-        where('username', '==', loginEmail),
-        limit(1)
-      ));
-      
-      if (userIndexSnap.empty) {
-          throw new Error('اسم المستخدم هذا غير مسجل في أي منشأة.');
-      }
-      loginEmail = userIndexSnap.docs[0].data().email;
-    }
-
+  const login = useCallback(async (email: string, password: string) => {
+    if (!masterAuth) throw new Error("تعذر الاتصال بخادم الأمان.");
     try {
-      await signInWithEmailAndPassword(masterAuth, loginEmail, password);
+      await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (e: any) {
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
           throw new Error('بيانات الدخول غير صحيحة.');
       }
-      throw new Error('فشل تسجيل الدخول. تأكد من مزامنة الحساب من غرفة التحكم.');
+      throw new Error('فشل تسجيل الدخول. يرجى المحاولة لاحقاً.');
     }
-  }, [masterAuth, masterFirestore]);
+  }, [masterAuth]);
 
   const logout = useCallback(async () => {
     if (masterAuth) await signOut(masterAuth);
