@@ -23,7 +23,7 @@ export default function UnifiedLoginPage() {
     if (!authLoading && user) {
         const timer = setTimeout(() => {
             router.replace(user.role === 'Developer' ? '/developer' : '/dashboard');
-        }, 100); // تأخير بسيط لضمان ثبات الجلسة
+        }, 100); // تأخير بسيط لضمان ثبات الجلسة في المتصفح
         return () => clearTimeout(timer);
     }
   }, [user, authLoading, router]);
