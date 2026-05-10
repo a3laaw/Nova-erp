@@ -6,35 +6,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, Lock, AlertCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+/**
+ * بوابة العبور السيادية (The Gateway):
+ * تم تبسيطها بالكامل لضمان سرعة العبور وحل مشكلة الـ Loop.
+ */
 export default function LoginPage() {
-  const { login, user, loading: authLoading, error: contextError } = useAuth();
+  const { login, user, loading, error: authError } = useAuth();
   const router = useRouter();
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [localLoading, setLocalLoading] = useState(false);
 
-  // توجيه تلقائي مستقر
+  // التوجيه التلقائي عند التعرف على الهوية
   useEffect(() => {
-    if (!authLoading && user) {
+    if (user && !loading) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
-        setTimeout(() => router.replace(target), 100);
+        // تأخير بسيط لضمان حفظ الكوكيز في المتصفح قبل التوجيه
+        const timer = setTimeout(() => {
+            router.replace(target);
+        }, 150);
+        return () => clearTimeout(timer);
     }
-  }, [user, authLoading, router]);
+  }, [user, loading, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
-    setIsSubmitting(true);
+    if (localLoading) return;
+    setLocalLoading(true);
 
     try {
         await login(formData.email, formData.password);
     } catch (error) {
-        setIsSubmitting(false);
+        setLocalLoading(false);
     }
   };
 
@@ -53,11 +61,11 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {(contextError) && (
+            {authError && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
-                    <AlertDescription className="text-[11px] font-bold mt-1">{contextError}</AlertDescription>
+                    <AlertDescription className="text-[11px] font-bold mt-1">{authError}</AlertDescription>
                 </Alert>
             )}
 
@@ -71,7 +79,7 @@ export default function LoginPage() {
                         className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2" 
                         required 
                         placeholder="user@company.nova"
-                        disabled={isSubmitting || authLoading}
+                        disabled={localLoading || loading}
                     />
                 </div>
 
@@ -84,19 +92,19 @@ export default function LoginPage() {
                         className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2" 
                         required 
                         placeholder="********"
-                        disabled={isSubmitting || authLoading}
+                        disabled={localLoading || loading}
                     />
                 </div>
 
                 <Button 
                     type="submit" 
-                    disabled={isSubmitting || authLoading} 
+                    disabled={localLoading || loading} 
                     className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-4 border-black/30 mt-2"
                 >
-                    {isSubmitting || authLoading ? (
+                    {localLoading || loading ? (
                         <>
                             <Loader2 className="animate-spin h-6 w-6" />
-                            <span>جاري التحقق...</span>
+                            <span>جاري العبور...</span>
                         </>
                     ) : (
                         <>

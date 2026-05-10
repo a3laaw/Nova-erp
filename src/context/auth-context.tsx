@@ -29,13 +29,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchUserWithContext = useCallback(async (email: string, uid: string) => {
-    if (!masterFirestore) return { userProfile: null, companyData: null };
+  // 🛡️ محرك جلب الهوية السيادي (مبسط ومحصن)
+  const fetchIdentity = useCallback(async (email: string, uid: string) => {
+    if (!masterFirestore) return { profile: null, company: null };
     
     try {
         const lowerEmail = email.toLowerCase().trim();
         
-        // 🛡️ الأولوية للفهرس العالمي (توجيه nova1 لشركته فوراً)
+        // 1. البحث أولاً في الفهرس العالمي (لضمان توجيه nova1 لشركته)
         const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
 
@@ -43,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const indexData = globalSnap.docs[0].data();
             const tenantId = indexData.companyId;
 
+            // جلب ملف المستخدم من داخل مسار الشركة المعزول
             const userRef = doc(masterFirestore, `companies/${tenantId}/users`, uid);
             const userSnap = await getDoc(userRef);
 
@@ -52,29 +54,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const companyData = companySnap.exists() ? { id: companySnap.id, ...companySnap.data() } as CompanyType : null;
 
                 return { 
-                    userProfile: { ...profile, id: userSnap.id, uid, currentCompanyId: tenantId, companyName: companyData?.name || 'Nova Client' }, 
-                    companyData 
+                    profile: { ...profile, id: userSnap.id, uid, currentCompanyId: tenantId, companyName: companyData?.name || 'Nova Client' }, 
+                    company: companyData 
                 };
             }
         }
 
-        // 🛠️ فحص المطور (فقط إذا لم يكن في شركة)
+        // 2. إذا لم يوجد في الشركات، نفحص وضع المطور
         const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
         if (devDoc.exists()) {
             return {
-                userProfile: { 
+                profile: { 
                     id: uid, uid, email: lowerEmail, role: 'Developer', isActive: true, 
                     fullName: devDoc.data().fullName || 'Sovereign Developer',
                     isSuperAdmin: true, currentCompanyId: null, companyName: 'Nova ERP' 
                 } as AuthenticatedUser,
-                companyData: null
+                company: null
             };
         }
 
-        return { userProfile: null, companyData: null };
+        return { profile: null, company: null };
     } catch (e) {
-        console.error("Critical: Auth Fetch Error:", e);
-        return { userProfile: null, companyData: null };
+        console.error("Critical Auth Sync Failure:", e);
+        return { profile: null, company: null };
     }
   }, [masterFirestore]);
 
@@ -85,24 +87,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       try {
         if (firebaseUser?.email) {
-          const { userProfile, companyData } = await fetchUserWithContext(firebaseUser.email, firebaseUser.uid);
+          const { profile, company: companyData } = await fetchIdentity(firebaseUser.email, firebaseUser.uid);
           
-          if (userProfile && userProfile.isActive) {
-            // زرع الكوكيز فوراً لفتح أقفال الـ Middleware
+          if (profile && profile.isActive) {
+            // زرع كوكيز الجلسة فوراً لفتح أقفال الـ Middleware
             document.cookie = `nova-user-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
-            if (userProfile.role === 'Developer') {
+            if (profile.role === 'Developer') {
                 document.cookie = `nova-dev-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
             }
             
-            setUser(userProfile);
+            setUser(profile);
             setCompany(companyData);
             if (companyData) setCurrentCompany(companyData);
           } else {
+            // إذا كان الحساب موجوداً ولكن غير مفعل
             await signOut(masterAuth);
             setUser(null);
-            setError(userProfile ? 'الحساب غير مفعل.' : 'الحساب غير موجود.');
+            setError(profile ? 'الحساب معطل حالياً.' : 'بيانات الدخول غير مسجلة في أي منشأة.');
           }
         } else {
+          // حالة عدم وجود مستخدم (مسح الجلسة)
           setUser(null);
           setCompany(null);
           setCurrentCompany(null);
@@ -110,22 +114,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         }
       } catch (err) {
-          console.error("Auth Sync Error:", err);
+          console.error("Auth Loop Prevention catch:", err);
       } finally {
-        setLoading(false);
+        setLoading(false); // ضمان إغلاق حالة التحميل مهما كانت النتيجة
       }
     });
 
     return () => unsubscribe();
-  }, [masterAuth, fetchUserWithContext, setCurrentCompany]);
+  }, [masterAuth, fetchIdentity, setCurrentCompany]);
 
   const login = async (email: string, password: string) => {
     if (!masterAuth) return;
     setError(null);
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (err: any) {
-        setError('بيانات الدخول غير صحيحة.');
+        setLoading(false);
+        setError('خطأ في البريد الإلكتروني أو كلمة المرور.');
         throw err;
     }
   };
@@ -135,8 +141,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       await signOut(masterAuth);
-      document.cookie = 'nova-user-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       router.replace('/');
     } finally {
       setLoading(false);
