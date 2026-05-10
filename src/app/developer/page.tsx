@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -15,7 +14,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
     MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
     Activity, Users, Clock, CheckCircle2, ShieldAlert, 
-    FileStack, Rocket, Key, Copy, AlertCircle, Settings
+    FileStack, Rocket, Key, Copy, AlertCircle, Settings, RefreshCcw
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -35,13 +34,6 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-const activityTranslations: Record<string, string> = {
-    general: 'تجاري عام',
-    food_delivery: 'مطاعم وأغذية',
-    construction: 'مقاولات وبناء',
-    consulting: 'استشارات هندسية',
-};
-
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -50,8 +42,6 @@ export default function DeveloperDashboard() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  
-  // حالة نموذج التعديل والإضافة
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
@@ -143,13 +133,32 @@ export default function DeveloperDashboard() {
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
         
-        toast({ 
-            title: 'تم التفعيل', 
-            description: `المنشأة "${request.companyName}" مفعلة الآن.` 
-        });
+        toast({ title: 'تم التفعيل', description: `المنشأة "${request.companyName}" مفعلة الآن.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
+  };
+
+  const handleRepairAccount = async (company: Company) => {
+      if (!firestore || isProcessing) return;
+      setIsProcessing(company.id!);
+      try {
+          const response = await fetch('/api/manage-tenant-user', {
+              method: 'POST',
+              body: JSON.stringify({
+                  email: company.adminEmail,
+                  password: company.adminPassword,
+                  displayName: company.name,
+                  action: 'repair'
+              })
+          });
+          const result = await response.json();
+          if (!result.success && !result.simulated) throw new Error(result.error);
+          
+          toast({ title: 'نجاح المزامنة', description: `تم إصلاح وتفعيل حساب دخول "${company.name}" بنجاح.` });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'خطأ في الإصلاح', description: e.message });
+      } finally { setIsProcessing(null); }
   };
 
   const handleSwitchToCompany = async (company: Company) => {
@@ -172,16 +181,6 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
-  const handleEditCompany = (company: Company) => {
-      setSelectedCompany(company);
-      setIsFormOpen(true);
-  };
-
-  const handleAddNew = () => {
-      setSelectedCompany(null);
-      setIsFormOpen(true);
-  };
-
   return (
     <div className="space-y-10" dir="rtl">
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-[#1e1b4b]">
@@ -194,7 +193,7 @@ export default function DeveloperDashboard() {
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">تأسيس المنظمات، إدارة التراخيص، والرقابة العليا على المنصة.</CardDescription>
                         </div>
                     </div>
-                    <Button onClick={handleAddNew} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 border-b-4 border-indigo-900 active:translate-y-1 active:border-b-0 transition-all">
+                    <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 border-b-4 border-indigo-900 active:translate-y-1 active:border-b-0 transition-all">
                         <PlusCircle className="h-6 w-6" /> تأسيس منشأة جديدة
                     </Button>
                 </div>
@@ -282,15 +281,15 @@ export default function DeveloperDashboard() {
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl border-none bg-white/95 backdrop-blur-xl">
                                                             <DropdownMenuLabel className="font-black px-3 py-2 text-indigo-950">إدارة المنشأة</DropdownMenuLabel>
-                                                            <DropdownMenuItem onClick={() => handleEditCompany(company)} className="rounded-xl py-3 font-bold gap-3 cursor-pointer">
+                                                            <DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3 cursor-pointer">
                                                                 <Settings className="h-4 w-4 text-indigo-600" /> تعديل البيانات والترخيص
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleSwitchToCompany(company)} className="rounded-xl py-3 font-bold gap-3 cursor-pointer">
-                                                                <Activity className="h-4 w-4 text-green-600" /> مراقبة الأداء اللحظي
+                                                            <DropdownMenuItem onClick={() => handleRepairAccount(company)} className="rounded-xl py-3 font-black gap-3 cursor-pointer text-blue-600 focus:bg-blue-50">
+                                                                <RefreshCcw className="h-4 w-4" /> إصلاح ومزامنة الحساب
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem className="text-red-600 rounded-xl py-3 font-black gap-3 cursor-pointer focus:bg-red-50">
-                                                                <ShieldAlert className="h-4 w-4" /> تجميد الحساب (Sovereign Lock)
+                                                                <ShieldAlert className="h-4 w-4" /> تجميد الحساب
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
@@ -363,7 +362,6 @@ export default function DeveloperDashboard() {
             </TabsContent>
         </Tabs>
 
-        {/* نموذج تأسيس وتعديل الشركات */}
         <CompanyRegistrationForm 
             isOpen={isFormOpen} 
             onClose={() => setIsFormOpen(false)} 

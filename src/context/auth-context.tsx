@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -106,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * محرك الدخول الذكي: 
-   * يقبل الإيميل الكامل أو "اسم المستخدم" فقط.
+   * تم تحصينه للتعامل مع أخطاء الحسابات التي لم تُزامن بعد (وضع المحاكاة).
    */
   const login = useCallback(async (identifier: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("تعذر الاتصال بخادم الأمان.");
@@ -130,6 +129,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signInWithEmailAndPassword(masterAuth, email, password);
     } catch (e: any) {
+      if (e.code === 'auth/user-not-found') {
+          throw new Error('حسابك مسجل في قاعدة البيانات ولكن لم يتم تفعيله أمنياً بعد. يرجى مراجعة المسؤول لإجراء "إصلاح ومزامنة الحساب".');
+      }
       throw new Error('بيانات الدخول غير صحيحة. يرجى التأكد من اسم المستخدم وكلمة المرور.');
     }
   }, [masterAuth, masterFirestore]);
