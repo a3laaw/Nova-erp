@@ -30,6 +30,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
+/**
+ * قاموس تراجم الأنشطة المفقود (إصلاح خطأ ReferenceError)
+ */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -48,6 +51,7 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
+  // اشتراك لحظي في المنشآت والطلبات
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
   

@@ -18,8 +18,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * سياق الأمان السيادي المطور (Sovereign Auth Core v3.0):
- * تم تحصينه ببروتوكول "الإنهاء القاطع" لمنع حلقة التحميل اللانهائية (Loading Loop).
+ * سياق الأمان السيادي المطور (Sovereign Auth Core v3.8):
+ * تم تحصينه ببروتوكول "المزامنة القاطعة" لمنع حلقة التحميل اللانهائية.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
-  // مساعد زرع الكوكيز السيادي: يفتح أقفال الـ Middleware فوراً
+  // 🛡️ مساعد زرع الكوكيز السيادي: يفتح أقفال الـ Middleware فوراً
   const setAuthCookies = (uid: string, isDev: boolean) => {
     const expiry = 60 * 60 * 24 * 7; // 7 days
     document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
@@ -77,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           };
           setUser(devData);
           setAuthCookies(firebaseUser.uid, true);
-          setLoading(false);
+          setLoading(false); // ⚡ تحرير فوري
           return;
         }
 
@@ -116,11 +116,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               }
             } else {
                 // إذا وجدنا الإيميل ولكن لم نجد ملف المستخدم في الشركة (نقص مزامنة)
+                // نسجل الخروج ونحرر الحالة لمنع اللوب
+                await signOut(masterAuth);
                 setUser(null);
                 removeAuthCookies();
             }
           } else {
               // إذا لم يجد الإيميل في الفهرس العالمي (مستخدم مجهول)
+              await signOut(masterAuth);
               setUser(null);
               removeAuthCookies();
           }
@@ -130,7 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         removeAuthCookies();
       } finally {
-        // 🛡️ صمام الأمان الأهم: إنهاء وضع التحميل تحت أي ظرف
+        // 🛡️ صمام الأمان الأهم: إنهاء وضع التحميل تحت أي ظرف لمنع تعليق الشاشة
         setLoading(false);
       }
     });
@@ -141,21 +144,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error("تعذر الاتصال بخادم الأمان.");
     try {
+      // 🚀 إجبار مسح الكوكيز القديمة قبل محاولة الدخول الجديدة
+      removeAuthCookies();
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (e: any) {
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
           throw new Error('بيانات العبور غير صحيحة.');
       }
-      throw new Error('فشل تسجيل الدخول. يرجى المحاولة لاحقاً.');
+      throw new Error(`فشل الدخول: ${e.message}`);
     }
   }, [masterAuth]);
 
   const logout = useCallback(async () => {
+    setLoading(true); // إظهار شاشة التحميل أثناء الخروج لضمان النظافة
     if (masterAuth) await signOut(masterAuth);
     setUser(null);
     setCurrentCompany(null);
     removeAuthCookies();
     router.replace('/');
+    setLoading(false);
   }, [masterAuth, setCurrentCompany, router]);
 
   return (
