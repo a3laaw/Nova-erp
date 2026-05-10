@@ -29,14 +29,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🛡️ محرك جلب الهوية السيادي (مبسط ومحصن)
+  // 🛡️ محرك جلب الهوية السيادي: يبحث أولاً في الشركات لضمان دخول nova1 لشركته
   const fetchIdentity = useCallback(async (email: string, uid: string) => {
     if (!masterFirestore) return { profile: null, company: null };
     
     try {
         const lowerEmail = email.toLowerCase().trim();
         
-        // 1. البحث أولاً في الفهرس العالمي (لضمان توجيه nova1 لشركته)
+        // 1. البحث أولاً في الفهرس العالمي (لضمان توجيه المستخدمين لشركاتهم فوراً)
         const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
 
@@ -44,7 +44,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const indexData = globalSnap.docs[0].data();
             const tenantId = indexData.companyId;
 
-            // جلب ملف المستخدم من داخل مسار الشركة المعزول
             const userRef = doc(masterFirestore, `companies/${tenantId}/users`, uid);
             const userSnap = await getDoc(userRef);
 
@@ -60,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 2. إذا لم يوجد في الشركات، نفحص وضع المطور
+        // 2. إذا لم يوجد في الشركات، نفحص وضع المطور (غرفة التحكم)
         const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
         if (devDoc.exists()) {
             return {
@@ -75,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return { profile: null, company: null };
     } catch (e) {
-        console.error("Critical Auth Sync Failure:", e);
+        console.error("Auth Sync Failure:", e);
         return { profile: null, company: null };
     }
   }, [masterFirestore]);
@@ -90,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { profile, company: companyData } = await fetchIdentity(firebaseUser.email, firebaseUser.uid);
           
           if (profile && profile.isActive) {
-            // زرع كوكيز الجلسة فوراً لفتح أقفال الـ Middleware
+            // زرع الكوكيز فوراً لفتح أقفال الـ Middleware
             document.cookie = `nova-user-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
             if (profile.role === 'Developer') {
                 document.cookie = `nova-dev-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
@@ -100,23 +99,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setCompany(companyData);
             if (companyData) setCurrentCompany(companyData);
           } else {
-            // إذا كان الحساب موجوداً ولكن غير مفعل
             await signOut(masterAuth);
             setUser(null);
             setError(profile ? 'الحساب معطل حالياً.' : 'بيانات الدخول غير مسجلة في أي منشأة.');
           }
         } else {
-          // حالة عدم وجود مستخدم (مسح الجلسة)
           setUser(null);
           setCompany(null);
           setCurrentCompany(null);
           document.cookie = 'nova-user-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
           document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         }
-      } catch (err) {
-          console.error("Auth Loop Prevention catch:", err);
       } finally {
-        setLoading(false); // ضمان إغلاق حالة التحميل مهما كانت النتيجة
+        setLoading(false);
       }
     });
 

@@ -49,15 +49,6 @@ export default function DeveloperDashboard() {
 
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
-  const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
-
-  const userCountsByCompany = useMemo(() => {
-    const counts: Record<string, number> = {};
-    (allUsers || []).forEach(u => {
-        if (u.companyId) counts[u.companyId] = (counts[u.companyId] || 0) + 1;
-    });
-    return counts;
-  }, [allUsers]);
 
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
@@ -80,6 +71,8 @@ export default function DeveloperDashboard() {
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
         toast({ title: 'تم التقمص السيادي بنجاح' });
         router.push('/dashboard');
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'فشل التقمص' });
     } finally { setIsProcessing(null); }
   };
 
@@ -91,18 +84,9 @@ export default function DeveloperDashboard() {
             method: 'POST',
             body: JSON.stringify({ email: company.adminEmail, password: company.adminPassword, displayName: company.name, action: 'repair' })
         });
-        const batch = writeBatch(firestore);
-        const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail));
-        const globalSnap = await getDocs(globalQuery);
-        
-        if (globalSnap.empty) {
-            batch.set(doc(collection(firestore, 'global_users')), { 
-                username: company.adminEmail.split('@')[0], email: company.adminEmail, 
-                companyId: company.id, role: 'Admin', companyName: company.name 
-            });
-        }
-        await batch.commit();
         toast({ title: 'نجحت المزامنة الجبارة' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'فشل الإصلاح' });
     } finally { setIsProcessing(null); }
   };
 
@@ -138,14 +122,13 @@ export default function DeveloperDashboard() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">التواصل</TableHead><TableHead className="font-black text-indigo-100 text-center">الحصة (مستخدمين)</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">التواصل</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {companiesLoading ? <TableRow><TableCell colSpan={5} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow> :
+                                {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
                                     <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
                                         <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail?.split('@')[0]}</span></div></div></TableCell>
                                         <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
-                                        <TableCell className="text-center font-black text-xl text-indigo-950">{userCountsByCompany[company.id!] || 0} / {company.maxUsersLimit || 0}</TableCell>
                                         <TableCell className="text-center"><Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>{company.isActive ? 'ACTIVE' : 'LOCKED'}</Badge></TableCell>
                                         <TableCell className="text-left px-12">
                                             <div className="flex items-center justify-end gap-3">

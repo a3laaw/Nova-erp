@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
  * بوابة العبور السيادية (The Gateway):
- * تم تبسيطها بالكامل لضمان سرعة العبور وحل مشكلة الـ Loop.
+ * تم إعادة بنائها لتكون بسيطة، سريعة، وملتزمة 100% بالتصميم الأصلي.
  */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
@@ -22,14 +22,13 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [localLoading, setLocalLoading] = useState(false);
 
-  // التوجيه التلقائي عند التعرف على الهوية
+  // التوجيه التلقائي عند التعرف على الهوية (مع تأخير استقرار)
   useEffect(() => {
     if (user && !loading) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
-        // تأخير بسيط لضمان حفظ الكوكيز في المتصفح قبل التوجيه
         const timer = setTimeout(() => {
             router.replace(target);
-        }, 150);
+        }, 100);
         return () => clearTimeout(timer);
     }
   }, [user, loading, router]);
@@ -57,7 +56,7 @@ export default function LoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1">بوابة العبور السيادية</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest">بوابة العبور السيادية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
@@ -104,7 +103,7 @@ export default function LoginPage() {
                     {localLoading || loading ? (
                         <>
                             <Loader2 className="animate-spin h-6 w-6" />
-                            <span>جاري العبور...</span>
+                            <span>جاري التحقق...</span>
                         </>
                     ) : (
                         <>
