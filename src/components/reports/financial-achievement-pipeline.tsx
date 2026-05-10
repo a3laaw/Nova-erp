@@ -20,6 +20,10 @@ import { DateInput } from '@/components/ui/date-input';
 import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
+/**
+ * تقرير ميزان التحصيل والتدفق المالي (Revenue Pipeline):
+ * يربط الإنجاز الفني بالدفعات المستحقة بناءً على مراحل العقد.
+ */
 export function FinancialAchievementPipeline() {
   const { transactions, clients, journalEntries, accounts, loading } = useAnalyticalData();
   const { toast } = useToast();

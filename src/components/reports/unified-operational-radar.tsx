@@ -22,6 +22,10 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '@/components/ui/date-input';
 
+/**
+ * رادار نبض العمل والميدان (Operational Pulse Radar):
+ * دمج الحالة التشغيلية، الركود، والزيارات الميدانية في رؤية واحدة.
+ */
 export function UnifiedOperationalRadar() {
   const { transactions, clients, employees, departments, appointments, loading } = useAnalyticalData();
   

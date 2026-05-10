@@ -21,6 +21,10 @@ import { DateInput } from '@/components/ui/date-input';
 import { startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
 
+/**
+ * لوحة مؤشرات الأداء (Executive KPI Scorecard):
+ * تعطي لقطة مثبتة لكفاءة كل قسم هندسي ومعدلات الإنجاز.
+ */
 export function ExecutiveKpiScorecard() {
   const { transactions, departments, loading } = useAnalyticalData();
   const { toast } = useToast();

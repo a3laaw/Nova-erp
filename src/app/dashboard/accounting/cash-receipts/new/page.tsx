@@ -33,7 +33,12 @@ import { useBranding } from '@/context/branding-context';
 import { DateInput } from '@/components/ui/date-input';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 
+/**
+ * صفحة إصدار سند قبض جديد:
+ * تم ترميم كافة الأيقونات والمكونات لضمان أعلى درجات الدقة الرقابية والجمالية.
+ */
 export default function NewCashReceiptPage() {
   const router = useRouter();
   const { firestore } = useFirebase();

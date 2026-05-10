@@ -41,8 +41,12 @@ interface RfqComparisonViewProps {
   rfq: RequestForQuotation;
 }
 
-const VENDORS_PER_PAGE = 3; 
-
+/**
+ * مصفوفة مقارنة عروض الأسعار السيادية (Sovereign Comparison Matrix):
+ * - تظليل أقل سعر آلياً لكل صنف.
+ * - دعم الترسية المجزأة (Split Award) لكل مورد على حدة.
+ * - توليد أوامر شراء ذكية بناءً على الترسية.
+ */
 export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -50,7 +54,6 @@ export function RfqComparisonView({ rfq }: RfqComparisonViewProps) {
   const { user: currentUser } = useAuth();
 
   const [isAwarding, setIsAwarding] = useState(false);
-  const [isReopening, setIsReopening] = useState(false);
   const [selectedAwards, setSelectedAwards] = useState<Record<string, string>>({}); 
 
   const { data: allVendorsList, loading: vendorsLoading } = useSubscription<Vendor>(
