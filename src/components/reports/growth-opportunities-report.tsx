@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -13,22 +12,31 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Search, FileSearch, Loader2, Sparkles, Building2, 
-    ArrowUpRight, ShoppingBag, FileCheck, Target, Calculator 
+    ArrowUpRight, ShoppingBag, FileCheck, Target, Calculator, UserPlus
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { format } from 'date-fns';
 
 /**
- * تقرير رصد فرص النمو.
- * تم تبسيط المسميات وضمان استيراد كافة الأيقونات والمكونات.
+ * تقرير رصد فرص النمو والتحول (v2.0):
+ * - تقدير القيمة المالية المتوقعة للفرصة.
+ * - زر تحويل لطلب متابعة Lead.
+ * - تحليل التقارب من إغلاق التراخيص.
  */
 const LICENSING_KEYWORDS = ['بلدية', 'رخصة', 'تراخيص'];
 const DESIGN_KEYWORDS = ['معماري', 'تصميم'];
 const ALL_SERVICES = ['إشراف', 'واجهات', 'صحي', 'كهرباء', 'إنشائي'];
+
+const ESTIMATED_VALUES: Record<string, number> = {
+    'contracting': 45000, // متوسط عقد تنفيذ
+    'upsell': 1500, // متوسط خدمة إضافية
+};
 
 export function GrowthOpportunitiesReport() {
   const { transactions, clients, loading } = useAnalyticalData();
@@ -85,7 +93,8 @@ export function GrowthOpportunitiesReport() {
                         triggerDate: completedLicenses[0].updatedAt,
                         recommendation: 'عقد مقاولات / تنفيذ',
                         type: 'contracting',
-                        severity: 'high'
+                        severity: 'high',
+                        estValue: ESTIMATED_VALUES.contracting
                     });
                 }
             }
@@ -104,15 +113,16 @@ export function GrowthOpportunitiesReport() {
                         recommendation: `تقديم خدمات: ${missing.join('، ')}`,
                         type: 'upsell',
                         severity: 'medium',
-                        missingCount: missing.length
+                        missingCount: missing.length,
+                        estValue: missing.length * ESTIMATED_VALUES.upsell
                     });
                 }
             }
         });
 
-        setReportResults(opportunities.sort((a,b) => (a.type === 'contracting' ? -1 : 1)));
+        setReportResults(opportunities.sort((a,b) => (b.estValue - a.estValue)));
         setIsGenerating(false);
-        toast({ title: 'نجاح', description: 'تم جرد فرص النمو والتحول.' });
+        toast({ title: 'نجاح', description: 'تم جرد فرص النمو وتقدير قيمتها السوقية.' });
     }, 800);
   };
 
@@ -122,6 +132,10 @@ export function GrowthOpportunitiesReport() {
     const lower = searchQuery.toLowerCase();
     return reportResults.filter(r => r.clientName.toLowerCase().includes(lower));
   }, [reportResults, searchQuery]);
+
+  const totalPotentialValue = useMemo(() => 
+    filteredData.reduce((sum, i) => sum + i.estValue, 0)
+  , [filteredData]);
 
   return (
     <div className="space-y-6">
@@ -154,9 +168,9 @@ export function GrowthOpportunitiesReport() {
                     <TableRow className="h-14 border-none">
                         <TableHead className="px-8 font-black text-white text-right">العميل المستهدف</TableHead>
                         <TableHead className="font-black text-white">الإنجاز السابق</TableHead>
-                        <TableHead className="font-black text-white">التاريخ</TableHead>
+                        <TableHead className="font-black text-white">القيمة المتوقعة</TableHead>
                         <TableHead className="font-black text-white bg-amber-500/20">الإجراء المقترح</TableHead>
-                        <TableHead className="font-black text-white text-left px-8">الأهمية</TableHead>
+                        <TableHead className="font-black text-white text-left px-8">المتابعة</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -172,30 +186,42 @@ export function GrowthOpportunitiesReport() {
                                     </Link>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                                        {item.type === 'contracting' ? <FileCheck className="h-4 w-4 text-green-600" /> : <Calculator className="h-4 w-4 text-blue-600" />}
-                                        {item.trigger}
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                                            {item.type === 'contracting' ? <FileCheck className="h-4 w-4 text-green-600" /> : <Calculator className="h-4 w-4 text-blue-600" />}
+                                            {item.trigger}
+                                        </div>
+                                        <span className="text-[10px] opacity-40 font-mono">{toFirestoreDate(item.triggerDate) ? format(toFirestoreDate(item.triggerDate)!, 'dd/MM/yyyy') : '-'}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell className="font-mono text-xs opacity-60">
-                                    {toFirestoreDate(item.triggerDate) ? format(toFirestoreDate(item.triggerDate)!, 'dd/MM/yyyy') : '-'}
+                                <TableCell className="font-mono font-black text-primary">
+                                    {formatCurrency(item.estValue)}
                                 </TableCell>
                                 <TableCell className="bg-amber-50/30 border-r border-amber-100">
                                     <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-amber-100 rounded-xl text-amber-700"><Target className="h-4 w-4"/></div>
+                                        <div className="p-2 bg-amber-100 rounded-xl text-amber-700 shadow-inner"><Target className="h-4 w-4"/></div>
                                         <span className="font-black text-amber-900">{item.recommendation}</span>
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-left px-8">
-                                    <Badge className={cn(
-                                        "px-4 py-1 rounded-full font-black text-[10px]",
-                                        item.severity === 'high' ? "bg-red-600" : "bg-blue-600"
-                                    )}>{item.severity === 'high' ? 'عالية' : 'متوسطة'}</Badge>
+                                    <Button variant="outline" size="sm" className="rounded-xl font-bold h-9 gap-2 border-primary/20 text-primary hover:bg-primary hover:text-white" asChild>
+                                        <Link href={`/dashboard/appointments/new?clientId=${item.clientId}&nameAr=${encodeURIComponent(item.clientName)}`}>
+                                            <UserPlus className="h-4 w-4"/> تحويل لمتابعة
+                                        </Link>
+                                    </Button>
                                 </TableCell>
                             </TableRow>
                         ))
                     )}
                 </TableBody>
+                <TableFooter className="bg-amber-50 h-24 border-t-4 border-amber-200">
+                    <TableRow>
+                        <TableCell colSpan={2} className="px-12 font-black text-2xl text-amber-900">إجمالي القيمة السوقية للفرص:</TableCell>
+                        <TableCell className="text-left font-mono text-3xl font-black text-amber-700" colSpan={3}>
+                            {formatCurrency(totalPotentialValue)}
+                        </TableCell>
+                    </TableRow>
+                </TableFooter>
             </Table>
         </Card>
       ) : (
