@@ -15,7 +15,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, Pencil, 
     MoreHorizontal, DatabaseZap, ArrowRightLeft, ShieldCheck, 
     Activity, Users, Clock, CheckCircle2, ShieldAlert, 
-    FileStack, Rocket, Key, Copy, AlertCircle
+    FileStack, Rocket, Key, Copy, AlertCircle, Settings
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -41,10 +42,6 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
-/**
- * لوحة تحكم المطور:
- * مسؤولة عن "تأسيس" المنشآت الجديدة وضمان عزلها التام.
- */
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -53,6 +50,10 @@ export default function DeveloperDashboard() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  
+  // حالة نموذج التعديل والإضافة
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const { data: rawCompanies, loading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
@@ -66,24 +67,22 @@ export default function DeveloperDashboard() {
     });
     if (searchQuery) {
         const lower = searchQuery.toLowerCase();
-        processed = processed.filter(c => c.name.toLowerCase().includes(lower) || c.adminEmail?.toLowerCase().includes(lower));
+        processed = processed.filter(c => 
+            c.name.toLowerCase().includes(lower) || 
+            c.adminEmail?.toLowerCase().includes(lower)
+        );
     }
     return processed;
   }, [rawCompanies, searchQuery]);
 
-  /**
-   * محرك التفعيل الآلي (Sovereign Provisioning):
-   * يقوم بإنشاء شركة نظيفة تماماً بمعرف جديد، وبناء الهوية الرقمية للمدير.
-   */
   const handleApproveRequest = async (request: any) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
     try {
         const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
-        const username = request.username; // الاسم الذي اختاره العميل
-        const internalEmail = `${username}@${companyId}.nova`; // الهوية الرقمية المعزولة
+        const username = request.username; 
+        const internalEmail = `${username}@${companyId}.nova`; 
 
-        // 1. إنشاء الحساب في Firebase Auth عبر الـ API السيادي
         const authResponse = await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({
@@ -99,15 +98,14 @@ export default function DeveloperDashboard() {
         const trialEndDate = addDays(new Date(), 14);
 
         await runTransaction(firestore, async (transaction) => {
-            // 2. إنشاء وثيقة الشركة الرئيسية
             const companyRef = doc(firestore, 'companies', companyId);
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity,
                 adminEmail: internalEmail,
                 adminPassword: request.adminPassword,
-                contactPhone: request.phone, // حفظ الهاتف للتواصل اللاحق
-                contactEmail: request.email, // حفظ الإيميل الحقيقي للتواصل اللاحق
+                contactPhone: request.phone,
+                contactEmail: request.email,
                 subscriptionType: 'trial',
                 trialEndDate: Timestamp.fromDate(trialEndDate),
                 maxUsersLimit: 5,
@@ -122,7 +120,6 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            // 3. إنشاء ملف المدير في المجلد المعزول الخاص بالشركة
             const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid || 'simulated-uid');
             transaction.set(tenantUserRef, {
                 uid: authResult.uid || 'simulated-uid',
@@ -135,7 +132,6 @@ export default function DeveloperDashboard() {
                 createdAt: serverTimestamp()
             });
 
-            // 4. تحديث الفهرس العالمي لتمكين الدخول باسم المستخدم
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: internalEmail,
@@ -144,13 +140,12 @@ export default function DeveloperDashboard() {
                 role: 'Admin'
             });
 
-            // 5. تحديث حالة الطلب
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
         
         toast({ 
-            title: 'تم التأسيس بنجاح', 
-            description: `المنشأة "${request.companyName}" جاهزة الآن. الدخول بـ: ${username}` 
+            title: 'تم التفعيل', 
+            description: `المنشأة "${request.companyName}" مفعلة الآن.` 
         });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
@@ -170,11 +165,21 @@ export default function DeveloperDashboard() {
         if (!result.success) throw new Error(result.error);
         
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
-        toast({ title: 'تم التبديل', description: `أنت الآن في بيئة عمل: ${company.name}` });
+        toast({ title: 'تم الدخول', description: `أنت الآن تشرف على: ${company.name}` });
         router.push('/dashboard');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: e.message });
     } finally { setIsProcessing(null); }
+  };
+
+  const handleEditCompany = (company: Company) => {
+      setSelectedCompany(company);
+      setIsFormOpen(true);
+  };
+
+  const handleAddNew = () => {
+      setSelectedCompany(null);
+      setIsFormOpen(true);
   };
 
   return (
@@ -185,10 +190,13 @@ export default function DeveloperDashboard() {
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter">لوحة إدارة المنصة</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">تأسيس المنظمات الجديدة، إدارة التراخيص، ومتابعة قاعدة بيانات التواصل.</CardDescription>
+                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم والسيادة</CardTitle>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">تأسيس المنظمات، إدارة التراخيص، والرقابة العليا على المنصة.</CardDescription>
                         </div>
                     </div>
+                    <Button onClick={handleAddNew} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 border-b-4 border-indigo-900 active:translate-y-1 active:border-b-0 transition-all">
+                        <PlusCircle className="h-6 w-6" /> تأسيس منشأة جديدة
+                    </Button>
                 </div>
             </CardHeader>
         </Card>
@@ -200,37 +208,52 @@ export default function DeveloperDashboard() {
                 </TabsTrigger>
                 <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white relative">
                     <FileStack className="h-5 w-5"/> طلبات الانضمام
-                    {requests.filter(r => r.status === 'pending').length > 0 && <span className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-black animate-bounce shadow-lg">{requests.filter(r => r.status === 'pending').length}</span>}
+                    {requests.filter(r => r.status === 'pending').length > 0 && (
+                        <span className="absolute -top-1 -right-1 h-6 w-6 bg-red-500 rounded-full flex items-center justify-center text-xs font-black animate-bounce shadow-lg">{requests.filter(r => r.status === 'pending').length}</span>
+                    )}
                 </TabsTrigger>
             </TabsList>
 
             <TabsContent value="companies">
                 <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
+                    <CardHeader className="bg-slate-50 border-b p-8 px-12">
+                        <div className="relative w-full max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-950 opacity-40" />
+                            <Input
+                                placeholder="بحث باسم المنشأة..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold"
+                            />
+                        </div>
+                    </CardHeader>
                     <CardContent className="p-0">
                         <Table>
                             <TableHeader className="bg-[#1e1b4b] h-16">
                                 <TableRow className="border-none">
-                                    <TableHead className="px-12 font-black text-white text-base text-right">المنظمة وبيانات الدخول</TableHead>
-                                    <TableHead className="font-black text-indigo-100 text-base text-center">بيانات التواصل</TableHead>
-                                    <TableHead className="font-black text-indigo-100 text-base text-center">الحصة</TableHead>
+                                    <TableHead className="px-12 font-black text-white text-base text-right">المنظمة والربط</TableHead>
+                                    <TableHead className="font-black text-indigo-100 text-base text-center">التواصل</TableHead>
+                                    <TableHead className="font-black text-indigo-100 text-base text-center">الحصة (Users)</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-base text-center">الحالة</TableHead>
-                                    <TableHead className="text-left px-12 font-black text-indigo-100 text-base">التحكم</TableHead>
+                                    <TableHead className="text-left px-12 font-black text-indigo-100 text-base">إجراءات السيادة</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {loading ? (
                                     <TableRow><TableCell colSpan={5} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>
                                 ) : filteredCompanies.length === 0 ? (
-                                    <TableRow><TableCell colSpan={5} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Organizations Found</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={5} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Organizations Registered</TableCell></TableRow>
                                 ) : (
                                     filteredCompanies.map(company => (
-                                        <TableRow key={company.id} className="h-32 border-slate-100 group transition-all">
+                                        <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
                                             <TableCell className="px-12">
                                                 <div className="flex items-center gap-4">
-                                                    <Building2 className="h-8 w-8 text-indigo-600" />
+                                                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-sm">
+                                                        <Building2 className="h-6 w-6" />
+                                                    </div>
                                                     <div className="flex flex-col">
-                                                        <span className="font-black text-xl">{company.name}</span>
-                                                        <span className="font-mono text-xs text-primary font-bold">Username: {company.adminEmail?.split('@')[0]}</span>
+                                                        <span className="font-black text-xl text-[#1e1b4b]">{company.name}</span>
+                                                        <span className="font-mono text-xs text-primary font-bold">@{company.adminEmail?.split('@')[0]}</span>
                                                     </div>
                                                 </div>
                                             </TableCell>
@@ -240,7 +263,7 @@ export default function DeveloperDashboard() {
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 <div className="font-black text-xl text-indigo-950">{(company as any).currentUsersCount || 0} / {company.maxUsersLimit}</div>
-                                                <span className="text-[9px] font-black text-muted-foreground uppercase">Users Limit</span>
+                                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Active Licenses</span>
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 <Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200')}>
@@ -248,9 +271,30 @@ export default function DeveloperDashboard() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-left px-12">
-                                                <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2 border-indigo-200 text-indigo-700">
-                                                    <ArrowRightLeft className="h-4 w-4"/> دخول للمنظمة
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-3">
+                                                    <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                                                        {isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} 
+                                                        دخول للمنظمة
+                                                    </Button>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border group-hover:border-indigo-200"><MoreHorizontal className="h-5 w-5" /></Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl border-none bg-white/95 backdrop-blur-xl">
+                                                            <DropdownMenuLabel className="font-black px-3 py-2 text-indigo-950">إدارة المنشأة</DropdownMenuLabel>
+                                                            <DropdownMenuItem onClick={() => handleEditCompany(company)} className="rounded-xl py-3 font-bold gap-3 cursor-pointer">
+                                                                <Settings className="h-4 w-4 text-indigo-600" /> تعديل البيانات والترخيص
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleSwitchToCompany(company)} className="rounded-xl py-3 font-bold gap-3 cursor-pointer">
+                                                                <Activity className="h-4 w-4 text-green-600" /> مراقبة الأداء اللحظي
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem className="text-red-600 rounded-xl py-3 font-black gap-3 cursor-pointer focus:bg-red-50">
+                                                                <ShieldAlert className="h-4 w-4" /> تجميد الحساب (Sovereign Lock)
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -299,7 +343,7 @@ export default function DeveloperDashboard() {
                                                 <Button 
                                                     onClick={() => handleApproveRequest(req)} 
                                                     disabled={!!isProcessing} 
-                                                    className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8"
+                                                    className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-lg shadow-green-100"
                                                 >
                                                     {isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} 
                                                     تفعيل وبناء البيئة
@@ -318,6 +362,13 @@ export default function DeveloperDashboard() {
                 </Card>
             </TabsContent>
         </Tabs>
+
+        {/* نموذج تأسيس وتعديل الشركات */}
+        <CompanyRegistrationForm 
+            isOpen={isFormOpen} 
+            onClose={() => setIsFormOpen(false)} 
+            company={selectedCompany} 
+        />
     </div>
   );
 }
