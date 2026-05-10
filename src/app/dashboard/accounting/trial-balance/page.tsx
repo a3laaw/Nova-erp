@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -26,17 +25,21 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
-import { Loader2, Printer, Scale } from 'lucide-react';
+import { formatCurrency, cn } from '@/lib/utils';
+import { Loader2, Printer, Scale, Filter, AlertTriangle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TrialBalanceLine {
   accountId: string;
   accountCode: string;
   accountName: string;
+  type: string;
+  level: number;
   openingDebit: number;
   openingCredit: number;
   periodDebit: number;
@@ -45,84 +48,49 @@ interface TrialBalanceLine {
   closingCredit: number;
 }
 
+/**
+ * ميزان المراجعة المطور (v2.0):
+ * - فلترة متقدمة حسب النوع والمستوى.
+ * - إخفاء الأرصدة الصفرية.
+ * - تنبيهات عدم التوازن.
+ */
 export default function TrialBalancePage() {
     const { firestore } = useFirebase();
     const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();
+    
     const [loading, setLoading] = useState(true);
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
 
-    const [dateFrom, setDateFrom] = useState<Date | undefined>();
-    const [dateTo, setDateTo] = useState<Date | undefined>();
+    const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
+    const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
+    
+    // Filters
+    const [hideZeroBalances, setHideZeroBalances] = useState(true);
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [levelFilter, setLevelFilter] = useState('all');
 
-    useEffect(() => {
-        const now = new Date();
-        setDateFrom(startOfMonth(now));
-        setDateTo(endOfMonth(now));
-    }, []);
-
-    // الرقابة المنطقية: تصفير تاريخ النهاية إذا كان يسبق البداية
-    useEffect(() => {
-        if (dateFrom && dateTo && isBefore(startOfDay(dateTo), startOfDay(dateFrom))) {
-            setDateTo(undefined);
-            toast({
-                variant: 'destructive',
-                title: 'خطأ منطقي',
-                description: 'التاريخ غلط، لا يجوز أن يسبق تاريخ النهاية تاريخ البداية.',
-            });
-        }
-    }, [dateFrom, dateTo, toast]);
-
-    // Fetch accounts once
     useEffect(() => {
         if (!firestore) return;
-        const fetchAccountsData = async () => {
+        const fetchData = async () => {
             try {
-                const accountsSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code')));
+                const [accountsSnap, entriesSnap] = await Promise.all([
+                    getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted')))
+                ]);
                 setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
-            } catch (error) {
-                console.error("Error fetching accounts:", error);
-            }
+                setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
+            } finally { setLoading(false); }
         };
-        fetchAccountsData();
+        fetchData();
     }, [firestore]);
 
-    // Fetch entries when date changes
-    useEffect(() => {
-        if (!firestore || !dateTo || !dateFrom) return;
-        const fetchEntries = async () => {
-            setLoading(true);
-            try {
-                const endDate = new Date(dateTo);
-                endDate.setHours(23, 59, 59, 999);
-
-                const entriesQuery = query(
-                    collection(firestore, 'journalEntries'),
-                    where('date', '<=', Timestamp.fromDate(endDate))
-                );
-                const entriesSnap = await getDocs(entriesQuery);
-                const postedEntries = entriesSnap.docs
-                    .map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry))
-                    .filter(entry => entry.status === 'posted');
-                setJournalEntries(postedEntries);
-            } catch (error) {
-                console.error("Error fetching journal entries:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchEntries();
-    }, [firestore, dateTo, dateFrom]);
-    
     const trialBalanceData = useMemo(() => {
-        if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: {} };
+        if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: {} as any };
 
-        const startDate = new Date(dateFrom);
-        startDate.setHours(0, 0, 0, 0);
-        const endDate = new Date(dateTo);
-        endDate.setHours(23, 59, 59, 999);
-
+        const startDate = startOfDay(dateFrom);
+        const endDate = endOfDay(dateTo);
 
         const lines: TrialBalanceLine[] = accounts.map(account => {
             let openingBalance = 0;
@@ -130,7 +98,9 @@ export default function TrialBalancePage() {
             let periodCredit = 0;
 
             journalEntries.forEach(entry => {
-                const entryDate = (entry.date as Timestamp).toDate();
+                const entryDate = entry.date?.toDate();
+                if (!entryDate) return;
+
                 const relevantLine = entry.lines.find(line => line.accountId === account.id);
                 if (!relevantLine) return;
 
@@ -138,9 +108,9 @@ export default function TrialBalancePage() {
 
                 if (entryDate < startDate) {
                     openingBalance += amount;
-                } else if (entryDate >= startDate && entryDate <= endDate) {
-                    periodDebit += relevantLine.debit || 0;
-                    periodCredit += relevantLine.credit || 0;
+                } else if (entryDate <= endDate) {
+                    periodDebit += (relevantLine.debit || 0);
+                    periodCredit += (relevantLine.credit || 0);
                 }
             });
 
@@ -150,6 +120,8 @@ export default function TrialBalancePage() {
                 accountId: account.id!,
                 accountCode: account.code,
                 accountName: account.name,
+                type: account.type,
+                level: account.level,
                 openingDebit: openingBalance > 0 ? openingBalance : 0,
                 openingCredit: openingBalance < 0 ? -openingBalance : 0,
                 periodDebit,
@@ -157,9 +129,13 @@ export default function TrialBalancePage() {
                 closingDebit: closingBalance > 0 ? closingBalance : 0,
                 closingCredit: closingBalance < 0 ? -closingBalance : 0,
             };
-        }).filter(line => 
-             line.openingDebit > 0 || line.openingCredit > 0 || line.periodDebit > 0 || line.periodCredit > 0
-        );
+        }).filter(line => {
+             const hasMovement = line.openingDebit > 0 || line.openingCredit > 0 || line.periodDebit > 0 || line.periodCredit > 0;
+             if (hideZeroBalances && !hasMovement) return false;
+             if (typeFilter !== 'all' && line.type !== typeFilter) return false;
+             if (levelFilter !== 'all' && line.level !== parseInt(levelFilter)) return false;
+             return true;
+        });
         
         const totals = {
             openingDebit: lines.reduce((sum, l) => sum + l.openingDebit, 0),
@@ -168,116 +144,127 @@ export default function TrialBalancePage() {
             periodCredit: lines.reduce((sum, l) => sum + l.periodCredit, 0),
             closingDebit: lines.reduce((sum, l) => sum + l.closingDebit, 0),
             closingCredit: lines.reduce((sum, l) => sum + l.closingCredit, 0),
+            isBalanced: Math.abs(lines.reduce((sum, l) => sum + l.closingDebit, 0) - lines.reduce((sum, l) => sum + l.closingCredit, 0)) < 0.001
         };
 
         return { lines, totals };
-    }, [loading, accounts, journalEntries, dateFrom, dateTo]);
-
-    const handlePrint = () => {
-        window.print();
-    };
-    
-    const isLoading = loading || brandingLoading;
+    }, [loading, accounts, journalEntries, dateFrom, dateTo, hideZeroBalances, typeFilter, levelFilter]);
 
     return (
-        <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
-            <Card className="mb-4 no-print">
-                 <CardHeader>
-                    <CardTitle>ميزان المراجعة</CardTitle>
-                    <CardDescription>عرض أرصدة الحسابات المدينة والدائنة خلال فترة محددة.</CardDescription>
+        <div className="space-y-6" dir="rtl">
+            <Card className="no-print rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-blue-50">
+                <CardHeader className="pb-8 px-8 border-b">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner"><Scale className="h-8 w-8" /></div>
+                            <div>
+                                <CardTitle className="text-2xl font-black text-blue-900">ميزان المراجعة المطور</CardTitle>
+                                <CardDescription className="text-base font-medium">عرض أرصدة الحسابات مع فلاتر النوع والمستوى الرقابي.</CardDescription>
+                            </div>
+                        </div>
+                        <Button onClick={() => window.print()} variant="outline" className="rounded-xl font-bold gap-2"><Printer className="h-4 w-4" /> طباعة الميزان</Button>
+                    </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                    <div className="grid gap-2">
-                        <Label htmlFor="dateFrom">التاريخ من</Label>
-                        <DateInput id="dateFrom" value={dateFrom} onChange={setDateFrom} />
-                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="dateTo">التاريخ إلى</Label>
-                        <DateInput id="dateTo" value={dateTo} onChange={setDateTo} />
-                     </div>
+                <CardContent className="p-8">
+                    <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-6 items-end">
+                        <div className="grid gap-2"><Label className="text-xs font-bold mr-1">من تاريخ</Label><DateInput value={dateFrom} onChange={setDateFrom} /></div>
+                        <div className="grid gap-2"><Label className="text-xs font-bold mr-1">إلى تاريخ</Label><DateInput value={dateTo} onChange={setDateTo} /></div>
+                        <div className="grid gap-2">
+                            <Label className="text-xs font-bold mr-1">نوع الحساب</Label>
+                            <Select value={typeFilter} onValueChange={setTypeFilter}>
+                                <SelectTrigger className="h-11 rounded-xl bg-white"><SelectValue /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="all">كل الأنواع</SelectItem>
+                                    <SelectItem value="asset">الأصول</SelectItem>
+                                    <SelectItem value="liability">الالتزامات</SelectItem>
+                                    <SelectItem value="income">الإيرادات</SelectItem>
+                                    <SelectItem value="expense">المصروفات</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex items-center gap-2 pb-3">
+                            <Checkbox id="hide-zero" checked={hideZeroBalances} onCheckedChange={(c) => setHideZeroBalances(!!c)} />
+                            <Label htmlFor="hide-zero" className="font-bold cursor-pointer">إخفاء الأرصدة الصفرية</Label>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={fetchData} className="flex-1 rounded-xl h-11 font-black gap-2 shadow-lg shadow-blue-100">
+                                <Filter className="h-4 w-4" /> تحديث النتائج
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
-            
-            {isLoading && <Card><CardContent className="p-12 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-primary" /></CardContent></Card>}
 
-            {!isLoading && dateFrom && dateTo &&(
-                 <Card id="printable-area" className="max-w-6xl mx-auto bg-white dark:bg-card shadow-lg rounded-lg printable-wrapper print:shadow-none print:border-none print:bg-transparent">
-                    <CardHeader className="p-8 md:p-12">
-                        {branding?.letterhead_image_url ? (
-                            <img src={branding.letterhead_image_url} alt={`${branding.company_name || ''} Letterhead`} className="w-full h-auto object-contain max-h-[150px] mb-4"/>
-                        ) : (
-                             <div className="flex justify-between items-start pb-4 border-b-2 border-gray-800 dark:border-gray-300">
-                                <div className="text-left flex-shrink-0">
-                                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">ميزان المراجعة</h2>
-                                    <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">Trial Balance</p>
-                                    <p className="font-mono text-sm mt-2 text-muted-foreground">التاريخ: {format(new Date(), 'dd/MM/yyyy')}</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                   <Logo className="h-16 w-16 !p-3" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
-                                    <div>
-                                        <h1 className="font-bold text-lg">{branding?.company_name || 'Nova ERP'}</h1>
-                                        <p className="text-sm text-muted-foreground">{branding?.nameEn || 'Nova ERP'}</p>
-                                        <p className="text-xs text-muted-foreground mt-2">{branding?.address}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        <div className="mt-6 text-sm">
-                            <p><span className="font-semibold w-24 inline-block">الفترة من:</span> {format(dateFrom, 'dd/MM/yyyy')} <span className="font-semibold w-12 inline-block text-center">إلى:</span> {format(dateTo, 'dd/MM/yyyy')}</p>
-                         </div>
-                    </CardHeader>
-                    <CardContent className="px-8 md:px-12">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead rowSpan={2} className="align-bottom">الحساب</TableHead>
-                                    <TableHead colSpan={2} className="text-center">الرصيد الافتتاحي</TableHead>
-                                    <TableHead colSpan={2} className="text-center">حركة الفترة</TableHead>
-                                    <TableHead colSpan={2} className="text-center">الرصيد الختامي</TableHead>
-                                </TableRow>
-                                <TableRow>
-                                    <TableHead className="text-center">مدين</TableHead>
-                                    <TableHead className="text-center">دائن</TableHead>
-                                    <TableHead className="text-center">مدين</TableHead>
-                                    <TableHead className="text-center">دائن</TableHead>
-                                    <TableHead className="text-center">مدين</TableHead>
-                                    <TableHead className="text-center">دائن</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                             <TableBody>
-                                {trialBalanceData.lines.map((line) => (
-                                    <TableRow key={line.accountId}>
-                                        <TableCell className="font-medium">{line.accountName} ({line.accountCode})</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(line.openingDebit)}</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(line.openingCredit)}</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(line.periodDebit)}</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(line.periodCredit)}</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(line.closingDebit)}</TableCell>
-                                        <TableCell className="text-center font-mono">{formatCurrency(line.closingCredit)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                            <TableFooter>
-                                <TableRow className="font-bold bg-muted text-lg">
-                                    <TableCell>الإجمالي</TableCell>
-                                    <TableCell className="text-center font-mono">{formatCurrency(trialBalanceData.totals.openingDebit)}</TableCell>
-                                    <TableCell className="text-center font-mono">{formatCurrency(trialBalanceData.totals.openingCredit)}</TableCell>
-                                    <TableCell className="text-center font-mono">{formatCurrency(trialBalanceData.totals.periodDebit)}</TableCell>
-                                    <TableCell className="text-center font-mono">{formatCurrency(trialBalanceData.totals.periodCredit)}</TableCell>
-                                    <TableCell className="text-center font-mono">{formatCurrency(trialBalanceData.totals.closingDebit)}</TableCell>
-                                    <TableCell className="text-center font-mono">{formatCurrency(trialBalanceData.totals.closingCredit)}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </CardContent>
-                    <CardFooter className="p-8 md:p-12 flex justify-end items-center no-print">
-                        <Button onClick={handlePrint}>
-                            <Printer className="ml-2 h-4 w-4" />
-                            طباعة / تصدير PDF
-                        </Button>
-                    </CardFooter>
-                 </Card>
+            {!trialBalanceData.totals.isBalanced && !loading && (
+                <div className="bg-red-50 border-2 border-red-200 p-6 rounded-3xl animate-bounce flex items-center gap-4 shadow-xl">
+                    <AlertTriangle className="h-10 w-10 text-red-600" />
+                    <div>
+                        <h4 className="text-xl font-black text-red-800 tracking-tighter">تنبيه حرج: ميزان المراجعة غير متوازن!</h4>
+                        <p className="text-sm font-bold text-red-600">يوجد فرق مادي بين إجمالي الأرصدة المدينة والدائنة. يرجى مراجعة قيود اليومية المرحلة يدوياً.</p>
+                    </div>
+                </div>
             )}
+
+            <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-white">
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-muted/50 h-16">
+                            <TableRow className="border-none">
+                                <TableHead rowSpan={2} className="px-8 font-black border-l">اسم الحساب (الكود)</TableHead>
+                                <TableHead colSpan={2} className="text-center font-black border-l">الرصيد الافتتاحي</TableHead>
+                                <TableHead colSpan={2} className="text-center font-black border-l">حركة الفترة</TableHead>
+                                <TableHead colSpan={2} className="text-center font-black bg-primary/5 text-primary">الرصيد الختامي</TableHead>
+                            </TableRow>
+                            <TableRow className="bg-muted/30 h-10 text-[10px]">
+                                <TableHead className="text-center border-l">مدين (+)</TableHead>
+                                <TableHead className="text-center border-l">دائن (-)</TableHead>
+                                <TableHead className="text-center border-l">مدين (+)</TableHead>
+                                <TableHead className="text-center border-l">دائن (-)</TableHead>
+                                <TableHead className="text-center border-l text-primary">مدين (+)</TableHead>
+                                <TableHead className="text-center text-primary">دائن (-)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {loading ? (
+                                Array.from({length: 5}).map((_, i) => <TableRow key={i}><TableCell colSpan={7} className="p-8"><Skeleton className="h-10 w-full rounded-xl"/></TableCell></TableRow>)
+                            ) : trialBalanceData.lines.length === 0 ? (
+                                <TableRow><TableCell colSpan={7} className="h-64 text-center text-muted-foreground italic font-black">لا توجد بيانات للعرض وفق المعايير المختارة.</TableCell></TableRow>
+                            ) : (
+                                trialBalanceData.lines.map(line => (
+                                    <TableRow key={line.accountId} className={cn("h-14 transition-colors border-b last:border-0", line.level === 0 ? "bg-muted/20 font-black" : "hover:bg-primary/[0.02]")}>
+                                        <TableCell style={{ paddingRight: `${(line.level || 0) * 1.5 + 2}rem` }} className="font-bold text-slate-800">
+                                            {line.accountName} <span className="font-mono text-[10px] opacity-40 mr-2">({line.accountCode})</span>
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono text-xs">{line.openingDebit > 0 ? formatCurrency(line.openingDebit) : '-'}</TableCell>
+                                        <TableCell className="text-center font-mono text-xs">{line.openingCredit > 0 ? formatCurrency(line.openingCredit) : '-'}</TableCell>
+                                        <TableCell className="text-center font-mono text-xs text-blue-600">{line.periodDebit > 0 ? formatCurrency(line.periodDebit) : '-'}</TableCell>
+                                        <TableCell className="text-center font-mono text-xs text-amber-600">{line.periodCredit > 0 ? formatCurrency(line.periodCredit) : '-'}</TableCell>
+                                        <TableCell className="text-center font-mono font-black bg-primary/[0.02] border-l border-primary/10 text-primary">
+                                            {line.closingDebit > 0 ? formatCurrency(line.closingDebit) : '-'}
+                                        </TableCell>
+                                        <TableCell className="text-center font-mono font-black bg-primary/[0.02] text-primary">
+                                            {line.closingCredit > 0 ? formatCurrency(line.closingCredit) : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                        <TableFooter className="bg-primary h-24 text-white">
+                            <TableRow className="border-none hover:bg-primary">
+                                <TableCell className="px-12 font-black text-2xl">الإجماليات العامة للميزان:</TableCell>
+                                <TableCell className="text-center font-mono text-lg opacity-80">{formatCurrency(trialBalanceData.totals.openingDebit)}</TableCell>
+                                <TableCell className="text-center font-mono text-lg opacity-80">{formatCurrency(trialBalanceData.totals.openingCredit)}</TableCell>
+                                <TableCell className="text-center font-mono text-lg opacity-80">{formatCurrency(trialBalanceData.totals.periodDebit)}</TableCell>
+                                <TableCell className="text-center font-mono text-lg opacity-80">{formatCurrency(trialBalanceData.totals.periodCredit)}</TableCell>
+                                <TableCell className="text-center font-mono text-2xl font-black bg-white/10">{formatCurrency(trialBalanceData.totals.closingDebit)}</TableCell>
+                                <TableCell className="text-center font-mono text-2xl font-black bg-white/10">{formatCurrency(trialBalanceData.totals.closingCredit)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </CardContent>
+            </Card>
         </div>
     );
 }
+
+async function fetchData() { window.location.reload(); }

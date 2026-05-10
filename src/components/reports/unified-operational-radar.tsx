@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -14,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { 
     Search, FileSearch, Loader2, Clock, MapPin, 
     AlertTriangle, CheckCircle2, User, Building2, 
-    Activity // FIXED: Added Activity import
+    Activity 
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { differenceInDays, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -24,8 +23,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DateInput } from '@/components/ui/date-input';
 
 /**
- * رادار متابعة العمل والميدان (Operational Pulse Radar).
- * تم تبسيط اللغة وضمان استيراد كافة الأيقونات.
+ * رادار متابعة العمل والميدان (v2.0):
+ * - تخصيص عتبة الخمول.
+ * - تصنيف درجة الخطورة (Critical/Warning/Active).
+ * - فلترة متقدمة للتواريخ.
  */
 export function UnifiedOperationalRadar() {
   const { transactions, clients, employees, departments, appointments, loading } = useAnalyticalData();
@@ -37,6 +38,7 @@ export function UnifiedOperationalRadar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [threshold, setThreshold] = useState('14');
 
   const handleGenerate = () => {
     setIsGenerating(true);
@@ -44,6 +46,7 @@ export function UnifiedOperationalRadar() {
         const now = new Date();
         const start = dateFrom ? startOfDay(dateFrom) : null;
         const end = dateTo ? endOfDay(dateTo) : null;
+        const limitDays = parseInt(threshold);
 
         const results = transactions.filter(tx => {
             const createdAt = toFirestoreDate(tx.createdAt);
@@ -61,6 +64,11 @@ export function UnifiedOperationalRadar() {
                 .filter(a => a.clientId === tx.clientId && a.status === 'confirmed')
                 .sort((a, b) => (toFirestoreDate(b.appointmentDate)?.getTime() || 0) - (toFirestoreDate(a.appointmentDate)?.getTime() || 0))[0];
 
+            let severity: 'active' | 'warning' | 'critical' | 'stopped' = 'active';
+            if (daysStalled > 60) severity = 'stopped';
+            else if (daysStalled > limitDays) severity = 'critical';
+            else if (daysStalled > (limitDays / 2)) severity = 'warning';
+
             return {
                 id: tx.id,
                 deptName: engineer?.department || 'غير مسند',
@@ -68,13 +76,13 @@ export function UnifiedOperationalRadar() {
                 txType: tx.transactionType,
                 engineerName: engineer?.fullName || 'غير مسجل',
                 daysStalled,
+                severity,
                 lastVisitDate: visit ? toFirestoreDate(visit.appointmentDate) : null,
                 currentStage: (tx.stages || []).find(s => s.status === 'in-progress')?.name || 'بانتظار البدء',
-                status: tx.status
             };
         });
 
-        setReportResults(results);
+        setReportResults(results.sort((a, b) => b.daysStalled - a.daysStalled));
         setIsGenerating(false);
     }, 800);
   };
@@ -90,36 +98,39 @@ export function UnifiedOperationalRadar() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-end bg-white p-6 rounded-[2rem] border shadow-sm no-print">
-        <div className="grid gap-2">
-            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">من تاريخ</Label>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end bg-white p-8 rounded-[2.5rem] border shadow-sm no-print">
+        <div className="lg:col-span-2 grid gap-2">
+            <Label className="font-black text-[10px] pr-1 text-slate-500 uppercase">من تاريخ</Label>
             <DateInput value={dateFrom} onChange={setDateFrom} className="h-10 rounded-xl border-2" />
         </div>
-        <div className="grid gap-2">
-            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">إلى تاريخ</Label>
+        <div className="lg:col-span-2 grid gap-2">
+            <Label className="font-black text-[10px] pr-1 text-slate-500 uppercase">إلى تاريخ</Label>
             <DateInput value={dateTo} onChange={setDateTo} className="h-10 rounded-xl border-2" />
         </div>
-        <div className="grid gap-2">
-            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">القسم</Label>
-            <Select value={selectedDept} onValueChange={setSelectedDept}>
-                <SelectTrigger className="h-10 rounded-xl border-2 font-bold text-[#1e1b4b]"><SelectValue /></SelectTrigger>
+        <div className="lg:col-span-2 grid gap-2">
+            <Label className="font-black text-[10px] pr-1 text-slate-500 uppercase">عتبة الخمول (أيام)</Label>
+            <Select value={threshold} onValueChange={setThreshold}>
+                <SelectTrigger className="h-10 rounded-xl border-2 font-black text-[#1e1b4b]"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
-                    <SelectItem value="all">كل الأقسام</SelectItem>
-                    {departments.map(d => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
+                    <SelectItem value="7">7 أيام (كشف ميداني)</SelectItem>
+                    <SelectItem value="14">14 يوم (تصميم)</SelectItem>
+                    <SelectItem value="30">30 يوم (متابعة تراخيص)</SelectItem>
                 </SelectContent>
             </Select>
         </div>
-        <div className="grid gap-2 lg:col-span-2">
-            <Label className="font-bold text-xs pr-1 text-slate-500 uppercase tracking-widest">بحث سريع</Label>
+        <div className="lg:col-span-3 grid gap-2">
+            <Label className="font-black text-[10px] pr-1 text-slate-500 uppercase">بحث سريع</Label>
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="اسم العميل أو المعاملة..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-2 font-bold text-[#1e1b4b]" />
+                <Input placeholder="اسم العميل أو المعاملة..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-2 font-bold" />
             </div>
         </div>
-        <Button onClick={handleGenerate} disabled={isGenerating || loading} className="h-10 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20">
-            {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Activity className="h-5 w-5" />} 
-            تحديث الرادار
-        </Button>
+        <div className="lg:col-span-3">
+            <Button onClick={handleGenerate} disabled={isGenerating || loading} className="w-full h-12 rounded-xl font-black text-base gap-2 shadow-xl shadow-primary/20">
+                {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Activity className="h-5 w-5" />} 
+                تحديث رادار النبض
+            </Button>
+        </div>
       </div>
 
       {reportData ? (
@@ -127,19 +138,20 @@ export function UnifiedOperationalRadar() {
             <Table>
                 <TableHeader className="bg-slate-900 text-white">
                     <TableRow className="h-14 border-none">
-                        <TableHead className="px-8 font-black text-white text-right">القسم والعميل</TableHead>
+                        <TableHead className="px-8 font-black text-white text-right">المشروع والعميل</TableHead>
                         <TableHead className="font-black text-white">المرحلة الحالية</TableHead>
                         <TableHead className="font-black text-white text-center">أيام التوقف</TableHead>
-                        <TableHead className="font-black text-white">آخر زيارة ميدانية</TableHead>
+                        <TableHead className="font-black text-white text-center">درجة الخطورة</TableHead>
+                        <TableHead className="font-black text-white">آخر زيارة</TableHead>
                         <TableHead className="font-black text-white text-left px-8">المسؤول</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {filteredData.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد بيانات لهذه الفترة.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد بيانات لهذه الفترة.</TableCell></TableRow>
                     ) : (
                         filteredData.map(item => (
-                            <TableRow key={item.id} className={cn("h-20 hover:bg-muted/5 transition-colors border-b", item.daysStalled > 14 && "bg-red-50/30")}>
+                            <TableRow key={item.id} className={cn("h-20 hover:bg-muted/5 transition-colors border-b", item.severity === 'critical' && "bg-red-50/50")}>
                                 <TableCell className="px-8">
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600"><Building2 className="h-4 w-4"/></div>
@@ -153,9 +165,20 @@ export function UnifiedOperationalRadar() {
                                     <Badge variant="outline" className="font-black bg-white text-primary border-primary/20 px-3">{item.currentStage}</Badge>
                                 </TableCell>
                                 <TableCell className="text-center">
-                                    <span className={cn("text-lg font-black font-mono", item.daysStalled > 14 ? "text-red-600" : "text-green-600")}>
+                                    <span className={cn("text-lg font-black font-mono", item.severity === 'critical' ? "text-red-600" : "text-green-600")}>
                                         {item.daysStalled} <span className="text-[10px]">يوم</span>
                                     </span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    <Badge className={cn(
+                                        "px-4 py-1 rounded-full font-black text-[10px] border-none shadow-sm",
+                                        item.severity === 'active' ? "bg-green-600 text-white" :
+                                        item.severity === 'warning' ? "bg-orange-400 text-white" :
+                                        item.severity === 'critical' ? "bg-red-600 text-white animate-pulse" :
+                                        "bg-slate-900 text-white"
+                                    )}>
+                                        {item.severity === 'active' ? 'نشط' : item.severity === 'warning' ? 'تحذير' : item.severity === 'critical' ? 'خامل (حرج)' : 'متوقف'}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>
                                     {item.lastVisitDate ? (
@@ -180,7 +203,7 @@ export function UnifiedOperationalRadar() {
       ) : (
         <div className="h-96 flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] opacity-30 grayscale">
             <Activity className="h-20 w-20 text-muted-foreground mb-4" />
-            <p className="text-xl font-black text-slate-800">بانتظار تحديث الرادار</p>
+            <p className="text-xl font-black text-slate-800">بانتظار تحديث الرادار العملياتي</p>
         </div>
       )}
     </div>
