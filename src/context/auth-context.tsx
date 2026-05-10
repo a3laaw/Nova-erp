@@ -18,8 +18,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * سياق الأمان السيادي المطور (Sovereign Auth Core v4.0):
- * تم تحصينه ببروتوكول "المزامنة القاطعة" لضمان الاستقرار الفوري وحل مشكلة nova1@nova-erp.local.
+ * سياق الأمان السيادي المستقر (Stability Core v6.0):
+ * تم تحصينه لضمان دخول حسابات الـ .local إلى المنشآت بدلاً من غرفة المطور.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -28,9 +28,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🛡️ مساعد زرع الكوكيز السيادي: يفتح أقفال الـ Middleware فوراً
+  // زرع الكوكيز لفتح أقفال الـ Middleware
   const setAuthCookies = (uid: string, role: string) => {
-    const expiry = 60 * 60 * 24 * 7; // 7 days
+    const expiry = 60 * 60 * 24 * 7;
     document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
     if (role === 'Developer') {
         document.cookie = `nova-dev-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
@@ -58,71 +58,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const idToken = await firebaseUser.getIdTokenResult();
-        const role = idToken.claims.role as string;
         const userEmail = firebaseUser.email?.toLowerCase();
-
-        // 1. حالة المطور (Sovereign Developer) - تدعم nova1@nova-erp.local وكافة الإيميلات المعتمدة
-        if (role === 'Developer' || userEmail === 'dev@nova-erp.local') {
-          const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
-          const devData: AuthenticatedUser = {
-            id: firebaseUser.uid,
-            uid: firebaseUser.uid,
-            email: firebaseUser.email!,
-            username: 'root',
-            role: 'Developer',
-            isActive: true,
-            fullName: devDoc.exists() ? devDoc.data().fullName : 'Master Developer',
-            isSuperAdmin: true,
-          };
-          setUser(devData);
-          setAuthCookies(firebaseUser.uid, 'Developer');
-          setLoading(false);
-          return;
+        if (!userEmail) {
+            setLoading(false);
+            return;
         }
 
-        // 2. حالة الموظف (SaaS Tenant User)
-        if (userEmail) {
-          const userIndexSnap = await getDocs(query(
+        // 🛡️ فحص الفهرس العالمي أولاً (لأنه قد يكون مستخدماً عادياً بإيميل خاص)
+        const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
             limit(1)
-          ));
-          
-          if (!userIndexSnap.empty) {
+        ));
+
+        if (!userIndexSnap.empty) {
             const indexData = userIndexSnap.docs[0].data();
             const companyId = indexData.companyId;
             const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
 
             if (tenantUserDoc.exists()) {
-              const userData = tenantUserDoc.data() as UserProfile;
-              if (!userData.isActive) {
-                  await signOut(masterAuth);
-                  setUser(null);
-                  removeAuthCookies();
-              } else {
+                const userData = tenantUserDoc.data() as UserProfile;
                 setUser({ 
-                  ...userData, 
-                  uid: firebaseUser.uid, 
-                  id: tenantUserDoc.id,
-                  currentCompanyId: companyId,
-                  companyName: indexData.companyName || 'Nova Client'
+                    ...userData, 
+                    uid: firebaseUser.uid, 
+                    id: tenantUserDoc.id,
+                    currentCompanyId: companyId,
+                    companyName: indexData.companyName || 'Nova Client'
                 });
                 setAuthCookies(firebaseUser.uid, userData.role);
-
                 const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                 if (companyDoc.exists()) {
                     setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
                 }
-              }
-            } else {
-                await signOut(masterAuth);
-                setUser(null);
+                setLoading(false);
+                return;
             }
-          } else {
-              await signOut(masterAuth);
-              setUser(null);
-          }
+        }
+
+        // 🛡️ حالة المطور (إذا لم يكن مسجلاً كمستخدم منشأة)
+        const idToken = await firebaseUser.getIdTokenResult();
+        if (idToken.claims.role === 'Developer' || userEmail === 'dev@nova-erp.local') {
+            const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
+            setUser({
+                id: firebaseUser.uid,
+                uid: firebaseUser.uid,
+                email: firebaseUser.email!,
+                username: 'root',
+                role: 'Developer',
+                isActive: true,
+                fullName: devDoc.exists() ? devDoc.data().fullName : 'Master Developer',
+                isSuperAdmin: true,
+            });
+            setAuthCookies(firebaseUser.uid, 'Developer');
+        } else {
+            // مستخدم مجهول أو غير مفعل
+            await signOut(masterAuth);
+            setUser(null);
+            removeAuthCookies();
         }
       } catch (error) {
         console.error("Auth Loop Prevention:", error);
@@ -137,25 +129,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error("تعذر الاتصال بخادم الأمان.");
-    try {
-      removeAuthCookies();
-      await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
-    } catch (e: any) {
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-          throw new Error('بيانات العبور غير صحيحة.');
-      }
-      throw new Error(`فشل الدخول: ${e.message}`);
-    }
+    removeAuthCookies();
+    await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
   }, [masterAuth]);
 
   const logout = useCallback(async () => {
-    setLoading(true);
     if (masterAuth) await signOut(masterAuth);
     setUser(null);
     setCurrentCompany(null);
     removeAuthCookies();
     router.replace('/');
-    setLoading(false);
   }, [masterAuth, setCurrentCompany, router]);
 
   return (

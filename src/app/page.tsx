@@ -12,8 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية (The Sovereign Gate v5.0):
- * تم تحصين الأبعاد لتكون رشيقة (max-w-md) وعلاج حلقة التحميل اللانهائية.
+ * بوابة الدخول السيادية (The Sovereign Gate v6.0):
+ * تم تحصين العرض ليكون رشيقاً (max-w-md) والالتزام بالألوان الأصلية.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -28,7 +28,7 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 5 ثوانٍ، نعيد السيطرة للمستخدم
+  // صمام أمان التحرير التلقائي
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isLoading) {
@@ -36,18 +36,18 @@ export default function UnifiedLoginPage() {
             setShowEmergencyExit(true);
             setIsLoading(false);
             setErrorMessage("تنبيه: تعثرت المزامنة اللحظية. يرجى تحديث الصفحة أو مراجعة بيانات الدخول.");
-        }, 5000);
+        }, 6000);
     }
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  // التوجيه التلقائي الآمن مع تأخير ذكي لاستقرار الكوكيز
+  // التوجيه التلقائي مع تأخير الاستقرار
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
         const timer = setTimeout(() => {
             router.replace(targetPath);
-        }, 100);
+        }, 150);
         return () => clearTimeout(timer);
     }
   }, [user, authLoading, router]);
@@ -63,7 +63,7 @@ export default function UnifiedLoginPage() {
     try {
         await login(formData.email, formData.password);
     } catch (error: any) {
-        setErrorMessage(error.message);
+        setErrorMessage("بيانات الدخول غير صحيحة أو الحساب غير نشط.");
         setIsLoading(false); 
     }
   };
@@ -71,7 +71,7 @@ export default function UnifiedLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       {/* عناصر جمالية في الخلفية */}
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]" />
       
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40">

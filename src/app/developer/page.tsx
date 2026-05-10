@@ -30,9 +30,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
-/**
- * قاموس تراجم الأنشطة المفقود (إصلاح خطأ ReferenceError)
- */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -51,11 +48,8 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
-  // اشتراك لحظي في المنشآت والطلبات
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
-  
-  // اشتراك مجمع للمستخدمين لحساب الحصص اللحظية
   const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
 
   const userCountsByCompany = useMemo(() => {
@@ -76,104 +70,42 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
-  const handleApproveRequest = async (request: any) => {
-    if (!firestore || isProcessing) return;
-    setIsProcessing(request.id!);
-    try {
-        const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
-        const username = request.username || request.email.split('@')[0]; 
-        const internalEmail = `${username}@${companyId}.nova`; 
-
-        const authResponse = await fetch('/api/manage-tenant-user', {
-            method: 'POST',
-            body: JSON.stringify({ email: internalEmail, password: request.adminPassword, displayName: request.contactName, action: 'create' })
-        });
-        const authResult = await authResponse.json();
-        if (!authResult.success && !authResult.simulated) throw new Error(authResult.error);
-
-        await runTransaction(firestore, async (transaction) => {
-            const companyRef = doc(firestore, 'companies', companyId);
-            transaction.set(companyRef, {
-                name: request.companyName, activityType: request.activity || 'general',
-                adminEmail: internalEmail, adminPassword: request.adminPassword,
-                contactPhone: request.phone, contactEmail: request.email,
-                subscriptionType: 'trial', trialEndDate: Timestamp.fromDate(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
-                maxUsersLimit: 5, isActive: true,
-                firebaseConfig: {
-                    apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-                    authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-                    projectId: "studio-8039389980-3d2d0",
-                    appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
-                },
-                createdAt: serverTimestamp()
-            });
-
-            const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid || 'simulated-uid');
-            transaction.set(tenantUserRef, { uid: authResult.uid || 'simulated-uid', email: internalEmail, username: username, fullName: request.contactName, role: 'Admin', isActive: true, companyId: companyId, createdAt: serverTimestamp() });
-
-            const globalUserRef = doc(collection(firestore, 'global_users'));
-            transaction.set(globalUserRef, { email: internalEmail, username: username, companyId: companyId, role: 'Admin', companyName: request.companyName });
-            transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
-        });
-        toast({ title: 'تم تفعيل المنشأة بنجاح' });
-    } catch (e: any) { 
-        toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message }); 
-    } finally { 
-        setIsProcessing(null); 
-    }
-  };
-
-  const handleRepairAccount = async (company: Company) => {
-      if (!firestore || isProcessing) return;
-      setIsProcessing(company.id!);
-      try {
-          const response = await fetch('/api/manage-tenant-user', {
-              method: 'POST',
-              body: JSON.stringify({ email: company.adminEmail, password: company.adminPassword, displayName: company.name, action: 'repair' })
-          });
-          const result = await response.json();
-          
-          const batch = writeBatch(firestore);
-          const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail));
-          const globalSnap = await getDocs(globalQuery);
-          
-          if (globalSnap.empty) {
-              batch.set(doc(collection(firestore, 'global_users')), { 
-                  username: company.adminEmail.split('@')[0], 
-                  email: company.adminEmail, 
-                  companyId: company.id, 
-                  role: 'Admin',
-                  companyName: company.name
-              });
-          }
-          
-          batch.set(doc(firestore, `companies/${company.id}/users`, result.uid || 'manual-repair'), { 
-              uid: result.uid || 'manual-repair', 
-              email: company.adminEmail, 
-              username: company.adminEmail.split('@')[0], 
-              fullName: company.name, 
-              role: 'Admin', 
-              isActive: true, 
-              companyId: company.id, 
-              createdAt: serverTimestamp() 
-          }, { merge: true });
-          
-          await batch.commit();
-          toast({ title: 'نجحت المزامنة الجبارة' });
-      } finally { setIsProcessing(null); }
-  };
-
   const handleSwitchToCompany = async (company: Company) => {
     if (!firestore || !currentUser || isProcessing) return;
     setIsProcessing(company.id!);
     try {
-        await fetch('/api/switch-company', {
+        const response = await fetch('/api/switch-company', {
             method: 'POST',
             body: JSON.stringify({ uid: currentUser.id, companyId: company.id, companyName: company.name })
         });
+        const result = await response.json();
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
         toast({ title: 'تم التقمص السيادي بنجاح' });
         router.push('/dashboard');
+    } finally { setIsProcessing(null); }
+  };
+
+  const handleRepairAccount = async (company: Company) => {
+    if (!firestore || isProcessing) return;
+    setIsProcessing(company.id!);
+    try {
+        const response = await fetch('/api/manage-tenant-user', {
+            method: 'POST',
+            body: JSON.stringify({ email: company.adminEmail, password: company.adminPassword, displayName: company.name, action: 'repair' })
+        });
+        const result = await response.json();
+        const batch = writeBatch(firestore);
+        const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', company.adminEmail));
+        const globalSnap = await getDocs(globalQuery);
+        
+        if (globalSnap.empty) {
+            batch.set(doc(collection(firestore, 'global_users')), { 
+                username: company.adminEmail.split('@')[0], email: company.adminEmail, 
+                companyId: company.id, role: 'Admin', companyName: company.name 
+            });
+        }
+        await batch.commit();
+        toast({ title: 'نجحت المزامنة الجبارة' });
     } finally { setIsProcessing(null); }
   };
 
@@ -241,7 +173,7 @@ export default function DeveloperDashboard() {
                         <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {requests.map(req => (
-                                <TableRow key={req.id} className="h-32"><TableCell className="px-12"><div className="flex flex-col"><span className="font-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></TableCell><TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.email.split('@')[0]}</Badge></TableCell><TableCell className="text-left px-12">{req.status === 'pending' ? <Button onClick={() => handleApproveRequest(req)} disabled={!!isProcessing} className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg">تفعيل البيئة</Button> : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}</TableCell></TableRow>
+                                <TableRow key={req.id} className="h-32"><TableCell className="px-12"><div className="flex flex-col"><span className="font-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></TableCell><TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.email.split('@')[0]}</Badge></TableCell><TableCell className="text-left px-12">{req.status === 'pending' ? <Button className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg">تفعيل البيئة</Button> : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}</TableCell></TableRow>
                             ))}
                         </TableBody>
                     </Table>
