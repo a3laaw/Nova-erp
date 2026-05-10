@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
-// --- قاموس التراجم السيادي ---
+// 🛡️ تعريف قاموس التراجم السيادي لإنهاء خطأ ReferenceError
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',

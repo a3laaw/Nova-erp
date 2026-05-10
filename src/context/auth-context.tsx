@@ -78,7 +78,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const userData = tenantUserDoc.data() as UserProfile;
               if (!userData.isActive) {
                   await signOut(masterAuth);
-                  throw new Error("هذا الحساب معلق حالياً.");
+                  setUser(null);
+                  setLoading(false);
+                  return;
               }
               setUser({ 
                 ...userData, 
@@ -92,13 +94,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
               }
             } else {
+                // الموظف موجود في الفهرس ولكن ملفه داخل المنظمة مفقود أو معزول
+                console.warn("Tenant profile not found for authenticated user.");
                 await signOut(masterAuth);
-                throw new Error("لم يتم العثور على ملف الموظف.");
+                setUser(null);
             }
           } else {
-              // إذا لم نجد الفهرس، نحاول جلب ملف الموظف عبر الـ UID مباشرة كخيار أمان أخير
-              // لكن لضمان العزل، نفضل تسجيل الخروج وطلب الإصلاح
+              // مستخدم مجهول أو لم تتم مزامنته بالفهرس العالمي
+              console.warn("Global Index entry not found.");
               await signOut(masterAuth);
+              setUser(null);
           }
         }
       } catch (error: any) {
@@ -117,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let loginEmail = identifier.toLowerCase().trim();
 
-    // 🛡️ جسر الهوية: تحويل الاسم البسيط إلى إيميل فني عبر الفهرس العالمي
+    // 🛡️ جسر الهوية: إذا أدخل يوزراً بسيطاً (بدون @)، نبحث في الفهرس
     if (!loginEmail.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 
@@ -126,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ));
       
       if (userIndexSnap.empty) {
-          throw new Error('اسم المستخدم هذا غير مسجل أو يحتاج لمزامنة من غرفة التحكم.');
+          throw new Error('اسم المستخدم هذا غير مسجل في أي منشأة.');
       }
       loginEmail = userIndexSnap.docs[0].data().email;
     }
@@ -137,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
           throw new Error('بيانات الدخول غير صحيحة.');
       }
-      throw new Error('فشل تسجيل الدخول. يرجى التأكد من اتصال الإنترنت أو مزامنة الحساب.');
+      throw new Error('فشل تسجيل الدخول. تأكد من مزامنة الحساب من غرفة التحكم.');
     }
   }, [masterAuth, masterFirestore]);
 
