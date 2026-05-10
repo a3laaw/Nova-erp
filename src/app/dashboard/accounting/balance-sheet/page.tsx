@@ -23,6 +23,7 @@ import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DateInput } from '@/components/ui/date-input';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface BalanceSheetData {
     assets: {
@@ -126,7 +127,7 @@ export default function BalanceSheetPage() {
             data.liabilitiesAndEquity.total = totalLiabilities + data.liabilitiesAndEquity.totalEquity;
             data.isBalanced = Math.abs(data.assets.total - data.liabilitiesAndEquity.total) < 0.01;
 
-            // ✨ حساب مؤشرات الصحة المالية السيادية ✨
+            // ✨ حساب مؤشرات الصحة المالية ✨
             data.ratios = {
                 currentRatio: data.liabilitiesAndEquity.totalCurrentLiabilities > 0 ? data.assets.totalCurrent / data.liabilitiesAndEquity.totalCurrentLiabilities : 0,
                 debtToEquity: data.liabilitiesAndEquity.totalEquity > 0 ? totalLiabilities / data.liabilitiesAndEquity.totalEquity : 0,
@@ -167,7 +168,7 @@ export default function BalanceSheetPage() {
             {reportData ? (
                  <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
                     
-                    {/* ✨ لوحة مؤشرات الصحة المالية (Dashboard Insight) ✨ */}
+                    {/* ✨ لوحة مؤشرات الصحة المالية ✨ */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
                         <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
                             <div className="p-3 bg-blue-100 rounded-2xl text-blue-700"><TrendingUp className="h-6 w-6"/></div>
@@ -190,7 +191,7 @@ export default function BalanceSheetPage() {
                             <div>
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">نسبة الدين (D/E Ratio)</p>
                                 <p className="text-2xl font-black font-mono">{reportData.ratios.debtToEquity.toFixed(2)}</p>
-                                <p className="text-[9px] font-bold text-orange-600 mt-1">مدى اعتمادك على الديون مقابل رأس مالك</p>
+                                <p className="text-[9px] font-bold text-orange-600 mt-1">مدى الاعتماد على الديون مقابل الملكية</p>
                             </div>
                         </Card>
                     </div>

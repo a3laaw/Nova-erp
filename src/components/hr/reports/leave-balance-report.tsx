@@ -16,6 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Progress } from '../ui/progress';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 /**
  * تقرير أرصدة الإجازات المطور (v2.0):
@@ -50,6 +52,7 @@ export function LeaveBalanceReport() {
     const filteredEmployees = useMemo(() => {
         if (balanceFilter === 'all') return employeeLeaveBalances;
         const limit = parseInt(balanceFilter, 10);
+        if (limit === 999) return employeeLeaveBalances.filter(e => e.isHigh);
         return employeeLeaveBalances.filter(emp => emp.leaveBalance < limit);
     }, [employeeLeaveBalances, balanceFilter]);
 
@@ -59,7 +62,6 @@ export function LeaveBalanceReport() {
             'اسم الموظف': emp.fullName,
             'القسم': emp.department,
             'الرصيد المتبقي': emp.leaveBalance,
-            'أيام الغياب (شهر)': 0, // يتم تعبئتها من مديول الحضور
             'حالة الرصيد': emp.isCritical ? 'منخفض' : emp.isHigh ? 'متراكم (تنبيه)' : 'طبيعي'
         }));
 

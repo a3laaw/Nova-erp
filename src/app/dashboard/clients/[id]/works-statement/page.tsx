@@ -60,6 +60,7 @@ export default function ClientWorksStatementPage() {
 
                 const allLogs: LogEntry[] = [];
 
+                // 1. جلب سجل الحركات الأساسي
                 const historySnap = await getDocs(query(collection(firestore, `clients/${id}/history`), orderBy('createdAt', 'desc')));
                 historySnap.forEach(d => {
                     const data = d.data();
@@ -74,6 +75,7 @@ export default function ClientWorksStatementPage() {
                     });
                 });
 
+                // 2. جلب المواعيد (الزيارات المكتبية)
                 const apptsSnap = await getDocs(query(collection(firestore, 'appointments'), where('clientId', '==', id)));
                 apptsSnap.forEach(d => {
                     const data = d.data() as Appointment;
@@ -88,6 +90,7 @@ export default function ClientWorksStatementPage() {
                     });
                 });
 
+                // 3. جلب الزيارات الميدانية الموثقة
                 const visitsSnap = await getDocs(query(collection(firestore, 'field_visits'), where('clientId', '==', id), where('status', '==', 'confirmed')));
                 visitsSnap.forEach(d => {
                     const data = d.data() as FieldVisit;
@@ -102,6 +105,7 @@ export default function ClientWorksStatementPage() {
                     });
                 });
 
+                // 4. جلب تحديثات سير العمل من كافة المعاملات
                 const txsSnap = await getDocs(query(collection(firestore, `clients/${id}/transactions`)));
                 for (const txDoc of txsSnap.docs) {
                     const tx = txDoc.data() as ClientTransaction;

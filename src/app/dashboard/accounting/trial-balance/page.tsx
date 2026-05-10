@@ -24,7 +24,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfMonth, endOfMonth, isBefore, startOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Loader2, Printer, Scale, Filter, AlertTriangle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
@@ -33,6 +34,7 @@ import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toFirestoreDate } from '@/services/date-converter';
 
 interface TrialBalanceLine {
   accountId: string;
@@ -70,24 +72,27 @@ export default function TrialBalancePage() {
     const [hideZeroBalances, setHideZeroBalances] = useState(true);
     const [typeFilter, setTypeFilter] = useState('all');
     const [levelFilter, setLevelFilter] = useState('all');
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const fetchData = async () => {
+        if (!firestore) return;
+        setLoading(true);
+        try {
+            const [accountsSnap, entriesSnap] = await Promise.all([
+                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
+                getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted')))
+            ]);
+            setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
+            setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
+        } finally { setLoading(false); }
+    };
 
     useEffect(() => {
-        if (!firestore) return;
-        const fetchData = async () => {
-            try {
-                const [accountsSnap, entriesSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                    getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted')))
-                ]);
-                setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
-                setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
-            } finally { setLoading(false); }
-        };
         fetchData();
     }, [firestore]);
 
     const trialBalanceData = useMemo(() => {
-        if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: {} as any };
+        if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: { openingDebit: 0, openingCredit: 0, periodDebit: 0, periodCredit: 0, closingDebit: 0, closingCredit: 0, isBalanced: true } };
 
         const startDate = startOfDay(dateFrom);
         const endDate = endOfDay(dateTo);
@@ -98,7 +103,7 @@ export default function TrialBalancePage() {
             let periodCredit = 0;
 
             journalEntries.forEach(entry => {
-                const entryDate = entry.date?.toDate();
+                const entryDate = toFirestoreDate(entry.date);
                 if (!entryDate) return;
 
                 const relevantLine = entry.lines.find(line => line.accountId === account.id);
@@ -153,7 +158,7 @@ export default function TrialBalancePage() {
     return (
         <div className="space-y-6" dir="rtl">
             <Card className="no-print rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-blue-50">
-                <CardHeader className="pb-8 px-8 border-b">
+                <CardHeader>
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner"><Scale className="h-8 w-8" /></div>
@@ -172,7 +177,7 @@ export default function TrialBalancePage() {
                         <div className="grid gap-2">
                             <Label className="text-xs font-bold mr-1">نوع الحساب</Label>
                             <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                <SelectTrigger className="h-11 rounded-xl bg-white"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-11 rounded-xl bg-white border-2"><SelectValue /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="all">كل الأنواع</SelectItem>
                                     <SelectItem value="asset">الأصول</SelectItem>
@@ -266,5 +271,3 @@ export default function TrialBalancePage() {
         </div>
     );
 }
-
-async function fetchData() { window.location.reload(); }

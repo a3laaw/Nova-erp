@@ -16,6 +16,7 @@ import { History, TrendingUp, ArrowDownIcon, ArrowUpIcon, Search, AlertCircle, S
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ar } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
  * تقرير كشاف الأسعار المطور (Sovereign Price Intelligence):

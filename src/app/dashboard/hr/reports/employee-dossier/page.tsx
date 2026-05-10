@@ -140,7 +140,7 @@ export default function EmployeeDossierReport() {
                     </CardHeader>
                     <CardContent className="p-10 space-y-12">
                         
-                        {/* ✨ المخطط الزمني التاريخي (The Visual Timeline) ✨ */}
+                        {/* ✨ المخطط الزمني التاريخي ✨ */}
                         <section className="space-y-6">
                             <h3 className="text-xl font-black flex items-center gap-3 border-r-8 border-indigo-600 pr-4"><Activity className="text-indigo-600" /> الجدول الزمني للقرارات والمسيرة</h3>
                             <div className="relative pr-8 border-r-4 border-slate-100 space-y-8">

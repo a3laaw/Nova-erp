@@ -176,9 +176,7 @@ export function UnifiedOperationalRadar() {
                                         item.severity === 'warning' ? "bg-orange-400 text-white" :
                                         item.severity === 'critical' ? "bg-red-600 text-white animate-pulse" :
                                         "bg-slate-900 text-white"
-                                    )}>
-                                        {item.severity === 'active' ? 'نشط' : item.severity === 'warning' ? 'تحذير' : item.severity === 'critical' ? 'خامل (حرج)' : 'متوقف'}
-                                    </Badge>
+                                    )}>{item.severity === 'active' ? 'نشط' : item.severity === 'warning' ? 'تحذير' : item.severity === 'critical' ? 'خامل (حرج)' : 'متوقف'}</Badge>
                                 </TableCell>
                                 <TableCell>
                                     {item.lastVisitDate ? (
