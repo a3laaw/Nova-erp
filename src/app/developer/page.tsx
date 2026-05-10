@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -34,7 +35,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-// 🛡️ قاموس الترجمة المرجعي للأنشطة
+// 🛡️ قاموس الترجمة المرجعي للأنشطة - تم تعريفه خارج المكون لضمان الثبات
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -60,7 +61,7 @@ export default function DeveloperDashboard() {
   // ⚡ محرك حساب المستخدمين المجمع (Collection Group) لملء عداد الحصص
   const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
 
-  // حساب توزيع المستخدمين حسب المنشأة
+  // حساب توزيع المستخدمين حسب المنشأة بدقة
   const userCountsByCompany = useMemo(() => {
     const counts: Record<string, number> = {};
     (allUsers || []).forEach(u => {
@@ -88,7 +89,7 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
-  // دالة تفعيل طلب شركة جديد (أتمتة الحسابات)
+  // ⚡ محرك التأسيس الآلي الشامل: اعتماد الطلب وبناء الهوية
   const handleApproveRequest = async (request: any) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
@@ -97,6 +98,7 @@ export default function DeveloperDashboard() {
         const username = request.username || request.email.split('@')[0]; 
         const internalEmail = `${username}@${companyId}.nova`; 
 
+        // 1. إنشاء حساب الدخول في خادم الأمان
         const authResponse = await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({
@@ -111,13 +113,14 @@ export default function DeveloperDashboard() {
 
         const trialEndDate = addDays(new Date(), 14);
 
+        // 2. بناء المنشأة وملفات المستخدمين والفهرس العالمي في عملية واحدة
         await runTransaction(firestore, async (transaction) => {
             const companyRef = doc(firestore, 'companies', companyId);
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity || 'general',
                 adminEmail: internalEmail,
-                adminPassword: request.adminPassword,
+                adminPassword: request.adminPassword, // للحفظ المرجعي للمطور
                 contactPhone: request.phone,
                 contactEmail: request.email,
                 subscriptionType: 'trial',
@@ -134,6 +137,7 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
+            // إنشاء ملف المستخدم "مدير المنشأة"
             const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid || 'simulated-uid');
             transaction.set(tenantUserRef, {
                 uid: authResult.uid || 'simulated-uid',
@@ -146,6 +150,7 @@ export default function DeveloperDashboard() {
                 createdAt: serverTimestamp()
             });
 
+            // إنشاء الفهرس العالمي لتمكين الدخول بـ "الاسم فقط"
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: internalEmail,
@@ -154,10 +159,11 @@ export default function DeveloperDashboard() {
                 role: 'Admin'
             });
 
+            // تحديث حالة الطلب
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
         
-        toast({ title: 'تم التفعيل', description: `المنشأة "${request.companyName}" مفعلة الآن.` });
+        toast({ title: 'تم التفعيل والأتمتة', description: `المنشأة "${request.companyName}" جاهزة للعمل الآن بصلاحية مدير.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -198,7 +204,7 @@ export default function DeveloperDashboard() {
         if (!result.success) throw new Error(result.error);
         
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
-        toast({ title: 'تم الدخول', description: `أنت الآن تشرف على: ${company.name}` });
+        toast({ title: 'تم الدخول للمنظمة', description: `أنت الآن تشرف على: ${company.name}` });
         router.push('/dashboard');
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'خطأ', description: e.message });
