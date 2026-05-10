@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const userEmail = firebaseUser.email?.toLowerCase();
         
-        // 1. حالة المطور
+        // 1. حالة المطور (Root Access)
         if (userEmail === MASTER_DEV_EMAIL) {
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
           const devData: AuthenticatedUser = {
@@ -64,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // 2. حالة مستخدم المنشأة (SaaS User)
         if (userEmail) {
-          // البحث في الفهرس العالمي (Global Index Lookup) لمعرفة الشركة
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -73,8 +72,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           if (!userIndexSnap.empty) {
             const companyId = userIndexSnap.docs[0].data().companyId;
-            
-            // جلب ملف المستخدم المعزول من مسار الشركة
             const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
 
             if (tenantUserDoc.exists()) {
@@ -86,7 +83,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 currentCompanyId: companyId,
               });
 
-              // جلب إعدادات الشركة وتحميلها في سياق الشركة
               const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
               if (companyDoc.exists()) {
                   setCurrentCompany({ id: companyDoc.id, ...companyDoc.data() } as Company);
@@ -97,6 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error("Auth Sync Error:", error);
       } finally {
+        // 🛡️ صمام الأمان النهائي: ضمان توقف حالة التحميل مهما كانت النتيجة
         setLoading(false);
       }
     });
@@ -104,16 +101,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
-  /**
-   * محرك الدخول الموحد (Username Bridge):
-   * يقوم بتحويل اسم المستخدم البسيط (مثل alaa) إلى الهوية الفنية المعزولة آلياً.
-   */
   const login = useCallback(async (identifier: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("تعذر الاتصال بخادم الأمان.");
 
     let loginEmail = identifier.toLowerCase().trim();
 
-    // 🛡️ إذا أدخل اسم مستخدم فقط (بدون @)، نبحث عن إيميله الحقيقي في الفهرس العالمي
+    // 🛡️ جسر الهوية: إذا أدخل اسم مستخدم بدون @، نبحث عنه في الفهرس العالمي
     if (!loginEmail.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 
@@ -122,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ));
       
       if (userIndexSnap.empty) {
-          throw new Error('اسم المستخدم هذا غير مسجل. يرجى التأكد من كتابته بشكل صحيح (مثال: naser).');
+          throw new Error('اسم المستخدم هذا غير مسجل. يرجى التأكد من كتابته بشكل صحيح (مثال: alaa).');
       }
       loginEmail = userIndexSnap.docs[0].data().email;
     }
@@ -130,11 +123,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signInWithEmailAndPassword(masterAuth, loginEmail, password);
     } catch (e: any) {
-      console.error("Login Error:", e.code);
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+      console.error("Login Error Code:", e.code);
+      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
           throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
       }
-      throw new Error('حدث خطأ أثناء تسجيل الدخول. يرجى مراجعة الإدارة.');
+      if (e.code === 'auth/network-request-failed') {
+          throw new Error('تعذر الاتصال بالخادم. تأكد من اتصال الإنترنت.');
+      }
+      throw new Error('فشل تسجيل الدخول. قد يحتاج حسابك لـ "إصلاح ومزامنة" من غرفة التحكم.');
     }
   }, [masterAuth, masterFirestore]);
 

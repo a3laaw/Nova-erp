@@ -25,10 +25,6 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * صفحة طلب انضمام شركة جديدة.
- * تم تصحيح الحجم ليكون max-w-xl لضمان مظهر متناسق.
- */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -40,9 +36,9 @@ export default function RegisterPage() {
     companyName: '',
     activity: 'consulting',
     contactName: '',
-    email: '', // البريد الحقيقي للتواصل
-    username: '', // اسم المستخدم للدخول (ID)
-    phone: '', // رقم الجوال (WhatsApp)
+    email: '', 
+    username: '', 
+    phone: '', 
     adminPassword: '',
   });
 
@@ -93,7 +89,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      {/* 🛡️ الحجم المثالي لنموذج التسجيل هو max-w-xl 🛡️ */}
       <Card className="w-full max-w-xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect">
         <CardHeader className="py-12 px-10 border-b border-black/5 bg-white/20">
             <div className="flex justify-between items-center">

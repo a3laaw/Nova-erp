@@ -13,10 +13,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-/**
- * بوابة الدخول الموحدة لـ Nova ERP.
- * تم تصحيح الحجم ليكون max-w-md لضمان مظهر متناسق واحترافي.
- */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -25,7 +21,7 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', // يقبل اسم المستخدم (مثلاً: alaa)
+    identifier: '', 
     password: '',
   });
 
@@ -45,6 +41,8 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
+        // في حال النجاح، سيقوم الـ AuthContext بتحديث الحالة وسيتم التوجيه عبر الـ useEffect
+        // نترك isLoading مفعلة حتى يحدث التوجيه لإعطاء انطباع بالاستجابة
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -58,7 +56,6 @@ export default function UnifiedLoginPage() {
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
-      {/* 🛡️ الحجم المثالي للبطاقة هو max-w-md 🛡️ */}
       <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
         <CardHeader className="py-12 px-8 text-center relative border-b border-white/20">
             <div className="bg-white/40 p-5 rounded-[2.2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl transition-transform hover:scale-110 duration-500">
@@ -68,14 +65,14 @@ export default function UnifiedLoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">نظام الإدارة الموحد للمؤسسات</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">بوابة الدخول السيادية الموحدة</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تنبيه أمني</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تعذر الدخول</AlertTitle>
                     <AlertDescription className="text-[11px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
