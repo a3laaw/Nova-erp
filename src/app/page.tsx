@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,7 +22,7 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // توجيه سيادي فوري عند اكتمال التحقق من الجلسة
+  // توجيه فوري عند التعرف على الجلسة
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';

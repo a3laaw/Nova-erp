@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
@@ -64,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         // 2. حالة مستخدم المنشأة (SaaS User)
         if (userEmail) {
-          // نبحث في الفهرس العالمي عن الشركة التابعة
+          // البحث في الفهرس العالمي
           const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -94,11 +93,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
               }
             } else {
-                await signOut(masterAuth);
+                // الحساب موجود أمنياً ولكن ملف الموظف مفقود - نحتاج لإصلاح
+                console.warn("Tenant user doc missing - Repair needed.");
                 setUser(null);
             }
           } else {
-              await signOut(masterAuth);
+              // الحساب موجود أمنياً ولكن غير مفهرس عالمياً
+              console.warn("User not found in Global Index.");
               setUser(null);
           }
         }
@@ -106,7 +107,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Auth Sync Error:", error);
         setUser(null);
       } finally {
-        // نضمن دائماً إنهاء وضع التحميل لمنع تعليق الشاشة
         setLoading(false);
       }
     });
