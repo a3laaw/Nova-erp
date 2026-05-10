@@ -13,7 +13,7 @@ import Link from 'next/link';
 
 /**
  * بوابة الدخول السيادية المرممة:
- * تم إعادة الأبعاد الأصلية (max-w-md) واستعادة استقرار الدخول بالإيميل الفني.
+ * تم الالتزام بالأبعاد (max-w-md) والتدرج اللؤلؤي الأصلي.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -27,14 +27,11 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
+  // صمام أمان لإعادة توجيه المستخدم إذا كان مسجلاً للدخول بالفعل
   useEffect(() => {
     if (!authLoading && user) {
-        // تأخير بسيط لضمان ثبات الكوكيز في المتصفح قبل التوجيه
-        const timer = setTimeout(() => {
-            const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-            router.replace(targetPath);
-        }, 100);
-        return () => clearTimeout(timer);
+        const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
+        router.replace(targetPath);
     }
   }, [user, authLoading, router]);
 
@@ -47,6 +44,7 @@ export default function UnifiedLoginPage() {
 
     try {
         await login(formData.email, formData.password);
+        // التوجيه يتم عبر الـ useEffect أعلاه عند تحديث حالة المستخدم
     } catch (error: any) {
         console.error("Login failed:", error);
         setErrorMessage("بيانات الدخول غير صحيحة أو الحساب يحتاج لمزامنة.");
@@ -57,7 +55,7 @@ export default function UnifiedLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       {/* عناصر جمالية في الخلفية */}
-      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]" />
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
       
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40">

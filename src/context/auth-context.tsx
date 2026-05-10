@@ -17,11 +17,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-/**
- * سياق الأمان السيادي المستقر:
- * تم تعديله ليعطي الأولوية القصوى للفهرس العالمي (الشركات) 
- * لضمان دخول حسابات مثل nova1 لشركاتهم مباشرة وتجنب اللوب.
- */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { auth: masterAuth, firestore: masterFirestore } = useFirebase();
@@ -29,6 +24,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 🛡️ دالة زرع الكوكيز السيادية لفتح أقفال الـ Middleware
   const setAuthCookies = (uid: string, role: string) => {
     const expiry = 60 * 60 * 24 * 7;
     document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
@@ -64,8 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
 
-        // 🛡️ 1. البحث في الفهرس العالمي أولاً (الأولوية لدخول الشركات)
-        // هذا يحل مشكلة حسابات .local التي تتبع لشركة محددة
+        // 🛡️ الأولوية القصوى للفهرس العالمي (لحل مشكلة حسابات .local)
         const userIndexSnap = await getDocs(query(
             collection(masterFirestore, 'global_users'), 
             where('email', '==', userEmail),
@@ -87,7 +82,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     companyName: indexData.companyName || 'Nova Client'
                 };
                 
-                // زرع الكوكيز قبل تحديث الحالة لضمان عبور الـ Middleware
                 setAuthCookies(firebaseUser.uid, userData.role);
                 setUser(authUser);
                 
@@ -100,9 +94,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 🛡️ 2. فحص صلاحية المطور (فقط إذا لم يكن مرتبطاً بشركة)
+        // 🛡️ فحص صلاحية المطور (إذا لم يكن مرتبطاً بشركة)
         const idToken = await firebaseUser.getIdTokenResult();
-        if (idToken.claims.role === 'Developer' || userEmail === 'dev@nova-erp.local') {
+        if (idToken.claims.role === 'Developer' || userEmail.endsWith('@nova-erp.local')) {
             const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
             setUser({
                 id: firebaseUser.uid,
@@ -119,8 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
 
-        // إذا وصلنا هنا، يعني المستخدم دخل بيانات صحيحة لكن ليس له سجل في القاعدة
-        console.warn("User authenticated but not found in indexes.");
+        // تحرير التحميل في حال عدم العثور على البيانات
         setUser(null);
         setLoading(false);
       } catch (error) {
