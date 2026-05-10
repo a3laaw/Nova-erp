@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, Lock, AlertCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, Mail, Sparkles, LogIn, Building2, Lock, AlertCircle, RefreshCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -17,21 +17,27 @@ export default function UnifiedLoginPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showRescue, setShowRescue] = useState(false);
 
-  // 🛡️ محرك التوجيه السيادي
+  // 🛡️ محرك التوجيه والتحكم في تعليق الحالة
   useEffect(() => {
     if (!authLoading && user) {
-        const timer = setTimeout(() => {
-            router.replace(user.role === 'Developer' ? '/developer' : '/dashboard');
-        }, 100); // تأخير بسيط لضمان ثبات الجلسة في المتصفح
-        return () => clearTimeout(timer);
+        router.replace(user.role === 'Developer' ? '/developer' : '/dashboard');
     }
-  }, [user, authLoading, router]);
+    
+    // صمام أمان: إذا استمر التحميل أكثر من 6 ثوانٍ، نظهر خيار الإنقاذ
+    let timer: NodeJS.Timeout;
+    if (isLoading || authLoading) {
+        timer = setTimeout(() => setShowRescue(true), 6000);
+    }
+    return () => clearTimeout(timer);
+  }, [user, authLoading, router, isLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
     setIsLoading(true);
+    setShowRescue(false);
 
     try {
         await login(formData.email, formData.password);
@@ -55,18 +61,25 @@ export default function UnifiedLoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {(contextError) && (
+            {(contextError || showRescue) && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake-in duration-300">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
-                    <AlertDescription className="text-[11px] font-bold mt-1">{contextError}</AlertDescription>
+                    <AlertTitle className="font-black text-xs">{showRescue ? 'تأخر في الاستجابة' : 'تعذر العبور'}</AlertTitle>
+                    <AlertDescription className="text-[11px] font-bold mt-1">
+                        {showRescue ? 'يبدو أن الجلسة معلقة، يرجى تحديث الصفحة.' : contextError}
+                        {showRescue && (
+                            <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="w-full mt-3 h-8 rounded-lg gap-2 text-red-700 border-red-200">
+                                <RefreshCcw className="h-3 w-3" /> تحديث الصفحة الآن
+                            </Button>
+                        )}
+                    </AlertDescription>
                 </Alert>
             )}
 
             <form onSubmit={handleLogin} className="space-y-5">
                 <div className="grid gap-2">
                     <Label className="font-black text-[10px] pr-1 flex items-center gap-2 text-[#1e1b4b] uppercase tracking-widest">
-                        <Mail className="h-3 w-3 opacity-50" /> البريد الفني المعتمد
+                        <Mail className="h-3 w-3 opacity-50" /> البريد الإلكتروني الفني
                     </Label>
                     <Input 
                         type="email" 
@@ -102,7 +115,7 @@ export default function UnifiedLoginPage() {
                     {isLoading || authLoading ? (
                         <>
                             <Loader2 className="animate-spin h-6 w-6" />
-                            <span>جاري التحقق...</span>
+                            <span>جاري العبور...</span>
                         </>
                     ) : (
                         <>

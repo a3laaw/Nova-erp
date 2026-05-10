@@ -29,12 +29,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🛡️ محرك جلب سياق المستخدم السيادي - البحث أولاً في الفهرس العالمي
   const fetchUserWithContext = useCallback(async (email: string, uid: string) => {
     if (!masterFirestore) return { userProfile: null, companyData: null };
     
     try {
         const lowerEmail = email.toLowerCase().trim();
+        
         // 1. البحث في الفهرس العالمي (أولوية المنشأة لضمان دخول nova1 لشركته)
         const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
@@ -58,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 2. فحص وضع المطور (إذا لم يكن مرتبطاً بشركة)
+        // 2. فحص وضع المطور (إذا لم يكن مرتبطاً بشركة في الفهرس العالمي)
         const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
         if (devDoc.exists()) {
             return {
@@ -99,6 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (companyData) setCurrentCompany(companyData);
           } else {
             await signOut(masterAuth);
+            setUser(null);
           }
         } else {
           setUser(null);
@@ -110,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (err) {
           console.error("Auth State Sync Error:", err);
       } finally {
-        setLoading(false); // 🛡️ ضمان الإنهاء القاطع لمنع اللوب
+        setLoading(false); // 🛡️ الإنهاء القاطع لحماية الشاشة من التعليق
       }
     });
 
