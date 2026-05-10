@@ -25,16 +25,11 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // 🛡️ مراقبة حالة التحميل السيادية
+  // 🛡️ توجيه سيادي فوري عند اكتمال التحقق
   useEffect(() => {
-    if (!authLoading) {
-        if (user) {
-            const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-            router.replace(targetPath);
-        } else {
-            // إذا توقف تحميل الـ Auth ولم نجد مستخدم، نحرر زر الدخول
-            setIsLoading(false);
-        }
+    if (!authLoading && user) {
+        const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
+        router.replace(targetPath);
     }
   }, [user, authLoading, router]);
 
@@ -46,7 +41,7 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        // النجاح سيتم معالجته عبر useEffect أعلاه
+        // التوجيه سيحدث عبر useEffect عند تغيير حالة الـ User
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -69,14 +64,14 @@ export default function UnifiedLoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">بوابة الدخول السيادية الموحدة</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">بوابة العبور السيادية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
+                    <AlertTitle className="font-black text-xs">تعذر الدخول</AlertTitle>
                     <AlertDescription className="text-[11px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
@@ -86,7 +81,7 @@ export default function UnifiedLoginPage() {
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> اسم المستخدم (Username)
+                        <User className="h-3 w-3" /> اسم المستخدم أو البريد
                     </Label>
                     <Input 
                         type="text" 
@@ -94,7 +89,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
                         className="h-14 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-lg text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="مثال: alaa"
+                        placeholder="example: alaa"
                         disabled={isLoading}
                     />
                 </div>
@@ -130,7 +125,6 @@ export default function UnifiedLoginPage() {
             </form>
 
             <div className="pt-6 border-t border-white/10 flex flex-col gap-4">
-                <p className="text-center text-[10px] font-black text-[#1e1b4b]/60 uppercase tracking-[0.3em]">— هل تملك شركة أو مكتباً؟ —</p>
                 <Button asChild variant="outline" className="h-14 rounded-3xl border-white/40 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2" disabled={isLoading}>
                     <Link href={isLoading ? '#' : '/register'}>
                         <Building2 className="h-5 w-5" />
