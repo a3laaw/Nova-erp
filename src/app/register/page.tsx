@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,10 +20,6 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-/**
- * صفحة تسجيل المنشأة:
- * تم إصلاح خطأ استيراد Separator وتصحيح العرض ليكون رشيقاً ومتوازناً (max-w-xl).
- */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -65,11 +61,9 @@ export default function RegisterPage() {
     }
   };
 
-  const vibrantGlassBackground = "linear-gradient(135deg, #f3f4f6 0%, #e0e7ff 40%, #f3e8ff 70%, #fce7f3 100%)";
-
   if (isSuccess) {
       return (
-        <div className="min-h-screen flex items-center justify-center p-4" style={{ background: vibrantGlassBackground }}>
+        <div className="min-h-screen flex items-center justify-center p-4">
             <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
                 <div className="bg-green-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-green-500/40 shadow-inner">
                     <CheckCircle2 className="h-16 w-16 text-green-600" />
@@ -87,9 +81,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
-      <div className="absolute top-[-5%] left-[-5%] w-[400px] h-[400px] bg-primary/10 rounded-full blur-[80px]" />
-      
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       <Card className="w-full max-w-xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect relative z-10 animate-in fade-in duration-700">
         <CardHeader className="py-10 px-10 border-b border-black/5 bg-white/20">
             <div className="flex justify-between items-center">

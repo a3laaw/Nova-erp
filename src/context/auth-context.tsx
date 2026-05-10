@@ -6,11 +6,11 @@ import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebas
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
-import type { AuthenticatedUser, Company } from '@/lib/types';
+import type { AuthenticatedUser, Company as CompanyType } from '@/lib/types';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
-  company: Company | null;
+  company: CompanyType | null;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -25,18 +25,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setCurrentCompany } = useCompany();
   
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
+  const [company, setCompany] = useState<CompanyType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🔍 محرك العبور السيادي: يبحث في الفهرس العالمي أولاً لضمان توجيه nova1 لشركته
   const fetchUserWithContext = useCallback(async (email: string, uid: string) => {
     if (!masterFirestore) return { userProfile: null, companyData: null };
     
     try {
         const lowerEmail = email.toLowerCase().trim();
         
-        // 1. الأولوية القصوى: البحث في الفهرس العالمي للشركات
+        // 🛡️ الأولوية للفهرس العالمي (توجيه nova1 لشركته فوراً)
         const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
 
@@ -50,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (userSnap.exists()) {
                 const profile = userSnap.data() as AuthenticatedUser;
                 const companySnap = await getDoc(doc(masterFirestore, 'companies', tenantId));
-                const companyData = companySnap.exists() ? { id: companySnap.id, ...companySnap.data() } as Company : null;
+                const companyData = companySnap.exists() ? { id: companySnap.id, ...companySnap.data() } as CompanyType : null;
 
                 return { 
                     userProfile: { ...profile, id: userSnap.id, uid, currentCompanyId: tenantId, companyName: companyData?.name || 'Nova Client' }, 
@@ -59,7 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 2. البحث في سجل المطورين (فقط إذا لم يكن مرتبطاً بشركة)
+        // 🛠️ فحص المطور (فقط إذا لم يكن في شركة)
         const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
         if (devDoc.exists()) {
             return {
@@ -74,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return { userProfile: null, companyData: null };
     } catch (e) {
-        console.error("Critical: Context Fetch Error:", e);
+        console.error("Critical: Auth Fetch Error:", e);
         return { userProfile: null, companyData: null };
     }
   }, [masterFirestore]);
@@ -89,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const { userProfile, companyData } = await fetchUserWithContext(firebaseUser.email, firebaseUser.uid);
           
           if (userProfile && userProfile.isActive) {
-            // زرع كوكيز الجلسة فوراً لفتح أقفال الـ Middleware ومنع اللوب
+            // زرع الكوكيز فوراً لفتح أقفال الـ Middleware
             document.cookie = `nova-user-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
             if (userProfile.role === 'Developer') {
                 document.cookie = `nova-dev-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
@@ -101,6 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             await signOut(masterAuth);
             setUser(null);
+            setError(userProfile ? 'الحساب غير مفعل.' : 'الحساب غير موجود.');
           }
         } else {
           setUser(null);
@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (err) {
           console.error("Auth Sync Error:", err);
       } finally {
-        setLoading(false); // 🛡️ ضمان تحرير الشاشة تحت أي ظرف
+        setLoading(false);
       }
     });
 
@@ -125,10 +125,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (err: any) {
-        let msg = 'بيانات الدخول غير صحيحة.';
-        if (err.code === 'auth/user-not-found') msg = 'الحساب غير موجود.';
-        setError(msg);
-        throw new Error(msg);
+        setError('بيانات الدخول غير صحيحة.');
+        throw err;
     }
   };
 
