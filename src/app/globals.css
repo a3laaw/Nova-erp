@@ -82,8 +82,7 @@
 [data-radix-select-content],
 [data-radix-popover-content],
 .react-select__menu,
-.react-select__menu-portal,
-canvas {
+.react-select__menu-portal {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }

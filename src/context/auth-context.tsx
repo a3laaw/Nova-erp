@@ -18,8 +18,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * سياق الأمان السيادي المطور (Sovereign Auth Core v3.8):
- * تم تحصينه ببروتوكول "المزامنة القاطعة" لمنع حلقة التحميل اللانهائية.
+ * سياق الأمان السيادي المطور (Sovereign Auth Core v4.0):
+ * تم تحصينه ببروتوكول "المزامنة القاطعة" لضمان الاستقرار الفوري وحل مشكلة nova1@nova-erp.local.
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
@@ -27,14 +27,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setCurrentCompany } = useCompany();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  const MASTER_DEV_EMAIL = 'dev@nova-erp.local';
 
   // 🛡️ مساعد زرع الكوكيز السيادي: يفتح أقفال الـ Middleware فوراً
-  const setAuthCookies = (uid: string, isDev: boolean) => {
+  const setAuthCookies = (uid: string, role: string) => {
     const expiry = 60 * 60 * 24 * 7; // 7 days
     document.cookie = `nova-user-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
-    if (isDev) {
+    if (role === 'Developer') {
         document.cookie = `nova-dev-session=${uid}; path=/; max-age=${expiry}; SameSite=Lax`;
     }
   };
@@ -60,10 +58,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
+        const idToken = await firebaseUser.getIdTokenResult();
+        const role = idToken.claims.role as string;
         const userEmail = firebaseUser.email?.toLowerCase();
-        
-        // 1. حالة المطور (Sovereign Root)
-        if (userEmail === MASTER_DEV_EMAIL) {
+
+        // 1. حالة المطور (Sovereign Developer) - تدعم nova1@nova-erp.local وكافة الإيميلات المعتمدة
+        if (role === 'Developer' || userEmail === 'dev@nova-erp.local') {
           const devDoc = await getDoc(doc(masterFirestore, 'developers', firebaseUser.uid));
           const devData: AuthenticatedUser = {
             id: firebaseUser.uid,
@@ -76,8 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isSuperAdmin: true,
           };
           setUser(devData);
-          setAuthCookies(firebaseUser.uid, true);
-          setLoading(false); // ⚡ تحرير فوري
+          setAuthCookies(firebaseUser.uid, 'Developer');
+          setLoading(false);
           return;
         }
 
@@ -90,7 +90,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ));
           
           if (!userIndexSnap.empty) {
-            const companyId = userIndexSnap.docs[0].data().companyId;
+            const indexData = userIndexSnap.docs[0].data();
+            const companyId = indexData.companyId;
             const tenantUserDoc = await getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid));
 
             if (tenantUserDoc.exists()) {
@@ -105,9 +106,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   uid: firebaseUser.uid, 
                   id: tenantUserDoc.id,
                   currentCompanyId: companyId,
-                  companyName: userIndexSnap.docs[0].data().companyName || 'Nova Client'
+                  companyName: indexData.companyName || 'Nova Client'
                 });
-                setAuthCookies(firebaseUser.uid, false);
+                setAuthCookies(firebaseUser.uid, userData.role);
 
                 const companyDoc = await getDoc(doc(masterFirestore, 'companies', companyId));
                 if (companyDoc.exists()) {
@@ -115,25 +116,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
               }
             } else {
-                // إذا وجدنا الإيميل ولكن لم نجد ملف المستخدم في الشركة (نقص مزامنة)
-                // نسجل الخروج ونحرر الحالة لمنع اللوب
                 await signOut(masterAuth);
                 setUser(null);
-                removeAuthCookies();
             }
           } else {
-              // إذا لم يجد الإيميل في الفهرس العالمي (مستخدم مجهول)
               await signOut(masterAuth);
               setUser(null);
-              removeAuthCookies();
           }
         }
       } catch (error) {
-        console.error("Auth Listener Error:", error);
+        console.error("Auth Loop Prevention:", error);
         setUser(null);
-        removeAuthCookies();
       } finally {
-        // 🛡️ صمام الأمان الأهم: إنهاء وضع التحميل تحت أي ظرف لمنع تعليق الشاشة
         setLoading(false);
       }
     });
@@ -144,11 +138,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error("تعذر الاتصال بخادم الأمان.");
     try {
-      // 🚀 إجبار مسح الكوكيز القديمة قبل محاولة الدخول الجديدة
       removeAuthCookies();
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (e: any) {
-      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password') {
+      if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
           throw new Error('بيانات العبور غير صحيحة.');
       }
       throw new Error(`فشل الدخول: ${e.message}`);
@@ -156,7 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [masterAuth]);
 
   const logout = useCallback(async () => {
-    setLoading(true); // إظهار شاشة التحميل أثناء الخروج لضمان النظافة
+    setLoading(true);
     if (masterAuth) await signOut(masterAuth);
     setUser(null);
     setCurrentCompany(null);

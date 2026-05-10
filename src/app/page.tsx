@@ -12,10 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية (The Sovereign Gate v4.0):
- * - علاج حلقة التحميل (Loading Loop) عبر صمام أمان زمني.
- * - تحسين توازن الأبعاد البصرية لتكون رشيقة (max-w-md).
- * - معالجة خطأ الدخول الفوري مع تأخير ذكي للمزامنة.
+ * بوابة الدخول السيادية (The Sovereign Gate v5.0):
+ * تم تحصين الأبعاد لتكون رشيقة (max-w-md) وعلاج حلقة التحميل اللانهائية.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -30,24 +28,23 @@ export default function UnifiedLoginPage() {
     password: '',
   });
 
-  // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 6 ثوانٍ، نعيد السيطرة للمستخدم
+  // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 5 ثوانٍ، نعيد السيطرة للمستخدم
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isLoading) {
         timer = setTimeout(() => {
             setShowEmergencyExit(true);
             setIsLoading(false);
-            setErrorMessage("استغرقت الاستجابة وقتاً طويلاً. يرجى تحديث الصفحة أو التأكد من بيانات الدخول.");
-        }, 6000);
+            setErrorMessage("تنبيه: تعثرت المزامنة اللحظية. يرجى تحديث الصفحة أو مراجعة بيانات الدخول.");
+        }, 5000);
     }
     return () => clearTimeout(timer);
   }, [isLoading]);
 
-  // التوجيه التلقائي الآمن مع تأخير ذكي للمزامنة
+  // التوجيه التلقائي الآمن مع تأخير ذكي لاستقرار الكوكيز
   useEffect(() => {
     if (!authLoading && user) {
         const targetPath = user.role === 'Developer' ? '/developer' : '/dashboard';
-        // 🚀 تأخير سيادي (100ms) لضمان استقرار الكوكيز في المتصفح قبل التوجيه
         const timer = setTimeout(() => {
             router.replace(targetPath);
         }, 100);
@@ -65,36 +62,32 @@ export default function UnifiedLoginPage() {
 
     try {
         await login(formData.email, formData.password);
-        // التوجيه سيحدث عبر useEffect بمجرد تحديث حالة المستخدم في السياق
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
     }
   };
 
-  const vibrantGlassBackground = "linear-gradient(135deg, #f3f4f6 0%, #e0e7ff 40%, #f3e8ff 70%, #fce7f3 100%)";
-
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl" style={{ background: vibrantGlassBackground }}>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       {/* عناصر جمالية في الخلفية */}
       <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] animate-pulse" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-indigo-400/10 rounded-full blur-[100px]" />
       
-      <Card className="w-full max-w-md rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700 relative z-10">
+      <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40">
-            <div className="bg-white/60 p-4 rounded-[1.8rem] w-fit mx-auto mb-4 backdrop-blur-xl border border-white shadow-lg">
+            <div className="bg-white/60 p-4 rounded-3xl w-fit mx-auto mb-4 backdrop-blur-xl border border-white shadow-lg">
                 <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" />
             </div>
             <CardTitle className="text-3xl font-black tracking-tighter text-[#1e1b4b] flex items-center justify-center gap-2">
                 Nova ERP
-                <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
+                <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
             <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 text-xs uppercase tracking-widest">بوابة العبور السيادية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
             {errorMessage && (
-                <div className="space-y-4 animate-in shake-100">
+                <div className="space-y-3 animate-in shake-100">
                     <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle className="font-black text-xs">تعذر العبور</AlertTitle>
@@ -127,7 +120,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                         className="h-12 rounded-xl border-white/60 bg-white/40 backdrop-blur-md dir-ltr font-black text-base text-[#1e1b4b] shadow-inner focus:bg-white/80 transition-all border-2" 
                         required 
-                        placeholder="username@company.nova"
+                        placeholder="user@company.nova"
                         disabled={isLoading}
                     />
                 </div>
