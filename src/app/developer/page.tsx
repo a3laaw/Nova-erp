@@ -35,7 +35,6 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format, addDays } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-// 🛡️ قاموس الترجمة المرجعي للأنشطة - تم تعريفه خارج المكون لضمان الثبات
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -54,14 +53,10 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
-  // 🛡️ اشتراك لحظي سيادي في كافة البيانات المطلوبة
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
-  
-  // ⚡ محرك حساب المستخدمين المجمع (Collection Group) لملء عداد الحصص
   const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
 
-  // حساب توزيع المستخدمين حسب المنشأة بدقة
   const userCountsByCompany = useMemo(() => {
     const counts: Record<string, number> = {};
     (allUsers || []).forEach(u => {
@@ -89,7 +84,6 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
-  // ⚡ محرك التأسيس الآلي الشامل: اعتماد الطلب وبناء الهوية
   const handleApproveRequest = async (request: any) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(request.id!);
@@ -98,7 +92,6 @@ export default function DeveloperDashboard() {
         const username = request.username || request.email.split('@')[0]; 
         const internalEmail = `${username}@${companyId}.nova`; 
 
-        // 1. إنشاء حساب الدخول في خادم الأمان
         const authResponse = await fetch('/api/manage-tenant-user', {
             method: 'POST',
             body: JSON.stringify({
@@ -113,14 +106,13 @@ export default function DeveloperDashboard() {
 
         const trialEndDate = addDays(new Date(), 14);
 
-        // 2. بناء المنشأة وملفات المستخدمين والفهرس العالمي في عملية واحدة
         await runTransaction(firestore, async (transaction) => {
             const companyRef = doc(firestore, 'companies', companyId);
             transaction.set(companyRef, {
                 name: request.companyName,
                 activityType: request.activity || 'general',
                 adminEmail: internalEmail,
-                adminPassword: request.adminPassword, // للحفظ المرجعي للمطور
+                adminPassword: request.adminPassword,
                 contactPhone: request.phone,
                 contactEmail: request.email,
                 subscriptionType: 'trial',
@@ -137,7 +129,6 @@ export default function DeveloperDashboard() {
                 createdBy: 'system-auto-approval'
             });
 
-            // إنشاء ملف المستخدم "مدير المنشأة"
             const tenantUserRef = doc(firestore, `companies/${companyId}/users`, authResult.uid || 'simulated-uid');
             transaction.set(tenantUserRef, {
                 uid: authResult.uid || 'simulated-uid',
@@ -150,7 +141,6 @@ export default function DeveloperDashboard() {
                 createdAt: serverTimestamp()
             });
 
-            // إنشاء الفهرس العالمي لتمكين الدخول بـ "الاسم فقط"
             const globalUserRef = doc(collection(firestore, 'global_users'));
             transaction.set(globalUserRef, {
                 email: internalEmail,
@@ -159,7 +149,6 @@ export default function DeveloperDashboard() {
                 role: 'Admin'
             });
 
-            // تحديث حالة الطلب
             transaction.update(doc(firestore, 'company_requests', request.id!), { status: 'approved' });
         });
         
@@ -173,6 +162,8 @@ export default function DeveloperDashboard() {
       if (!firestore || isProcessing) return;
       setIsProcessing(company.id!);
       try {
+          const username = company.adminEmail.split('@')[0];
+          
           const response = await fetch('/api/manage-tenant-user', {
               method: 'POST',
               body: JSON.stringify({
@@ -185,7 +176,19 @@ export default function DeveloperDashboard() {
           const result = await response.json();
           if (!result.success && !result.simulated) throw new Error(result.error);
           
-          toast({ title: 'نجاح المزامنة', description: `تم تفعيل حساب دخول "${company.name}" أمنياً.` });
+          // 🛡️ إعادة بناء الفهرس العالمي لضمان الربط بالاسم
+          const globalQuery = query(collection(firestore, 'global_users'), where('username', '==', username));
+          const globalSnap = await getDocs(globalQuery);
+          if (globalSnap.empty) {
+              await addDoc(collection(firestore, 'global_users'), {
+                  username: username,
+                  email: company.adminEmail,
+                  companyId: company.id,
+                  role: 'Admin'
+              });
+          }
+
+          toast({ title: 'نجاح المزامنة', description: `تم تفعيل حساب دخول "${company.name}" وربط الفهرس العالمي.` });
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'خطأ في الإصلاح', description: e.message });
       } finally { setIsProcessing(null); }
@@ -282,7 +285,7 @@ export default function DeveloperDashboard() {
                                                     </div>
                                                     <div className="flex flex-col">
                                                         <span className="font-black text-xl text-[#1e1b4b]">{company.name}</span>
-                                                        <span className="font-mono text-xs text-primary font-bold">@{company.adminEmail?.split('@')[0]}</span>
+                                                        <span className="font-mono text-xs text-primary font-black">@{company.adminEmail?.split('@')[0]}</span>
                                                     </div>
                                                 </div>
                                             </TableCell>
@@ -364,7 +367,7 @@ export default function DeveloperDashboard() {
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username}</Badge>
+                                            <Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username || req.email.split('@')[0]}</Badge>
                                         </TableCell>
                                         <TableCell className="text-center">
                                             <p className="font-black text-indigo-900">{req.contactName}</p>
@@ -378,7 +381,7 @@ export default function DeveloperDashboard() {
                                                     disabled={!!isProcessing} 
                                                     className="rounded-2xl font-black gap-2 bg-green-600 hover:bg-green-700 h-12 px-8 shadow-lg shadow-green-100"
                                                 >
-                                                    {isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5"/> : <CheckCircle2 className="h-5 w-5" />} 
+                                                    {isProcessing === req.id ? <Loader2 className="animate-spin h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />} 
                                                     تفعيل وبناء البيئة
                                                 </Button>
                                             ) : (

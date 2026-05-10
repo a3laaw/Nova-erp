@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
  * بوابة الدخول الموحدة لـ Nova ERP.
- * تدعم الدخول بـ "اسم المستخدم" المباشر لتبسيط التجربة.
+ * تدعم الدخول بـ "اسم المستخدم" المباشر لتبسيط تجربة الموظفين والعملاء.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -24,7 +25,7 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', // يقبل اسم المستخدم (مثلاً: naser)
+    identifier: '', // يقبل اسم المستخدم (مثلاً: alaa)
     password: '',
   });
 
@@ -44,7 +45,6 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
-        // التوجيه سيتم عبر الـ useEffect في الأعلى
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -58,7 +58,7 @@ export default function UnifiedLoginPage() {
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/20 rounded-full blur-[120px] animate-pulse" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse" />
 
-      <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
+      <Card className="w-full max-md rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-700">
         <CardHeader className="py-12 px-8 text-center relative border-b border-white/20">
             <div className="bg-white/40 p-5 rounded-[2.2rem] w-fit mx-auto mb-6 backdrop-blur-xl border border-white/60 shadow-xl transition-transform hover:scale-110 duration-500">
                 <ShieldCheck className="h-12 w-12 text-[#1e1b4b]" />
@@ -83,57 +83,57 @@ export default function UnifiedLoginPage() {
 
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
-                    <Label className="font-bold text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> اسم المستخدم
+                    <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
+                        <User className="h-3 w-3" /> اسم المستخدم (Username)
                     </Label>
                     <Input 
                         type="text" 
                         value={formData.identifier} 
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
-                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-bold text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
+                        className="h-14 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-black text-lg text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="أدخل اسمك هنا (مثلاً: ali)"
+                        placeholder="مثال: naser (بدون @)"
                         disabled={isLoading}
                     />
                 </div>
 
                 <div className="grid gap-2">
-                    <Label className="font-bold text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
+                    <Label className="font-black text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
                         <Lock className="h-3 w-3" /> كلمة المرور
                     </Label>
                     <Input 
                         type="password" 
                         value={formData.password} 
                         onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
-                        className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-bold text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
+                        className="h-14 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md font-mono font-black text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2 text-center" 
                         required 
                         placeholder="********"
                         disabled={isLoading}
                     />
                 </div>
 
-                <Button type="submit" disabled={isLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-indigo-900/20 bg-[#1e1b4b] text-white hover:bg-black transition-all active:scale-95 border-b-4 border-black">
+                <Button type="submit" disabled={isLoading} className="w-full h-16 rounded-3xl font-black text-2xl gap-4 shadow-2xl shadow-indigo-900/20 bg-[#1e1b4b] text-white hover:bg-black transition-all active:scale-95 border-b-8 border-black/40">
                     {isLoading ? (
                         <>
-                            <Loader2 className="animate-spin h-6 w-6" />
-                            جاري التحقق...
+                            <Loader2 className="animate-spin h-8 w-8" />
+                            <span>جاري الدخول...</span>
                         </>
                     ) : (
                         <>
-                            <LogIn className="h-6 w-6" />
-                            دخول للنظام
+                            <LogIn className="h-8 w-8" />
+                            <span>دخول للنظام</span>
                         </>
                     )}
                 </Button>
             </form>
 
-            <div className="pt-4 border-t border-white/10 flex flex-col gap-4">
-                <p className="text-center text-xs font-bold text-[#1e1b4b]/60 uppercase tracking-widest">— هل تملك شركة أو مكتباً؟ —</p>
-                <Button asChild variant="outline" className="h-12 rounded-2xl border-white/40 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2" disabled={isLoading}>
+            <div className="pt-6 border-t border-white/10 flex flex-col gap-4">
+                <p className="text-center text-[10px] font-black text-[#1e1b4b]/60 uppercase tracking-[0.3em]">— هل تملك شركة أو مكتباً؟ —</p>
+                <Button asChild variant="outline" className="h-14 rounded-3xl border-white/40 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 transition-all gap-2" disabled={isLoading}>
                     <Link href={isLoading ? '#' : '/register'}>
-                        <Building2 className="h-4 w-4" />
+                        <Building2 className="h-5 w-5" />
                         سجل منشأتك الآن في Nova
-                        <ArrowLeft className="h-4 w-4 mr-auto" />
+                        <ArrowLeft className="h-5 w-5 mr-auto" />
                     </Link>
                 </Button>
             </div>

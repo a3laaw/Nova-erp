@@ -111,33 +111,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (identifier: string, password: string) => {
     if (!masterAuth || !masterFirestore) throw new Error("تعذر الاتصال بخادم الأمان.");
 
-    let email = identifier.toLowerCase().trim();
+    let loginEmail = identifier.toLowerCase().trim();
 
     // 🛡️ إذا أدخل اسم مستخدم فقط (بدون @)، نبحث عن إيميله الحقيقي في الفهرس العالمي
-    if (!email.includes('@')) {
+    if (!loginEmail.includes('@')) {
       const userIndexSnap = await getDocs(query(
         collection(masterFirestore, 'global_users'), 
-        where('username', '==', email),
+        where('username', '==', loginEmail),
         limit(1)
       ));
       
       if (userIndexSnap.empty) {
-          throw new Error('اسم المستخدم هذا غير مسجل في أي منشأة. يرجى التأكد من الاسم.');
+          throw new Error('اسم المستخدم هذا غير مسجل. يرجى التأكد من كتابته بشكل صحيح (مثال: naser).');
       }
-      email = userIndexSnap.docs[0].data().email;
+      loginEmail = userIndexSnap.docs[0].data().email;
     }
 
     try {
-      await signInWithEmailAndPassword(masterAuth, email, password);
+      await signInWithEmailAndPassword(masterAuth, loginEmail, password);
     } catch (e: any) {
-      console.error("Login Error Details:", e.code, e.message);
-      
-      // التعامل مع حالة الحسابات التي أُنشئت في وضع المحاكاة ولم تُفعل أمنياً
+      console.error("Login Error:", e.code);
       if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
-          throw new Error('بيانات الدخول غير صحيحة، أو أن الحساب لم يُفعل أمنياً بعد. يرجى مراجعة الإدارة لإجراء "إصلاح ومزامنة الحساب".');
+          throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
       }
-      
-      throw new Error('حدث خطأ أثناء تسجيل الدخول. يرجى التأكد من اسم المستخدم وكلمة المرور.');
+      throw new Error('حدث خطأ أثناء تسجيل الدخول. يرجى مراجعة الإدارة.');
     }
   }, [masterAuth, masterFirestore]);
 
