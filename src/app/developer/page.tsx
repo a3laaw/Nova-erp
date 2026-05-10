@@ -53,9 +53,23 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
-  // اشتراك لحظي في قائمة الشركات وطلبات الانضمام
-  const { data: rawCompanies, loading } = useSubscription<Company>(firestore, 'companies', []);
+  // 🛡️ اشتراك لحظي سيادي في كافة البيانات المطلوبة
+  const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
+  
+  // ⚡ محرك حساب المستخدمين المجمع (Collection Group) لملء عداد الحصص
+  const { data: allUsers } = useSubscription<UserProfile>(firestore, 'users', [], true);
+
+  // حساب توزيع المستخدمين حسب المنشأة
+  const userCountsByCompany = useMemo(() => {
+    const counts: Record<string, number> = {};
+    (allUsers || []).forEach(u => {
+        if (u.companyId) {
+            counts[u.companyId] = (counts[u.companyId] || 0) + 1;
+        }
+    });
+    return counts;
+  }, [allUsers]);
 
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
@@ -149,7 +163,6 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
-  // دالة إصلاح الحساب المفقود (لشركة علاء وغيرهم)
   const handleRepairAccount = async (company: Company) => {
       if (!firestore || isProcessing) return;
       setIsProcessing(company.id!);
@@ -166,7 +179,7 @@ export default function DeveloperDashboard() {
           const result = await response.json();
           if (!result.success && !result.simulated) throw new Error(result.error);
           
-          toast({ title: 'نجاح المزامنة', description: `تم تفعيل حساب دخول "${company.name}" أمنياً. يمكنهم الدخول الآن.` });
+          toast({ title: 'نجاح المزامنة', description: `تم تفعيل حساب دخول "${company.name}" أمنياً.` });
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'خطأ في الإصلاح', description: e.message });
       } finally { setIsProcessing(null); }
@@ -249,7 +262,7 @@ export default function DeveloperDashboard() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {loading ? (
+                                {companiesLoading ? (
                                     <TableRow><TableCell colSpan={5} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow>
                                 ) : filteredCompanies.length === 0 ? (
                                     <TableRow><TableCell colSpan={5} className="h-64 text-center text-slate-300 font-black text-2xl uppercase">No Organizations Registered</TableCell></TableRow>
@@ -272,7 +285,9 @@ export default function DeveloperDashboard() {
                                                 <p className="text-[10px] font-mono text-muted-foreground">{company.contactEmail || '-'}</p>
                                             </TableCell>
                                             <TableCell className="text-center">
-                                                <div className="font-black text-xl text-indigo-950">{(company as any).currentUsersCount || 0} / {company.maxUsersLimit}</div>
+                                                <div className="font-black text-xl text-indigo-950">
+                                                    {userCountsByCompany[company.id!] || 0} / {company.maxUsersLimit || 0}
+                                                </div>
                                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Active Licenses</span>
                                             </TableCell>
                                             <TableCell className="text-center">
