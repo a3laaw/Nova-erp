@@ -15,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 /**
  * بوابة الدخول الموحدة لـ Nova ERP.
- * تم تبسيط اللغة ودعم الدخول المباشر باسم المستخدم.
+ * تدعم الدخول بـ "اسم المستخدم" المباشر لتبسيط التجربة.
  */
 export default function UnifiedLoginPage() {
   const { login, user, loading: authLoading } = useAuth();
@@ -25,7 +25,7 @@ export default function UnifiedLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    identifier: '', 
+    identifier: '', // يقبل اسم المستخدم (مثلاً: naser)
     password: '',
   });
 
@@ -45,6 +45,7 @@ export default function UnifiedLoginPage() {
     setErrorMessage(null);
     try {
         await login(formData.identifier, formData.password);
+        // التوجيه سيتم عبر الـ useEffect
     } catch (error: any) {
         setErrorMessage(error.message);
         setIsLoading(false); 
@@ -67,15 +68,15 @@ export default function UnifiedLoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">نظام الإدارة المتكامل للأعمال</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/70 font-bold mt-2 text-sm uppercase tracking-widest">نظام الإدارة الموحد للمؤسسات</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8">
             {errorMessage && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50 animate-in shake duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تنبيه</AlertTitle>
-                    <AlertDescription className="text-[10px] font-bold mt-1 leading-relaxed">
+                    <AlertTitle className="font-black text-xs">خطأ في الدخول</AlertTitle>
+                    <AlertDescription className="text-[11px] font-bold mt-1 leading-relaxed">
                         {errorMessage}
                     </AlertDescription>
                 </Alert>
@@ -84,7 +85,7 @@ export default function UnifiedLoginPage() {
             <form onSubmit={handleLogin} className="space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-bold text-xs pr-1 flex items-center gap-2 text-[#1e1b4b]">
-                        <User className="h-3 w-3" /> اسم المستخدم أو البريد الإلكتروني
+                        <User className="h-3 w-3" /> اسم المستخدم
                     </Label>
                     <Input 
                         type="text" 
@@ -92,7 +93,7 @@ export default function UnifiedLoginPage() {
                         onChange={e => setFormData(p => ({...p, identifier: e.target.value}))} 
                         className="h-12 rounded-2xl border-white/40 bg-white/30 backdrop-blur-md dir-ltr font-bold text-[#1e1b4b] shadow-inner focus:bg-white/60 transition-all border-2" 
                         required 
-                        placeholder="اسم المستخدم..."
+                        placeholder="أدخل اسمك هنا..."
                         disabled={isLoading}
                     />
                 </div>
