@@ -51,7 +51,7 @@
   }
 }
 
-/* 🛡️ Sovereign UI Safety Layer */
+/* 🛡️ Sovereign UI Protection Layer */
 [data-radix-portal] {
   z-index: 999999 !important;
 }

@@ -29,6 +29,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
+/**
+ * غرفة التحكم السيادية:
+ * تم ترميم كافة الأيقونات والتراجم لضمان استقرار العمليات الرقابية العليا.
+ */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
@@ -52,7 +56,11 @@ export default function DeveloperDashboard() {
 
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
-    let processed = [...rawCompanies].sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    let processed = [...rawCompanies].sort((a, b) => {
+        const timeB = b.createdAt?.toMillis?.() || 0;
+        const timeA = a.createdAt?.toMillis?.() || 0;
+        return timeB - timeA;
+    });
     if (searchQuery) {
         const lower = searchQuery.toLowerCase();
         processed = processed.filter(c => c.name.toLowerCase().includes(lower) || c.adminEmail?.toLowerCase().includes(lower));
@@ -73,20 +81,6 @@ export default function DeveloperDashboard() {
         router.push('/dashboard');
     } catch (e) {
         toast({ variant: 'destructive', title: 'فشل التقمص' });
-    } finally { setIsProcessing(null); }
-  };
-
-  const handleRepairAccount = async (company: Company) => {
-    if (!firestore || isProcessing) return;
-    setIsProcessing(company.id!);
-    try {
-        await fetch('/api/manage-tenant-user', {
-            method: 'POST',
-            body: JSON.stringify({ email: company.adminEmail, password: company.adminPassword, displayName: company.name, action: 'repair' })
-        });
-        toast({ title: 'نجحت المزامنة الجبارة' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'فشل الإصلاح' });
     } finally { setIsProcessing(null); }
   };
 
@@ -128,14 +122,14 @@ export default function DeveloperDashboard() {
                                 filteredCompanies.map(company => (
                                     <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
                                         <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail?.split('@')[0]}</span></div></div></TableCell>
-                                        <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
+                                        <TableCell className="text-center"><p className="font-bold text-slate-700">{company.phone || '-'}</p></TableCell>
                                         <TableCell className="text-center"><Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>{company.isActive ? 'ACTIVE' : 'LOCKED'}</Badge></TableCell>
                                         <TableCell className="text-left px-12">
                                             <div className="flex items-center justify-end gap-3">
                                                 <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2">{isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} دخول</Button>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل الترخيص</DropdownMenuItem><DropdownMenuItem onClick={() => handleRepairAccount(company)} className="rounded-xl py-3 font-black gap-3 text-blue-600"><RefreshCcw className="h-4 w-4" /> إصلاح ومزامنة</DropdownMenuItem></DropdownMenuContent>
+                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل الترخيص</DropdownMenuItem></DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
                                         </TableCell>

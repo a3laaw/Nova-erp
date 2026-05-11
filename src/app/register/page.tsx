@@ -20,6 +20,10 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
+/**
+ * صفحة تسجيل المنشآت الجديدة:
+ * تم إصلاح أخطاء الاستيراد (CardFooter) وضبط الأبعاد لتطابق التصميم الأصلي.
+ */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();

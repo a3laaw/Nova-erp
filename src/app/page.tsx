@@ -11,6 +11,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+/**
+ * بوابة العبور السيادية:
+ * تم تصميمها لتكون سريعة ورشيقة، مع صمامات أمان تمنع تعليق الشاشة.
+ */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
   const router = useRouter();
@@ -51,7 +55,7 @@ export default function LoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest">بوابة العبور السيادية</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">بوابة العبور السيادية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
@@ -72,7 +76,7 @@ export default function LoginPage() {
                         onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                         className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2" 
                         required 
-                        placeholder="user@company.nova"
+                        placeholder="user@nova.erp"
                         disabled={localLoading || loading}
                     />
                 </div>
