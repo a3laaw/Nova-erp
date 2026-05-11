@@ -84,6 +84,75 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
+  const handleActivateCompany = async (req: CompanyRequest) => {
+    if (!firestore || isProcessing) return;
+    setIsProcessing(req.id!);
+    try {
+      // 1. إنشاء حساب Firebase Auth للعميل
+      const createRes = await fetch('/api/manage-tenant-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+          password: req.adminPassword, 
+          displayName: req.contactName, 
+          action: 'create' 
+        })
+      });
+      const { uid } = await createRes.json();
+      if (!uid) throw new Error('فشل إنشاء الحساب');
+
+      const batch = writeBatch(firestore);
+      const companyRef = doc(collection(firestore, 'companies'));
+
+      // 2. إنشاء وثيقة الشركة
+      batch.set(companyRef, {
+        name: req.companyName,
+        activity: req.activity,
+        adminEmail: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        adminPassword: req.adminPassword,
+        contactPhone: req.phone,
+        isActive: true,
+        createdAt: serverTimestamp(),
+      });
+
+      // 3. إنشاء المستخدم داخل الشركة
+      const userRef = doc(firestore, `companies/${companyRef.id}/users`, uid);
+      batch.set(userRef, {
+        id: uid,
+        uid,
+        fullName: req.contactName,
+        email: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        role: 'Admin',
+        isActive: true,
+        createdAt: serverTimestamp(),
+      });
+
+      // 4. إضافة للفهرس العالمي (global_users) — هذا هو مفتاح الدخول
+      const globalRef = doc(collection(firestore, 'global_users'));
+      batch.set(globalRef, {
+        email: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        companyId: companyRef.id,
+        uid,
+        createdAt: serverTimestamp(),
+      });
+
+      // 5. تحديث حالة الطلب لـ activated
+      batch.update(doc(firestore, 'company_requests', req.id!), { 
+        status: 'activated',
+        activatedAt: serverTimestamp(),
+        companyId: companyRef.id,
+      });
+
+      await batch.commit();
+      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
+    } finally { 
+      setIsProcessing(null); 
+    }
+  };
+
   return (
     <div className="space-y-10" dir="rtl">
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-[#1e1b4b]">
@@ -147,7 +216,31 @@ export default function DeveloperDashboard() {
                         <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {requests.map(req => (
-                                <TableRow key={req.id} className="h-32"><TableCell className="px-12"><div className="flex flex-col"><span className="font-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></TableCell><TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.email.split('@')[0]}</Badge></TableCell><TableCell className="text-left px-12">{req.status === 'pending' ? <Button className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg">تفعيل البيئة</Button> : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}</TableCell></TableRow>
+                                <TableRow key={req.id} className="h-32">
+                                    <TableCell className="px-12">
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-2xl tracking-tight">{req.companyName}</span>
+                                            <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.email.split('@')[0]}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-left px-12">
+                                        {req.status === 'pending' ? (
+                                            <Button 
+                                                onClick={() => handleActivateCompany(req)}
+                                                disabled={isProcessing === req.id}
+                                                className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
+                                            >
+                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null}
+                                                تفعيل البيئة
+                                            </Button>
+                                        ) : (
+                                            <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
                             ))}
                         </TableBody>
                     </Table>
