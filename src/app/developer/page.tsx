@@ -88,32 +88,46 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
+      // 🛡️ معالجة الإيميل لضمان عدم وجود أحرف عربية (استخدام الـ username حصراً)
+      const safeUsername = req.username || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
+      const sovereignEmail = `${safeUsername}@${safeUsername}.nova-erp.local`;
+
       // 1. إنشاء حساب Firebase Auth للعميل
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+          email: sovereignEmail,
           password: req.adminPassword, 
           displayName: req.contactName, 
           action: 'create' 
         })
       });
       const { uid } = await createRes.json();
-      if (!uid) throw new Error('فشل إنشاء الحساب');
+      if (!uid) throw new Error('فشل إنشاء الحساب في خادم الأمان.');
 
       const batch = writeBatch(firestore);
       const companyRef = doc(collection(firestore, 'companies'));
 
-      // 2. إنشاء وثيقة الشركة
+      // 2. إنشاء وثيقة الشركة مع تهيئة حقول الإعدادات فارغة لتجنب الـ undefined
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
-        adminEmail: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        adminEmail: sovereignEmail,
         adminPassword: req.adminPassword,
         contactPhone: req.phone,
         isActive: true,
         createdAt: serverTimestamp(),
+        subscriptionType: 'trial',
+        maxUsersLimit: 5,
+        firebaseConfig: {
+            apiKey: '',
+            authDomain: '',
+            projectId: '',
+            storageBucket: '',
+            messagingSenderId: '',
+            appId: ''
+        }
       });
 
       // 3. إنشاء المستخدم داخل الشركة
@@ -122,22 +136,22 @@ export default function DeveloperDashboard() {
         id: uid,
         uid,
         fullName: req.contactName,
-        email: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        email: sovereignEmail,
         role: 'Admin',
         isActive: true,
         createdAt: serverTimestamp(),
       });
 
-      // 4. إضافة للفهرس العالمي (global_users) — هذا هو مفتاح الدخول
+      // 4. إضافة للفهرس العالمي (global_users) — مفتاح الدخول
       const globalRef = doc(collection(firestore, 'global_users'));
       batch.set(globalRef, {
-        email: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        email: sovereignEmail,
         companyId: companyRef.id,
         uid,
         createdAt: serverTimestamp(),
       });
 
-      // 5. تحديث حالة الطلب لـ activated
+      // 5. تحديث حالة الطلب
       batch.update(doc(firestore, 'company_requests', req.id!), { 
         status: 'activated',
         activatedAt: serverTimestamp(),
@@ -191,7 +205,7 @@ export default function DeveloperDashboard() {
                                 filteredCompanies.map(company => (
                                     <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
                                         <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail?.split('@')[0]}</span></div></div></TableCell>
-                                        <TableCell className="text-center"><p className="font-bold text-slate-700">{company.phone || '-'}</p></TableCell>
+                                        <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
                                         <TableCell className="text-center"><Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>{company.isActive ? 'ACTIVE' : 'LOCKED'}</Badge></TableCell>
                                         <TableCell className="text-left px-12">
                                             <div className="flex items-center justify-end gap-3">
@@ -224,7 +238,7 @@ export default function DeveloperDashboard() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.email.split('@')[0]}</Badge>
+                                        <Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username || req.email.split('@')[0]}</Badge>
                                     </TableCell>
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
