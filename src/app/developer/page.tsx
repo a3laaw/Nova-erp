@@ -5,13 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from 'firebase/firestore';
-import type { Company, CompanyRequest, UserProfile } from '@/lib/types';
+import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
-    MoreHorizontal, DatabaseZap, ArrowRightLeft, 
+    MoreHorizontal, ArrowRightLeft, 
     FileStack, Settings, RefreshCcw, X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';

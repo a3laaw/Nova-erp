@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
@@ -29,14 +29,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🛡️ محرك جلب الهوية السيادي: يبحث أولاً في الشركات لضمان دخول nova1 لشركته
+  // 🛡️ محرك جلب الهوية السيادي: يبحث أولاً في الشركات لضمان توجيه المستخدمين لشركاتهم فوراً
   const fetchIdentity = useCallback(async (email: string, uid: string) => {
     if (!masterFirestore) return { profile: null, company: null };
     
     try {
         const lowerEmail = email.toLowerCase().trim();
         
-        // 1. البحث أولاً في الفهرس العالمي (لضمان توجيه المستخدمين لشركاتهم فوراً)
+        // 1. الأولوية المطلقة: البحث في الفهرس العالمي (Global Index)
+        // هذا يضمن أن nova1@nova-erp.local يذهب لشركته فوراً
         const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
 
@@ -59,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // 2. إذا لم يوجد في الشركات، نفحص وضع المطور (غرفة التحكم)
+        // 2. إذا لم يوجد في الشركات، نفحص وضع المطور (Developer Mode)
         const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
         if (devDoc.exists()) {
             return {
@@ -99,9 +100,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setCompany(companyData);
             if (companyData) setCurrentCompany(companyData);
           } else {
-            await signOut(masterAuth);
             setUser(null);
-            setError(profile ? 'الحساب معطل حالياً.' : 'بيانات الدخول غير مسجلة في أي منشأة.');
+            setCompany(null);
+            setError(profile ? 'الحساب معطل حالياً.' : 'بيانات الدخول غير مسجلة.');
+            await signOut(masterAuth);
           }
         } else {
           setUser(null);

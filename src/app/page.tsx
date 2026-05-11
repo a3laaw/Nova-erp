@@ -11,10 +11,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-/**
- * بوابة العبور السيادية (The Gateway):
- * تم إعادة بنائها لتكون بسيطة، سريعة، وملتزمة 100% بالتصميم الأصلي.
- */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
   const router = useRouter();
@@ -22,7 +18,6 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [localLoading, setLocalLoading] = useState(false);
 
-  // التوجيه التلقائي عند التعرف على الهوية (مع تأخير استقرار)
   useEffect(() => {
     if (user && !loading) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
