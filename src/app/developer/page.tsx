@@ -93,7 +93,7 @@ export default function DeveloperDashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          email: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+          email: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
           password: req.adminPassword, 
           displayName: req.contactName, 
           action: 'create' 
@@ -109,7 +109,7 @@ export default function DeveloperDashboard() {
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
-        adminEmail: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        adminEmail: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
         adminPassword: req.adminPassword,
         contactPhone: req.phone,
         isActive: true,
@@ -122,7 +122,7 @@ export default function DeveloperDashboard() {
         id: uid,
         uid,
         fullName: req.contactName,
-        email: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        email: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
         role: 'Admin',
         isActive: true,
         createdAt: serverTimestamp(),
@@ -131,7 +131,7 @@ export default function DeveloperDashboard() {
       // 4. إضافة للفهرس العالمي (global_users) — هذا هو مفتاح الدخول
       const globalRef = doc(collection(firestore, 'global_users'));
       batch.set(globalRef, {
-        email: `${(req as any).username}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
+        email: `${req.email.split('@')[0]}@${req.companyName.replace(/\s+/g, '-').toLowerCase()}.nova-erp.local`,
         companyId: companyRef.id,
         uid,
         createdAt: serverTimestamp(),
@@ -187,7 +187,7 @@ export default function DeveloperDashboard() {
                         <Table>
                             <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">التواصل</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-500" /></TableCell></TableRow> :
+                                {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-50" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
                                     <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
                                         <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail?.split('@')[0]}</span></div></div></TableCell>

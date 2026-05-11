@@ -3,18 +3,24 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
-import type { AuthenticatedUser, Company as CompanyType } from '@/lib/types';
+import type { AuthenticatedUser, Company } from '@/lib/types';
+import { mapFirebaseAuthError, validateUserProfile, getUserRole, logAuthEvent, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
-interface AuthContextType {
+interface AuthState {
   user: AuthenticatedUser | null;
-  company: CompanyType | null;
+  company: Company | null;
   loading: boolean;
   error: string | null;
+  loadingStage?: 'initializing' | 'checking_global' | 'fetching_tenant' | 'validating_role' | 'complete';
+}
+
+interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,137 +30,143 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { auth: masterAuth, firestore: masterFirestore } = useFirebase();
   const { setCurrentCompany } = useCompany();
   
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [company, setCompany] = useState<CompanyType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<AuthState>({
+    user: null, company: null, loading: true, error: null, loadingStage: 'initializing'
+  });
 
-  /**
-   * 🛡️ محرك جلب الهوية السيادي:
-   * يبحث أولاً في "الفهرس العالمي" لضمان دخول nova1 لشركته فوراً.
-   */
-  const fetchIdentity = useCallback(async (email: string, uid: string) => {
-    if (!masterFirestore) return { profile: null, company: null };
+  const updateState = useCallback((next: Partial<AuthState>) => {
+    setState(prev => ({ ...prev, ...next }));
+  }, []);
+
+  const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
+    updateState({ loadingStage: 'checking_global' });
     
-    try {
-        const lowerEmail = email.toLowerCase().trim();
-        
-        // 1. الأولوية: البحث في الفهرس العالمي (Global Index)
-        const globalQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', lowerEmail), limit(1));
-        const globalSnap = await getDocs(globalQuery);
+    // 1. الأولوية المطلقة: الفحص في الفهرس العالمي (لضمان دخول nova1 لشركته)
+    const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
+    const globalSnap = await getDocs(globalQuery);
+    
+    if (!globalSnap.empty) {
+      const idx = globalSnap.docs[0].data();
+      updateState({ loadingStage: 'fetching_tenant' });
+      const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users`, user.uid));
+      
+      if (tenantDoc.exists()) {
+          updateState({ loadingStage: 'validating_role' });
+          const profile = validateUserProfile(tenantDoc.data());
+          const role = await getUserRole(user);
+          
+          const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
+          const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
-        if (!globalSnap.empty) {
-            const indexData = globalSnap.docs[0].data();
-            const tenantId = indexData.companyId;
-
-            // جلب ملف المستخدم من مسار الشركة المعزول
-            const userRef = doc(masterFirestore, `companies/${tenantId}/users`, uid);
-            const userSnap = await getDoc(userRef);
-
-            if (userSnap.exists()) {
-                const profile = userSnap.data() as AuthenticatedUser;
-                const companySnap = await getDoc(doc(masterFirestore, 'companies', tenantId));
-                const companyData = companySnap.exists() ? { id: companySnap.id, ...companySnap.data() } as CompanyType : null;
-
-                return { 
-                    profile: { ...profile, id: userSnap.id, uid, currentCompanyId: tenantId, companyName: companyData?.name || 'Nova Client' }, 
-                    company: companyData 
-                };
-            }
-        }
-
-        // 2. فحص وضع المطور (Developer Mode) - فقط إذا لم يكن مرتبطاً بشركة
-        const devDoc = await getDoc(doc(masterFirestore, 'developers', uid));
-        if (devDoc.exists()) {
-            return {
-                profile: { 
-                    id: uid, uid, email: lowerEmail, role: 'Developer', isActive: true, 
-                    fullName: devDoc.data().fullName || 'Sovereign Developer',
-                    isSuperAdmin: true, currentCompanyId: null, companyName: 'Nova ERP' 
-                } as AuthenticatedUser,
-                company: null
-            };
-        }
-
-        return { profile: null, company: null };
-    } catch (e) {
-        console.error("Critical: Auth Sync Failure:", e);
-        return { profile: null, company: null };
+          return {
+            user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client', isSuperAdmin: role === 'Developer' } as AuthenticatedUser,
+            company
+          };
+      }
     }
-  }, [masterFirestore]);
+
+    // 2. فحص وضع المطور (فقط إذا لم يكن في الفهرس العالمي)
+    updateState({ loadingStage: 'validating_role' });
+    if (email.endsWith('@nova-erp.local')) {
+      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
+      if (devDoc.exists()) {
+        return {
+          user: { id: user.uid, uid: user.uid, email: user.email!, username: 'root', role: 'Developer', isActive: true, fullName: devDoc.data()?.fullName || 'Master Developer', isSuperAdmin: true, currentCompanyId: null, companyName: 'Nova ERP Platform' } as AuthenticatedUser,
+          company: null
+        };
+      }
+    }
+
+    logAuthEvent('USER_NOT_FOUND', { uid: user.uid, email });
+    return { user: null, company: null };
+  }, [updateState]);
 
   useEffect(() => {
-    if (!masterAuth) return;
+    if (!masterAuth || !masterFirestore) {
+      updateState({ loading: false, loadingStage: 'complete' });
+      return;
+    }
 
+    let isMounted = true;
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
-      setLoading(true);
       try {
-        if (firebaseUser?.email) {
-          const { profile, company: companyData } = await fetchIdentity(firebaseUser.email, firebaseUser.uid);
-          
-          if (profile && profile.isActive) {
-            // زرع الكوكيز لفتح أقفال الـ Middleware
-            document.cookie = `nova-user-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
-            if (profile.role === 'Developer') {
-                document.cookie = `nova-dev-session=${firebaseUser.uid}; path=/; max-age=604800; SameSite=Lax`;
-            }
-            
-            setUser(profile);
-            setCompany(companyData);
-            if (companyData) setCurrentCompany(companyData);
-          } else {
-            setUser(null);
-            setCompany(null);
-            setError(profile ? 'الحساب معطل حالياً.' : 'بيانات الدخول غير مسجلة في الفهرس العالمي.');
-            await signOut(masterAuth);
+        if (!firebaseUser) {
+          if (isMounted) {
+            updateState({ user: null, company: null, loading: false, error: null, loadingStage: 'complete' });
+            setCurrentCompany(null);
+            clearSessionIndicators();
           }
-        } else {
-          setUser(null);
-          setCompany(null);
-          setCurrentCompany(null);
-          document.cookie = 'nova-user-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          document.cookie = 'nova-dev-session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          return;
         }
-      } finally {
-        // ⚡ ضمان إيقاف حالة التحميل تحت أي ظرف لمنع اللووب
-        setLoading(false);
+
+        const email = firebaseUser.email?.toLowerCase();
+        if (!email) { if (isMounted) updateState({ loading: false, loadingStage: 'complete' }); return; }
+
+        logAuthEvent('AUTH_STATE_CHANGED', { uid: firebaseUser.uid, email });
+        const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, email);
+
+        if (isMounted) {
+          if (user?.isActive) {
+            setSessionIndicators(firebaseUser.uid, user.role);
+            updateState({ user, company, loading: false, error: null, loadingStage: 'complete' });
+            if (company) setCurrentCompany(company);
+            logAuthEvent('LOGIN_SUCCESS', { uid: firebaseUser.uid, role: user.role, companyId: company?.id });
+          } else {
+            updateState({ user: null, company: null, loading: false, error: user ? 'حسابك معطل حالياً.' : 'لم يتم العثور على صلاحيات دخول.', loadingStage: 'complete' });
+            clearSessionIndicators();
+            if (!user?.isSuperAdmin) await signOut(masterAuth);
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر مزامنة الجلسة السيادية.', loadingStage: 'complete' });
+        clearSessionIndicators();
       }
     });
 
-    return () => unsubscribe();
-  }, [masterAuth, fetchIdentity, setCurrentCompany]);
+    return () => { isMounted = false; unsubscribe(); };
+  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext, updateState]);
 
-  const login = async (email: string, password: string) => {
-    if (!masterAuth) return;
-    setError(null);
-    setLoading(true);
+  const login = useCallback(async (email: string, password: string) => {
+    if (!masterAuth) throw new Error('خدمة المصادقة غير متاحة');
+    updateState({ loading: true, error: null });
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (err: any) {
-        setLoading(false);
-        setError('خطأ في البريد الإلكتروني أو كلمة المرور.');
-        throw err;
+      updateState({ loading: false });
+      throw new Error(mapFirebaseAuthError(err.code));
     }
-  };
+  }, [masterAuth, updateState]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     if (!masterAuth) return;
-    setLoading(true);
-    try {
+    try { 
       await signOut(masterAuth);
+      updateState({ user: null, company: null, loading: false, error: null, loadingStage: 'complete' });
+      setCurrentCompany(null);
+      clearSessionIndicators();
       router.replace('/');
-    } finally {
-      setLoading(false);
+    } catch (e) { console.error('Logout err:', e); }
+  }, [masterAuth, router, setCurrentCompany, updateState]);
+
+  const refreshUserData = useCallback(async () => {
+    if (!state.user || !masterFirestore) return;
+    updateState({ loading: true });
+    try {
+      const { user, company } = await fetchUserWithContext(masterFirestore, { uid: state.user.uid, email: state.user.email } as FirebaseUser, state.user.email);
+      updateState({ user, company, loading: false });
+      if (company) setCurrentCompany(company);
+    } catch (e) {
+      updateState({ loading: false, error: 'فشل تحديث البيانات' });
     }
-  };
+  }, [state.user, masterFirestore, fetchUserWithContext, updateState, setCurrentCompany]);
 
-  const value = useMemo(() => ({ user, company, loading, error, login, logout }), [user, company, loading, error]);
+  const ctx = useMemo(() => ({ ...state, login, logout, refreshUserData }), [state, login, logout, refreshUserData]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) throw new Error('useAuth must be used within <AuthProvider>');
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  return ctx;
 };
