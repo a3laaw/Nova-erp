@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
-    FileStack, Settings, RefreshCcw, X
+    FileStack, Settings, Trash2, ShieldAlert
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -27,11 +27,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
 /**
  * غرفة التحكم السيادية:
- * تم ترميم كافة الأيقونات والتراجم لضمان استقرار العمليات الرقابية العليا.
+ * تم ترميم كافة الأيقونات والتراجم وإضافة محرك الحذف النهائي للمنشآت.
  */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
@@ -50,6 +60,7 @@ export default function DeveloperDashboard() {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
@@ -72,7 +83,7 @@ export default function DeveloperDashboard() {
     if (!firestore || !currentUser || isProcessing) return;
     setIsProcessing(company.id!);
     try {
-        const response = await fetch('/api/switch-company', {
+        await fetch('/api/switch-company', {
             method: 'POST',
             body: JSON.stringify({ uid: currentUser.id, companyId: company.id, companyName: company.name })
         });
@@ -88,28 +99,20 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      // 🛡️ معالجة الإيميل لضمان عدم وجود أحرف عربية (استخدام الـ username حصراً)
       const safeUsername = req.username || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
       const sovereignEmail = `${safeUsername}@${safeUsername}.nova-erp.local`;
 
-      // 1. إنشاء حساب Firebase Auth للعميل
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          email: sovereignEmail,
-          password: req.adminPassword, 
-          displayName: req.contactName, 
-          action: 'create' 
-        })
+        body: JSON.stringify({ email: sovereignEmail, password: req.adminPassword, displayName: req.contactName, action: 'create' })
       });
       const { uid } = await createRes.json();
-      if (!uid) throw new Error('فشل إنشاء الحساب في خادم الأمان.');
+      if (!uid) throw new Error('فشل إنشاء الحساب');
 
       const batch = writeBatch(firestore);
       const companyRef = doc(collection(firestore, 'companies'));
 
-      // 2. إنشاء وثيقة الشركة مع تهيئة حقول الإعدادات فارغة لتجنب الـ undefined
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -118,53 +121,38 @@ export default function DeveloperDashboard() {
         contactPhone: req.phone,
         isActive: true,
         createdAt: serverTimestamp(),
-        subscriptionType: 'trial',
-        maxUsersLimit: 5,
-        firebaseConfig: {
-            apiKey: '',
-            authDomain: '',
-            projectId: '',
-            storageBucket: '',
-            messagingSenderId: '',
-            appId: ''
-        }
+        firebaseConfig: { apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '' }
       });
 
-      // 3. إنشاء المستخدم داخل الشركة
       const userRef = doc(firestore, `companies/${companyRef.id}/users`, uid);
-      batch.set(userRef, {
-        id: uid,
-        uid,
-        fullName: req.contactName,
-        email: sovereignEmail,
-        role: 'Admin',
-        isActive: true,
-        createdAt: serverTimestamp(),
-      });
+      batch.set(userRef, { id: uid, uid, fullName: req.contactName, email: sovereignEmail, role: 'Admin', isActive: true, createdAt: serverTimestamp() });
 
-      // 4. إضافة للفهرس العالمي (global_users) — مفتاح الدخول
       const globalRef = doc(collection(firestore, 'global_users'));
-      batch.set(globalRef, {
-        email: sovereignEmail,
-        companyId: companyRef.id,
-        uid,
-        createdAt: serverTimestamp(),
-      });
+      batch.set(globalRef, { email: sovereignEmail, companyId: companyRef.id, uid, createdAt: serverTimestamp() });
 
-      // 5. تحديث حالة الطلب
-      batch.update(doc(firestore, 'company_requests', req.id!), { 
-        status: 'activated',
-        activatedAt: serverTimestamp(),
-        companyId: companyRef.id,
-      });
+      batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId: companyRef.id });
 
       await batch.commit();
       toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
-    } finally { 
-      setIsProcessing(null); 
-    }
+    } finally { setIsProcessing(null); }
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!firestore || !companyToDelete || isProcessing) return;
+    setIsProcessing(companyToDelete.id!);
+    try {
+        const batch = writeBatch(firestore);
+        batch.delete(doc(firestore, 'companies', companyToDelete.id!));
+        const gQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
+        const gSnap = await getDocs(gQuery);
+        gSnap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        toast({ title: '✅ تم إنهاء السيادة', description: `تم حذف منشأة ${companyToDelete.name} وبيانات الدخول.` });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+    } finally { setIsProcessing(null); setCompanyToDelete(null); }
   };
 
   return (
@@ -212,7 +200,7 @@ export default function DeveloperDashboard() {
                                                 <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2">{isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} دخول</Button>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل الترخيص</DropdownMenuItem></DropdownMenuContent>
+                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل الترخيص</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3"><Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
                                         </TableCell>
@@ -231,28 +219,14 @@ export default function DeveloperDashboard() {
                         <TableBody>
                             {requests.map(req => (
                                 <TableRow key={req.id} className="h-32">
-                                    <TableCell className="px-12">
-                                        <div className="flex flex-col">
-                                            <span className="font-black text-2xl tracking-tight">{req.companyName}</span>
-                                            <Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                        <Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username || req.email.split('@')[0]}</Badge>
-                                    </TableCell>
+                                    <TableCell className="px-12"><div className="flex flex-col"><span className="font-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></TableCell>
+                                    <TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username || req.email.split('@')[0]}</Badge></TableCell>
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
-                                            <Button 
-                                                onClick={() => handleActivateCompany(req)}
-                                                disabled={isProcessing === req.id}
-                                                className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
-                                            >
-                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null}
-                                                تفعيل البيئة
+                                            <Button onClick={() => handleActivateCompany(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg">
+                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null} تفعيل البيئة
                                             </Button>
-                                        ) : (
-                                            <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>
-                                        )}
+                                        ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -262,6 +236,19 @@ export default function DeveloperDashboard() {
             </TabsContent>
         </Tabs>
         <CompanyRegistrationForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} company={selectedCompany} />
+        <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
+                <AlertDialogHeader>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><ShieldAlert className="h-10 w-10"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الإنهاء السيادي؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed">أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. سيتم مسح سجلات الشركة وإلغاء صلاحيات دخول المالك من الفهرس العالمي. <br/><br/> <span className="font-black text-red-600 underline">تحذير: لا يمكن استعادة هذه المنشأة بعد الحذف.</span></AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="mt-8 gap-3">
+                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteCompany} disabled={!!isProcessing} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12"> {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'نعم، قم بالإنهاء والحذف'} </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

@@ -14,7 +14,6 @@ interface AuthState {
   company: Company | null;
   loading: boolean;
   error: string | null;
-  loadingStage?: 'initializing' | 'checking_global' | 'fetching_tenant' | 'validating_role' | 'complete';
 }
 
 interface AuthContextType extends AuthState {
@@ -31,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setCurrentCompany } = useCompany();
   
   const [state, setState] = useState<AuthState>({
-    user: null, company: null, loading: true, error: null, loadingStage: 'initializing'
+    user: null, company: null, loading: true, error: null
   });
 
   const updateState = useCallback((next: Partial<AuthState>) => {
@@ -39,19 +38,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
-    updateState({ loadingStage: 'checking_global' });
-    
-    // 🛡️ المبدأ السيادي: البحث في الفهرس العالمي أولاً لفك تداخل .local
+    // 🛡️ المبدأ السيادي: البحث في الفهرس العالمي أولاً لفتح قفل الحسابات مثل nova1
     const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
     const globalSnap = await getDocs(globalQuery);
     
     if (!globalSnap.empty) {
       const idx = globalSnap.docs[0].data();
-      updateState({ loadingStage: 'fetching_tenant' });
       const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users`, user.uid));
       
       if (tenantDoc.exists()) {
-          updateState({ loadingStage: 'validating_role' });
           const profile = validateUserProfile(tenantDoc.data());
           const role = await getUserRole(user);
           
@@ -65,9 +60,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // 🛠️ فحص وضع المطور (فقط إذا لم يكن تابعاً لمنشأة)
-    updateState({ loadingStage: 'validating_role' });
-    if (email.endsWith('@nova-erp.local')) {
+    // 🛠️ فحص وضع المطور السيادي
+    if (email.endsWith('.local')) {
       const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
       if (devDoc.exists()) {
         return {
@@ -77,13 +71,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    logAuthEvent('USER_NOT_FOUND', { uid: user.uid, email });
     return { user: null, company: null };
-  }, [updateState]);
+  }, []);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
-      updateState({ loading: false, loadingStage: 'complete' });
+      updateState({ loading: false });
       return;
     }
 
@@ -92,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         if (!firebaseUser) {
           if (isMounted) {
-            updateState({ user: null, company: null, loading: false, error: null, loadingStage: 'complete' });
+            updateState({ user: null, company: null, loading: false, error: null });
             setCurrentCompany(null);
             clearSessionIndicators();
           }
@@ -100,25 +93,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const email = firebaseUser.email?.toLowerCase();
-        if (!email) { if (isMounted) updateState({ loading: false, loadingStage: 'complete' }); return; }
+        if (!email) { if (isMounted) updateState({ loading: false }); return; }
 
-        logAuthEvent('AUTH_STATE_CHANGED', { uid: firebaseUser.uid, email });
         const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, email);
 
         if (isMounted) {
           if (user?.isActive) {
             setSessionIndicators(firebaseUser.uid, user.role);
-            updateState({ user, company, loading: false, error: null, loadingStage: 'complete' });
+            updateState({ user, company, loading: false, error: null });
             if (company) setCurrentCompany(company);
-            logAuthEvent('LOGIN_SUCCESS', { uid: firebaseUser.uid, role: user.role, companyId: company?.id });
           } else {
-            updateState({ user: null, company: null, loading: false, error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على حسابك في السجلات.', loadingStage: 'complete' });
+            updateState({ user: null, company: null, loading: false, error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على ملف المستخدم.' });
             clearSessionIndicators();
             if (!user?.isSuperAdmin) await signOut(masterAuth);
           }
         }
       } catch (err: any) {
-        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر مزامنة الجلسة السيادية.', loadingStage: 'complete' });
+        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر مزامنة الجلسة السيادية.' });
         clearSessionIndicators();
       }
     });
@@ -141,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!masterAuth) return;
     try { 
       await signOut(masterAuth);
-      updateState({ user: null, company: null, loading: false, error: null, loadingStage: 'complete' });
+      updateState({ user: null, company: null, loading: false, error: null });
       setCurrentCompany(null);
       clearSessionIndicators();
       router.replace('/');

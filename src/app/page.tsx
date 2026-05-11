@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [localLoading, setLocalLoading] = useState(false);
 
+  // 🛡️ صمام أمان للتوجيه التلقائي
   useEffect(() => {
     if (user && !loading) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';

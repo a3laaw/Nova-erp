@@ -22,7 +22,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة تسجيل المنشآت الجديدة:
- * تم إصلاح أخطاء الاستيراد (CardFooter) وضبط الأبعاد لتطابق التصميم الأصلي.
+ * تم إصلاح خطأ استيراد CardFooter وضمان استقرار العملية.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
