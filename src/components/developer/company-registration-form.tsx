@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -89,13 +88,13 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 activityType: company.activityType || 'general',
                 adminEmail: company.adminEmail || '',
                 adminPassword: company.adminPassword || '', 
-                apiKey: company.firebaseConfig.apiKey || '',
-                authDomain: company.firebaseConfig.authDomain || '',
-                projectId: company.firebaseConfig.projectId || '',
-                storageBucket: company.firebaseConfig.storageBucket || '',
-                messagingSenderId: company.firebaseConfig.messagingSenderId || '',
-                appId: company.firebaseConfig.appId || '',
-                measurementId: company.firebaseConfig.measurementId || '',
+                apiKey: company.firebaseConfig?.apiKey || '',
+                authDomain: company.firebaseConfig?.authDomain || '',
+                projectId: company.firebaseConfig?.projectId || '',
+                storageBucket: company.firebaseConfig?.storageBucket || '',
+                messagingSenderId: company.firebaseConfig?.messagingSenderId || '',
+                appId: company.firebaseConfig?.appId || '',
+                measurementId: company.firebaseConfig?.measurementId || '',
                 subscriptionType: company.subscriptionType || 'trial',
                 maxUsersLimit: company.maxUsersLimit || 5,
                 trialEndDate: company.trialEndDate ? (company.trialEndDate.toDate ? company.trialEndDate.toDate() : new Date(company.trialEndDate.seconds * 1000)) : undefined,
@@ -212,7 +211,8 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               email: formData.adminEmail.toLowerCase().trim(),
               username: formData.adminEmail.split('@')[0],
               companyId: companyId,
-              role: 'Admin',
+              uid: authResult.uid, // ربط الـ UID لضمان دقة الدخول
+              createdAt: serverTimestamp(),
             });
           });
 

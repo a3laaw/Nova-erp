@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     updateState({ loadingStage: 'checking_global' });
     
-    // 1. الأولوية المطلقة: الفحص في الفهرس العالمي (لضمان دخول nova1 لشركته)
+    // 🛡️ المبدأ السيادي: البحث في الفهرس العالمي أولاً لفك تداخل .local
     const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
     const globalSnap = await getDocs(globalQuery);
     
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // 2. فحص وضع المطور (فقط إذا لم يكن في الفهرس العالمي)
+    // 🛠️ فحص وضع المطور (فقط إذا لم يكن تابعاً لمنشأة)
     updateState({ loadingStage: 'validating_role' });
     if (email.endsWith('@nova-erp.local')) {
       const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (company) setCurrentCompany(company);
             logAuthEvent('LOGIN_SUCCESS', { uid: firebaseUser.uid, role: user.role, companyId: company?.id });
           } else {
-            updateState({ user: null, company: null, loading: false, error: user ? 'حسابك معطل حالياً.' : 'لم يتم العثور على صلاحيات دخول.', loadingStage: 'complete' });
+            updateState({ user: null, company: null, loading: false, error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على حسابك في السجلات.', loadingStage: 'complete' });
             clearSessionIndicators();
             if (!user?.isSuperAdmin) await signOut(masterAuth);
           }
