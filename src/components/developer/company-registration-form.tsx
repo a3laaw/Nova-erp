@@ -85,7 +85,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             setFormData({
                 name: company.name || '',
                 nameEn: company.nameEn || '',
-                activityType: company.activityType || 'general',
+                activityType: (company as any).activity || 'general',
                 adminEmail: company.adminEmail || '',
                 adminPassword: company.adminPassword || '', 
                 apiKey: company.firebaseConfig?.apiKey || '',
@@ -165,7 +165,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           await updateDoc(companyRef, cleanFirestoreData({
               name: formData.name,
               nameEn: formData.nameEn,
-              activityType: formData.activityType,
+              activity: formData.activityType,
               adminEmail: formData.adminEmail,
               adminPassword: formData.adminPassword,
               firebaseProjectId: formData.projectId,
@@ -182,7 +182,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             transaction.set(companyRef, {
               name: formData.name,
               nameEn: formData.nameEn,
-              activityType: formData.activityType,
+              activity: formData.activityType,
               firebaseProjectId: formData.projectId,
               firebaseConfig,
               isActive: true,
@@ -211,7 +211,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               email: formData.adminEmail.toLowerCase().trim(),
               username: formData.adminEmail.split('@')[0],
               companyId: companyId,
-              uid: authResult.uid, // ربط الـ UID لضمان دقة الدخول
+              uid: authResult.uid, 
               createdAt: serverTimestamp(),
             });
           });

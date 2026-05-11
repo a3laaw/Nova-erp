@@ -41,7 +41,7 @@ import { CompanyRegistrationForm } from '@/components/developer/company-registra
 
 /**
  * غرفة التحكم السيادية:
- * تم ترميم كافة الأيقونات والتراجم وإضافة محرك الحذف النهائي للمنشآت.
+ * تم تحديث محرك التفعيل لضمان التعبئة التلقائية لبيانات Firebase من الطلب.
  */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
@@ -52,7 +52,7 @@ const activityTranslations: Record<string, string> = {
 
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
-  const { user: currentUser } = useAuth();
+  const { currentUser } = useAuth() as any;
   const { toast } = useToast();
   const router = useRouter();
   
@@ -68,8 +68,8 @@ export default function DeveloperDashboard() {
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
     let processed = [...rawCompanies].sort((a, b) => {
-        const timeB = b.createdAt?.toMillis?.() || 0;
-        const timeA = a.createdAt?.toMillis?.() || 0;
+        const timeB = (b.createdAt as any)?.toMillis?.() || 0;
+        const timeA = (a.createdAt as any)?.toMillis?.() || 0;
         return timeB - timeA;
     });
     if (searchQuery) {
@@ -95,7 +95,7 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
-  const handleActivateCompany = async (req: CompanyRequest) => {
+  const handleActivateCompany = async (req: any) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
@@ -113,6 +113,7 @@ export default function DeveloperDashboard() {
       const batch = writeBatch(firestore);
       const companyRef = doc(collection(firestore, 'companies'));
 
+      // 🛡️ الربط الآلي: سحب بيانات الـ Firebase من الطلب
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -121,7 +122,15 @@ export default function DeveloperDashboard() {
         contactPhone: req.phone,
         isActive: true,
         createdAt: serverTimestamp(),
-        firebaseConfig: { apiKey: '', authDomain: '', projectId: '', storageBucket: '', messagingSenderId: '', appId: '' }
+        // تعبئة البيانات تلقائياً إذا كانت موجودة في الطلب
+        firebaseConfig: { 
+            apiKey: req.apiKey || '', 
+            authDomain: req.authDomain || '', 
+            projectId: req.projectId || '', 
+            storageBucket: req.storageBucket || '', 
+            messagingSenderId: req.messagingSenderId || '', 
+            appId: req.appId || '' 
+        }
       });
 
       const userRef = doc(firestore, `companies/${companyRef.id}/users`, uid);
@@ -133,7 +142,7 @@ export default function DeveloperDashboard() {
       batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId: companyRef.id });
 
       await batch.commit();
-      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول.` });
+      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول ببيانات الربط الآلية.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }

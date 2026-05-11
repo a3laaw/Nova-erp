@@ -11,7 +11,9 @@ import {
     Building2, 
     ArrowRight,
     CheckCircle2,
-    ShieldCheck
+    ShieldCheck,
+    Cloud,
+    Database
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,7 +24,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة تسجيل المنشآت الجديدة:
- * تم إصلاح خطأ استيراد CardFooter وضمان استقرار العملية.
+ * تم تحديثها لتشمل حقول الربط السحابي لضمان التعبئة التلقائية في غرفة التحكم.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -39,6 +41,11 @@ export default function RegisterPage() {
     username: '', 
     phone: '', 
     adminPassword: '',
+    // بيانات الـ Firebase (تعبئة تلقائية سيادية)
+    apiKey: '',
+    projectId: '',
+    authDomain: '',
+    appId: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,14 +93,14 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      <Card className="w-full max-w-xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect relative z-10 animate-in fade-in duration-700">
+      <Card className="w-full max-w-2xl rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect relative z-10 animate-in fade-in duration-700">
         <CardHeader className="py-10 px-10 border-b border-black/5 bg-white/20">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-[#1e1b4b] rounded-[2rem] shadow-xl"><Rocket className="h-8 w-8 text-white" /></div>
                     <div className="text-right">
                         <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">سجل منشأتك الآن</CardTitle>
-                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">انضم إلى مجتمع Nova ERP</CardDescription>
+                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">انضم إلى مجتمع Nova ERP السيادي</CardDescription>
                     </div>
                 </div>
                 <Button asChild variant="ghost" className="text-[#1e1b4b] hover:bg-white/40 rounded-xl gap-2 font-black h-10 px-4">
@@ -162,8 +169,6 @@ export default function RegisterPage() {
                     </div>
                 </div>
 
-                <Separator className="bg-black/5" />
-
                 <div className="space-y-6">
                     <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب الدخول</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -197,6 +202,30 @@ export default function RegisterPage() {
                                 required 
                                 placeholder="********" 
                             />
+                        </div>
+                    </div>
+                </div>
+
+                <Separator className="bg-black/5" />
+
+                <div className="space-y-6">
+                    <h3 className="font-black text-primary text-[10px] border-r-4 border-primary pr-3 uppercase tracking-widest">بيانات الربط السحابي (اختياري)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/20">
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-black uppercase flex items-center gap-1"><Cloud className="h-3 w-3"/> API Key</Label>
+                            <Input value={formData.apiKey} onChange={e => setFormData(p => ({...p, apiKey: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="AIzaSy..." />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-black uppercase flex items-center gap-1"><Database className="h-3 w-3"/> Project ID</Label>
+                            <Input value={formData.projectId} onChange={e => setFormData(p => ({...p, projectId: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="company-prj-123" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-black uppercase">Auth Domain</Label>
+                            <Input value={formData.authDomain} onChange={e => setFormData(p => ({...p, authDomain: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="...firebaseapp.com" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label className="text-[10px] font-black uppercase">App ID</Label>
+                            <Input value={formData.appId} onChange={e => setFormData(p => ({...p, appId: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="1:828494:web:..." />
                         </div>
                     </div>
                 </div>
