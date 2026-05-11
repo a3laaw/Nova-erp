@@ -24,7 +24,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة تسجيل المنشآت الجديدة:
- * تم تحديثها لتشمل حقول الربط السحابي لضمان التعبئة التلقائية في غرفة التحكم.
+ * تم تحديثها لتبدأ بحقول فارغة تماماً للهوية (User/Pass) وضمان رشاقة الإدخال.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -38,10 +38,10 @@ export default function RegisterPage() {
     activity: 'consulting',
     contactName: '',
     email: '', 
-    username: '', 
+    username: '', // تبدأ فارغة كما طلب المستخدم
     phone: '', 
-    adminPassword: '',
-    // بيانات الـ Firebase (تعبئة تلقائية سيادية)
+    adminPassword: '', // تبدأ فارغة كما طلب المستخدم
+    // بيانات الـ Firebase (اختيارية لمنع تعليق النموذج)
     apiKey: '',
     projectId: '',
     authDomain: '',
@@ -51,6 +51,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore) return;
+
+    if (!formData.username || !formData.adminPassword) {
+        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يجب اختيار اسم مستخدم وكلمة مرور لتأسيس الحساب.' });
+        return;
+    }
 
     if (formData.adminPassword.length < 8) {
         toast({ variant: 'destructive', title: 'كلمة مرور ضعيفة', description: 'يجب أن لا تقل كلمة المرور عن 8 أحرف لضمان أمان حسابك.' });

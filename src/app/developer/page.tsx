@@ -41,7 +41,7 @@ import { CompanyRegistrationForm } from '@/components/developer/company-registra
 
 /**
  * غرفة التحكم السيادية:
- * تم تحديث محرك التفعيل لضمان التعبئة التلقائية لبيانات Firebase من الطلب.
+ * تم تبسيط الإيميلات لتكون: username@companyId.nova لمنع العربي والتعقيد.
  */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
@@ -52,7 +52,7 @@ const activityTranslations: Record<string, string> = {
 
 export default function DeveloperDashboard() {
   const { firestore, auth: clientAuth } = useFirebase();
-  const { currentUser } = useAuth() as any;
+  const { user: currentUser } = useAuth() as any;
   const { toast } = useToast();
   const router = useRouter();
   
@@ -99,8 +99,12 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      const safeUsername = req.username || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
-      const sovereignEmail = `${safeUsername}@${safeUsername}.nova-erp.local`;
+      // توليد معرف منشأة فريد ورشيق
+      const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
+      
+      // تبسيط الإيميل السيادي: username @ companyId . nova
+      const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
+      const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
@@ -111,9 +115,9 @@ export default function DeveloperDashboard() {
       if (!uid) throw new Error('فشل إنشاء الحساب');
 
       const batch = writeBatch(firestore);
-      const companyRef = doc(collection(firestore, 'companies'));
+      const companyRef = doc(firestore, 'companies', companyId);
 
-      // 🛡️ الربط الآلي: سحب بيانات الـ Firebase من الطلب
+      // 🛡️ الربط الآلي: نقل بيانات الـ Firebase من الطلب
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -122,7 +126,6 @@ export default function DeveloperDashboard() {
         contactPhone: req.phone,
         isActive: true,
         createdAt: serverTimestamp(),
-        // تعبئة البيانات تلقائياً إذا كانت موجودة في الطلب
         firebaseConfig: { 
             apiKey: req.apiKey || '', 
             authDomain: req.authDomain || '', 
@@ -133,16 +136,16 @@ export default function DeveloperDashboard() {
         }
       });
 
-      const userRef = doc(firestore, `companies/${companyRef.id}/users`, uid);
-      batch.set(userRef, { id: uid, uid, fullName: req.contactName, email: sovereignEmail, role: 'Admin', isActive: true, createdAt: serverTimestamp() });
+      const userRef = doc(firestore, `companies/${companyId}/users`, uid);
+      batch.set(userRef, { id: uid, uid, fullName: req.contactName, email: sovereignEmail, username: safeUsername, role: 'Admin', isActive: true, createdAt: serverTimestamp() });
 
       const globalRef = doc(collection(firestore, 'global_users'));
-      batch.set(globalRef, { email: sovereignEmail, companyId: companyRef.id, uid, createdAt: serverTimestamp() });
+      batch.set(globalRef, { email: sovereignEmail, username: safeUsername, companyId, uid, createdAt: serverTimestamp() });
 
-      batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId: companyRef.id });
+      batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
 
       await batch.commit();
-      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول ببيانات الربط الآلية.` });
+      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول بإيميل: ${sovereignEmail}` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }

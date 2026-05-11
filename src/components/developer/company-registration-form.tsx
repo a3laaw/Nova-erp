@@ -88,6 +88,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 activityType: (company as any).activity || 'general',
                 adminEmail: company.adminEmail || '',
                 adminPassword: company.adminPassword || '', 
+                // 🛡️ تحصين قراءة الـ Firebase Config ببروتوكول التدقيق الاختياري
                 apiKey: company.firebaseConfig?.apiKey || '',
                 authDomain: company.firebaseConfig?.authDomain || '',
                 projectId: company.firebaseConfig?.projectId || '',
@@ -374,21 +375,21 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
                             <div className="grid gap-3 md:col-span-2">
                                 <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Key className="h-3 w-3" /> API KEY *
+                                    <Key className="h-3 w-3" /> API KEY
                                 </Label>
-                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="AIzaSy..." />
+                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="AIzaSy..." />
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Globe className="h-3 w-3" /> AUTH DOMAIN *
+                                    <Globe className="h-3 w-3" /> AUTH DOMAIN
                                 </Label>
-                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="...firebaseapp.com" />
+                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="...firebaseapp.com" />
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Database className="h-3 w-3" /> PROJECT ID *
+                                    <Database className="h-3 w-3" /> PROJECT ID
                                 </Label>
-                                <Input id="projectId" value={formData.projectId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="company-prj-123" />
+                                <Input id="projectId" value={formData.projectId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="company-prj-123" />
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
@@ -404,9 +405,9 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="appId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <LayoutGrid className="h-3 w-3" /> APP ID *
+                                    <LayoutGrid className="h-3 w-3" /> APP ID
                                 </Label>
-                                <Input id="appId" value={formData.appId} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="1:828494:web:..." />
+                                <Input id="appId" value={formData.appId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="1:828494:web:..." />
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="measurementId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
