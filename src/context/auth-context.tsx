@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * محرك المصادقة السيادي: 
-   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات (مثل nova1).
+   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
@@ -53,13 +53,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (tenantDoc.exists()) {
             const profile = validateUserProfile(tenantDoc.data());
-            const role = await getUserRole(user);
-            
             const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
             const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
             return {
-              user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client', isSuperAdmin: role === 'Developer' } as AuthenticatedUser,
+              user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client', isSuperAdmin: profile.role === 'Developer' } as AuthenticatedUser,
               company
             };
         }
@@ -111,14 +109,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           } else {
             updateState({ user: null, company: null, loading: false, error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على ملف المستخدم.' });
             clearSessionIndicators();
-            if (!user?.isSuperAdmin) await signOut(masterAuth);
           }
         }
       } catch (err: any) {
         if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر مزامنة الجلسة السيادية.' });
         clearSessionIndicators();
       } finally {
-        if (isMounted) updateState({ loading: false }); // 🛡️ كسر حلقة التحميل تحت أي ظرف
+        if (isMounted) updateState({ loading: false });
       }
     });
 

@@ -20,8 +20,8 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * صفحة تسجيل المنشآت الجديدة (Sovereign Registration Gateway):
- * تم تطهير الواجهة من الحقول التقنية لتبدو كمنصة SaaS احترافية.
+ * بوابة تسجيل المنشآت (Sovereign Registration Gateway)
+ * تم تطهيرها من الحقول التقنية لضمان واجهة SaaS احترافية.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -30,6 +30,7 @@ export default function RegisterPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  // 🛡️ القيم تبدأ فارغة تماماً لضمان تجربة مستخدم نظيفة
   const [formData, setFormData] = useState({
     companyName: '',
     activity: 'consulting',
@@ -49,8 +50,8 @@ export default function RegisterPage() {
         return;
     }
 
-    if (formData.adminPassword.length < 8) {
-        toast({ variant: 'destructive', title: 'كلمة مرور ضعيفة', description: 'يجب أن لا تقل كلمة المرور عن 8 أحرف لضمان أمان حسابك.' });
+    if (formData.adminPassword.length < 6) {
+        toast({ variant: 'destructive', title: 'كلمة مرور قصيرة', description: 'يجب أن لا تقل كلمة المرور عن 6 أحرف.' });
         return;
     }
 
@@ -126,7 +127,7 @@ export default function RegisterPage() {
                                 <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">نوع النشاط</Label>
                                 <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
                                     <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]">
-                                        <SelectValue />
+                                        <SelectValue placeholder="اختر النشاط..." />
                                     </SelectTrigger>
                                     <SelectContent dir="rtl">
                                         <SelectItem value="consulting">استشارات هندسية</SelectItem>
@@ -152,7 +153,7 @@ export default function RegisterPage() {
                                 />
                             </div>
                             <div className="grid gap-1.5">
-                                <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني *</Label>
+                                <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني للتواصل *</Label>
                                 <Input 
                                     type="email" 
                                     value={formData.email} 
@@ -167,21 +168,23 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-6">
-                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب الدخول</h3>
+                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب دخول المالك</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-1.5">
-                            <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
+                            <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
                             <Input 
+                                id="username"
                                 value={formData.username} 
                                 onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
                                 className="h-11 rounded-xl bg-white border-2 font-black text-primary dir-ltr" 
                                 required 
-                                placeholder="ali.ahmed" 
+                                placeholder="مثال: alaa" 
                             />
                         </div>
                         <div className="grid gap-1.5">
-                            <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">رقم الهاتف (WhatsApp) *</Label>
+                            <Label htmlFor="phone" className="text-[#1e1b4b] font-black text-[11px] pr-1">رقم الهاتف (WhatsApp) *</Label>
                             <Input 
+                                id="phone"
                                 value={formData.phone} 
                                 onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
                                 className="h-11 rounded-xl bg-white border-2 font-black dir-ltr" 
@@ -190,14 +193,15 @@ export default function RegisterPage() {
                             />
                         </div>
                         <div className="grid gap-1.5 md:col-span-2">
-                            <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">كلمة المرور التأسيسية *</Label>
+                            <Label htmlFor="adminPassword" className="text-[#1e1b4b] font-black text-[11px] pr-1">كلمة المرور التأسيسية *</Label>
                             <Input 
+                                id="adminPassword"
                                 type="password" 
                                 value={formData.adminPassword} 
                                 onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
-                                className="h-11 rounded-xl bg-white border-2 font-bold" 
+                                className="h-11 rounded-xl bg-white border-2 font-bold text-center" 
                                 required 
-                                placeholder="********" 
+                                placeholder="أدخل كلمة مرور قوية..." 
                             />
                         </div>
                     </div>
