@@ -12,8 +12,7 @@ import {
     ArrowRight,
     CheckCircle2,
     ShieldCheck,
-    Cloud,
-    Database
+    Briefcase
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -23,8 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 
 /**
- * صفحة تسجيل المنشآت الجديدة:
- * تم التأكد من أن حقول اسم المستخدم وكلمة المرور تبدأ فارغة تماماً لضمان أفضل تجربة مستخدم.
+ * صفحة تسجيل المنشآت الجديدة (Sovereign Registration Gateway):
+ * تم تنظيف الواجهة من الحقول التقنية المعقدة، وترك أمر الربط السحابي آلياً للنظام.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -38,13 +37,9 @@ export default function RegisterPage() {
     activity: 'consulting',
     contactName: '',
     email: '', 
-    username: '', // 🛡️ تبدأ فارغة تماماً
+    username: '', 
     phone: '', 
-    adminPassword: '', // 🛡️ تبدأ فارغة تماماً
-    apiKey: '',
-    projectId: '',
-    authDomain: '',
-    appId: ''
+    adminPassword: '', 
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,7 +80,7 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-3xl font-black text-[#1e1b4b] mb-4 tracking-tighter">تم استلام طلبك!</h2>
                 <p className="text-[#1e1b4b]/70 font-bold mb-8 leading-relaxed">
-                    فريق Nova ERP سيقوم بمراجعة بياناتك وتهيئة نظامك المعزول خلال 24 ساعة كحد أقصى.
+                    فريق Nova ERP سيقوم بمراجعة بياناتك وتهيئة نظامك السحابي المعزول خلال 24 ساعة كحد أقصى.
                 </p>
                 <Button asChild className="h-14 px-12 rounded-2xl bg-[#1e1b4b] text-white font-black hover:bg-black shadow-xl">
                     <Link href="/">العودة للرئيسية</Link>
@@ -113,7 +108,7 @@ export default function RegisterPage() {
             </div>
         </CardHeader>
         
-        <CardContent className="p-10 scrollbar-none max-h-[70vh] overflow-y-auto">
+        <CardContent className="p-10">
             <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6">
@@ -206,30 +201,6 @@ export default function RegisterPage() {
                                 required 
                                 placeholder="********" 
                             />
-                        </div>
-                    </div>
-                </div>
-
-                <Separator className="bg-black/5" />
-
-                <div className="space-y-6">
-                    <h3 className="font-black text-primary text-[10px] border-r-4 border-primary pr-3 uppercase tracking-widest">بيانات الربط السحابي (اختياري)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/20">
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-black uppercase flex items-center gap-1"><Cloud className="h-3 w-3"/> API Key</Label>
-                            <Input value={formData.apiKey} onChange={e => setFormData(p => ({...p, apiKey: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="AIzaSy..." />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-black uppercase flex items-center gap-1"><Database className="h-3 w-3"/> Project ID</Label>
-                            <Input value={formData.projectId} onChange={e => setFormData(p => ({...p, projectId: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="company-prj-123" />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-black uppercase">Auth Domain</Label>
-                            <Input value={formData.authDomain} onChange={e => setFormData(p => ({...p, authDomain: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="...firebaseapp.com" />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label className="text-[10px] font-black uppercase">App ID</Label>
-                            <Input value={formData.appId} onChange={e => setFormData(p => ({...p, appId: e.target.value}))} className="h-9 text-xs font-mono bg-white" placeholder="1:828494:web:..." />
                         </div>
                     </div>
                 </div>

@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc, Timestamp } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
-    FileStack, Settings, Trash2, ShieldAlert
+    FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -38,16 +38,24 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
+import { addDays } from 'date-fns';
 
-/**
- * غرفة التحكم السيادية:
- * تم تعديل توليد الـ CompanyId لاستخدام الشرطة العادية (-) بدلاً من السفلية (_) لضمان صحة الإيميل.
- */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
     food_delivery: 'مطاعم وتوصيل أغذية',
     construction: 'مقاولات وبناء إنشائي',
     consulting: 'استشارات هندسية',
+};
+
+// 🛡️ المصفوفة السحابية الماستر للنظام (سيتم حقنها آلياً للمشتركين الجدد)
+const MASTER_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
+  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
+  projectId: "studio-8039389980-3d2d0",
+  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
+  messagingSenderId: "828494117254",
+  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
+  measurementId: "G-Q7DPZ802VJ"
 };
 
 export default function DeveloperDashboard() {
@@ -99,10 +107,7 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      // 🛡️ التعديل الجوهري: استخدام شرطة عادية (-) لمنع أخطاء المتصفح في الإيميل
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
-      
-      // تبسيط الإيميل السيادي: username@companyId.nova
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
@@ -117,7 +122,9 @@ export default function DeveloperDashboard() {
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
 
-      // نقل بيانات الـ Firebase من الطلب بدقة
+      // ✨ الإجراء السيادي: أتمتة تاريخ الانتهاء وحقن مصفوفة الـ Firebase تلقائياً ✨
+      const trialEndDate = addDays(new Date(), 14); // افتراضياً 14 يوم
+
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -125,15 +132,12 @@ export default function DeveloperDashboard() {
         adminPassword: req.adminPassword,
         contactPhone: req.phone,
         isActive: true,
+        subscriptionType: 'trial',
+        trialEndDate: Timestamp.fromDate(trialEndDate),
+        maxUsersLimit: 5,
+        firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
+        firebaseConfig: MASTER_FIREBASE_CONFIG, // حقن المصفوفة آلياً من النظام
         createdAt: serverTimestamp(),
-        firebaseConfig: { 
-            apiKey: req.apiKey || '', 
-            authDomain: req.authDomain || '', 
-            projectId: req.projectId || '', 
-            storageBucket: req.storageBucket || '', 
-            messagingSenderId: req.messagingSenderId || '', 
-            appId: req.appId || '' 
-        }
       });
 
       const userRef = doc(firestore, `companies/${companyId}/users`, uid);
@@ -145,7 +149,7 @@ export default function DeveloperDashboard() {
       batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
 
       await batch.commit();
-      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول بإيميل رصين: ${sovereignEmail}` });
+      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول مع فترة تجريبية 14 يوم.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -240,7 +244,7 @@ export default function DeveloperDashboard() {
                                                 disabled={isProcessing === req.id} 
                                                 className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
                                             >
-                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null} 
+                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4" />} 
                                                 تفعيل البيئة
                                             </Button>
                                         ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}

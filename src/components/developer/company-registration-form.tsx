@@ -95,6 +95,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 trialEndDate: company.trialEndDate ? (company.trialEndDate.toDate ? company.trialEndDate.toDate() : new Date(company.trialEndDate.seconds * 1000)) : undefined,
             });
         } else {
+            // ✨ تعيين تاريخ انتهاء افتراضي (14 يوم) للمنشآت الجديدة ✨
             const defaultTrialEnd = addDays(new Date(), 14);
             setFormData({
                 name: '', nameEn: '', activityType: 'general', adminEmail: '', adminPassword: '',
@@ -139,13 +140,13 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
       if (!authResult.success) throw new Error(authResult.error);
 
       const firebaseConfig = {
-        apiKey: formData.apiKey.trim(),
-        authDomain: formData.authDomain.trim(),
-        projectId: formData.projectId.trim(),
-        storageBucket: formData.storageBucket.trim(),
-        messagingSenderId: formData.messagingSenderId.trim(),
-        appId: formData.appId.trim(),
-        measurementId: formData.measurementId.trim(),
+        apiKey: formData.apiKey?.trim() || '',
+        authDomain: formData.authDomain?.trim() || '',
+        projectId: formData.projectId?.trim() || '',
+        storageBucket: formData.storageBucket?.trim() || '',
+        messagingSenderId: formData.messagingSenderId?.trim() || '',
+        appId: formData.appId?.trim() || '',
+        measurementId: formData.measurementId?.trim() || '',
       };
 
       const licenseData = {
@@ -169,7 +170,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           }));
           toast({ title: 'نجاح التحديث' });
       } else {
-          // 🛡️ استخدام شرطة عادية لمنع أخطاء الدومين في الإيميل
           const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
           
           await runTransaction(masterFirestore, async (transaction) => {
@@ -228,7 +228,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
         <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
           <DialogHeader className="p-8 bg-[#1e1b4b] text-white shrink-0 relative overflow-hidden text-right">
             <div className="flex items-center justify-between w-full relative z-10">
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-4">
                     <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl border border-white/20">
                         <DatabaseZap className="h-8 w-8" />
                     </div>
@@ -270,7 +270,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             </Label>
                             <Select value={formData.activityType} onValueChange={(v) => setFormData(p => ({...p, activityType: v}))}>
                                 <SelectTrigger className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black">
-                                    <SelectValue placeholder="اختر نوع النشاط..." />
+                                    <SelectValue placeholder="اختر النشاط..." />
                                 </SelectTrigger>
                                 <SelectContent dir="rtl">
                                     <SelectItem value="general">نشاط عام (تجاري/مكتب)</SelectItem>
@@ -338,7 +338,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> عدد المستخدمين المسموح به *</Label>
                             <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-2xl text-center shadow-sm" />
                         </div>
-                        {formData.subscriptionType === 'trial' && (
+                        {(formData.subscriptionType === 'trial' || formData.trialEndDate) && (
                             <div className="grid gap-2 md:col-span-2 animate-in slide-in-from-top-2">
                                 <Label className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><CalendarClock className="h-3 w-3 text-orange-600"/> تاريخ انتهاء الفترة التجريبية</Label>
                                 <DateInput 
@@ -346,6 +346,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))}
                                     className="h-12 rounded-xl"
                                 />
+                                <p className="text-[10px] text-orange-600 font-bold pr-1">سيتم قفل لوحة التحكم للعميل آلياً بعد هذا التاريخ.</p>
                             </div>
                         )}
                     </div>
