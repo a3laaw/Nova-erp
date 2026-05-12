@@ -41,7 +41,7 @@ import { CompanyRegistrationForm } from '@/components/developer/company-registra
 
 /**
  * غرفة التحكم السيادية:
- * تم تبسيط الإيميلات لتكون: username@companyId.nova لمنع العربي والتعقيد.
+ * تم تعديل توليد الـ CompanyId لاستخدام الشرطة العادية (-) بدلاً من السفلية (_) لضمان صحة الإيميل.
  */
 const activityTranslations: Record<string, string> = {
     general: 'نشاط تجاري عام',
@@ -95,14 +95,14 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
-  const handleActivateCompany = async (req: any) => {
+  const handleActivateCompany = async (req: CompanyRequest) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      // توليد معرف منشأة فريد ورشيق
-      const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
+      // 🛡️ التعديل الجوهري: استخدام شرطة عادية (-) لمنع أخطاء المتصفح في الإيميل
+      const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       
-      // تبسيط الإيميل السيادي: username @ companyId . nova
+      // تبسيط الإيميل السيادي: username@companyId.nova
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
@@ -117,7 +117,7 @@ export default function DeveloperDashboard() {
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
 
-      // 🛡️ الربط الآلي: نقل بيانات الـ Firebase من الطلب
+      // نقل بيانات الـ Firebase من الطلب بدقة
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -145,7 +145,7 @@ export default function DeveloperDashboard() {
       batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
 
       await batch.commit();
-      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول بإيميل: ${sovereignEmail}` });
+      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول بإيميل رصين: ${sovereignEmail}` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -173,7 +173,7 @@ export default function DeveloperDashboard() {
             <CardHeader className="p-10 pb-8 bg-indigo-950/60 border-b border-white/10">
                 <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-6">
-                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.5)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
+                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.4)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم السيادية</CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والحماية السحابية.</CardDescription>
@@ -235,8 +235,13 @@ export default function DeveloperDashboard() {
                                     <TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username || req.email.split('@')[0]}</Badge></TableCell>
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
-                                            <Button onClick={() => handleActivateCompany(req)} disabled={isProcessing === req.id} className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg">
-                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null} تفعيل البيئة
+                                            <Button 
+                                                onClick={() => handleActivateCompany(req)} 
+                                                disabled={isProcessing === req.id} 
+                                                className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
+                                            >
+                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : null} 
+                                                تفعيل البيئة
                                             </Button>
                                         ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}
                                     </TableCell>

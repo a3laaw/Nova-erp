@@ -14,7 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, setDoc, updateDoc, getDocs, query, where, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, doc, runTransaction, serverTimestamp, updateDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -22,19 +22,14 @@ import {
   Building2, 
   Mail, 
   Lock, 
-  Database, 
   DatabaseZap, 
   X, 
   Key, 
   Globe, 
   Cloud,
-  LayoutGrid,
-  Target,
-  Send,
   Activity,
   CalendarClock,
   Users,
-  ShieldCheck,
   CreditCard,
   Eye,
   EyeOff,
@@ -88,7 +83,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 activityType: (company as any).activity || 'general',
                 adminEmail: company.adminEmail || '',
                 adminPassword: company.adminPassword || '', 
-                // 🛡️ تحصين قراءة الـ Firebase Config ببروتوكول التدقيق الاختياري
                 apiKey: company.firebaseConfig?.apiKey || '',
                 authDomain: company.firebaseConfig?.authDomain || '',
                 projectId: company.firebaseConfig?.projectId || '',
@@ -132,7 +126,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     savingRef.current = true;
     setIsSaving(true);
     try {
-      // 1. مزامنة الحساب مع خادم الأمان (Firebase Auth) أولاً
       const authResponse = await fetch('/api/manage-tenant-user', {
           method: 'POST',
           body: JSON.stringify({
@@ -174,9 +167,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               ...licenseData,
               updatedAt: serverTimestamp()
           }));
-          toast({ title: 'نجاح التحديث', description: 'تم تحديث بيانات ربط وترخيص المنشأة ومزامنة الحماية.' });
+          toast({ title: 'نجاح التحديث' });
       } else {
-          const companyId = `comp_${Math.random().toString(36).substring(2, 9)}`;
+          // 🛡️ استخدام شرطة عادية لمنع أخطاء الدومين في الإيميل
+          const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
           
           await runTransaction(masterFirestore, async (transaction) => {
             const companyRef = doc(masterFirestore, 'companies', companyId);
@@ -194,7 +188,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               createdBy: masterAuth.currentUser?.uid || 'system',
             });
 
-            // إنشاء ملف المستخدم المعزول داخل مجلد الشركة
             const tenantUserRef = doc(masterFirestore, `companies/${companyId}/users`, authResult.uid);
             transaction.set(tenantUserRef, {
                 uid: authResult.uid,
@@ -217,13 +210,12 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             });
           });
 
-          toast({ title: 'نجاح التأسيس', description: 'تم ربط المنشأة وتفعيل حساب المالك بنجاح.' });
+          toast({ title: 'نجاح التأسيس' });
       }
 
       onClose();
     } catch (error: any) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'فشل التأسيس', description: error.message });
+      toast({ variant: 'destructive', title: 'خطأ', description: error.message });
     } finally {
       setIsSaving(false);
       savingRef.current = false;
@@ -345,7 +337,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <div className="grid gap-2">
                             <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> عدد المستخدمين المسموح به *</Label>
                             <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-2xl text-center shadow-sm" />
-                            <p className="text-[10px] text-orange-700 font-black pr-1 uppercase">أدخل الرقم يدوياً حسب ما سدده العميل (رخصة مقعد)</p>
                         </div>
                         {formData.subscriptionType === 'trial' && (
                             <div className="grid gap-2 md:col-span-2 animate-in slide-in-from-top-2">
@@ -355,7 +346,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))}
                                     className="h-12 rounded-xl"
                                 />
-                                <p className="text-[10px] text-orange-700 font-bold pr-1 italic">سيتم قفل لوحة التحكم للعميل آلياً بعد هذا التاريخ.</p>
                             </div>
                         )}
                     </div>
@@ -368,7 +358,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
                             <Cloud className="h-6 w-6 text-indigo-600" /> مصفوفة الربط السحابي (Firebase Config)
                         </h3>
-                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 font-black px-4 py-1 rounded-full uppercase tracking-widest text-[10px]">Isolated Environment</Badge>
                     </div>
                     
                     <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30 shadow-inner">
@@ -387,7 +376,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Database className="h-3 w-3" /> PROJECT ID
+                                    <Key className="h-3 w-3" /> PROJECT ID
                                 </Label>
                                 <Input id="projectId" value={formData.projectId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="company-prj-123" />
                             </div>
@@ -399,21 +388,15 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Send className="h-3 w-3" /> MESSAGING SENDER ID
+                                    <Key className="h-3 w-3" /> MESSAGING SENDER ID
                                 </Label>
                                 <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="828494..." />
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="appId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <LayoutGrid className="h-3 w-3" /> APP ID
+                                    <Activity className="h-3 w-3" /> APP ID
                                 </Label>
                                 <Input id="appId" value={formData.appId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="1:828494:web:..." />
-                            </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="measurementId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Target className="h-3 w-3" /> MEASUREMENT ID
-                                </Label>
-                                <Input id="measurementId" value={formData.measurementId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="G-XXXXXX" />
                             </div>
                         </div>
                     </div>

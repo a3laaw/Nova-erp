@@ -24,7 +24,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة تسجيل المنشآت الجديدة:
- * تم تحديثها لتبدأ بحقول فارغة تماماً للهوية (User/Pass) وضمان رشاقة الإدخال.
+ * تم التأكد من أن حقول اسم المستخدم وكلمة المرور تبدأ فارغة تماماً لضمان أفضل تجربة مستخدم.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -38,10 +38,9 @@ export default function RegisterPage() {
     activity: 'consulting',
     contactName: '',
     email: '', 
-    username: '', // تبدأ فارغة كما طلب المستخدم
+    username: '', // 🛡️ تبدأ فارغة تماماً
     phone: '', 
-    adminPassword: '', // تبدأ فارغة كما طلب المستخدم
-    // بيانات الـ Firebase (اختيارية لمنع تعليق النموذج)
+    adminPassword: '', // 🛡️ تبدأ فارغة تماماً
     apiKey: '',
     projectId: '',
     authDomain: '',
