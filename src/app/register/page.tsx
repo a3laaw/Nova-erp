@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 /**
  * بوابة تسجيل المنشآت (Sovereign Registration Gateway)
- * تم تطهيرها من الحقول التقنية لضمان واجهة SaaS احترافية.
+ * تم تصفير الحقول وحذف القسم التقني لضمان واجهة SaaS احترافية.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -30,15 +30,15 @@ export default function RegisterPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // 🛡️ القيم تبدأ فارغة تماماً لضمان تجربة مستخدم نظيفة
+  // 🛡️ الحقول تبدأ فارغة تماماً لضمان تجربة مستخدم نظيفة ومنع الاقتراحات التلقائية
   const [formData, setFormData] = useState({
     companyName: '',
     activity: 'consulting',
     contactName: '',
     email: '', 
-    username: '', 
+    username: '', // تم التصفير
     phone: '', 
-    adminPassword: '', 
+    adminPassword: '', // تم التصفير
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -114,8 +114,9 @@ export default function RegisterPage() {
                         <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">بيانات الشركة</h3>
                         <div className="grid gap-4">
                             <div className="grid gap-1.5">
-                                <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المكتب / الشركة *</Label>
+                                <Label htmlFor="companyName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المكتب / الشركة *</Label>
                                 <Input 
+                                    id="companyName"
                                     value={formData.companyName} 
                                     onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
                                     className="h-11 rounded-xl bg-white border-2 font-bold text-[#1e1b4b]" 
@@ -143,8 +144,9 @@ export default function RegisterPage() {
                         <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">بيانات التواصل والمدير</h3>
                         <div className="grid gap-4">
                             <div className="grid gap-1.5">
-                                <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المدير المسؤول *</Label>
+                                <Label htmlFor="contactName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المدير المسؤول *</Label>
                                 <Input 
+                                    id="contactName"
                                     value={formData.contactName} 
                                     onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} 
                                     className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]" 
@@ -153,8 +155,9 @@ export default function RegisterPage() {
                                 />
                             </div>
                             <div className="grid gap-1.5">
-                                <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني للتواصل *</Label>
+                                <Label htmlFor="email" className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني للتواصل *</Label>
                                 <Input 
+                                    id="email"
                                     type="email" 
                                     value={formData.email} 
                                     onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
@@ -178,6 +181,7 @@ export default function RegisterPage() {
                                 onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
                                 className="h-11 rounded-xl bg-white border-2 font-black text-primary dir-ltr" 
                                 required 
+                                autoComplete="off"
                                 placeholder="مثال: alaa" 
                             />
                         </div>
@@ -201,6 +205,7 @@ export default function RegisterPage() {
                                 onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
                                 className="h-11 rounded-xl bg-white border-2 font-bold text-center" 
                                 required 
+                                autoComplete="new-password"
                                 placeholder="أدخل كلمة مرور قوية..." 
                             />
                         </div>

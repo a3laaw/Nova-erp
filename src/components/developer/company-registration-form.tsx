@@ -95,8 +95,8 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 trialEndDate: company.trialEndDate ? (company.trialEndDate.toDate ? company.trialEndDate.toDate() : new Date(company.trialEndDate.seconds * 1000)) : undefined,
             });
         } else {
-            // ✨ تعيين تاريخ انتهاء افتراضي (14 يوم) للمنشآت الجديدة ✨
-            const defaultTrialEnd = addDays(new Date(), 14);
+            // التأسيس الافتراضي للمنشآت الجديدة
+            const defaultTrialEnd = addDays(new Date(), 7);
             setFormData({
                 name: '', nameEn: '', activityType: 'general', adminEmail: '', adminPassword: '',
                 apiKey: '', authDomain: '', projectId: '', storageBucket: '',

@@ -113,7 +113,7 @@ export default function DeveloperDashboard() {
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
       
-      // الهوية الرشيقة: alaa @ comp-x7y2 . nova
+      // الهوية الرشيقة: username @ comp-id . nova
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
       const createRes = await fetch('/api/manage-tenant-user', {
@@ -128,7 +128,7 @@ export default function DeveloperDashboard() {
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
 
-      // ✨ أتمتة الحقن والجدولة (7 أيام) ✨
+      // ✨ أتمتة الحقن والجدولة لـ 7 أيام ديمو ✨
       const trialEndDate = addDays(new Date(), 7);
 
       batch.set(companyRef, {
@@ -142,7 +142,7 @@ export default function DeveloperDashboard() {
         trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5,
         firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
-        firebaseConfig: MASTER_FIREBASE_CONFIG, // حقن تلقائي للمصفوفة
+        firebaseConfig: MASTER_FIREBASE_CONFIG, // حقن تلقائي للمصفوفة لضمان عدم ظهور حقول فارغة
         createdAt: serverTimestamp(),
       });
 

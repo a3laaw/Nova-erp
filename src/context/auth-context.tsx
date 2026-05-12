@@ -7,7 +7,7 @@ import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore }
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
-import { mapFirebaseAuthError, validateUserProfile, getUserRole, logAuthEvent, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
+import { mapFirebaseAuthError, validateUserProfile, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
 interface AuthState {
   user: AuthenticatedUser | null;
@@ -39,11 +39,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * محرك المصادقة السيادي: 
-   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات.
+   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات وضمان استجابة nova1.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
-      // 🛡️ المبدأ السيادي الأول: الفحص في الفهرس العالمي
+      // 🛡️ المبدأ السيادي الأول: الفحص في الفهرس العالمي (أولوية قصوى لمديري الشركات)
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
