@@ -47,7 +47,7 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
-// 🛡️ المصفوفة السحابية الماستر للنظام (سيتم حقنها آلياً للمشتركين الجدد)
+// 🛡️ المصفوفة السحابية الماستر للنظام (حقن آلي للمشتركين الجدد)
 const MASTER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
   authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
@@ -103,12 +103,20 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
+  /**
+   * محرك التفعيل السيادي المطور:
+   * 1. إنشاء حساب المالك.
+   * 2. حقن مصفوفة الـ Firebase آلياً.
+   * 3. جدولة انتهاء الديمو لـ 7 أيام.
+   */
   const handleActivateCompany = async (req: CompanyRequest) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
+      
+      // صيغة رشيقة جداً: username @ comp-id . nova
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
       const createRes = await fetch('/api/manage-tenant-user', {
@@ -116,14 +124,15 @@ export default function DeveloperDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: sovereignEmail, password: req.adminPassword, displayName: req.contactName, action: 'create' })
       });
+      
       const { uid } = await createRes.json();
       if (!uid) throw new Error('فشل إنشاء الحساب');
 
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
 
-      // ✨ الإجراء السيادي: أتمتة تاريخ الانتهاء وحقن مصفوفة الـ Firebase تلقائياً ✨
-      const trialEndDate = addDays(new Date(), 14); // افتراضياً 14 يوم
+      // ✨ الإجراء السيادي: أتمتة تاريخ الانتهاء (7 أيام) وحقن مصفوفة الـ Firebase تلقائياً ✨
+      const trialEndDate = addDays(new Date(), 7); 
 
       batch.set(companyRef, {
         name: req.companyName,
@@ -136,7 +145,7 @@ export default function DeveloperDashboard() {
         trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5,
         firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
-        firebaseConfig: MASTER_FIREBASE_CONFIG, // حقن المصفوفة آلياً من النظام
+        firebaseConfig: MASTER_FIREBASE_CONFIG, // حقن المصفوفة الماستر آلياً
         createdAt: serverTimestamp(),
       });
 
@@ -149,7 +158,7 @@ export default function DeveloperDashboard() {
       batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
 
       await batch.commit();
-      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول مع فترة تجريبية 14 يوم.` });
+      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول مع فترة تجريبية 7 أيام.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -165,7 +174,7 @@ export default function DeveloperDashboard() {
         const gSnap = await getDocs(gQuery);
         gSnap.forEach(d => batch.delete(d.ref));
         await batch.commit();
-        toast({ title: '✅ تم إنهاء السيادة', description: `تم حذف منشأة ${companyToDelete.name} وبيانات الدخول.` });
+        toast({ title: '✅ تم إنهاء السيادة', description: `تم حذف منشأة ${companyToDelete.name} وبياناتها نهائياً.` });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ في الحذف' });
     } finally { setIsProcessing(null); setCompanyToDelete(null); }

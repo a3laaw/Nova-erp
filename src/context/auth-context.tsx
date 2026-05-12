@@ -37,39 +37,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, ...next }));
   }, []);
 
+  /**
+   * محرك المصادقة السيادي: 
+   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات (مثل nova1).
+   */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
-    // 🛡️ المبدأ السيادي: البحث في الفهرس العالمي أولاً لفتح قفل الحسابات مثل nova1
-    const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
-    const globalSnap = await getDocs(globalQuery);
-    
-    if (!globalSnap.empty) {
-      const idx = globalSnap.docs[0].data();
-      const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users`, user.uid));
+    try {
+      // 🛡️ المبدأ السيادي الأول: الفحص في الفهرس العالمي
+      const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
+      const globalSnap = await getDocs(globalQuery);
       
-      if (tenantDoc.exists()) {
-          const profile = validateUserProfile(tenantDoc.data());
-          const role = await getUserRole(user);
-          
-          const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
-          const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+      if (!globalSnap.empty) {
+        const idx = globalSnap.docs[0].data();
+        const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users`, user.uid));
+        
+        if (tenantDoc.exists()) {
+            const profile = validateUserProfile(tenantDoc.data());
+            const role = await getUserRole(user);
+            
+            const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
+            const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
+            return {
+              user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client', isSuperAdmin: role === 'Developer' } as AuthenticatedUser,
+              company
+            };
+        }
+      }
+
+      // 🛠️ المبدأ السيادي الثاني: وضع المطور (فقط إذا لم يكن في الفهرس العالمي)
+      if (email.endsWith('.local')) {
+        const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
+        if (devDoc.exists()) {
           return {
-            user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client', isSuperAdmin: role === 'Developer' } as AuthenticatedUser,
-            company
+            user: { id: user.uid, uid: user.uid, email: user.email!, username: 'root', role: 'Developer', isActive: true, fullName: devDoc.data()?.fullName || 'Master Developer', isSuperAdmin: true, currentCompanyId: null, companyName: 'Nova ERP Platform' } as AuthenticatedUser,
+            company: null
           };
+        }
       }
-    }
-
-    // 🛠️ فحص وضع المطور السيادي
-    if (email.endsWith('.local')) {
-      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
-      if (devDoc.exists()) {
-        return {
-          user: { id: user.uid, uid: user.uid, email: user.email!, username: 'root', role: 'Developer', isActive: true, fullName: devDoc.data()?.fullName || 'Master Developer', isSuperAdmin: true, currentCompanyId: null, companyName: 'Nova ERP Platform' } as AuthenticatedUser,
-          company: null
-        };
-      }
-    }
+    } catch (e) { console.error("Identity Fetch Error:", e); }
 
     return { user: null, company: null };
   }, []);
@@ -111,6 +117,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (err: any) {
         if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر مزامنة الجلسة السيادية.' });
         clearSessionIndicators();
+      } finally {
+        if (isMounted) updateState({ loading: false }); // 🛡️ كسر حلقة التحميل تحت أي ظرف
       }
     });
 

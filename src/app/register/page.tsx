@@ -11,19 +11,17 @@ import {
     Building2, 
     ArrowRight,
     CheckCircle2,
-    ShieldCheck,
-    Briefcase
+    ShieldCheck
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 
 /**
  * صفحة تسجيل المنشآت الجديدة (Sovereign Registration Gateway):
- * تم تنظيف الواجهة من الحقول التقنية المعقدة، وترك أمر الربط السحابي آلياً للنظام.
+ * تم تطهير الواجهة من الحقول التقنية لتبدو كمنصة SaaS احترافية.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
