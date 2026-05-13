@@ -13,7 +13,7 @@ import {
     MoreHorizontal, ArrowRightLeft, 
     Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
     Wrench, AlertCircle, ShieldCheck, ShieldX, Copy, Key,
-    Info, ExternalLink
+    Info, ExternalLink, RotateCcw
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -38,11 +38,24 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { addDays } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import { format } from 'date-fns';
+
+const MASTER_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
+  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
+  projectId: "studio-8039389980-3d2d0",
+  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
+  messagingSenderId: "828494117254",
+  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
+  measurementId: "G-Q7DPZ802VJ"
+};
 
 export default function DeveloperDashboard() {
-  const { firestore, auth: clientAuth } = useFirebase();
+  const { firestore } = useFirebase();
   const { user: currentUser } = useAuth() as any;
   const { toast } = useToast();
   const router = useRouter();
@@ -84,6 +97,62 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
+  const handleDeleteCompany = async () => {
+    if (!firestore || !companyToDelete) return;
+    setIsProcessing(companyToDelete.id!);
+    try {
+        const batch = writeBatch(firestore);
+        batch.delete(doc(firestore, 'companies', companyToDelete.id!));
+        const globalQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id!));
+        const globalSnap = await getDocs(globalQuery);
+        globalSnap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        toast({ title: '🗑️ تم تصفية المنشأة نهائياً' });
+    } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحذف' }); } finally { setIsProcessing(null); setCompanyToDelete(null); }
+  };
+
+  const handleRepairData = async () => {
+    if (!firestore) return;
+    setIsRepairing(true);
+    try {
+        const batch = writeBatch(firestore);
+        const companiesSnap = await getDocs(collection(firestore, 'companies'));
+        
+        let repairedCount = 0;
+        for (const companyDoc of companiesSnap.docs) {
+            const data = companyDoc.data() as Company;
+            const updates: any = {};
+
+            // 1. حقن مصفوفة الـ Config إذا كانت مفقودة
+            if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
+                updates.firebaseConfig = MASTER_FIREBASE_CONFIG;
+                updates.firebaseProjectId = MASTER_FIREBASE_CONFIG.projectId;
+            }
+
+            // 2. تحديث الفهرس العالمي لضمان الدخول بـ Username
+            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
+            const globalSnap = await getDocs(globalQuery);
+            if (globalSnap.empty) {
+                const globalRef = doc(collection(firestore, 'global_users'));
+                batch.set(globalRef, {
+                    email: data.adminEmail.toLowerCase().trim(),
+                    username: data.adminEmail.split('@')[0],
+                    companyId: companyDoc.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            if (Object.keys(updates).length > 0) {
+                batch.update(companyDoc.ref, updates);
+                repairedCount++;
+            }
+        }
+
+        await batch.commit();
+        toast({ title: '🛠️ تم الانتهاء من الترميم', description: `تم إصلاح ومزامنة ${repairedCount} منشأة قديمة بنجاح.` });
+    } catch (e) { toast({ variant: 'destructive', title: 'فشل الترميم' }); } finally { setIsRepairing(false); }
+  };
+
   return (
     <div className="space-y-10" dir="rtl">
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-[#1e1b4b]">
@@ -104,6 +173,9 @@ export default function DeveloperDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-4">
+                        <Button onClick={handleRepairData} disabled={isRepairing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 text-white border-white/20 hover:bg-white/10">
+                            {isRepairing ? <Loader2 className="animate-spin h-6 w-6"/> : <RotateCcw className="h-6 w-6" />} ترميم البيانات القديمة
+                        </Button>
                         <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all"><PlusCircle className="h-6 w-6" /> تأسيس منشأة</Button>
                     </div>
                 </div>
