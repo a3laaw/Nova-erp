@@ -6,7 +6,7 @@ import path from 'path';
 
 /**
  * @fileOverview API سيادي لإدارة حسابات المستخدمين عابرة المنشآت.
- * تم تحديثه لدعم تحديث الإيميل وكلمة المرور للمستخدمين الحاليين بواسطة الـ UID.
+ * تم تحديثه ليكون صريحاً جداً بشأن حالة ملف الأمان المفقود.
  */
 
 export async function POST(request: NextRequest) {
@@ -14,25 +14,22 @@ export async function POST(request: NextRequest) {
     const { email, password, displayName, uid, action } = await request.json();
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
-    let useSimulation = false;
+    let hasServiceAccount = false;
 
-    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        useSimulation = true;
-    } else {
+    if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
         const sa = JSON.parse(fileContent || '{}');
-        if (!sa || Object.keys(sa).length === 0 || !sa.project_id) {
-            useSimulation = true;
+        if (sa && sa.project_id && sa.private_key) {
+            hasServiceAccount = true;
         }
     }
 
-    // 🛡️ وضع المحاكاة الصالح (GitHub Protection Active)
-    if (useSimulation) {
+    // 🛡️ إذا لم يتوفر ملف الأمان، نرفض العملية ونطلب التفعيل اليدوي بدلاً من المحاكاة الصامتة
+    if (!hasServiceAccount) {
         return NextResponse.json({ 
-            success: true, 
-            simulated: true,
-            uid: uid || `sim_${Math.random().toString(36).substring(7)}`,
-            message: "تم تنفيذ العملية في وضع المحاكاة السيادي." 
+            success: false, 
+            error: "MISSING_SERVICE_ACCOUNT",
+            message: "ملف الأمان السيادي (service-account.json) مفقود أو فارغ. يرجى إنشاء الحساب يدوياً في Firebase Console." 
         });
     }
 
@@ -65,7 +62,6 @@ export async function POST(request: NextRequest) {
             }
         }
     } else if (action === 'update_full' && uid) {
-        // 🔄 تحديث شامل للمستخدم (بما في ذلك تغيير الإيميل)
         const updateData: any = {};
         if (sanitizedEmail) updateData.email = sanitizedEmail;
         if (password) updateData.password = password;
@@ -85,6 +81,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
         success: false, 
         error: error.message 
-    }, { status: 200 }); 
+    });
   }
 }

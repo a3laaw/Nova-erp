@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Info } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -16,9 +15,8 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v3.0):
- * تدعم الآن "الدخول بالهوية المبسطة" (Username Login).
- * يقوم النظام آلياً بتحويل اسم المستخدم إلى البريد السيادي المعقد خلف الكواليس.
+ * بوابة العبور السيادية (Sovereign Gateway v3.5):
+ * تم تحصينها بمحرك تشخيص أعطال الأمان (Auth Diagnosis Engine).
  */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
@@ -26,11 +24,11 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [identifier, setIdentifier] = useState(''); // يمكن أن يكون اسم مستخدم أو بريد
+  const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
+  const [diagnosisMessage, setDiagnosisMessage] = useState<string | null>(null);
 
-  // 🛡️ محرك التوجيه التلقائي المعتمد على الحالة السيادية
   useEffect(() => {
     if (user && !loading) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -43,11 +41,12 @@ export default function LoginPage() {
     if (localLoading) return;
     
     setLocalLoading(true);
+    setDiagnosisMessage(null);
+
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك تحويل الهوية (Identity Resolution Engine)
-        // إذا لم يحتوي المدخل على @، نعتبره اسم مستخدم ونبحث عنه في الفهرس العالمي
+        // 1. محرك تحويل الهوية من الفهرس العالمي
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -55,15 +54,33 @@ export default function LoginPage() {
                 limit(1)
             );
             const snap = await getDocs(globalQuery);
-            if (snap.empty) {
-                throw new Error('اسم المستخدم هذا غير مسجل في المنظومة.');
-            }
+            if (snap.empty) throw new Error('اسم المستخدم هذا غير مسجل في المنظومة.');
             finalEmail = snap.docs[0].data().email;
         }
 
+        // 2. محاولة الدخول الفعلية
         await login(finalEmail, password);
+
     } catch (error: any) {
         setLocalLoading(false);
+        const errorCode = error.code || '';
+        
+        // 🔍 محرك تشخيص الأعطال السيادي
+        if (errorCode.includes('user-not-found') || error.message?.includes('غير صحيح')) {
+            // فحص هل الحساب موجود في Firestore ولكنه مفقود من Auth؟
+            if (firestore) {
+                const checkEmail = identifier.includes('@') ? identifier : null;
+                const globalQuery = checkEmail 
+                    ? query(collection(firestore, 'global_users'), where('email', '==', checkEmail), limit(1))
+                    : query(collection(firestore, 'global_users'), where('username', '==', identifier), limit(1));
+                
+                const snap = await getDocs(globalQuery);
+                if (!snap.empty) {
+                    setDiagnosisMessage('⚠️ تنبيه أمني: حسابك موجود في قاعدة البيانات ولكن لم يتم تفعيله في نظام الأمان (Auth). يرجى التواصل مع المدير لتفعيله يدوياً.');
+                }
+            }
+        }
+
         toast({
             variant: 'destructive',
             title: 'خطأ في الدخول',
@@ -74,7 +91,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      {/* الخلفية اللؤلؤية المتحركة */}
       <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 50%, #818cf8 0%, transparent 50%)' }} />
       
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
@@ -90,6 +106,13 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
+            {diagnosisMessage && (
+                <Alert variant="destructive" className="rounded-2xl bg-red-50 border-red-200 animate-bounce">
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-[10px] font-black leading-relaxed">{diagnosisMessage}</AlertDescription>
+                </Alert>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-5">
                 <div className="grid gap-2">
                     <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد</Label>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -14,7 +13,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
     FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
-    Wrench, DatabaseZap
+    Wrench, DatabaseZap, AlertCircle
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -90,32 +89,22 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
-  /**
-   * 🛠️ محرك ترميم البيانات القديمة (The Sovereign Repair Engine)
-   */
   const handleRepairData = async () => {
     if (!firestore || isRepairing) return;
     setIsRepairing(true);
     try {
         const batch = writeBatch(firestore);
         const companiesSnap = await getDocs(collection(firestore, 'companies'));
-        
         let repairCount = 0;
-
         for (const cDoc of companiesSnap.docs) {
             const data = cDoc.data();
             const companyId = cDoc.id;
-
-            // 1. حقن مصفوفة Firebase
             if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
                 batch.update(cDoc.ref, { firebaseConfig: MASTER_FIREBASE_CONFIG });
                 repairCount++;
             }
-
-            // 2. ضمان وجود المدير في الفهرس العالمي
             const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
             const globalSnap = await getDocs(globalQuery);
-            
             if (globalSnap.empty && data.adminEmail) {
                 const newGlobalRef = doc(collection(firestore, 'global_users'));
                 batch.set(newGlobalRef, {
@@ -128,9 +117,8 @@ export default function DeveloperDashboard() {
                 repairCount++;
             }
         }
-
         await batch.commit();
-        toast({ title: '✅ تم الترميم السيادي', description: `تم تصحيح وتحديث ${repairCount} حقل في البيانات.` });
+        toast({ title: '✅ تم الترميم السيادي', description: `تم تصحيح وتحديث ${repairCount} حقل.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل الترميم', description: e.message });
     } finally {
@@ -162,7 +150,7 @@ export default function DeveloperDashboard() {
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
-      // 1. تفعيل حساب الأمان (Auth)
+      // 1. محاولة تفعيل الحساب في نظام الأمان (Firebase Auth)
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -175,13 +163,24 @@ export default function DeveloperDashboard() {
       });
       
       const authResult = await createRes.json();
-      if (!authResult.success) throw new Error(authResult.error);
+      
+      // ⚠️ تنبيه هام إذا تعذر الربط الحقيقي
+      if (!authResult.success) {
+          if (authResult.error === 'MISSING_SERVICE_ACCOUNT') {
+              toast({ 
+                variant: 'destructive', 
+                title: 'تنبيه: الأمان غير مرتبط', 
+                description: 'تم إنشاء البيانات في قاعدة البيانات فقط. يرجى إنشاء حساب البريد يدوياً في Firebase Console لتتمكن من الدخول.' 
+              });
+          } else {
+              throw new Error(authResult.error);
+          }
+      }
 
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
-      // 2. تأسيس ملف الشركة
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -192,16 +191,17 @@ export default function DeveloperDashboard() {
         subscriptionType: 'trial',
         trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5,
-        firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
         firebaseConfig: MASTER_FIREBASE_CONFIG, 
         createdAt: serverTimestamp(),
       });
 
-      // 3. تأسيس ملف المستخدم الإداري الأول
-      const userRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
+      // استخدام الـ UID الراجع من الـ API أو توليد معرف مؤقت في حال الفشل
+      const finalUid = authResult.uid || `TEMP_${Date.now()}`;
+
+      const userRef = doc(firestore, `companies/${companyId}/users`, finalUid);
       batch.set(userRef, {
-        id: authResult.uid,
-        uid: authResult.uid,
+        id: finalUid,
+        uid: finalUid,
         fullName: req.contactName,
         email: sovereignEmail,
         username: safeUsername,
@@ -211,13 +211,12 @@ export default function DeveloperDashboard() {
         createdAt: serverTimestamp()
       });
 
-      // 4. تفعيل المفتاح الذهبي في الفهرس العالمي
       const globalRef = doc(collection(firestore, 'global_users'));
       batch.set(globalRef, {
         email: sovereignEmail,
         username: safeUsername,
         companyId: companyId,
-        uid: authResult.uid,
+        uid: finalUid,
         createdAt: serverTimestamp(),
       });
 
@@ -228,7 +227,7 @@ export default function DeveloperDashboard() {
       });
 
       await batch.commit();
-      toast({ title: '✅ تفعيل ناجح', description: `المنشأة جاهزة للعبور باسم المستخدم: ${safeUsername}` });
+      toast({ title: '✅ تم التفعيل', description: `المنشأة جاهزة للعبور باسم المستخدم: ${safeUsername}` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -345,7 +344,7 @@ export default function DeveloperDashboard() {
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
                 <AlertDialogHeader>
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><ShieldAlert className="h-10 w-10"/></div>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldAlert className="h-10 w-10"/></div>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الإنهاء السيادي؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed">أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. <br/><br/> <span className="font-black text-red-600 underline">تحذير: لا يمكن استعادة هذه المنشأة بعد الحذف.</span></AlertDialogDescription>
                 </AlertDialogHeader>
