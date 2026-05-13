@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API سيادي لإدارة حسابات المستخدمين عابرة المنشآت.
- * تم تحديثه ليكون صريحاً جداً بشأن حالة ملف الأمان المفقود.
+ * @fileOverview API الأمان السيادي الموحد.
+ * تم تحديثه ليدعم توليد "رابط تفعيل" (Invite Link) لتمكين الموظف من الدخول وتعيين كلمة مروره.
  */
 
 export async function POST(request: NextRequest) {
@@ -24,12 +24,11 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // 🛡️ إذا لم يتوفر ملف الأمان، نرفض العملية ونطلب التفعيل اليدوي بدلاً من المحاكاة الصامتة
     if (!hasServiceAccount) {
         return NextResponse.json({ 
             success: false, 
             error: "MISSING_SERVICE_ACCOUNT",
-            message: "ملف الأمان السيادي (service-account.json) مفقود أو فارغ. يرجى إنشاء الحساب يدوياً في Firebase Console." 
+            message: "ملف الأمان (service-account.json) مفقود. يرجى إضافة المستخدم يدوياً في Console." 
         });
     }
 
@@ -42,45 +41,46 @@ export async function POST(request: NextRequest) {
     let userRecord;
     const sanitizedEmail = email?.toLowerCase().trim();
 
-    if (action === 'create') {
+    if (action === 'create' || action === 'activate_invite') {
         try {
             userRecord = await auth.createUser({
                 email: sanitizedEmail,
-                password: password,
+                password: password || Math.random().toString(36).slice(-10),
                 displayName: displayName || 'Nova User',
                 emailVerified: true,
             });
         } catch (e: any) {
             if (e.code === 'auth/email-already-exists') {
                 userRecord = await auth.getUserByEmail(sanitizedEmail);
-                await auth.updateUser(userRecord.uid, { 
-                    password: password,
-                    displayName: displayName || userRecord.displayName
-                });
             } else {
                 throw e;
             }
         }
-    } else if (action === 'update_full' && uid) {
-        const updateData: any = {};
-        if (sanitizedEmail) updateData.email = sanitizedEmail;
-        if (password) updateData.password = password;
-        if (displayName) updateData.displayName = displayName;
-        
-        userRecord = await auth.updateUser(uid, updateData);
+
+        // 🔗 توليد رابط "تغيير كلمة المرور" ليعمل كـ "رابط تفعيل"
+        const inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
+
+        return NextResponse.json({ 
+            success: true, 
+            uid: userRecord?.uid,
+            inviteLink,
+            message: "تم تأسيس الحساب سحابياً وتوليد رابط التفعيل." 
+        });
     }
 
-    return NextResponse.json({ 
-        success: true, 
-        uid: userRecord?.uid,
-        message: "تمت مزامنة بيانات الهوية السيادية بنجاح." 
-    });
+    if (action === 'update_full' && uid) {
+        userRecord = await auth.updateUser(uid, { 
+            email: sanitizedEmail,
+            password: password || undefined,
+            displayName: displayName
+        });
+        return NextResponse.json({ success: true, uid: userRecord.uid });
+    }
+
+    return NextResponse.json({ success: false, error: "Unknown action" });
 
   } catch (error: any) {
-    console.error("Manage User API Error:", error);
-    return NextResponse.json({ 
-        success: false, 
-        error: error.message 
-    });
+    console.error("Auth API Error:", error);
+    return NextResponse.json({ success: false, error: error.message });
   }
 }

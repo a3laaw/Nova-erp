@@ -15,11 +15,11 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v4.5):
- * تدعم الدخول بـ "اسم المستخدم" وتوفر حلولاً تشخيصية للأعطال السحابية.
+ * بوابة العبور السيادية (Sovereign Gateway v5.0):
+ * تدعم الدخول بـ "اسم المستخدم" مع محرك تشخيص أعطال سحابي ذكي.
  */
 export default function LoginPage() {
-  const { login, user, loading, error: authError } = useAuth();
+  const { login, user, loading } = useAuth();
   const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
@@ -65,7 +65,7 @@ export default function LoginPage() {
     } catch (error: any) {
         setLocalLoading(false);
         
-        // 🔍 محرك تشخيص أعطال الأمان المطور
+        // 🔍 محرك تشخيص أعطال الأمان
         if (firestore) {
             const checkEmail = identifier.includes('@') ? identifier.trim().toLowerCase() : null;
             const diagQuery = checkEmail 
@@ -76,7 +76,7 @@ export default function LoginPage() {
             if (!snap.empty) {
                 const userData = snap.docs[0].data();
                 setDiagnosis({
-                    message: 'بياناتك موجودة في السجلات، ولكن الحساب لم يتم تفعيله سحابياً (Firebase Auth). يرجى إضافة هذا البريد يدوياً في لوحة تحكم Firebase وتعيين كلمة المرور.',
+                    message: 'تم العثور على حسابك، ولكنه غير مفعل سحابياً. يرجى إضافة هذا البريد يدوياً في Firebase Console أو استخدام رابط التفعيل المرسل من المدير.',
                     email: userData.email
                 });
             } else {
@@ -112,7 +112,7 @@ export default function LoginPage() {
             {diagnosis && (
                 <Alert variant="destructive" className="rounded-2xl bg-red-50 border-red-200 animate-in fade-in slide-in-from-top-2">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">حل مشكلة الدخول</AlertTitle>
+                    <AlertTitle className="text-[11px] font-black">تشخيص أعطال العبور</AlertTitle>
                     <AlertDescription className="text-[10px] font-black leading-relaxed space-y-2 mt-1">
                         <p>{diagnosis.message}</p>
                         {diagnosis.email && (
