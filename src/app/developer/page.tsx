@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, limit, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, limit, updateDoc, deleteField, deleteDoc } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
     Info, ExternalLink, RotateCcw, Activity, Rocket, UserPlus, Mail, Phone, Lock, RefreshCw, Send, Check
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
@@ -65,7 +66,7 @@ export default function DeveloperDashboard() {
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
 
-  // --- ميزات تفعيل الحسابات الجديدة ---
+  // --- ميزات تفعيل الحسابات الجديدة (The Activation Hub) ---
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
@@ -148,12 +149,62 @@ export default function DeveloperDashboard() {
     toast({ title: '📋 تم النسخ' });
   };
 
+  const handleRepairData = async () => {
+    if (!firestore || !companies) return;
+    setIsProcessing('REPAIR');
+    try {
+        const batch = writeBatch(firestore);
+        const globalUsersRef = collection(firestore, 'global_users');
+        
+        for (const company of companies) {
+            const companyRef = doc(firestore, 'companies', company.id!);
+            
+            // 1. حقن المصفوفة المفقودة
+            batch.update(companyRef, {
+                firebaseConfig: {
+                    apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
+                    authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
+                    projectId: "studio-8039389980-3d2d0",
+                    storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
+                    messagingSenderId: "828494117254",
+                    appId: "1:828494117254:web:d0c31facd0d0bb2f341407"
+                },
+                updatedAt: serverTimestamp()
+            });
+
+            // 2. تحديث الفهرس العالمي
+            if (company.adminEmail) {
+                const userQuery = query(globalUsersRef, where('email', '==', company.adminEmail));
+                const userSnap = await getDocs(userQuery);
+                if (userSnap.empty) {
+                    batch.set(doc(globalUsersRef), {
+                        email: company.adminEmail,
+                        username: company.adminEmail.split('@')[0],
+                        companyId: company.id,
+                        role: 'Admin',
+                        createdAt: serverTimestamp()
+                    });
+                }
+            }
+        }
+        await batch.commit();
+        toast({ title: 'نجاح الترميم', description: 'تمت مزامنة كافة الشركات القديمة وتأمين العبور.' });
+    } finally { setIsProcessing(null); }
+  };
+
   const handleDeleteCompany = async () => {
     if (!companyToDelete || !firestore) return;
     setIsProcessing(companyToDelete.id!);
     try {
-        await deleteDoc(doc(firestore, 'companies', companyToDelete.id!));
-        toast({ title: 'نجاح التصفية', description: 'تم حذف المنشأة من قاعدة البيانات.' });
+        const batch = writeBatch(firestore);
+        batch.delete(doc(firestore, 'companies', companyToDelete.id!));
+        
+        const globalUsersQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
+        const globalSnap = await getDocs(globalUsersQuery);
+        globalSnap.forEach(d => batch.delete(d.ref));
+
+        await batch.commit();
+        toast({ title: 'نجاح التصفية', description: 'تم حذف المنشأة وهوياتها بالكامل.' });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ في الحذف' });
     } finally {
@@ -182,11 +233,24 @@ export default function DeveloperDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-4">
+                        <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-white/20 text-white hover:bg-white/10">
+                            {isProcessing === 'REPAIR' ? <Loader2 className="animate-spin h-5 w-5" /> : <Wrench className="h-5 w-5" />} ترميم البيانات القديمة
+                        </Button>
                         <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all"><PlusCircle className="h-6 w-6" /> تأسيس منشأة</Button>
                     </div>
                 </div>
             </CardHeader>
         </Card>
+
+        {systemStatus === 'MANUAL_MODE' && (
+            <Alert className="rounded-3xl border-2 border-red-500 bg-red-50/50 p-6 animate-in slide-in-from-top-4">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+                <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة متوقف!</AlertTitle>
+                <AlertDescription className="text-red-700 font-bold text-sm leading-relaxed mt-2">
+                    لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بـ "محاكاة التفعيل" في قاعدة البيانات، ولكن يجب عليك إنشاء حساب الأمان (Auth) يدوياً في Firebase Console لكل منشأة جديدة.
+                </AlertDescription>
+            </Alert>
+        )}
 
         <Tabs defaultValue="requests" className="w-full">
             <TabsList className="bg-white/10 p-1 rounded-2xl border border-white/10 mb-6 h-14">
@@ -218,7 +282,7 @@ export default function DeveloperDashboard() {
                             {requestsLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-8 w-8 mx-auto" /></TableCell></TableRow> :
                             requests.length === 0 ? <TableRow><TableCell colSpan={4} className="h-64 text-center opacity-30 italic font-black text-xl">لا توجد طلبات معلقة.</TableCell></TableRow> :
                             requests.map(req => (
-                                <TableRow key={req.id} className="h-24 border-slate-100 group transition-all">
+                                <TableRow key={req.id} className="h-24 group transition-all border-b">
                                     <TableCell className="px-10">
                                         <div className="flex flex-col">
                                             <span className="font-black text-xl text-[#1e1b4b]">{req.companyName}</span>
@@ -254,7 +318,7 @@ export default function DeveloperDashboard() {
             </TabsContent>
 
             <TabsContent value="companies">
-                <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
+                <Card className="rounded-[3.5rem] border-none shadow-xl overflow-hidden bg-white/95">
                     <CardHeader className="bg-slate-50 border-b p-8 px-12 flex flex-row justify-between items-center">
                         <div className="relative w-full max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-950 opacity-40" />
@@ -271,7 +335,7 @@ export default function DeveloperDashboard() {
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
-                                    <TableRow key={company.id} className="h-24 border-slate-100 group transition-all">
+                                    <TableRow key={company.id} className="h-24 border-slate-100 group transition-all border-b">
                                         <TableCell className="px-12">
                                             <div className="flex items-center gap-4">
                                                 <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-sm"><Building2 className="h-6 w-6" /></div>
