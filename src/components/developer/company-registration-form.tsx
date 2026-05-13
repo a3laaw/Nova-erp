@@ -32,7 +32,8 @@ import {
   Eye,
   EyeOff,
   Copy,
-  AlertTriangle
+  AlertTriangle,
+  Cloud
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -55,8 +56,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
   const isEditing = !!company;
   const savingRef = useRef(false);
 
-  // تخزين البيانات الأصلية للمقارنة والمزامنة
-  const originalEmailRef = useRef('');
   const adminUidRef = useRef('');
 
   const [formData, setFormData] = useState({
@@ -79,7 +78,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
   useEffect(() => {
     if (isOpen && company && masterFirestore) {
-        // جلب الـ UID الخاص بالمدير من الفهرس العالمي للمزامنة
         const fetchAdminUid = async () => {
             const q = query(collection(masterFirestore, 'global_users'), where('email', '==', company.adminEmail));
             const snap = await getDocs(q);
@@ -94,7 +92,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
   useEffect(() => {
     if (isOpen) {
         if (company) {
-            originalEmailRef.current = company.adminEmail || '';
             setFormData({
                 name: company.name || '',
                 nameEn: company.nameEn || '',
@@ -144,8 +141,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     savingRef.current = true;
     setIsSaving(true);
     try {
-      const emailChanged = formData.adminEmail !== originalEmailRef.current;
-      
       // 1. تحديث حساب Firebase Auth عبر الـ API الموحد
       const authResponse = await fetch('/api/manage-tenant-user', {
           method: 'POST',
@@ -195,12 +190,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           ...(!isEditing && { createdAt: serverTimestamp() })
       }), { merge: true });
 
-      // 3. تحديث الفهرس العالمي (Global Index) إذا تغير الإيميل
-      if (emailChanged && isEditing) {
-          const oldIndexQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', originalEmailRef.current));
-          const oldIndexSnap = await getDocs(oldIndexQuery);
-          oldIndexSnap.forEach(d => batch.delete(d.ref));
-      }
+      // 3. تحديث الفهرس العالمي (Global Index)
+      const globalIndexQuery = query(collection(masterFirestore, 'global_users'), where('uid', '==', authResult.uid));
+      const globalIndexSnap = await getDocs(globalIndexQuery);
+      globalIndexSnap.forEach(d => batch.delete(d.ref));
 
       const globalIndexRef = doc(collection(masterFirestore, 'global_users'));
       batch.set(globalIndexRef, {
@@ -226,13 +219,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
       }, { merge: true });
 
       await batch.commit();
-      toast({ 
-          title: '✅ تم المزامنة السيادية', 
-          description: emailChanged ? 'تم تحديث الإيميل في كافة طبقات النظام بنجاح.' : 'تم حفظ التغييرات بنجاح.' 
-      });
+      toast({ title: '✅ تم الحفظ والمزامنة' });
       onClose();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'خطأ في المزامنة', description: error.message });
+      toast({ variant: 'destructive', title: 'خطأ', description: error.message });
     } finally {
       setIsSaving(false);
       savingRef.current = false;

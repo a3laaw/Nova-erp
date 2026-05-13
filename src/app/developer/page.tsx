@@ -4,15 +4,16 @@ import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc, Timestamp } from 'firebase/firestore';
-import type { Company, CompanyRequest } from '@/lib/types';
+import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
+import type { Company, CompanyRequest, UserProfile } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
-    FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2
+    FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
+    Wrench, DatabaseZap
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -47,7 +48,7 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
-// 🛡️ مصفوفة الحقن السيادي (Master Firebase Matrix)
+// 🛡️ مصفوفة الحقن السيادي الموحدة (Master Firebase Matrix)
 const MASTER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
   authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
@@ -69,6 +70,7 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
+  const [isRepairing, setIsRepairing] = useState(false);
 
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
@@ -86,6 +88,58 @@ export default function DeveloperDashboard() {
     }
     return processed;
   }, [rawCompanies, searchQuery]);
+
+  /**
+   * 🛠️ محرك ترميم البيانات القديمة (The Sovereign Repair Engine)
+   * يقوم بتطبيق المعايير الجديدة على كافة المنشآت الحالية آلياً.
+   */
+  const handleRepairData = async () => {
+    if (!firestore || isRepairing) return;
+    setIsRepairing(true);
+    try {
+        const batch = writeBatch(firestore);
+        const companiesSnap = await getDocs(collection(firestore, 'companies'));
+        
+        let repairCount = 0;
+
+        for (const cDoc of companiesSnap.docs) {
+            const data = cDoc.data();
+            const companyId = cDoc.id;
+
+            // 1. حقن مصفوفة Firebase إذا كانت ناقصة
+            if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
+                batch.update(cDoc.ref, { firebaseConfig: MASTER_FIREBASE_CONFIG });
+                repairCount++;
+            }
+
+            // 2. ضمان وجود المدير في الفهرس العالمي (Global User Index)
+            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
+            const globalSnap = await getDocs(globalQuery);
+            
+            if (globalSnap.empty && data.adminEmail) {
+                const newGlobalRef = doc(collection(firestore, 'global_users'));
+                batch.set(newGlobalRef, {
+                    email: data.adminEmail,
+                    username: data.adminEmail.split('@')[0],
+                    companyId: companyId,
+                    role: 'Admin',
+                    createdAt: serverTimestamp()
+                });
+                repairCount++;
+            }
+        }
+
+        await batch.commit();
+        toast({ 
+            title: '✅ تم الانتهاء من الترميم السيادي', 
+            description: `تم تصحيح وتحديث ${repairCount} حقل في البيانات القديمة لتتوافق مع المعايير الجديدة.` 
+        });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل الترميم', description: e.message });
+    } finally {
+        setIsRepairing(false);
+    }
+  };
 
   const handleSwitchToCompany = async (company: Company) => {
     if (!firestore || !currentUser || isProcessing) return;
@@ -130,7 +184,7 @@ export default function DeveloperDashboard() {
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
-      // 2. تأسيس ملف الشركة مع الحقن الآلي للمصفوفة السحابية (أتمتة طلب المستخدم)
+      // 2. تأسيس ملف الشركة مع الحقن الآلي للمصفوفة السحابية والربط الزمني (7 أيام)
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -141,7 +195,6 @@ export default function DeveloperDashboard() {
         subscriptionType: 'trial',
         trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5,
-        // حقن مصفوفة الـ Firebase آلياً من النظام (المشكلة الثالثة)
         firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
         firebaseConfig: MASTER_FIREBASE_CONFIG, 
         createdAt: serverTimestamp(),
@@ -215,9 +268,20 @@ export default function DeveloperDashboard() {
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والمزامنة الهوياتية.</CardDescription>
                         </div>
                     </div>
-                    <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700">
-                        <PlusCircle className="h-6 w-6" /> تأسيس منشأة جديدة
-                    </Button>
+                    <div className="flex gap-4">
+                        <Button 
+                            onClick={handleRepairData} 
+                            disabled={isRepairing} 
+                            variant="outline" 
+                            className="h-14 px-8 rounded-2xl font-black text-base gap-3 border-indigo-400 text-indigo-100 hover:bg-indigo-600/20"
+                        >
+                            {isRepairing ? <Loader2 className="animate-spin h-6 w-6" /> : <Wrench className="h-6 w-6" />}
+                            ترميم البيانات القديمة
+                        </Button>
+                        <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700">
+                            <PlusCircle className="h-6 w-6" /> تأسيس منشأة جديدة
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
         </Card>
