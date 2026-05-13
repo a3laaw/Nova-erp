@@ -3,17 +3,16 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, limit, updateDoc, deleteField, deleteDoc } from 'firebase/firestore';
+import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, deleteField } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
-    MoreHorizontal, ArrowRightLeft, 
-    Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
+    MoreHorizontal, Settings, Trash2, ShieldAlert, CheckCircle2,
     Wrench, AlertCircle, ShieldCheck, ShieldX, Copy, Key,
-    Info, ExternalLink, RotateCcw, Activity, Rocket, UserPlus, Mail, Phone, Lock, RefreshCw, Send, Check
+    Activity, Rocket, UserPlus, Lock, Send, X, Phone, Mail
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -158,8 +157,6 @@ export default function DeveloperDashboard() {
         
         for (const company of companies) {
             const companyRef = doc(firestore, 'companies', company.id!);
-            
-            // 1. حقن المصفوفة المفقودة
             batch.update(companyRef, {
                 firebaseConfig: {
                     apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
@@ -172,7 +169,6 @@ export default function DeveloperDashboard() {
                 updatedAt: serverTimestamp()
             });
 
-            // 2. تحديث الفهرس العالمي
             if (company.adminEmail) {
                 const userQuery = query(globalUsersRef, where('email', '==', company.adminEmail));
                 const userSnap = await getDocs(userQuery);
@@ -188,7 +184,7 @@ export default function DeveloperDashboard() {
             }
         }
         await batch.commit();
-        toast({ title: 'نجاح الترميم', description: 'تمت مزامنة كافة الشركات القديمة وتأمين العبور.' });
+        toast({ title: 'نجاح الترميم', description: 'تمت مزامنة كافة الشركات والعبور.' });
     } finally { setIsProcessing(null); }
   };
 
@@ -198,11 +194,9 @@ export default function DeveloperDashboard() {
     try {
         const batch = writeBatch(firestore);
         batch.delete(doc(firestore, 'companies', companyToDelete.id!));
-        
         const globalUsersQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
         const globalSnap = await getDocs(globalUsersQuery);
         globalSnap.forEach(d => batch.delete(d.ref));
-
         await batch.commit();
         toast({ title: 'نجاح التصفية', description: 'تم حذف المنشأة وهوياتها بالكامل.' });
     } catch (e) {
@@ -229,12 +223,12 @@ export default function DeveloperDashboard() {
                                     <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> التفعيل يدوي</Badge>
                                 )}
                             </CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، الأتمتة، والترميم السحابي الموحد.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات والاحتضان السحابي الموحد.</CardDescription>
                         </div>
                     </div>
                     <div className="flex gap-4">
                         <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-white/20 text-white hover:bg-white/10">
-                            {isProcessing === 'REPAIR' ? <Loader2 className="animate-spin h-5 w-5" /> : <Wrench className="h-5 w-5" />} ترميم البيانات القديمة
+                            {isProcessing === 'REPAIR' ? <Loader2 className="animate-spin h-5 w-5" /> : <Wrench className="h-5 w-5" />} ترميم البيانات
                         </Button>
                         <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all"><PlusCircle className="h-6 w-6" /> تأسيس منشأة</Button>
                     </div>
@@ -411,7 +405,7 @@ export default function DeveloperDashboard() {
                                             onClick={generateStrongPassword}
                                             className="h-12 rounded-xl border-2 font-bold gap-2 text-primary"
                                         >
-                                            <Sparkles className="h-4 w-4" /> توليد قوية
+                                            <PlusCircle className="h-4 w-4" /> توليد قوية
                                         </Button>
                                     </div>
                                 </div>
@@ -464,7 +458,7 @@ export default function DeveloperDashboard() {
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق الغرفة السيادية</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إإغلاق الغرفة السيادية</Button>
                     )}
                 </DialogFooter>
             </DialogContent>

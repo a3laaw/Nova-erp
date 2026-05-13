@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/request';
+import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, Timestamp } from 'firebase/admin/firestore';
@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد (V12.0 - Fully Automated Activation Flow).
- * تم تحصينه لدعم تفعيل طلبات الديمو وإنشاء الـ Tenants والمستخدمين آلياً.
+ * @fileOverview API الأمان السيادي الموحد (V13.0 - Fully Isolated Multi-tenancy).
+ * تم تحديثه لدعم حفظ طلبات الانضمام (add_request) والتفعيل من قبل الأدمن.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -23,7 +23,7 @@ const MASTER_FIREBASE_CONFIG = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, email, username, companyName, contactName, phone, activity, employeeCountRange, password, requestId } = body;
+    const { action, email, username, companyName, contactName, phone, activity, employeeCountRange, password, requestId, uid, displayName } = body;
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     let hasServiceAccount = false;
@@ -40,6 +40,11 @@ export async function POST(request: NextRequest) {
         }
     }
 
+    if (getApps().length === 0 && hasServiceAccount) {
+        const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
+        initializeApp({ credential: cert(sa) });
+    }
+
     if (action === 'check') {
         return NextResponse.json({ 
             success: true, 
@@ -48,11 +53,32 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    if (getApps().length === 0 && hasServiceAccount) {
-        const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
-        initializeApp({ credential: cert(sa) });
+    // --- 1. حفظ طلب الانضمام (بوابة العميل) ---
+    if (action === 'add_request') {
+        const adminApp = getApps().length > 0 ? getApps()[0] : null;
+        if (!adminApp && !hasServiceAccount) {
+            // إذا لم يتوفر ملف الأمان، نستخدم الطريقة اليدوية لحفظ الطلب عبر Firestore (إذا كان مسموحاً)
+            // لكن هنا نفضل التنبيه بأن السيرفر يحتاج تهيئة
+            throw new Error("سيرفر المنظومة يحتاج لتهيئة ملف الأمان (service-account.json) لاستقبال الطلبات.");
+        }
+        
+        const db = getFirestore();
+        await db.collection('company_requests').add({
+            companyName,
+            activity,
+            employeeCountRange,
+            contactName,
+            email: email.toLowerCase().trim(),
+            username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
+            phone,
+            status: 'pending',
+            createdAt: FieldValue.serverTimestamp()
+        });
+
+        return NextResponse.json({ success: true, message: "تم إرسال طلب الانضمام بنجاح." });
     }
 
+    // --- 2. التفعيل السيادي (بوابة المطور) ---
     if (action === 'instant_setup') {
         if (!hasServiceAccount) throw new Error("محرك الأتمتة غير مفعل. يرجى رفع ملف الأمان أولاً.");
 
@@ -63,7 +89,7 @@ export async function POST(request: NextRequest) {
         const trialEndDate = new Date();
         trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-        // 1. إنشاء حساب المالك سحابياً
+        // أ. إنشاء حساب المالك سحابياً
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -78,13 +104,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. تعيين الصلاحيات الماستر للمنشأة (Tenant ID)
+        // ب. تعيين الصلاحيات الماستر للمنشأة (Tenant ID)
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // 3. إنشاء وثيقة المنشأة السيادية
+        // ج. إنشاء وثيقة المنشأة السيادية
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
             id: companyId,
@@ -102,7 +128,7 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 4. إنشاء ملف المستخدم داخل المنشأة (The Owner Profile)
+        // د. إنشاء ملف المستخدم داخل المنشأة (The Owner Profile)
         const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
         await tenantUserRef.set({
             uid: userRecord.uid,
@@ -114,7 +140,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. تسجيل الهوية في الفهرس العالمي للدخول السريع
+        // هـ. تسجيل الهوية في الفهرس العالمي للدخول السريع
         const globalIndexRef = db.collection('global_users').doc();
         await globalIndexRef.set({
             email: sanitizedEmail,
@@ -124,7 +150,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث طلب الديمو الأصلي
+        // و. تحديث طلب الديمو الأصلي
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
@@ -147,7 +173,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unknown action" });
 
   } catch (error: any) {
-    console.error("Sovereign Instant Setup Error:", error);
+    console.error("Sovereign Multi-tenant Setup Error:", error);
     return NextResponse.json({ success: false, error: error.message });
   }
 }

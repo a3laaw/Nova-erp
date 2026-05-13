@@ -13,24 +13,23 @@ import {
     CheckCircle2,
     Mail,
     User,
-    Link2,
-    Copy,
     Sparkles,
-    ShieldCheck
+    MessageSquare,
+    Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * بوابة التأسيس الفوري (Instant Sovereign Setup v10.0)
- * التفعيل يتم آلياً في أجزاء من الثانية دون تدخل الأدمن.
+ * بوابة طلب الانضمام (Sovereign Request Gateway v11.0)
+ * تم ترميمها لتكون "طلب ديمو" بانتظار تفعيل الأدمن من الغرفة السيادية.
  */
 export default function RegisterPage() {
   const { toast } = useToast();
   
   const [isSaving, setIsSaving] = useState(false);
-  const [setupResult, setSetupResult] = useState<{ name: string, link: string } | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const [formData, setFormData] = useState({
     companyName: '',
@@ -56,7 +55,7 @@ export default function RegisterPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                action: 'instant_setup',
+                action: 'add_request',
                 ...formData
             })
         });
@@ -64,57 +63,46 @@ export default function RegisterPage() {
         const result = await response.json();
         
         if (result.success) {
-            setSetupResult({
-                name: formData.companyName,
-                link: result.inviteLink
-            });
-            toast({ title: '✅ تم تأسيس منشأتك بنجاح' });
+            setIsSubmitted(true);
+            toast({ title: '✅ تم إرسال طلبك بنجاح' });
         } else {
-            throw new Error(result.message || result.error);
+            throw new Error(result.error);
         }
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ في التأسيس', description: error.message || 'يرجى مراجعة الدعم الفني.' });
+        toast({ variant: 'destructive', title: 'خطأ في الإرسال', description: error.message || 'يرجى مراجعة الدعم الفني.' });
     } finally {
         setIsSaving(false);
     }
   };
 
-  if (setupResult) {
+  if (isSubmitted) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
             <Card className="w-full max-w-lg rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
-                <div className="bg-green-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-green-500/40 shadow-inner">
-                    <CheckCircle2 className="h-16 w-16 text-green-600" />
+                <div className="bg-indigo-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-indigo-500/40 shadow-inner">
+                    <Clock className="h-16 w-16 text-indigo-600 animate-pulse" />
                 </div>
-                <h2 className="text-3xl font-black text-[#1e1b4b] mb-2 tracking-tighter">مبروك! منشأتك جاهزة</h2>
+                <h2 className="text-3xl font-black text-[#1e1b4b] mb-2 tracking-tighter">طلبك قيد المراجعة السيادية</h2>
                 <p className="text-[#1e1b4b]/70 font-bold mb-8 leading-relaxed">
-                    تم تأسيس **{setupResult.name}** سحابياً وتفعيل فترة ديمو 7 أيام.
+                    شكراً لاهتمامك بـ Nova ERP. تم استلام بيانات منشأة **{formData.companyName}**.
                     <br/>
-                    استخدم الرابط أدناه لتفعيل حسابك والدخول فوراً.
+                    سيقوم فريقنا بمراجعة الطلب وتفعيل حسابك خلال دقائق، وستصلك رسالة التفعيل على بريدك الإلكتروني.
                 </p>
                 
-                <div className="p-6 bg-white/60 rounded-3xl border-2 border-dashed border-green-500/30 mb-8 space-y-4">
-                    <p className="text-xs font-black text-green-700 uppercase tracking-widest flex items-center justify-center gap-2">
-                        <Sparkles className="h-4 w-4" /> رابط التفعيل السيادي
+                <div className="p-6 bg-white/60 rounded-3xl border-2 border-dashed border-indigo-500/30 mb-8 space-y-2">
+                    <p className="text-xs font-black text-indigo-700 uppercase tracking-widest flex items-center justify-center gap-2">
+                        <Sparkles className="h-4 w-4" /> ماذا يحدث الآن؟
                     </p>
-                    <div className="flex gap-2">
-                        <Input readOnly value={setupResult.link} className="h-11 rounded-xl bg-white border-2 font-mono text-[10px] text-left" />
-                        <Button 
-                            onClick={() => { navigator.clipboard.writeText(setupResult.link); toast({ title: '📋 تم النسخ' }); }}
-                            className="bg-green-600 text-white rounded-xl h-11 px-4"
-                        >
-                            <Copy className="h-4 w-4" />
-                        </Button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-medium italic">تم إرسال نسخة أيضاً إلى {formData.email}</p>
+                    <p className="text-[11px] text-muted-foreground font-medium italic leading-loose">
+                        1. يقوم المدير باعتماد طلبك. <br/>
+                        2. ستصلك دعوة رسمية لتعيين كلمة المرور. <br/>
+                        3. يمكنك الدخول وبدء العمل فوراً.
+                    </p>
                 </div>
 
                 <div className="flex flex-col gap-3">
-                    <Button asChild className="h-14 rounded-2xl bg-[#1e1b4b] text-white font-black hover:bg-black shadow-xl">
-                        <a href={setupResult.link}>تفعيل الحساب والدخول الآن</a>
-                    </Button>
-                    <Button asChild variant="ghost" className="text-[#1e1b4b] font-bold">
-                        <Link href="/">العودة للرئيسية</Link>
+                    <Button asChild variant="outline" className="h-14 rounded-2xl border-2 border-[#1e1b4b] text-[#1e1b4b] font-black hover:bg-indigo-50 shadow-sm">
+                        <Link href="/">العودة لصفحة الدخول</Link>
                     </Button>
                 </div>
             </Card>
@@ -128,10 +116,10 @@ export default function RegisterPage() {
         <CardHeader className="py-10 px-10 border-b border-black/5 bg-white/20">
             <div className="flex justify-between items-center">
                 <div className="flex items-center gap-5">
-                    <div className="p-4 bg-[#1e1b4b] rounded-[2rem] shadow-xl"><Rocket className="h-8 w-8 text-white" /></div>
+                    <div className="p-4 bg-[#1e1b4b] rounded-[2rem] shadow-xl"><MessageSquare className="h-8 w-8 text-white" /></div>
                     <div className="text-right">
-                        <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">تأسيس منشأة فورية</CardTitle>
-                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">تأسيس سحابي فوري ومستقر 100%</CardDescription>
+                        <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">طلب انضمام للمنظومة</CardTitle>
+                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">تأسيس منشأة سحابية معزولة باحترافية SaaS</CardDescription>
                     </div>
                 </div>
                 <Button asChild variant="ghost" className="text-[#1e1b4b] hover:bg-white/40 rounded-xl gap-2 font-black h-10 px-4">
@@ -258,8 +246,8 @@ export default function RegisterPage() {
         </CardContent>
         <CardFooter className="p-8 border-t bg-black/5">
             <Button onClick={handleSubmit} disabled={isSaving} className="w-full h-16 rounded-[2rem] font-black text-xl gap-4 shadow-2xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-8 border-black/40 active:translate-y-1 active:border-b-0">
-                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6 text-green-400" />}
-                تأسيس المنشأة والدخول الآن
+                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Rocket className="h-6 w-6 text-green-400" />}
+                إرسال طلب الانضمام للتدقيق
             </Button>
         </CardFooter>
       </Card>
