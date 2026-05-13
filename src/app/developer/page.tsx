@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -48,7 +47,7 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
-// 🛡️ المصفوفة السحابية الماستر لحقن الشركات الجديدة
+// 🛡️ مصفوفة الحقن السيادي (Master Firebase Matrix)
 const MASTER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
   authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
@@ -97,26 +96,22 @@ export default function DeveloperDashboard() {
             body: JSON.stringify({ uid: currentUser.id, companyId: company.id, companyName: company.name })
         });
         if (clientAuth?.currentUser) await clientAuth.currentUser.getIdToken(true);
-        toast({ title: 'تم التقمص السيادي بنجاح' });
+        toast({ title: '✅ تم التقمص السيادي' });
         router.push('/dashboard');
     } catch (e) {
         toast({ variant: 'destructive', title: 'فشل التقمص' });
     } finally { setIsProcessing(null); }
   };
 
-  /**
-   * محرك التفعيل السيادي الموحد (The Final Unification Logic)
-   */
   const handleActivateCompany = async (req: CompanyRequest) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      // 1. توليد هوية سيادية نظيفة وموحدة
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
-      // 2. إنشاء حساب الأمان (Auth) عبر الـ API
+      // 1. تفعيل حساب الأمان (Auth)
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +130,7 @@ export default function DeveloperDashboard() {
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
-      // 3. إنشاء وثيقة الشركة مع حقن المصفوفة آلياً
+      // 2. تأسيس ملف الشركة مع الحقن الآلي للمصفوفة السحابية (أتمتة طلب المستخدم)
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -146,12 +141,13 @@ export default function DeveloperDashboard() {
         subscriptionType: 'trial',
         trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5,
+        // حقن مصفوفة الـ Firebase آلياً من النظام (المشكلة الثالثة)
         firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
-        firebaseConfig: MASTER_FIREBASE_CONFIG,
+        firebaseConfig: MASTER_FIREBASE_CONFIG, 
         createdAt: serverTimestamp(),
       });
 
-      // 4. إنشاء المستخدم الإداري داخل الشركة
+      // 3. تأسيس ملف المستخدم الإداري الأول
       const userRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
       batch.set(userRef, {
         id: authResult.uid,
@@ -165,7 +161,7 @@ export default function DeveloperDashboard() {
         createdAt: serverTimestamp()
       });
 
-      // 5. الربط بالفهرس العالمي (المفتاح الذهبي للدخول)
+      // 4. تفعيل المفتاح الذهبي في الفهرس العالمي
       const globalRef = doc(collection(firestore, 'global_users'));
       batch.set(globalRef, {
         email: sovereignEmail,
@@ -175,7 +171,6 @@ export default function DeveloperDashboard() {
         createdAt: serverTimestamp(),
       });
 
-      // 6. تحديث حالة الطلب
       batch.update(doc(firestore, 'company_requests', req.id!), { 
         status: 'activated',
         activatedAt: serverTimestamp(),
@@ -184,8 +179,8 @@ export default function DeveloperDashboard() {
 
       await batch.commit();
       toast({ 
-        title: '✅ تم تفعيل البيئة السيادية', 
-        description: `المنشأة جاهزة للدخول بإيميل: ${sovereignEmail}` 
+        title: '✅ تفعيل ناجح', 
+        description: `المنشأة جاهزة للعبور: ${sovereignEmail}` 
       });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
@@ -202,7 +197,7 @@ export default function DeveloperDashboard() {
         const gSnap = await getDocs(gQuery);
         gSnap.forEach(d => batch.delete(d.ref));
         await batch.commit();
-        toast({ title: '✅ تم إنهاء السيادة', description: `تم حذف منشأة ${companyToDelete.name} نهائياً.` });
+        toast({ title: '✅ تم مسح المنشأة' });
     } catch (e) {
         toast({ variant: 'destructive', title: 'خطأ في الحذف' });
     } finally { setIsProcessing(null); setCompanyToDelete(null); }
@@ -217,7 +212,7 @@ export default function DeveloperDashboard() {
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.4)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم السيادية</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والحماية السحابية.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والمزامنة الهوياتية.</CardDescription>
                         </div>
                     </div>
                     <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700">
@@ -240,12 +235,12 @@ export default function DeveloperDashboard() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">التواصل</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">الإداري</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-50" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
                                     <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
-                                        <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail?.split('@')[0]}</span></div></div></TableCell>
+                                        <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail}</span></div></div></TableCell>
                                         <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
                                         <TableCell className="text-center"><Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>{company.isActive ? 'ACTIVE' : 'LOCKED'}</Badge></TableCell>
                                         <TableCell className="text-left px-12">
@@ -253,7 +248,7 @@ export default function DeveloperDashboard() {
                                                 <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2">{isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} دخول</Button>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل الترخيص</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3"><Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
+                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل ومزامنة</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3"><Trash2 className="h-4 w-4" /> حذف نهائياً</DropdownMenuItem></DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
                                         </TableCell>
@@ -282,7 +277,7 @@ export default function DeveloperDashboard() {
                                                 className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
                                             >
                                                 {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4" />} 
-                                                تفعيل البيئة
+                                                تفعيل البيئة آلياً
                                             </Button>
                                         ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}
                                     </TableCell>

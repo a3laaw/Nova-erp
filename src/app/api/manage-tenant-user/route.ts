@@ -5,13 +5,13 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API سيادي لإدارة حسابات المستخدمين.
- * تم تحديثه لضمان إرجاع استجابة JSON نظيفة تمنع خطأ "Unexpected token <".
+ * @fileOverview API سيادي لإدارة حسابات المستخدمين عابرة المنشآت.
+ * تم تحديثه لدعم تحديث الإيميل وكلمة المرور للمستخدمين الحاليين بواسطة الـ UID.
  */
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, displayName, action } = await request.json();
+    const { email, password, displayName, uid, action } = await request.json();
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     let useSimulation = false;
@@ -26,13 +26,13 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // 🛡️ وضع المحاكاة: يسمح بحفظ البيانات في Firestore حتى بدون مفتاح الأمان الحقيقي
+    // 🛡️ وضع المحاكاة الصالح (GitHub Protection Active)
     if (useSimulation) {
         return NextResponse.json({ 
             success: true, 
             simulated: true,
-            uid: `sim_${Math.random().toString(36).substring(7)}`,
-            message: "تم تنفيذ العملية في وضع المحاكاة الصالح (GitHub Protection Active)." 
+            uid: uid || `sim_${Math.random().toString(36).substring(7)}`,
+            message: "تم تنفيذ العملية في وضع المحاكاة السيادي." 
         });
     }
 
@@ -43,9 +43,9 @@ export async function POST(request: NextRequest) {
 
     const auth = getAuth();
     let userRecord;
-    const sanitizedEmail = email.toLowerCase().trim();
+    const sanitizedEmail = email?.toLowerCase().trim();
 
-    if (action === 'create' || action === 'repair') {
+    if (action === 'create') {
         try {
             userRecord = await auth.createUser({
                 email: sanitizedEmail,
@@ -64,18 +64,24 @@ export async function POST(request: NextRequest) {
                 throw e;
             }
         }
-    } else if (action === 'update_password') {
-        userRecord = await auth.getUserByEmail(sanitizedEmail);
-        await auth.updateUser(userRecord.uid, { password: password });
+    } else if (action === 'update_full' && uid) {
+        // 🔄 تحديث شامل للمستخدم (بما في ذلك تغيير الإيميل)
+        const updateData: any = {};
+        if (sanitizedEmail) updateData.email = sanitizedEmail;
+        if (password) updateData.password = password;
+        if (displayName) updateData.displayName = displayName;
+        
+        userRecord = await auth.updateUser(uid, updateData);
     }
 
     return NextResponse.json({ 
         success: true, 
         uid: userRecord?.uid,
-        message: "تمت مزامنة الحساب السيادي بنجاح." 
+        message: "تمت مزامنة بيانات الهوية السيادية بنجاح." 
     });
 
   } catch (error: any) {
+    console.error("Manage User API Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: error.message 

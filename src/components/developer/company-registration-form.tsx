@@ -14,7 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, updateDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { collection, doc, runTransaction, serverTimestamp, updateDoc, getDocs, query, where, Timestamp, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -25,15 +25,14 @@ import {
   DatabaseZap, 
   X, 
   Key, 
-  Globe, 
-  Cloud,
   Activity,
   CalendarClock,
   Users,
   CreditCard,
   Eye,
   EyeOff,
-  Copy
+  Copy,
+  AlertTriangle
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
@@ -49,17 +48,21 @@ interface Props {
 }
 
 export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Props) {
-  const { firestore: masterFirestore, auth: masterAuth } = useFirebase();
+  const { firestore: masterFirestore } = useFirebase();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const isEditing = !!company;
   const savingRef = useRef(false);
 
+  // تخزين البيانات الأصلية للمقارنة والمزامنة
+  const originalEmailRef = useRef('');
+  const adminUidRef = useRef('');
+
   const [formData, setFormData] = useState({
     name: '',
     nameEn: '',
-    activityType: 'general',
+    activityType: 'consulting',
     adminEmail: '',
     adminPassword: '',
     apiKey: '',
@@ -75,12 +78,27 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
   });
 
   useEffect(() => {
+    if (isOpen && company && masterFirestore) {
+        // جلب الـ UID الخاص بالمدير من الفهرس العالمي للمزامنة
+        const fetchAdminUid = async () => {
+            const q = query(collection(masterFirestore, 'global_users'), where('email', '==', company.adminEmail));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+                adminUidRef.current = snap.docs[0].data().uid;
+            }
+        };
+        fetchAdminUid();
+    }
+  }, [isOpen, company, masterFirestore]);
+
+  useEffect(() => {
     if (isOpen) {
         if (company) {
+            originalEmailRef.current = company.adminEmail || '';
             setFormData({
                 name: company.name || '',
                 nameEn: company.nameEn || '',
-                activityType: (company as any).activity || 'general',
+                activityType: (company as any).activity || 'consulting',
                 adminEmail: company.adminEmail || '',
                 adminPassword: company.adminPassword || '', 
                 apiKey: company.firebaseConfig?.apiKey || '',
@@ -95,10 +113,9 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 trialEndDate: company.trialEndDate ? (company.trialEndDate.toDate ? company.trialEndDate.toDate() : new Date(company.trialEndDate.seconds * 1000)) : undefined,
             });
         } else {
-            // التأسيس الافتراضي للمنشآت الجديدة
             const defaultTrialEnd = addDays(new Date(), 7);
             setFormData({
-                name: '', nameEn: '', activityType: 'general', adminEmail: '', adminPassword: '',
+                name: '', nameEn: '', activityType: 'consulting', adminEmail: '', adminPassword: '',
                 apiKey: '', authDomain: '', projectId: '', storageBucket: '',
                 messagingSenderId: '', appId: '', measurementId: '',
                 subscriptionType: 'trial',
@@ -122,18 +139,22 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!masterFirestore || !masterAuth || savingRef.current) return;
+    if (!masterFirestore || savingRef.current) return;
 
     savingRef.current = true;
     setIsSaving(true);
     try {
+      const emailChanged = formData.adminEmail !== originalEmailRef.current;
+      
+      // 1. تحديث حساب Firebase Auth عبر الـ API الموحد
       const authResponse = await fetch('/api/manage-tenant-user', {
           method: 'POST',
           body: JSON.stringify({
               email: formData.adminEmail,
               password: formData.adminPassword,
               displayName: formData.name,
-              action: 'create'
+              uid: adminUidRef.current,
+              action: isEditing ? 'update_full' : 'create'
           })
       });
       const authResult = await authResponse.json();
@@ -155,67 +176,63 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           trialEndDate: formData.trialEndDate ? Timestamp.fromDate(formData.trialEndDate) : null,
       };
 
-      if (isEditing && company?.id) {
-          const companyRef = doc(masterFirestore, 'companies', company.id);
-          await updateDoc(companyRef, cleanFirestoreData({
-              name: formData.name,
-              nameEn: formData.nameEn,
-              activity: formData.activityType,
-              adminEmail: formData.adminEmail,
-              adminPassword: formData.adminPassword,
-              firebaseProjectId: formData.projectId,
-              firebaseConfig,
-              ...licenseData,
-              updatedAt: serverTimestamp()
-          }));
-          toast({ title: 'نجاح التحديث' });
-      } else {
-          const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
-          
-          await runTransaction(masterFirestore, async (transaction) => {
-            const companyRef = doc(masterFirestore, 'companies', companyId);
-            transaction.set(companyRef, {
-              name: formData.name,
-              nameEn: formData.nameEn,
-              activity: formData.activityType,
-              firebaseProjectId: formData.projectId,
-              firebaseConfig,
-              isActive: true,
-              adminEmail: formData.adminEmail.toLowerCase().trim(),
-              adminPassword: formData.adminPassword,
-              ...licenseData,
-              createdAt: serverTimestamp(),
-              createdBy: masterAuth.currentUser?.uid || 'system',
-            });
+      const batch = writeBatch(masterFirestore);
+      const companyId = isEditing ? company!.id! : `comp-${Math.random().toString(36).substring(2, 9)}`;
+      const companyRef = doc(masterFirestore, 'companies', companyId);
 
-            const tenantUserRef = doc(masterFirestore, `companies/${companyId}/users`, authResult.uid);
-            transaction.set(tenantUserRef, {
-                uid: authResult.uid,
-                email: formData.adminEmail.toLowerCase().trim(),
-                username: formData.adminEmail.split('@')[0],
-                fullName: formData.name,
-                role: 'Admin',
-                isActive: true,
-                companyId: companyId,
-                createdAt: serverTimestamp()
-            });
+      // 2. تحديث وثيقة الشركة
+      batch.set(companyRef, cleanFirestoreData({
+          name: formData.name,
+          nameEn: formData.nameEn,
+          activity: formData.activityType,
+          adminEmail: formData.adminEmail.toLowerCase().trim(),
+          adminPassword: formData.adminPassword,
+          firebaseProjectId: formData.projectId,
+          firebaseConfig,
+          isActive: true,
+          ...licenseData,
+          updatedAt: serverTimestamp(),
+          ...(!isEditing && { createdAt: serverTimestamp() })
+      }), { merge: true });
 
-            const globalUserRef = doc(collection(masterFirestore, 'global_users'));
-            transaction.set(globalUserRef, {
-              email: formData.adminEmail.toLowerCase().trim(),
-              username: formData.adminEmail.split('@')[0],
-              companyId: companyId,
-              uid: authResult.uid, 
-              createdAt: serverTimestamp(),
-            });
-          });
-
-          toast({ title: 'نجاح التأسيس' });
+      // 3. تحديث الفهرس العالمي (Global Index) إذا تغير الإيميل
+      if (emailChanged && isEditing) {
+          const oldIndexQuery = query(collection(masterFirestore, 'global_users'), where('email', '==', originalEmailRef.current));
+          const oldIndexSnap = await getDocs(oldIndexQuery);
+          oldIndexSnap.forEach(d => batch.delete(d.ref));
       }
 
+      const globalIndexRef = doc(collection(masterFirestore, 'global_users'));
+      batch.set(globalIndexRef, {
+          email: formData.adminEmail.toLowerCase().trim(),
+          username: formData.adminEmail.split('@')[0],
+          companyId: companyId,
+          uid: authResult.uid,
+          createdAt: serverTimestamp(),
+      });
+
+      // 4. تحديث ملف المستخدم داخل الشركة (Tenant Profile)
+      const tenantUserRef = doc(masterFirestore, `companies/${companyId}/users`, authResult.uid);
+      batch.set(tenantUserRef, {
+          id: authResult.uid,
+          uid: authResult.uid,
+          email: formData.adminEmail.toLowerCase().trim(),
+          fullName: formData.name,
+          role: 'Admin',
+          isActive: true,
+          companyId: companyId,
+          updatedAt: serverTimestamp(),
+          ...(!isEditing && { createdAt: serverTimestamp() })
+      }, { merge: true });
+
+      await batch.commit();
+      toast({ 
+          title: '✅ تم المزامنة السيادية', 
+          description: emailChanged ? 'تم تحديث الإيميل في كافة طبقات النظام بنجاح.' : 'تم حفظ التغييرات بنجاح.' 
+      });
       onClose();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'خطأ', description: error.message });
+      toast({ variant: 'destructive', title: 'خطأ في المزامنة', description: error.message });
     } finally {
       setIsSaving(false);
       savingRef.current = false;
@@ -224,7 +241,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
-      <DialogContent className="max-w-4xl p-0 rounded-[2.5rem] border-none shadow-[0_50px_100px_rgba(0,0,0,0.4)] overflow-hidden bg-white" dir="rtl">
+      <DialogContent className="max-w-4xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white" dir="rtl">
         <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
           <DialogHeader className="p-8 bg-[#1e1b4b] text-white shrink-0 relative overflow-hidden text-right">
             <div className="flex items-center justify-between w-full relative z-10">
@@ -249,7 +266,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         </h3>
                         {isEditing && (
                             <Button type="button" variant="outline" size="sm" onClick={copyCredentials} className="rounded-xl font-black text-[10px] gap-2 border-indigo-200 text-indigo-700 bg-indigo-50">
-                                <Copy className="h-3 w-3" /> نسخ بيانات الدخول للعميل
+                                <Copy className="h-3 w-3" /> نسخ بيانات الدخول المحدثة
                             </Button>
                         )}
                     </div>
@@ -283,10 +300,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
                         <div className="grid gap-2">
                             <Label htmlFor="adminEmail" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام (Login) *</Label>
-                            <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.com" />
+                            <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.nova" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور التأسيسية *</Label>
+                            <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور السيادية *</Label>
                             <div className="relative">
                                 <Input 
                                     id="adminPassword" 
@@ -318,7 +335,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-orange-600 pr-4 flex items-center gap-3">
                             <CreditCard className="h-6 w-6 text-orange-600" /> نظام التراخيص والحصص المفتوحة
                         </h3>
-                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-black px-4 py-1 rounded-full uppercase tracking-widest text-[10px]">Financial Quota System</Badge>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-orange-50/20 border-2 border-dashed border-orange-200 shadow-inner">
@@ -346,7 +362,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))}
                                     className="h-12 rounded-xl"
                                 />
-                                <p className="text-[10px] text-orange-600 font-bold pr-1">سيتم قفل لوحة التحكم للعميل آلياً بعد هذا التاريخ.</p>
                             </div>
                         )}
                     </div>
@@ -370,28 +385,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Input id="apiKey" value={formData.apiKey} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="AIzaSy..." />
                             </div>
                             <div className="grid gap-3">
-                                <Label htmlFor="authDomain" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Globe className="h-3 w-3" /> AUTH DOMAIN
-                                </Label>
-                                <Input id="authDomain" value={formData.authDomain} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="...firebaseapp.com" />
-                            </div>
-                            <div className="grid gap-3">
                                 <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
                                     <Key className="h-3 w-3" /> PROJECT ID
                                 </Label>
                                 <Input id="projectId" value={formData.projectId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="company-prj-123" />
-                            </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="storageBucket" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Cloud className="h-3 w-3" /> STORAGE BUCKET
-                                </Label>
-                                <Input id="storageBucket" value={formData.storageBucket} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="...firebasestorage.app" />
-                            </div>
-                            <div className="grid gap-3">
-                                <Label htmlFor="messagingSenderId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Key className="h-3 w-3" /> MESSAGING SENDER ID
-                                </Label>
-                                <Input id="messagingSenderId" value={formData.messagingSenderId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="828494..." />
                             </div>
                             <div className="grid gap-3">
                                 <Label htmlFor="appId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
@@ -408,7 +405,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                {isEditing ? 'حفظ وتأمين التراخيص' : 'تأسيس المنشأة وتفعيل التراخيص'}
+                {isEditing ? 'حفظ ومزامنة الهوية السيادية' : 'تأسيس المنشأة وتفعيل التراخيص'}
             </Button>
           </DialogFooter>
         </form>
