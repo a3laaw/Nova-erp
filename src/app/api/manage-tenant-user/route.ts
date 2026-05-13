@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد.
- * تم تحديثه ليدعم توليد "رابط تفعيل" (Invite Link) لتمكين الموظف من الدخول وتعيين كلمة مروره.
+ * @fileOverview API الأمان السيادي الموحد (V7.0 - Odoo Auto-Flow).
+ * مسؤول عن إنشاء الحسابات سحابياً وتوليد روابط التفعيل آلياً.
  */
 
 export async function POST(request: NextRequest) {
@@ -24,11 +24,15 @@ export async function POST(request: NextRequest) {
         }
     }
 
+    if (action === 'check') {
+        return NextResponse.json({ success: true, status: hasServiceAccount ? 'READY' : 'MANUAL_MODE' });
+    }
+
     if (!hasServiceAccount) {
         return NextResponse.json({ 
             success: false, 
             error: "MISSING_SERVICE_ACCOUNT",
-            message: "ملف الأمان (service-account.json) مفقود. يرجى إضافة المستخدم يدوياً في Console." 
+            message: "ملف الأمان (service-account.json) مفقود. النظام في وضع التفعيل اليدوي." 
         });
     }
 
@@ -41,11 +45,12 @@ export async function POST(request: NextRequest) {
     let userRecord;
     const sanitizedEmail = email?.toLowerCase().trim();
 
-    if (action === 'create' || action === 'activate_invite') {
+    if (action === 'activate_invite') {
         try {
+            // 🛡️ إنشاء المستخدم بكلمة مرور عشوائية (كما في Odoo)
             userRecord = await auth.createUser({
                 email: sanitizedEmail,
-                password: password || Math.random().toString(36).slice(-10),
+                password: password || Math.random().toString(36).slice(-12),
                 displayName: displayName || 'Nova User',
                 emailVerified: true,
             });
@@ -57,14 +62,14 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // 🔗 توليد رابط "تغيير كلمة المرور" ليعمل كـ "رابط تفعيل"
+        // 🔗 توليد رابط تفعيل (يعمل كدعوة رسمية لتعيين كلمة المرور)
         const inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
 
         return NextResponse.json({ 
             success: true, 
             uid: userRecord?.uid,
             inviteLink,
-            message: "تم تأسيس الحساب سحابياً وتوليد رابط التفعيل." 
+            message: "تم تأسيس الحساب سحابياً بنجاح وتوليد رابط التفعيل." 
         });
     }
 
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unknown action" });
 
   } catch (error: any) {
-    console.error("Auth API Error:", error);
+    console.error("Sovereign Auth API Error:", error);
     return NextResponse.json({ success: false, error: error.message });
   }
 }

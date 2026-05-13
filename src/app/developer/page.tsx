@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc, Timestamp, setDoc } from 'firebase/firestore';
-import type { Company, CompanyRequest, UserProfile } from '@/lib/types';
+import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc, Timestamp } from 'firebase/firestore';
+import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
     FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
-    Wrench, DatabaseZap, AlertCircle, ShieldCheck, ShieldX, Copy, Link2
+    Wrench, DatabaseZap, AlertCircle, ShieldCheck, ShieldX, Copy, Link2, Key
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -48,6 +48,7 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
+// 🛡️ مصفوفة الـ Firebase الماستر للحقن التلقائي
 const MASTER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
   authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
@@ -70,28 +71,28 @@ export default function DeveloperDashboard() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [isRepairing, setIsRepairing] = useState(false);
-  const [isSAMissing, setIsSAMissing] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
   const [lastInviteLink, setLastInviteLink] = useState<{name: string, link: string} | null>(null);
 
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
+  // 🛡️ رادار فحص جاهزية الأتمتة (Odoo Logic)
   useEffect(() => {
-    const checkSecurityFile = async () => {
+    const checkSystem = async () => {
         try {
             const res = await fetch('/api/manage-tenant-user', { method: 'POST', body: JSON.stringify({ action: 'check' }) });
             const data = await res.json();
-            if (data.error === "MISSING_SERVICE_ACCOUNT") setIsSAMissing(true);
-            else setIsSAMissing(false);
-        } catch (e) {}
+            setSystemStatus(data.status);
+        } catch (e) { setSystemStatus('MANUAL_MODE'); }
     };
-    checkSecurityFile();
+    checkSystem();
   }, []);
 
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
     return [...rawCompanies].sort((a, b) => ((b.createdAt as any)?.toMillis?.() || 0) - ((a.createdAt as any)?.toMillis?.() || 0))
-      .filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.adminEmail?.toLowerCase().includes(searchQuery.toLowerCase()));
+      .filter(c => !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [rawCompanies, searchQuery]);
 
   const handleRepairData = async () => {
@@ -100,29 +101,17 @@ export default function DeveloperDashboard() {
     try {
         const batch = writeBatch(firestore);
         const companiesSnap = await getDocs(collection(firestore, 'companies'));
-        let repairCount = 0;
         const defaultTrialEnd = addDays(new Date(), 7);
 
         for (const cDoc of companiesSnap.docs) {
             const data = cDoc.data();
-            const companyId = cDoc.id;
             const updatePayload: any = {};
-            if (!data.firebaseConfig?.apiKey) { updatePayload.firebaseConfig = MASTER_FIREBASE_CONFIG; repairCount++; }
-            if (!data.trialEndDate) { updatePayload.trialEndDate = Timestamp.fromDate(defaultTrialEnd); updatePayload.subscriptionType = 'trial'; repairCount++; }
+            if (!data.firebaseConfig?.apiKey) updatePayload.firebaseConfig = MASTER_FIREBASE_CONFIG;
+            if (!data.trialEndDate) { updatePayload.trialEndDate = Timestamp.fromDate(defaultTrialEnd); updatePayload.subscriptionType = 'trial'; }
             if (Object.keys(updatePayload).length > 0) batch.update(cDoc.ref, updatePayload);
-
-            const gQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
-            const gSnap = await getDocs(gQuery);
-            if (gSnap.empty && data.adminEmail) {
-                batch.set(doc(collection(firestore, 'global_users')), {
-                    email: data.adminEmail, username: data.adminEmail.split('@')[0],
-                    companyId, role: 'Admin', createdAt: serverTimestamp()
-                });
-                repairCount++;
-            }
         }
         await batch.commit();
-        toast({ title: '✅ تم الترميم السيادي', description: `تم تصحيح ${repairCount} حقل بنجاح.` });
+        toast({ title: '✅ تم الترميم والحقن السحابي' });
     } catch (e: any) { toast({ variant: 'destructive', title: 'خطأ', description: e.message }); } finally { setIsRepairing(false); }
   };
 
@@ -141,10 +130,12 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
+      // 1. توليد هوية سيادية فريدة (Sovereign ID)
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
+      // 2. محاولة الأتمتة الكاملة (Auth Creation)
       const authRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,6 +147,7 @@ export default function DeveloperDashboard() {
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
+      // 3. حقن المصفوفة السحابية والبيانات المرجعية (The Odoo Step)
       batch.set(companyRef, {
         name: req.companyName, activity: req.activity, adminEmail: sovereignEmail,
         adminPassword: req.adminPassword, contactPhone: req.phone, isActive: true,
@@ -178,7 +170,10 @@ export default function DeveloperDashboard() {
           setLastInviteLink({ name: req.companyName, link: authResult.inviteLink });
       }
 
-      toast({ title: authResult.error ? '⚠️ تفعيل جزئي' : '✅ تم التفعيل بنجاح' });
+      toast({ 
+          title: authResult.error ? '⚠️ تفعيل جزئي (يدوي)' : '✅ تم التفعيل والربط الآلي',
+          description: authResult.error ? "يرجى إضافة المستخدم يدوياً في Console." : "تم إنشاء الحساب وحقن البيانات آلياً."
+      });
     } catch (e: any) { toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message }); } finally { setIsProcessing(null); }
   };
 
@@ -197,20 +192,20 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="space-y-10" dir="rtl">
-        {/* --- بنر رابط التفعيل الأخير --- */}
+        {/* --- بنر رابط التفعيل الذكي --- */}
         {lastInviteLink && (
             <Card className="bg-green-600 text-white p-6 rounded-[2rem] shadow-2xl animate-in slide-in-from-top-4 border-none flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-white/20 rounded-2xl"><Sparkles className="h-6 w-6"/></div>
                     <div>
-                        <h4 className="text-xl font-black">جاهز للإرسال: رابط تفعيل {lastInviteLink.name}</h4>
-                        <p className="text-xs font-bold opacity-80">انسخ الرابط وأرسله للمالك لتعيين كلمة مروره والدخول فوراً.</p>
+                        <h4 className="text-xl font-black">رابط تفعيل {lastInviteLink.name} جاهز</h4>
+                        <p className="text-xs font-bold opacity-80">انسخ الرابط وأرسله للمالك لتعيين كلمة المرور والدخول فوراً.</p>
                     </div>
                 </div>
                 <div className="flex gap-3">
                     <Button variant="ghost" onClick={() => setLastInviteLink(null)} className="text-white hover:bg-white/10 rounded-xl font-bold">إغلاق</Button>
                     <Button onClick={() => { navigator.clipboard.writeText(lastInviteLink.link); toast({ title: '📋 تم النسخ' }); }} className="bg-white text-green-700 hover:bg-slate-100 rounded-xl font-black gap-2 h-12 px-8">
-                        <Link2 className="h-5 w-5" /> نسخ رابط التفعيل (Odoo Flow)
+                        <Link2 className="h-5 w-5" /> نسخ رابط التفعيل
                     </Button>
                 </div>
             </Card>
@@ -224,13 +219,17 @@ export default function DeveloperDashboard() {
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
                                 غرفة التحكم السيادية
-                                {isSAMissing ? <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> تفعيل يدوي مطلوب</Badge> : <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة</Badge>}
+                                {systemStatus === 'READY' ? (
+                                    <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة (Odoo Flow)</Badge>
+                                ) : (
+                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> التفعيل يدوي مطلوب</Badge>
+                                )}
                             </CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والترميم التاريخي للبيانات.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، الأتمتة، والترميم السحابي الموحد.</CardDescription>
                         </div>
                     </div>
                     <div className="flex gap-4">
-                        <Button onClick={handleRepairData} disabled={isRepairing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-base gap-3 border-indigo-400 text-indigo-100 hover:bg-indigo-600/20">{isRepairing ? <Loader2 className="animate-spin h-6 w-6" /> : <Wrench className="h-6 w-6" />} ترميم البيانات</Button>
+                        <Button onClick={handleRepairData} disabled={isRepairing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-base gap-3 border-indigo-400 text-indigo-100 hover:bg-indigo-600/20">{isRepairing ? <Loader2 className="animate-spin h-6 w-6" /> : <Wrench className="h-6 w-6" />} ترميم وحقن البيانات</Button>
                         <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700"><PlusCircle className="h-6 w-6" /> تأسيس منشأة</Button>
                     </div>
                 </div>
@@ -257,7 +256,11 @@ export default function DeveloperDashboard() {
                                     <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
                                         <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail}</span></div></div></TableCell>
                                         <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
-                                        <TableCell className="text-center"><Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>{company.isActive ? 'ACTIVE' : 'LOCKED'}</Badge></TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
+                                                {company.isActive ? 'ACTIVE' : 'LOCKED'}
+                                            </Badge>
+                                        </TableCell>
                                         <TableCell className="text-left px-12">
                                             <div className="flex items-center justify-end gap-3">
                                                 <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2">{isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} دخول</Button>
@@ -292,7 +295,7 @@ export default function DeveloperDashboard() {
                                                 className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
                                             >
                                                 {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4" />} 
-                                                تفعيل البيئة آلياً
+                                                تفعيل البيئة آلياً (Odoo Flow)
                                             </Button>
                                         ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}
                                     </TableCell>
@@ -320,3 +323,4 @@ export default function DeveloperDashboard() {
     </div>
   );
 }
+

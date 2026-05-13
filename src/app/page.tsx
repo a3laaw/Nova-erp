@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Info, Key } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Key } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,8 +15,8 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v5.0):
- * تدعم الدخول بـ "اسم المستخدم" مع محرك تشخيص أعطال سحابي ذكي.
+ * بوابة العبور السيادية (Sovereign Gateway v7.0):
+ * تدعم الدخول بـ "اسم المستخدم" مع محرك تحويل هوية سحابي ذكي.
  */
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -46,7 +46,8 @@ export default function LoginPage() {
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك تحويل الهوية الذكي
+        // 🛡️ محرك تحويل الهوية الذكي (Identity Transformer)
+        // يبحث في الفهرس العالمي عن اسم المستخدم ليجلب الإيميل الحقيقي
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -76,7 +77,7 @@ export default function LoginPage() {
             if (!snap.empty) {
                 const userData = snap.docs[0].data();
                 setDiagnosis({
-                    message: 'تم العثور على حسابك، ولكنه غير مفعل سحابياً. يرجى إضافة هذا البريد يدوياً في Firebase Console أو استخدام رابط التفعيل المرسل من المدير.',
+                    message: 'تم العثور على حسابك في قاعدة البيانات، ولكنه غير مفعل سحابياً. يرجى إضافة هذا البريد يدوياً في Auth أو طلب رابط تفعيل جديد.',
                     email: userData.email
                 });
             } else {
@@ -127,7 +128,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleLogin} className="space-y-5">
                 <div className="grid gap-2">
-                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد</Label>
+                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم فقط</Label>
                     <div className="relative group">
                         <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                         <Input 
@@ -136,7 +137,7 @@ export default function LoginPage() {
                             onChange={e => setIdentifier(e.target.value)} 
                             className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 pr-10" 
                             required 
-                            placeholder="username / email"
+                            placeholder="e.g. nova1"
                             disabled={localLoading || loading}
                         />
                     </div>
@@ -188,3 +189,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
