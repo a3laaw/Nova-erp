@@ -13,7 +13,7 @@ import {
     MoreHorizontal, ArrowRightLeft, 
     Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
     Wrench, AlertCircle, ShieldCheck, ShieldX, Copy, Key,
-    Info, ExternalLink, RotateCcw
+    Info, ExternalLink, RotateCcw, Activity
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -123,13 +123,11 @@ export default function DeveloperDashboard() {
             const data = companyDoc.data() as Company;
             const updates: any = {};
 
-            // 1. حقن مصفوفة الـ Config إذا كانت مفقودة
             if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
                 updates.firebaseConfig = MASTER_FIREBASE_CONFIG;
                 updates.firebaseProjectId = MASTER_FIREBASE_CONFIG.projectId;
             }
 
-            // 2. تحديث الفهرس العالمي لضمان الدخول بـ Username
             const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
             const globalSnap = await getDocs(globalQuery);
             if (globalSnap.empty) {
