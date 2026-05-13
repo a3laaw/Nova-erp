@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد (V10.0 - Full Auto Flow).
- * مسؤول عن التأسيس الفوري للمنشآت وحقن المصفوفة السحابية آلياً.
+ * @fileOverview API الأمان السيادي الموحد (V11.0 - Full Auto Flow).
+ * تم تحصينه لضمان الشفافية المطلقة عند فشل الأتمتة بسبب نقص ملفات الأمان.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -30,57 +30,65 @@ export async function POST(request: NextRequest) {
 
     if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-        const sa = JSON.parse(fileContent || '{}');
-        if (sa && sa.project_id && sa.private_key) {
-            hasServiceAccount = true;
+        try {
+            const sa = JSON.parse(fileContent || '{}');
+            if (sa && sa.project_id && sa.private_key) {
+                hasServiceAccount = true;
+            }
+        } catch (e) {
+            console.error("Invalid Service Account JSON");
         }
     }
 
+    // 🛡️ رادار فحص الجاهزية للأدمن
     if (action === 'check') {
-        return NextResponse.json({ success: true, status: hasServiceAccount ? 'READY' : 'MANUAL_MODE' });
-    }
-
-    if (!hasServiceAccount) {
         return NextResponse.json({ 
-            success: false, 
-            error: "MISSING_SERVICE_ACCOUNT",
-            message: "ملف الأمان (service-account.json) مفقود. يرجى رفعه لتفعيل الأتمتة الفورية." 
+            success: true, 
+            status: hasServiceAccount ? 'READY' : 'MANUAL_MODE',
+            projectId: MASTER_FIREBASE_CONFIG.projectId
         });
     }
 
-    if (getApps().length === 0) {
+    if (getApps().length === 0 && hasServiceAccount) {
         const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
         initializeApp({ credential: cert(sa) });
     }
 
-    const auth = getAuth();
-    const db = getFirestore();
-    const sanitizedEmail = email?.toLowerCase().trim();
-
     if (action === 'instant_setup') {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
+        const sanitizedEmail = email?.toLowerCase().trim();
         const trialEndDate = new Date();
         trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-        // 1. إنشاء حساب الأمان (Firebase Auth)
-        let userRecord;
-        try {
-            userRecord = await auth.createUser({
-                email: sanitizedEmail,
-                password: Math.random().toString(36).slice(-12) + 'A1!', // كلمة مرور عشوائية للتفعيل
-                displayName: contactName,
-                emailVerified: true,
-            });
-        } catch (e: any) {
-            if (e.code === 'auth/email-already-exists') {
-                userRecord = await auth.getUserByEmail(sanitizedEmail);
-            } else { throw e; }
+        let inviteLink = null;
+        let authCreated = false;
+
+        // 1. محاولة إنشاء حساب الأمان (Authentication)
+        if (hasServiceAccount) {
+            try {
+                const auth = getAuth();
+                let userRecord;
+                try {
+                    userRecord = await auth.createUser({
+                        email: sanitizedEmail,
+                        password: Math.random().toString(36).slice(-12) + 'A1!',
+                        displayName: contactName,
+                        emailVerified: true,
+                    });
+                } catch (e: any) {
+                    if (e.code === 'auth/email-already-exists') {
+                        userRecord = await auth.getUserByEmail(sanitizedEmail);
+                    } else { throw e; }
+                }
+                inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
+                authCreated = true;
+            } catch (e: any) {
+                console.error("Auth creation failed:", e.message);
+            }
         }
 
-        // 2. توليد رابط التفعيل (Password Reset)
-        const inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
-
-        // 3. إنشاء سجل المنشأة في Firestore
+        // 2. إنشاء السجلات في قاعدة البيانات (حتى لو فشل الـ Auth، لتمكين الإضافة اليدوية)
+        const db = getFirestore();
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
             name: companyName,
@@ -97,34 +105,20 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 4. إنشاء ملف الموظف الإداري داخل الشركة
-        const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
-        await tenantUserRef.set({
-            id: userRecord.uid,
-            uid: userRecord.uid,
-            fullName: contactName,
-            email: sanitizedEmail,
-            username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
-            role: 'Admin',
-            isActive: true,
-            companyId: companyId,
-            createdAt: FieldValue.serverTimestamp(),
-        });
-
-        // 5. زرع الهوية في الفهرس العالمي
+        // 3. الفهرس العالمي
         const globalIndexRef = db.collection('global_users').doc();
         await globalIndexRef.set({
             email: sanitizedEmail,
             username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
             companyId,
-            uid: userRecord.uid,
             createdAt: FieldValue.serverTimestamp()
         });
 
         return NextResponse.json({ 
             success: true, 
+            authCreated,
             inviteLink,
-            message: "تم تأسيس المنشأة وتفعيل النظام آلياً." 
+            message: authCreated ? "تم تأسيس المنشأة آلياً." : "تأسيس جزئي: يرجى إضافة الإيميل يدوياً في Console."
         });
     }
 

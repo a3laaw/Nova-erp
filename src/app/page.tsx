@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Key } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Key, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,8 +15,8 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v10.0):
- * تدعم الدخول بـ "اسم المستخدم" مع محرك تحويل هوية سحابي ذكي.
+ * بوابة العبور السيادية (Sovereign Gateway v11.0):
+ * تم تحصينها بمحرك تشخيص ذكي يوجه المالك للتفعيل اليدوي في حال فشل الأتمتة.
  */
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<{ message: string, email?: string } | null>(null);
+  const [diagnosis, setDiagnosis] = useState<{ message: string, email?: string, type: 'error' | 'manual_needed' } | null>(null);
 
   useEffect(() => {
     if (user && !loading) {
@@ -46,8 +46,7 @@ export default function LoginPage() {
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك تحويل الهوية الذكي (Identity Transformer)
-        // يبحث في الفهرس العالمي عن اسم المستخدم ليجلب الإيميل الحقيقي
+        // 🛡️ محرك تحويل الهوية الذكي
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -66,22 +65,23 @@ export default function LoginPage() {
     } catch (error: any) {
         setLocalLoading(false);
         
-        // 🔍 محرك تشخيص أعطال الأمان
+        // 🔍 محرك تشخيص أعطال الأمان المتقدم
         if (firestore) {
-            const checkEmail = identifier.includes('@') ? identifier.trim().toLowerCase() : null;
-            const diagQuery = checkEmail 
-                ? query(collection(firestore, 'global_users'), where('email', '==', checkEmail), limit(1))
-                : query(collection(firestore, 'global_users'), where('username', '==', identifier.trim().toLowerCase()), limit(1));
+            const checkId = identifier.trim().toLowerCase();
+            const diagQuery = identifier.includes('@')
+                ? query(collection(firestore, 'global_users'), where('email', '==', checkId), limit(1))
+                : query(collection(firestore, 'global_users'), where('username', '==', checkId), limit(1));
             
             const snap = await getDocs(diagQuery);
             if (!snap.empty) {
                 const userData = snap.docs[0].data();
                 setDiagnosis({
-                    message: 'تم العثور على حسابك في قاعدة البيانات، ولكنه غير مفعل سحابياً. يرجى تفعيل الحساب عبر الرابط المرسل لبريدك.',
+                    type: 'manual_needed',
+                    message: 'تم العثور على منشأتك في قاعدة البيانات، ولكن حساب الأمان لم يفعل بعد.',
                     email: userData.email
                 });
             } else {
-                setDiagnosis({ message: 'تأكد من كتابة اسم المستخدم وكلمة المرور بشكل صحيح.' });
+                setDiagnosis({ type: 'error', message: 'تأكد من كتابة اسم المستخدم وكلمة المرور بشكل صحيح.' });
             }
         }
 
@@ -111,15 +111,21 @@ export default function LoginPage() {
         
         <CardContent className="p-8 space-y-6">
             {diagnosis && (
-                <Alert variant="destructive" className="rounded-2xl bg-red-50 border-red-200 animate-in fade-in slide-in-from-top-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">تشخيص أعطال العبور</AlertTitle>
-                    <AlertDescription className="text-[10px] font-black leading-relaxed space-y-2 mt-1">
-                        <p>{diagnosis.message}</p>
-                        {diagnosis.email && (
-                            <div className="p-2 bg-white rounded-lg border border-red-100 flex items-center justify-between">
-                                <span className="font-mono select-all text-[9px]">{diagnosis.email}</span>
-                                <Key className="h-3 w-3 opacity-30" />
+                <Alert variant="destructive" className={cn("rounded-2xl border-2 animate-in fade-in slide-in-from-top-2", diagnosis.type === 'manual_needed' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200")}>
+                    <AlertCircle className={cn("h-4 w-4", diagnosis.type === 'manual_needed' ? "text-amber-600" : "text-red-600")} />
+                    <AlertTitle className="text-[11px] font-black">{diagnosis.type === 'manual_needed' ? 'تفعيل جزئي (يدوي)' : 'تشخيص أعطال العبور'}</AlertTitle>
+                    <AlertDescription className="text-[10px] font-black leading-relaxed space-y-3 mt-1">
+                        <p className={diagnosis.type === 'manual_needed' ? "text-amber-800" : "text-red-800"}>{diagnosis.message}</p>
+                        {diagnosis.type === 'manual_needed' && (
+                            <div className="space-y-2">
+                                <div className="p-2 bg-white rounded-lg border border-amber-100 flex items-center justify-between">
+                                    <span className="font-mono select-all text-[9px] text-amber-900">{diagnosis.email}</span>
+                                    <Key className="h-3 w-3 opacity-30 text-amber-600" />
+                                </div>
+                                <p className="text-[9px] text-amber-700 italic">يجب على المدير إضافة هذا البريد يدوياً في Firebase Console ليتمكن المالك من الدخول.</p>
+                                <Button asChild variant="link" className="h-auto p-0 text-[10px] font-black text-amber-900 underline gap-1">
+                                    <a href="https://console.firebase.google.com/" target="_blank"><ExternalLink className="h-3 w-3"/> فتح Firebase Console</a>
+                                </Button>
                             </div>
                         )}
                     </AlertDescription>
