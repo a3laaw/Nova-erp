@@ -107,7 +107,10 @@ export default function DeveloperDashboard() {
             const data = cDoc.data();
             const updatePayload: any = {};
             if (!data.firebaseConfig?.apiKey) updatePayload.firebaseConfig = MASTER_FIREBASE_CONFIG;
-            if (!data.trialEndDate) { updatePayload.trialEndDate = Timestamp.fromDate(defaultTrialEnd); updatePayload.subscriptionType = 'trial'; }
+            if (!data.trialEndDate) { 
+                updatePayload.trialEndDate = Timestamp.fromDate(defaultTrialEnd); 
+                updatePayload.subscriptionType = 'trial'; 
+            }
             if (Object.keys(updatePayload).length > 0) batch.update(cDoc.ref, updatePayload);
         }
         await batch.commit();
@@ -130,7 +133,7 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      // 1. توليد هوية سيادية فريدة (Sovereign ID)
+      // 1. توليد هوية سيادية فريدة رشيقة (Odoo Logic)
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
@@ -145,9 +148,9 @@ export default function DeveloperDashboard() {
       
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
-      const trialEndDate = addDays(new Date(), 7);
+      const trialEndDate = addDays(new Date(), 7); // 7 أيام افتراضية للديمو
 
-      // 3. حقن المصفوفة السحابية والبيانات المرجعية (The Odoo Step)
+      // 3. حقن مصفوفة Firebase والترخيص المبرمج
       batch.set(companyRef, {
         name: req.companyName, activity: req.activity, adminEmail: sovereignEmail,
         adminPassword: req.adminPassword, contactPhone: req.phone, isActive: true,
@@ -323,4 +326,3 @@ export default function DeveloperDashboard() {
     </div>
   );
 }
-

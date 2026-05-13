@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 /**
  * بوابة تسجيل المنشآت (Sovereign Registration Gateway)
- * تم تصفير الحقول وحذف القسم التقني لضمان واجهة SaaS احترافية.
+ * تم تصفير الحقول تماماً وحذف التعقيدات التقنية لضمان تجربة SaaS احترافية.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -30,15 +30,15 @@ export default function RegisterPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // 🛡️ الحقول تبدأ فارغة تماماً لضمان تجربة مستخدم نظيفة ومنع الاقتراحات التلقائية
+  // 🛡️ الحقول تبدأ فارغة تماماً لضمان تجربة مستخدم نظيفة
   const [formData, setFormData] = useState({
     companyName: '',
     activity: 'consulting',
     contactName: '',
     email: '', 
-    username: '', // تم التصفير
+    username: '', 
     phone: '', 
-    adminPassword: '', // تم التصفير
+    adminPassword: '', 
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,11 +47,6 @@ export default function RegisterPage() {
 
     if (!formData.username || !formData.adminPassword) {
         toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يجب اختيار اسم مستخدم وكلمة مرور لتأسيس الحساب.' });
-        return;
-    }
-
-    if (formData.adminPassword.length < 6) {
-        toast({ variant: 'destructive', title: 'كلمة مرور قصيرة', description: 'يجب أن لا تقل كلمة المرور عن 6 أحرف.' });
         return;
     }
 
