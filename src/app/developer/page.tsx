@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
@@ -13,7 +13,7 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
     FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
-    Wrench, DatabaseZap, AlertCircle
+    Wrench, DatabaseZap, AlertCircle, ShieldCheck, ShieldX
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -71,9 +71,22 @@ export default function DeveloperDashboard() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [isRepairing, setIsRepairing] = useState(false);
+  const [isSAMissing, setIsSAMissing] = useState(false);
 
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
+
+  // فحص حالة ملف الأمان
+  useEffect(() => {
+    const checkSecurityFile = async () => {
+        try {
+            const res = await fetch('/api/manage-tenant-user', { method: 'POST', body: JSON.stringify({ action: 'check' }) });
+            const data = await res.json();
+            if (data.error === "MISSING_SERVICE_ACCOUNT") setIsSAMissing(true);
+        } catch (e) {}
+    };
+    checkSecurityFile();
+  }, []);
 
   const filteredCompanies = useMemo(() => {
     if (!rawCompanies) return [];
@@ -89,10 +102,6 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
-  /**
-   * محرك الترميم السيادي (v4.0):
-   * يقوم بإصلاح كافة البيانات القديمة لتتوافق مع معايير الدخول والأمان الجديدة.
-   */
   const handleRepairData = async () => {
     if (!firestore || isRepairing) return;
     setIsRepairing(true);
@@ -107,13 +116,11 @@ export default function DeveloperDashboard() {
             const companyId = cDoc.id;
             const updatePayload: any = {};
 
-            // 1. حقن مصفوفة الربط المفقودة
             if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
                 updatePayload.firebaseConfig = MASTER_FIREBASE_CONFIG;
                 repairCount++;
             }
 
-            // 2. تفعيل فترة الـ 7 أيام للبيانات القديمة
             if (!data.trialEndDate) {
                 updatePayload.trialEndDate = Timestamp.fromDate(defaultTrialEnd);
                 updatePayload.subscriptionType = 'trial';
@@ -124,7 +131,6 @@ export default function DeveloperDashboard() {
                 batch.update(cDoc.ref, updatePayload);
             }
 
-            // 3. مزامنة الفهرس العالمي لتمكين الدخول بـ اسم المستخدم
             const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
             const globalSnap = await getDocs(globalQuery);
             if (globalSnap.empty && data.adminEmail) {
@@ -173,7 +179,6 @@ export default function DeveloperDashboard() {
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
-      // 1. تفعيل حساب الأمان
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -187,15 +192,10 @@ export default function DeveloperDashboard() {
       
       const authResult = await createRes.json();
       
-      if (!authResult.success && authResult.error !== 'MISSING_SERVICE_ACCOUNT') {
-          throw new Error(authResult.error);
-      }
-
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
-      // 2. حقن المصفوفة الماستر آلياً + تحديد الـ 7 أيام
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -241,7 +241,16 @@ export default function DeveloperDashboard() {
       });
 
       await batch.commit();
-      toast({ title: '✅ تم التفعيل بنجاح', description: `المنشأة نشطة لفترة تجريبية 7 أيام.` });
+      
+      if (authResult.error === "MISSING_SERVICE_ACCOUNT") {
+          toast({ 
+              variant: 'default', 
+              title: '⚠️ تفعيل جزئي', 
+              description: 'تم إنشاء الشركة بنجاح، ولكن يجب إضافة الحساب يدوياً في Firebase Console Authentication للتمكن من الدخول.' 
+          });
+      } else {
+          toast({ title: '✅ تم التفعيل بنجاح', description: `المنشأة نشطة لفترة تجريبية 7 أيام.` });
+      }
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -271,7 +280,18 @@ export default function DeveloperDashboard() {
                     <div className="flex items-center gap-6">
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.4)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم السيادية</CardTitle>
+                            <CardTitle className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
+                                غرفة التحكم السيادية
+                                {isSAMissing ? (
+                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3">
+                                        <ShieldX className="h-3 w-3"/> وضع التفعيل اليدوي نشط
+                                    </Badge>
+                                ) : (
+                                    <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3">
+                                        <ShieldCheck className="h-3 w-3"/> الأتمتة السحابية نشطة
+                                    </Badge>
+                                )}
+                            </CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والترميم التاريخي للبيانات.</CardDescription>
                         </div>
                     </div>

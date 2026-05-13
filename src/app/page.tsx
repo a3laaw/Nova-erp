@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Info } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Info, Key } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -15,8 +15,8 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v4.0):
- * تدعم الدخول بـ "اسم المستخدم" فقط (مثل: nova1) وتتحقق من سلامة المزامنة السحابية.
+ * بوابة العبور السيادية (Sovereign Gateway v4.5):
+ * تدعم الدخول بـ "اسم المستخدم" وتوفر حلولاً تشخيصية للأعطال السحابية.
  */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
-  const [diagnosisMessage, setDiagnosisMessage] = useState<string | null>(null);
+  const [diagnosis, setDiagnosis] = useState<{ message: string, email?: string } | null>(null);
 
   useEffect(() => {
     if (user && !loading) {
@@ -41,12 +41,12 @@ export default function LoginPage() {
     if (localLoading) return;
     
     setLocalLoading(true);
-    setDiagnosisMessage(null);
+    setDiagnosis(null);
 
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك تحويل الهوية الذكي (Look up email from username)
+        // 🛡️ محرك تحويل الهوية الذكي
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -60,28 +60,27 @@ export default function LoginPage() {
             finalEmail = snap.docs[0].data().email;
         }
 
-        // محاولة الدخول
         await login(finalEmail, password);
 
     } catch (error: any) {
         setLocalLoading(false);
-        const errorCode = error.code || '';
         
-        // 🔍 محرك تشخيص أعطال الأمان (Auth vs Firestore sync check)
+        // 🔍 محرك تشخيص أعطال الأمان المطور
         if (firestore) {
             const checkEmail = identifier.includes('@') ? identifier.trim().toLowerCase() : null;
-            const diagnosisQuery = checkEmail 
+            const diagQuery = checkEmail 
                 ? query(collection(firestore, 'global_users'), where('email', '==', checkEmail), limit(1))
                 : query(collection(firestore, 'global_users'), where('username', '==', identifier.trim().toLowerCase()), limit(1));
             
-            const snap = await getDocs(diagnosisQuery);
+            const snap = await getDocs(diagQuery);
             if (!snap.empty) {
-                // الحساب موجود في DB ولكن فشل الدخول
-                if (errorCode === 'auth/invalid-credential' || error.message?.includes('غير صحيح')) {
-                    setDiagnosisMessage('⚠️ تنبيه: بياناتك موجودة في السجلات، ولكن كلمة المرور غير صحيحة أو أن الحساب لم يتم تفعيله سحابياً بعد (Firebase Auth). يرجى مراجعة المطور.');
-                }
+                const userData = snap.docs[0].data();
+                setDiagnosis({
+                    message: 'بياناتك موجودة في السجلات، ولكن الحساب لم يتم تفعيله سحابياً (Firebase Auth). يرجى إضافة هذا البريد يدوياً في لوحة تحكم Firebase وتعيين كلمة المرور.',
+                    email: userData.email
+                });
             } else {
-                setDiagnosisMessage('لا يوجد حساب مسجل بهذا الاسم. تأكد من كتابة اسم المستخدم بشكل صحيح.');
+                setDiagnosis({ message: 'لا يوجد حساب مسجل بهذا الاسم. تأكد من كتابة اسم المستخدم بشكل صحيح.' });
             }
         }
 
@@ -110,10 +109,19 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {diagnosisMessage && (
+            {diagnosis && (
                 <Alert variant="destructive" className="rounded-2xl bg-red-50 border-red-200 animate-in fade-in slide-in-from-top-2">
-                    <Info className="h-4 w-4" />
-                    <AlertDescription className="text-[10px] font-black leading-relaxed">{diagnosisMessage}</AlertDescription>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle className="text-[11px] font-black">حل مشكلة الدخول</AlertTitle>
+                    <AlertDescription className="text-[10px] font-black leading-relaxed space-y-2 mt-1">
+                        <p>{diagnosis.message}</p>
+                        {diagnosis.email && (
+                            <div className="p-2 bg-white rounded-lg border border-red-100 flex items-center justify-between">
+                                <span className="font-mono select-all text-[9px]">{diagnosis.email}</span>
+                                <Key className="h-3 w-3 opacity-30" />
+                            </div>
+                        )}
+                    </AlertDescription>
                 </Alert>
             )}
 
