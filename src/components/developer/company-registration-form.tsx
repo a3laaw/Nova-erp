@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -275,7 +276,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             <Label className="font-black text-black text-xs pr-1 uppercase flex items-center gap-2">
                                 <Activity className="h-3 w-3 text-indigo-600" /> نشاط المنشأة الرئيسي *
                             </Label>
-                            <Select value={formData.activityType} onValueChange={(v) => setFormData(p => ({...p, activityType: v}))}>
+                            <Select value={formData.activityType} onValueChange={(v: any) => setFormData(p => ({...p, activityType: v}))}>
                                 <SelectTrigger className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black">
                                     <SelectValue placeholder="اختر النشاط..." />
                                 </SelectTrigger>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -91,7 +92,6 @@ export default function DeveloperDashboard() {
 
   /**
    * 🛠️ محرك ترميم البيانات القديمة (The Sovereign Repair Engine)
-   * يقوم بتطبيق المعايير الجديدة على كافة المنشآت الحالية آلياً.
    */
   const handleRepairData = async () => {
     if (!firestore || isRepairing) return;
@@ -106,13 +106,13 @@ export default function DeveloperDashboard() {
             const data = cDoc.data();
             const companyId = cDoc.id;
 
-            // 1. حقن مصفوفة Firebase إذا كانت ناقصة
+            // 1. حقن مصفوفة Firebase
             if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
                 batch.update(cDoc.ref, { firebaseConfig: MASTER_FIREBASE_CONFIG });
                 repairCount++;
             }
 
-            // 2. ضمان وجود المدير في الفهرس العالمي (Global User Index)
+            // 2. ضمان وجود المدير في الفهرس العالمي
             const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
             const globalSnap = await getDocs(globalQuery);
             
@@ -130,10 +130,7 @@ export default function DeveloperDashboard() {
         }
 
         await batch.commit();
-        toast({ 
-            title: '✅ تم الانتهاء من الترميم السيادي', 
-            description: `تم تصحيح وتحديث ${repairCount} حقل في البيانات القديمة لتتوافق مع المعايير الجديدة.` 
-        });
+        toast({ title: '✅ تم الترميم السيادي', description: `تم تصحيح وتحديث ${repairCount} حقل في البيانات.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل الترميم', description: e.message });
     } finally {
@@ -184,7 +181,7 @@ export default function DeveloperDashboard() {
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
-      // 2. تأسيس ملف الشركة مع الحقن الآلي للمصفوفة السحابية والربط الزمني (7 أيام)
+      // 2. تأسيس ملف الشركة
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -231,10 +228,7 @@ export default function DeveloperDashboard() {
       });
 
       await batch.commit();
-      toast({ 
-        title: '✅ تفعيل ناجح', 
-        description: `المنشأة جاهزة للعبور: ${sovereignEmail}` 
-      });
+      toast({ title: '✅ تفعيل ناجح', description: `المنشأة جاهزة للعبور باسم المستخدم: ${safeUsername}` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -269,12 +263,7 @@ export default function DeveloperDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-4">
-                        <Button 
-                            onClick={handleRepairData} 
-                            disabled={isRepairing} 
-                            variant="outline" 
-                            className="h-14 px-8 rounded-2xl font-black text-base gap-3 border-indigo-400 text-indigo-100 hover:bg-indigo-600/20"
-                        >
+                        <Button onClick={handleRepairData} disabled={isRepairing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-base gap-3 border-indigo-400 text-indigo-100 hover:bg-indigo-600/20">
                             {isRepairing ? <Loader2 className="animate-spin h-6 w-6" /> : <Wrench className="h-6 w-6" />}
                             ترميم البيانات القديمة
                         </Button>

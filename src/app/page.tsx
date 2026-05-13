@@ -7,22 +7,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway):
- * تم تحصينها بمحرك توجيه ذكي ومعالجة فورية للأخطاء.
+ * بوابة العبور السيادية (Sovereign Gateway v3.0):
+ * تدعم الآن "الدخول بالهوية المبسطة" (Username Login).
+ * يقوم النظام آلياً بتحويل اسم المستخدم إلى البريد السيادي المعقد خلف الكواليس.
  */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
+  const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [identifier, setIdentifier] = useState(''); // يمكن أن يكون اسم مستخدم أو بريد
+  const [password, setPassword] = useState('');
   const [localLoading, setLocalLoading] = useState(false);
 
   // 🛡️ محرك التوجيه التلقائي المعتمد على الحالة السيادية
@@ -39,14 +44,30 @@ export default function LoginPage() {
     
     setLocalLoading(true);
     try {
-        await login(formData.email, formData.password);
-        // في حال النجاح، سيقوم useEffect أعلاه بالتوجيه آلياً
+        let finalEmail = identifier.trim().toLowerCase();
+
+        // 🛡️ محرك تحويل الهوية (Identity Resolution Engine)
+        // إذا لم يحتوي المدخل على @، نعتبره اسم مستخدم ونبحث عنه في الفهرس العالمي
+        if (!finalEmail.includes('@') && firestore) {
+            const globalQuery = query(
+                collection(firestore, 'global_users'), 
+                where('username', '==', finalEmail),
+                limit(1)
+            );
+            const snap = await getDocs(globalQuery);
+            if (snap.empty) {
+                throw new Error('اسم المستخدم هذا غير مسجل في المنظومة.');
+            }
+            finalEmail = snap.docs[0].data().email;
+        }
+
+        await login(finalEmail, password);
     } catch (error: any) {
         setLocalLoading(false);
         toast({
             variant: 'destructive',
             title: 'خطأ في الدخول',
-            description: error.message || 'فشل التحقق من بيانات الاعتماد.'
+            description: error.message || 'البريد أو كلمة المرور غير صحيحة.'
         });
     }
   };
@@ -69,34 +90,29 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {(authError) && (
-                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50/50">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="font-black text-xs">تنبيه النظام</AlertTitle>
-                    <AlertDescription className="text-[11px] font-bold mt-1">{authError}</AlertDescription>
-                </Alert>
-            )}
-
             <form onSubmit={handleLogin} className="space-y-5">
                 <div className="grid gap-2">
-                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">البريد الإلكتروني الفني</Label>
-                    <Input 
-                        type="email" 
-                        value={formData.email} 
-                        onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                        className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 focus:border-primary/50 transition-all" 
-                        required 
-                        placeholder="user@comp-id.nova"
-                        disabled={localLoading || loading}
-                    />
+                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد</Label>
+                    <div className="relative group">
+                        <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                        <Input 
+                            type="text" 
+                            value={identifier} 
+                            onChange={e => setIdentifier(e.target.value)} 
+                            className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 pr-10" 
+                            required 
+                            placeholder="username / email"
+                            disabled={localLoading || loading}
+                        />
+                    </div>
                 </div>
 
                 <div className="grid gap-2">
                     <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">كلمة المرور</Label>
                     <Input 
                         type="password" 
-                        value={formData.password} 
-                        onChange={e => setFormData(p => ({...p, password: e.target.value}))} 
+                        value={password} 
+                        onChange={e => setPassword(e.target.value)} 
                         className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2 focus:border-primary/50 transition-all" 
                         required 
                         placeholder="********"
