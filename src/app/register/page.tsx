@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -15,75 +14,111 @@ import {
     ShieldCheck,
     Users,
     Mail,
-    User
+    User,
+    Link2,
+    Copy,
+    Sparkles
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * بوابة تسجيل المنشآت (Sovereign Registration Gateway v9.0)
- * تم دمج حقل البريد الإلكتروني الحقيقي لتمكين إرسال روابط التفعيل.
+ * بوابة التأسيس الفوري (Instant Sovereign Setup v10.0)
+ * لا تتطلب تدخل الأدمن؛ التفعيل يتم في أجزاء من الثانية.
  */
 export default function RegisterPage() {
-  const { firestore } = useFirebase();
   const { toast } = useToast();
   
   const [isSaving, setIsSaving] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [setupResult, setSetupResult] = useState<{ name: string, link: string } | null>(null);
 
   const [formData, setFormData] = useState({
     companyName: '',
     activity: 'consulting',
     employeeCountRange: '1-5',
     contactName: '',
-    email: '', // 📧 البريد الحقيقي للتفعيل
-    username: '', // 🔑 المعرف الرشيق للدخول
+    email: '', 
+    username: '', 
     phone: '', 
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
-
-    if (!formData.username.trim() || !formData.email.trim()) {
-        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال البريد الإلكتروني واسم المستخدم.' });
+    
+    if (!formData.username.trim() || !formData.email.trim() || !formData.companyName.trim()) {
+        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى تعبئة كافة الحقول المطلوبة.' });
         return;
     }
 
     setIsSaving(true);
     try {
-        await addDoc(collection(firestore, 'company_requests'), {
-            ...formData,
-            email: formData.email.toLowerCase().trim(),
-            username: formData.username.toLowerCase().replace(/[^a-z0-9]/g, ''),
-            status: 'pending',
-            createdAt: serverTimestamp(),
+        const response = await fetch('/api/manage-tenant-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'instant_setup',
+                ...formData
+            })
         });
-        setIsSuccess(true);
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'خطأ في الإرسال', description: 'يرجى المحاولة مرة أخرى لاحقاً.' });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            setSetupResult({
+                name: formData.companyName,
+                link: result.inviteLink
+            });
+            toast({ title: '✅ تم تأسيس منشأتك بنجاح' });
+        } else {
+            throw new Error(result.message || result.error);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'خطأ في التأسيس', description: error.message || 'يرجى مراجعة الدعم الفني.' });
     } finally {
         setIsSaving(false);
     }
   };
 
-  if (isSuccess) {
+  if (setupResult) {
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
-            <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
+            <Card className="w-full max-w-lg rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
                 <div className="bg-green-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-green-500/40 shadow-inner">
                     <CheckCircle2 className="h-16 w-16 text-green-600" />
                 </div>
-                <h2 className="text-3xl font-black text-[#1e1b4b] mb-4 tracking-tighter">تم استلام طلبك!</h2>
+                <h2 className="text-3xl font-black text-[#1e1b4b] mb-2 tracking-tighter">مبروك! منشأتك جاهزة</h2>
                 <p className="text-[#1e1b4b]/70 font-bold mb-8 leading-relaxed">
-                    فريق Nova ERP سيقوم بمراجعة طلبك وإرسال **رابط تفعيل** إلى بريدك الإلكتروني قريباً.
+                    تم تأسيس **{setupResult.name}** سحابياً وتفعيل فترة ديمو 7 أيام.
+                    <br/>
+                    استخدم الرابط أدناه لتفعيل حسابك والدخول فوراً.
                 </p>
-                <Button asChild className="h-14 px-12 rounded-2xl bg-[#1e1b4b] text-white font-black hover:bg-black shadow-xl">
-                    <Link href="/">العودة للرئيسية</Link>
-                </Button>
+                
+                <div className="p-6 bg-white/60 rounded-3xl border-2 border-dashed border-green-500/30 mb-8 space-y-4">
+                    <p className="text-xs font-black text-green-700 uppercase tracking-widest flex items-center justify-center gap-2">
+                        <Sparkles className="h-4 w-4" /> رابط التفعيل السيادي
+                    </p>
+                    <div className="flex gap-2">
+                        <Input readOnly value={setupResult.link} className="h-11 rounded-xl bg-white border-2 font-mono text-[10px] text-left" />
+                        <Button 
+                            onClick={() => { navigator.clipboard.writeText(setupResult.link); toast({ title: '📋 تم النسخ' }); }}
+                            className="bg-green-600 text-white rounded-xl h-11 px-4"
+                        >
+                            <Copy className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">أرسلنا لك نسخة أيضاً على بريدك الإلكتروني {formData.email}</p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <Button asChild className="h-14 rounded-2xl bg-[#1e1b4b] text-white font-black hover:bg-black shadow-xl">
+                        <a href={setupResult.link}>تفعيل الحساب والدخول الآن</a>
+                    </Button>
+                    <Button asChild variant="ghost" className="text-[#1e1b4b] font-bold">
+                        <Link href="/">العودة للرئيسية</Link>
+                    </Button>
+                </div>
             </Card>
         </div>
       );
@@ -97,8 +132,8 @@ export default function RegisterPage() {
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-[#1e1b4b] rounded-[2rem] shadow-xl"><Rocket className="h-8 w-8 text-white" /></div>
                     <div className="text-right">
-                        <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">سجل منشأتك الآن</CardTitle>
-                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">انضم إلى مجتمع Nova ERP السيادي</CardDescription>
+                        <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">ابدأ منشأتك فوراً</CardTitle>
+                        <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">تأسيس سحابي فوري ومستقر 100%</CardDescription>
                     </div>
                 </div>
                 <Button asChild variant="ghost" className="text-[#1e1b4b] hover:bg-white/40 rounded-xl gap-2 font-black h-10 px-4">
@@ -111,7 +146,7 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6">
-                        <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">بيانات الشركة</h3>
+                        <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">هوية المنشأة</h3>
                         <div className="grid gap-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="companyName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المكتب / الشركة *</Label>
@@ -157,10 +192,10 @@ export default function RegisterPage() {
                     </div>
 
                     <div className="space-y-6">
-                        <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">بيانات التواصل والمدير</h3>
+                        <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">بيانات المالك</h3>
                         <div className="grid gap-4">
                             <div className="grid gap-1.5">
-                                <Label htmlFor="contactName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المدير المسؤول *</Label>
+                                <Label htmlFor="contactName" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المالك المسؤول *</Label>
                                 <Input 
                                     id="contactName"
                                     value={formData.contactName} 
@@ -186,10 +221,10 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-6">
-                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب المالك والتفعيل</h3>
+                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات العبور والأمان</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="grid gap-1.5">
-                            <Label htmlFor="email" className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني الحقيقي *</Label>
+                            <Label htmlFor="email" className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الحقيقي للتفعيل *</Label>
                             <div className="relative group">
                                 <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                                 <Input 
@@ -202,10 +237,9 @@ export default function RegisterPage() {
                                     placeholder="your@email.com" 
                                 />
                             </div>
-                            <p className="text-[9px] text-muted-foreground font-bold pr-1">سنرسل رابط تفعيل الحساب لهذا البريد فوراً.</p>
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
+                            <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم للدخول (ID) *</Label>
                             <div className="relative group">
                                 <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                                 <Input 
@@ -217,7 +251,6 @@ export default function RegisterPage() {
                                     placeholder="e.g. alaa" 
                                 />
                             </div>
-                            <p className="text-[9px] text-muted-foreground font-bold pr-1">المعرف الذي ستستخدمه دائماً للدخول السريع.</p>
                         </div>
                     </div>
                 </div>
@@ -226,7 +259,7 @@ export default function RegisterPage() {
         <CardFooter className="p-8 border-t bg-black/5">
             <Button onClick={handleSubmit} disabled={isSaving} className="w-full h-16 rounded-[2rem] font-black text-xl gap-4 shadow-2xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-8 border-black/40 active:translate-y-1 active:border-b-0">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <ShieldCheck className="h-6 w-6 text-green-400" />}
-                إرسال طلب التأسيس السيادي
+                تأسيس المنشأة والدخول الآن
             </Button>
         </CardFooter>
       </Card>
