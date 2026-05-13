@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/request';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase/admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد (V11.0 - Full Auto Flow).
- * تم تحصينه لضمان الشفافية المطلقة عند فشل الأتمتة بسبب نقص ملفات الأمان.
+ * @fileOverview API الأمان السيادي الموحد (V12.0 - Fully Automated Activation Flow).
+ * تم تحصينه لدعم تفعيل طلبات الديمو وإنشاء الـ Tenants والمستخدمين آلياً.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -23,7 +23,7 @@ const MASTER_FIREBASE_CONFIG = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, email, username, companyName, contactName, phone, activity, employeeCountRange } = body;
+    const { action, email, username, companyName, contactName, phone, activity, employeeCountRange, password, requestId } = body;
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     let hasServiceAccount = false;
@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
         }
     }
 
-    // 🛡️ رادار فحص الجاهزية للأدمن
     if (action === 'check') {
         return NextResponse.json({ 
             success: true, 
@@ -55,42 +54,40 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'instant_setup') {
+        if (!hasServiceAccount) throw new Error("محرك الأتمتة غير مفعل. يرجى رفع ملف الأمان أولاً.");
+
+        const auth = getAuth();
+        const db = getFirestore();
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         const trialEndDate = new Date();
         trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-        let inviteLink = null;
-        let authCreated = false;
-
-        // 1. محاولة إنشاء حساب الأمان (Authentication)
-        if (hasServiceAccount) {
-            try {
-                const auth = getAuth();
-                let userRecord;
-                try {
-                    userRecord = await auth.createUser({
-                        email: sanitizedEmail,
-                        password: Math.random().toString(36).slice(-12) + 'A1!',
-                        displayName: contactName,
-                        emailVerified: true,
-                    });
-                } catch (e: any) {
-                    if (e.code === 'auth/email-already-exists') {
-                        userRecord = await auth.getUserByEmail(sanitizedEmail);
-                    } else { throw e; }
-                }
-                inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
-                authCreated = true;
-            } catch (e: any) {
-                console.error("Auth creation failed:", e.message);
-            }
+        // 1. إنشاء حساب المالك سحابياً
+        let userRecord;
+        try {
+            userRecord = await auth.createUser({
+                email: sanitizedEmail,
+                password: password || Math.random().toString(36).slice(-12) + 'A1!',
+                displayName: contactName,
+                emailVerified: true,
+            });
+        } catch (e: any) {
+            if (e.code === 'auth/email-already-exists') {
+                userRecord = await auth.getUserByEmail(sanitizedEmail);
+            } else { throw e; }
         }
 
-        // 2. إنشاء السجلات في قاعدة البيانات (حتى لو فشل الـ Auth، لتمكين الإضافة اليدوية)
-        const db = getFirestore();
+        // 2. تعيين الصلاحيات الماستر للمنشأة (Tenant ID)
+        await auth.setCustomUserClaims(userRecord.uid, {
+            companyId: companyId,
+            role: 'Admin'
+        });
+
+        // 3. إنشاء وثيقة المنشأة السيادية
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
+            id: companyId,
             name: companyName,
             activity: activity || 'general',
             employeeCountRange: employeeCountRange || '1-5',
@@ -105,20 +102,45 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 3. الفهرس العالمي
+        // 4. إنشاء ملف المستخدم داخل المنشأة (The Owner Profile)
+        const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
+        await tenantUserRef.set({
+            uid: userRecord.uid,
+            email: sanitizedEmail,
+            fullName: contactName,
+            username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
+            role: 'Admin',
+            isActive: true,
+            createdAt: FieldValue.serverTimestamp()
+        });
+
+        // 5. تسجيل الهوية في الفهرس العالمي للدخول السريع
         const globalIndexRef = db.collection('global_users').doc();
         await globalIndexRef.set({
             email: sanitizedEmail,
             username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
             companyId,
+            uid: userRecord.uid,
             createdAt: FieldValue.serverTimestamp()
         });
 
+        // 6. تحديث طلب الديمو الأصلي
+        if (requestId) {
+            const requestRef = db.collection('company_requests').doc(requestId);
+            await requestRef.update({
+                status: 'activated',
+                activatedAt: FieldValue.serverTimestamp(),
+                companyId: companyId
+            });
+        }
+
+        const inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
+
         return NextResponse.json({ 
             success: true, 
-            authCreated,
+            uid: userRecord.uid,
             inviteLink,
-            message: authCreated ? "تم تأسيس المنشأة آلياً." : "تأسيس جزئي: يرجى إضافة الإيميل يدوياً في Console."
+            message: "تم تأسيس المنشأة وتفعيل حساب المالك آلياً بنجاح."
         });
     }
 
