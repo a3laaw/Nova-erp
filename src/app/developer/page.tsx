@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, limit, updateDoc, deleteField } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import {
@@ -54,7 +54,7 @@ import { ar } from 'date-fns/locale';
 
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
-  const { user: currentUser } = useAuth() as any;
+  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   
@@ -63,7 +63,6 @@ export default function DeveloperDashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
-  const [isRepairing, setIsRepairing] = useState(false);
   const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
 
   // --- ميزات تفعيل الحسابات الجديدة ---
@@ -72,7 +71,9 @@ export default function DeveloperDashboard() {
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
 
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
-  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
+  
+  const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
+  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
 
   useEffect(() => {
     const checkSystem = async () => {
@@ -144,7 +145,21 @@ export default function DeveloperDashboard() {
     if (!activationResult || !requestToActivate) return;
     const msg = `أهلاً بك في عائلة Nova ERP! 🚀\n\nتم تفعيل منشأتك: *${requestToActivate.companyName}*\n\nبيانات الدخول:\n👤 اسم المستخدم: ${requestToActivate.username}\n📧 البريد: ${activationResult.email}\n🔑 كلمة المرور: ${activationResult.pass}\n\nيرجى تفعيل حسابك عبر الرابط:\n${activationResult.link}\n\nنتمنى لك عملاً موفقاً!`;
     navigator.clipboard.writeText(msg);
-    toast({ title: '📋 تم نسخ رسالة الترحيب' });
+    toast({ title: '📋 تم النسخ' });
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!companyToDelete || !firestore) return;
+    setIsProcessing(companyToDelete.id!);
+    try {
+        await deleteDoc(doc(firestore, 'companies', companyToDelete.id!));
+        toast({ title: 'نجاح التصفية', description: 'تم حذف المنشأة من قاعدة البيانات.' });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
+    } finally {
+        setIsProcessing(null);
+        setCompanyToDelete(null);
+    }
   };
 
   return (
@@ -178,7 +193,7 @@ export default function DeveloperDashboard() {
                 <TabsTrigger value="requests" className="rounded-xl px-10 font-black gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                     <Rocket className="h-4 w-4" /> طلبات الديمو المعلقة
                     {requests.filter(r => r.status === 'pending').length > 0 && (
-                        <Badge className="bg-red-500 text-white h-5 w-5 p-0 flex items-center justify-center rounded-full animate-bounce">
+                        <Badge className="bg-red-500 text-white h-5 w-5 p-0 flex items-center justify-center rounded-full mr-2">
                             {requests.filter(r => r.status === 'pending').length}
                         </Badge>
                     )}
@@ -222,7 +237,7 @@ export default function DeveloperDashboard() {
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
                                             <Button 
-                                                onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); setIsPrimaryDialogOpen(true); }}
+                                                onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); }}
                                                 className="h-11 px-8 rounded-xl font-black bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 gap-2 active:scale-95 transition-all"
                                             >
                                                 <UserPlus className="h-4 w-4" /> تفعيل الحساب
@@ -244,6 +259,10 @@ export default function DeveloperDashboard() {
                         <div className="relative w-full max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-950 opacity-40" />
                             <Input placeholder="بحث باسم المنشأة..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold" />
+                        </div>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Activity className="h-3 w-3" />
+                            تم العثور على {filteredCompanies.length} منشأة
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -404,8 +423,4 @@ export default function DeveloperDashboard() {
         </AlertDialog>
     </div>
   );
-}
-
-function orderBy(arg0: string, arg1: string): import("@firebase/firestore").QueryConstraint {
-    throw new Error('Function not implemented.');
 }
