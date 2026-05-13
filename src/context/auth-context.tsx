@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
@@ -39,17 +40,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * محرك المصادقة السيادي: 
-   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات وضمان استجابة nova1.
+   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات وضمان الاستقرار.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
-      // 🛡️ المبدأ السيادي الأول: الفحص في الفهرس العالمي (أولوية قصوى لمديري الشركات)
+      // 🛡️ المحطة 1: الفحص في الفهرس العالمي (الشركات السحابية)
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
       if (!globalSnap.empty) {
         const idx = globalSnap.docs[0].data();
-        const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users`, user.uid));
+        const tenantUserPath = `companies/${idx.companyId}/users/${user.uid}`;
+        const tenantDoc = await getDoc(doc(firestore, tenantUserPath));
         
         if (tenantDoc.exists()) {
             const profile = validateUserProfile(tenantDoc.data());
@@ -57,23 +59,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
             return {
-              user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client', isSuperAdmin: profile.role === 'Developer' } as AuthenticatedUser,
+              user: { 
+                ...profile, 
+                uid: user.uid, 
+                id: tenantDoc.id, 
+                currentCompanyId: idx.companyId, 
+                companyName: company?.name || 'Nova Client',
+                isActive: profile.isActive ?? true 
+              } as AuthenticatedUser,
               company
             };
         }
       }
 
-      // 🛠️ المبدأ السيادي الثاني: وضع المطور (فقط إذا لم يكن في الفهرس العالمي)
+      // 🛠️ المحطة 2: وضع المطور (فقط إذا لم يكن في الفهرس العالمي)
       if (email.endsWith('.local')) {
         const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
         if (devDoc.exists()) {
           return {
-            user: { id: user.uid, uid: user.uid, email: user.email!, username: 'root', role: 'Developer', isActive: true, fullName: devDoc.data()?.fullName || 'Master Developer', isSuperAdmin: true, currentCompanyId: null, companyName: 'Nova ERP Platform' } as AuthenticatedUser,
+            user: { 
+                id: user.uid, 
+                uid: user.uid, 
+                email: user.email!, 
+                username: 'root', 
+                role: 'Developer', 
+                isActive: true, 
+                fullName: devDoc.data()?.fullName || 'Master Developer', 
+                isSuperAdmin: true, 
+                currentCompanyId: null, 
+                companyName: 'Nova ERP Platform' 
+            } as AuthenticatedUser,
             company: null
           };
         }
       }
-    } catch (e) { console.error("Identity Fetch Error:", e); }
+    } catch (e) { 
+        console.error("Identity Resolution Error:", e); 
+    }
 
     return { user: null, company: null };
   }, []);
@@ -96,23 +118,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const email = firebaseUser.email?.toLowerCase();
-        if (!email) { if (isMounted) updateState({ loading: false }); return; }
-
+        const email = firebaseUser.email?.toLowerCase() || '';
         const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, email);
 
         if (isMounted) {
-          if (user?.isActive) {
+          if (user && user.isActive) {
             setSessionIndicators(firebaseUser.uid, user.role);
             updateState({ user, company, loading: false, error: null });
             if (company) setCurrentCompany(company);
           } else {
-            updateState({ user: null, company: null, loading: false, error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على ملف المستخدم.' });
+            updateState({ 
+                user: null, 
+                company: null, 
+                loading: false, 
+                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول لهذا البريد.' 
+            });
             clearSessionIndicators();
           }
         }
       } catch (err: any) {
-        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر مزامنة الجلسة السيادية.' });
+        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر التحقق من الجلسة السيادية.' });
         clearSessionIndicators();
       } finally {
         if (isMounted) updateState({ loading: false });
@@ -127,6 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateState({ loading: true, error: null });
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
+      // ملاحظة: loading سيتم إغلاقه عبر onAuthStateChanged لضمان ثبات التوجيه
     } catch (err: any) {
       updateState({ loading: false });
       throw new Error(mapFirebaseAuthError(err.code));
@@ -141,7 +167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCurrentCompany(null);
       clearSessionIndicators();
       router.replace('/');
-    } catch (e) { console.error('Logout err:', e); }
+    } catch (e) { console.error('Logout failed:', e); }
   }, [masterAuth, router, setCurrentCompany, updateState]);
 
   const refreshUserData = useCallback(async () => {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'next/navigation';
 import {
@@ -47,7 +48,7 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
-// 🛡️ المصفوفة السحابية الماستر (يتم حقنها آلياً لكل شركة جديدة)
+// 🛡️ المصفوفة السحابية الماستر لحقن الشركات الجديدة
 const MASTER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
   authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
@@ -104,22 +105,27 @@ export default function DeveloperDashboard() {
   };
 
   /**
-   * محرك التفعيل السيادي (7 أيام ديمو + حقن مصفوفة آلي)
+   * محرك التفعيل السيادي الموحد (The Final Unification Logic)
    */
   const handleActivateCompany = async (req: CompanyRequest) => {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
+      // 1. توليد هوية سيادية نظيفة وموحدة
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
-      const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || req.email.split('@')[0].replace(/[^a-z0-9]/g, '');
-      
-      // الهوية الرشيقة: username @ comp-id . nova
+      const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
+      // 2. إنشاء حساب الأمان (Auth) عبر الـ API
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sovereignEmail, password: req.adminPassword, displayName: req.contactName, action: 'create' })
+        body: JSON.stringify({ 
+          email: sovereignEmail, 
+          password: req.adminPassword, 
+          displayName: req.contactName, 
+          action: 'create' 
+        })
       });
       
       const authResult = await createRes.json();
@@ -127,10 +133,9 @@ export default function DeveloperDashboard() {
 
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
-
-      // ✨ أتمتة الحقن والجدولة لـ 7 أيام ديمو ✨
       const trialEndDate = addDays(new Date(), 7);
 
+      // 3. إنشاء وثيقة الشركة مع حقن المصفوفة آلياً
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -142,20 +147,46 @@ export default function DeveloperDashboard() {
         trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5,
         firebaseProjectId: MASTER_FIREBASE_CONFIG.projectId,
-        firebaseConfig: MASTER_FIREBASE_CONFIG, // حقن تلقائي للمصفوفة لضمان عدم ظهور حقول فارغة
+        firebaseConfig: MASTER_FIREBASE_CONFIG,
         createdAt: serverTimestamp(),
       });
 
+      // 4. إنشاء المستخدم الإداري داخل الشركة
       const userRef = doc(firestore, `companies/${companyId}/users`, authResult.uid);
-      batch.set(userRef, { id: authResult.uid, uid: authResult.uid, fullName: req.contactName, email: sovereignEmail, username: safeUsername, role: 'Admin', isActive: true, createdAt: serverTimestamp() });
+      batch.set(userRef, {
+        id: authResult.uid,
+        uid: authResult.uid,
+        fullName: req.contactName,
+        email: sovereignEmail,
+        username: safeUsername,
+        role: 'Admin',
+        isActive: true,
+        companyId: companyId,
+        createdAt: serverTimestamp()
+      });
 
+      // 5. الربط بالفهرس العالمي (المفتاح الذهبي للدخول)
       const globalRef = doc(collection(firestore, 'global_users'));
-      batch.set(globalRef, { email: sovereignEmail, username: safeUsername, companyId, uid: authResult.uid, createdAt: serverTimestamp() });
+      batch.set(globalRef, {
+        email: sovereignEmail,
+        username: safeUsername,
+        companyId: companyId,
+        uid: authResult.uid,
+        createdAt: serverTimestamp(),
+      });
 
-      batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
+      // 6. تحديث حالة الطلب
+      batch.update(doc(firestore, 'company_requests', req.id!), { 
+        status: 'activated',
+        activatedAt: serverTimestamp(),
+        companyId: companyId 
+      });
 
       await batch.commit();
-      toast({ title: '✅ تم تفعيل البيئة', description: `${req.companyName} جاهزة للدخول مع فترة 7 أيام.` });
+      toast({ 
+        title: '✅ تم تفعيل البيئة السيادية', 
+        description: `المنشأة جاهزة للدخول بإيميل: ${sovereignEmail}` 
+      });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
