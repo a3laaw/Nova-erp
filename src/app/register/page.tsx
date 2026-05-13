@@ -13,7 +13,9 @@ import {
     ArrowRight,
     CheckCircle2,
     ShieldCheck,
-    Users
+    Users,
+    Mail,
+    User
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,8 +24,8 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * بوابة تسجيل المنشآت (Sovereign Registration Gateway v8.0)
- * تم تصفير حقول الأمان (تلقائية بالكامل) وإضافة حقل حجم المنشأة.
+ * بوابة تسجيل المنشآت (Sovereign Registration Gateway v9.0)
+ * تم دمج حقل البريد الإلكتروني الحقيقي لتمكين إرسال روابط التفعيل.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -35,9 +37,10 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     companyName: '',
     activity: 'consulting',
-    employeeCountRange: '1-5', // القيمة الافتراضية
+    employeeCountRange: '1-5',
     contactName: '',
-    username: '', 
+    email: '', // 📧 البريد الحقيقي للتفعيل
+    username: '', // 🔑 المعرف الرشيق للدخول
     phone: '', 
   });
 
@@ -45,8 +48,8 @@ export default function RegisterPage() {
     e.preventDefault();
     if (!firestore) return;
 
-    if (!formData.username.trim()) {
-        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار اسم مستخدم (ID) لتأسيس حسابك.' });
+    if (!formData.username.trim() || !formData.email.trim()) {
+        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى إدخال البريد الإلكتروني واسم المستخدم.' });
         return;
     }
 
@@ -54,6 +57,8 @@ export default function RegisterPage() {
     try {
         await addDoc(collection(firestore, 'company_requests'), {
             ...formData,
+            email: formData.email.toLowerCase().trim(),
+            username: formData.username.toLowerCase().replace(/[^a-z0-9]/g, ''),
             status: 'pending',
             createdAt: serverTimestamp(),
         });
@@ -74,7 +79,7 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-3xl font-black text-[#1e1b4b] mb-4 tracking-tighter">تم استلام طلبك!</h2>
                 <p className="text-[#1e1b4b]/70 font-bold mb-8 leading-relaxed">
-                    فريق Nova ERP سيقوم بمراجعة طلبك وتهيئة نظامك السحابي المعزول وتوليد رابط تفعيلك خلال ساعات.
+                    فريق Nova ERP سيقوم بمراجعة طلبك وإرسال **رابط تفعيل** إلى بريدك الإلكتروني قريباً.
                 </p>
                 <Button asChild className="h-14 px-12 rounded-2xl bg-[#1e1b4b] text-white font-black hover:bg-black shadow-xl">
                     <Link href="/">العودة للرئيسية</Link>
@@ -114,7 +119,7 @@ export default function RegisterPage() {
                                     id="companyName"
                                     value={formData.companyName} 
                                     onChange={e => setFormData(p => ({...p, companyName: e.target.value}))} 
-                                    className="h-11 rounded-xl bg-white border-2 font-bold text-[#1e1b4b]" 
+                                    className="h-11 rounded-xl bg-white border-2 font-bold" 
                                     required 
                                     placeholder="أدخل الاسم التجاري..." 
                                 />
@@ -123,8 +128,8 @@ export default function RegisterPage() {
                                 <div className="grid gap-1.5">
                                     <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">نوع النشاط</Label>
                                     <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
-                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]">
-                                            <SelectValue placeholder="النشاط..." />
+                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black">
+                                            <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent dir="rtl">
                                             <SelectItem value="consulting">استشارات هندسية</SelectItem>
@@ -136,7 +141,7 @@ export default function RegisterPage() {
                                 <div className="grid gap-1.5">
                                     <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">حجم الشركة</Label>
                                     <Select value={formData.employeeCountRange} onValueChange={(v) => setFormData(p => ({...p, employeeCountRange: v}))}>
-                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]">
+                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent dir="rtl">
@@ -160,7 +165,7 @@ export default function RegisterPage() {
                                     id="contactName"
                                     value={formData.contactName} 
                                     onChange={e => setFormData(p => ({...p, contactName: e.target.value}))} 
-                                    className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]" 
+                                    className="h-11 rounded-xl bg-white border-2 font-bold" 
                                     required 
                                     placeholder="الاسم الثلاثي..." 
                                 />
@@ -181,21 +186,39 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-6">
-                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب دخول المالك</h3>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
-                        <div className="relative">
-                            <Input 
-                                id="username"
-                                value={formData.username} 
-                                onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
-                                className="h-12 rounded-xl border-2 border-slate-200 bg-white font-black text-primary dir-ltr" 
-                                required 
-                                autoComplete="off"
-                                placeholder="مثال: alaa" 
-                            />
+                    <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب المالك والتفعيل</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="email" className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني الحقيقي *</Label>
+                            <div className="relative group">
+                                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                <Input 
+                                    id="email"
+                                    type="email"
+                                    value={formData.email} 
+                                    onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
+                                    className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-bold" 
+                                    required 
+                                    placeholder="your@email.com" 
+                                />
+                            </div>
+                            <p className="text-[9px] text-muted-foreground font-bold pr-1">سنرسل رابط تفعيل الحساب لهذا البريد فوراً.</p>
                         </div>
-                        <p className="text-[9px] text-muted-foreground font-bold pr-1">هذا هو المعرف الذي ستستخدمه دائماً للدخول إلى نظامك.</p>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
+                            <div className="relative group">
+                                <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                <Input 
+                                    id="username"
+                                    value={formData.username} 
+                                    onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
+                                    className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-black text-primary" 
+                                    required 
+                                    placeholder="e.g. alaa" 
+                                />
+                            </div>
+                            <p className="text-[9px] text-muted-foreground font-bold pr-1">المعرف الذي ستستخدمه دائماً للدخول السريع.</p>
+                        </div>
                     </div>
                 </div>
             </form>

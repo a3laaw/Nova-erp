@@ -48,7 +48,7 @@ export interface Company extends BaseEntity {
   phone?: string;
   email?: string;
   activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
-  employeeCountRange?: string; // 👥 حجم القوى العاملة
+  employeeCountRange?: string;
   status?: 'pending' | 'active' | 'suspended';
   // --- Licensing & Subscription ---
   subscriptionType: 'trial' | 'premium';
@@ -60,9 +60,10 @@ export interface Company extends BaseEntity {
 export interface CompanyRequest extends BaseEntity {
     companyName: string;
     activity: string;
-    employeeCountRange: string; // 👥 حجم القوى العاملة
+    employeeCountRange: string;
     contactName: string;
-    username: string; // 🔑 اسم المستخدم المختار كمعرف
+    email: string; // 📧 البريد الحقيقي للتفعيل
+    username: string; // 🔑 اسم المستخدم المختار كمعرف للدخول
     phone: string;
     status: 'pending' | 'activated' | 'rejected';
     activatedAt?: Timestamp | any;

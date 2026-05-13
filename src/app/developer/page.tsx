@@ -15,7 +15,8 @@ import {
     MoreHorizontal, ArrowRightLeft, 
     FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
     Wrench, DatabaseZap, AlertCircle, ShieldCheck, ShieldX, Copy, Link2, Key,
-    Users
+    Users,
+    Mail
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -79,7 +80,6 @@ export default function DeveloperDashboard() {
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
-  // 🛡️ رادار فحص جاهزية الأتمتة (Odoo Logic)
   useEffect(() => {
     const checkSystem = async () => {
         try {
@@ -135,31 +135,30 @@ export default function DeveloperDashboard() {
     if (!firestore || isProcessing) return;
     setIsProcessing(req.id!);
     try {
-      // 1. توليد هوية سيادية فريدة رشيقة (Odoo Logic)
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
-      const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
-      const sovereignEmail = `${safeUsername}@${companyId}.nova`;
-      const randomPassword = Math.random().toString(36).slice(-12) + 'A1!'; // كلمة مرور عشوائية قوية
+      const realEmail = req.email.toLowerCase().trim();
+      const safeUsername = req.username.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const randomPassword = Math.random().toString(36).slice(-12) + 'A1!';
 
-      // 2. محاولة الأتمتة الكاملة (Auth Creation)
+      // 🛡️ إنشاء الحساب السحابي باستخدام البريد الحقيقي
       const authRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sovereignEmail, password: randomPassword, displayName: req.contactName, action: 'activate_invite' })
+        body: JSON.stringify({ email: realEmail, password: randomPassword, displayName: req.contactName, action: 'activate_invite' })
       });
       const authResult = await authRes.json();
       
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
-      const trialEndDate = addDays(new Date(), 7); // 7 أيام افتراضية للديمو
+      const trialEndDate = addDays(new Date(), 7);
 
       // 3. حقن مصفوفة Firebase والترخيص المبرمج
       batch.set(companyRef, {
         name: req.companyName, 
         activity: req.activity,
-        employeeCountRange: req.employeeCountRange || '1-5',
-        adminEmail: sovereignEmail,
-        adminPassword: randomPassword, // تُحفظ كمرجع لإرسالها في الرابط
+        employeeCountRange: req.employeeCountRange,
+        adminEmail: realEmail,
+        adminPassword: randomPassword,
         contactPhone: req.phone, isActive: true,
         subscriptionType: 'trial', trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5, firebaseConfig: MASTER_FIREBASE_CONFIG, createdAt: serverTimestamp(),
@@ -167,11 +166,19 @@ export default function DeveloperDashboard() {
 
       const finalUid = authResult.uid || `TEMP_${Date.now()}`;
       batch.set(doc(firestore, `companies/${companyId}/users`, finalUid), {
-        id: finalUid, uid: finalUid, fullName: req.contactName, email: sovereignEmail,
+        id: finalUid, uid: finalUid, fullName: req.contactName, email: realEmail,
         username: safeUsername, role: 'Admin', isActive: true, companyId, createdAt: serverTimestamp()
       });
 
-      batch.set(doc(collection(firestore, 'global_users')), { email: sovereignEmail, username: safeUsername, companyId, uid: finalUid, createdAt: serverTimestamp() });
+      // الربط في الفهرس العالمي: اسم المستخدم -> البريد الحقيقي
+      batch.set(doc(collection(firestore, 'global_users')), { 
+          email: realEmail, 
+          username: safeUsername, 
+          companyId, 
+          uid: finalUid, 
+          createdAt: serverTimestamp() 
+      });
+      
       batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
 
       await batch.commit();
@@ -202,7 +209,6 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="space-y-10" dir="rtl">
-        {/* --- بنر رابط التفعيل الذكي --- */}
         {lastInviteLink && (
             <Card className="bg-green-600 text-white p-6 rounded-[2rem] shadow-2xl animate-in slide-in-from-top-4 border-none flex flex-col md:flex-row items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -230,9 +236,9 @@ export default function DeveloperDashboard() {
                             <CardTitle className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
                                 غرفة التحكم السيادية
                                 {systemStatus === 'READY' ? (
-                                    <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة (Odoo Flow)</Badge>
+                                    <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة</Badge>
                                 ) : (
-                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> التفعيل يدوي مطلوب</Badge>
+                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> التفعيل يدوي</Badge>
                                 )}
                             </CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، الأتمتة، والترميم السحابي الموحد.</CardDescription>
@@ -291,7 +297,7 @@ export default function DeveloperDashboard() {
             <TabsContent value="requests">
                 <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
                     <Table>
-                        <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة والحجم</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم (ID)</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
+                        <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة والحجم</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم (ID)</TableHead><TableHead className="font-black text-indigo-100 text-center">البريد الحقيقي</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {requests.map(req => (
                                 <TableRow key={req.id} className="h-32">
@@ -305,6 +311,12 @@ export default function DeveloperDashboard() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username}</Badge></TableCell>
+                                    <TableCell className="text-center">
+                                        <div className="flex flex-col items-center gap-1">
+                                            <Mail className="h-4 w-4 opacity-30 text-indigo-600" />
+                                            <span className="font-bold text-xs text-slate-600">{req.email}</span>
+                                        </div>
+                                    </TableCell>
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
                                             <Button 
@@ -313,7 +325,7 @@ export default function DeveloperDashboard() {
                                                 className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
                                             >
                                                 {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4" />} 
-                                                تفعيل البيئة آلياً (Odoo Flow)
+                                                تفعيل وإرسال رابط
                                             </Button>
                                         ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}
                                     </TableCell>
