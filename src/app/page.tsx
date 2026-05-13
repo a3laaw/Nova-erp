@@ -15,7 +15,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v7.0):
+ * بوابة العبور السيادية (Sovereign Gateway v10.0):
  * تدعم الدخول بـ "اسم المستخدم" مع محرك تحويل هوية سحابي ذكي.
  */
 export default function LoginPage() {
@@ -77,11 +77,11 @@ export default function LoginPage() {
             if (!snap.empty) {
                 const userData = snap.docs[0].data();
                 setDiagnosis({
-                    message: 'تم العثور على حسابك في قاعدة البيانات، ولكنه غير مفعل سحابياً. يرجى إضافة هذا البريد يدوياً في Auth أو طلب رابط تفعيل جديد.',
+                    message: 'تم العثور على حسابك في قاعدة البيانات، ولكنه غير مفعل سحابياً. يرجى تفعيل الحساب عبر الرابط المرسل لبريدك.',
                     email: userData.email
                 });
             } else {
-                setDiagnosis({ message: 'لا يوجد حساب مسجل بهذا الاسم. تأكد من كتابة اسم المستخدم بشكل صحيح.' });
+                setDiagnosis({ message: 'تأكد من كتابة اسم المستخدم وكلمة المرور بشكل صحيح.' });
             }
         }
 
@@ -126,9 +126,9 @@ export default function LoginPage() {
                 </Alert>
             )}
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-5" autoComplete="on">
                 <div className="grid gap-2">
-                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم فقط</Label>
+                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم فقط (Login ID)</Label>
                     <div className="relative group">
                         <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                         <Input 
@@ -189,4 +189,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -6,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFirebase, useSubscription } from '@/firebase';
 import { doc, collection, orderBy, query, getDocs, where, writeBatch, serverTimestamp, deleteDoc, Timestamp } from 'firebase/firestore';
-import type { Company, CompanyRequest } from '@/lib/types';
+import type { Company, GlobalUserIndex } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,7 +50,6 @@ const activityTranslations: Record<string, string> = {
     consulting: 'استشارات هندسية',
 };
 
-// 🛡️ مصفوفة الـ Firebase الماستر للحقن التلقائي
 const MASTER_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
   authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
@@ -75,10 +73,8 @@ export default function DeveloperDashboard() {
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [isRepairing, setIsRepairing] = useState(false);
   const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
-  const [lastInviteLink, setLastInviteLink] = useState<{name: string, link: string} | null>(null);
 
   const { data: rawCompanies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
-  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
   useEffect(() => {
     const checkSystem = async () => {
@@ -131,69 +127,6 @@ export default function DeveloperDashboard() {
     } finally { setIsProcessing(null); }
   };
 
-  const handleActivateCompany = async (req: CompanyRequest) => {
-    if (!firestore || isProcessing) return;
-    setIsProcessing(req.id!);
-    try {
-      const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
-      const realEmail = req.email.toLowerCase().trim();
-      const safeUsername = req.username.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const randomPassword = Math.random().toString(36).slice(-12) + 'A1!';
-
-      // 🛡️ إنشاء الحساب السحابي باستخدام البريد الحقيقي
-      const authRes = await fetch('/api/manage-tenant-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: realEmail, password: randomPassword, displayName: req.contactName, action: 'activate_invite' })
-      });
-      const authResult = await authRes.json();
-      
-      const batch = writeBatch(firestore);
-      const companyRef = doc(firestore, 'companies', companyId);
-      const trialEndDate = addDays(new Date(), 7);
-
-      // 3. حقن مصفوفة Firebase والترخيص المبرمج
-      batch.set(companyRef, {
-        name: req.companyName, 
-        activity: req.activity,
-        employeeCountRange: req.employeeCountRange,
-        adminEmail: realEmail,
-        adminPassword: randomPassword,
-        contactPhone: req.phone, isActive: true,
-        subscriptionType: 'trial', trialEndDate: Timestamp.fromDate(trialEndDate),
-        maxUsersLimit: 5, firebaseConfig: MASTER_FIREBASE_CONFIG, createdAt: serverTimestamp(),
-      });
-
-      const finalUid = authResult.uid || `TEMP_${Date.now()}`;
-      batch.set(doc(firestore, `companies/${companyId}/users`, finalUid), {
-        id: finalUid, uid: finalUid, fullName: req.contactName, email: realEmail,
-        username: safeUsername, role: 'Admin', isActive: true, companyId, createdAt: serverTimestamp()
-      });
-
-      // الربط في الفهرس العالمي: اسم المستخدم -> البريد الحقيقي
-      batch.set(doc(collection(firestore, 'global_users')), { 
-          email: realEmail, 
-          username: safeUsername, 
-          companyId, 
-          uid: finalUid, 
-          createdAt: serverTimestamp() 
-      });
-      
-      batch.update(doc(firestore, 'company_requests', req.id!), { status: 'activated', activatedAt: serverTimestamp(), companyId });
-
-      await batch.commit();
-
-      if (authResult.inviteLink) {
-          setLastInviteLink({ name: req.companyName, link: authResult.inviteLink });
-      }
-
-      toast({ 
-          title: authResult.error ? '⚠️ تفعيل جزئي (يدوي)' : '✅ تم التفعيل والربط الآلي',
-          description: authResult.error ? "يرجى إضافة المستخدم يدوياً في Console." : "تم إنشاء الحساب وحقن البيانات آلياً."
-      });
-    } catch (e: any) { toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message }); } finally { setIsProcessing(null); }
-  };
-
   const handleDeleteCompany = async () => {
     if (!firestore || !companyToDelete || isProcessing) return;
     setIsProcessing(companyToDelete.id!);
@@ -209,24 +142,6 @@ export default function DeveloperDashboard() {
 
   return (
     <div className="space-y-10" dir="rtl">
-        {lastInviteLink && (
-            <Card className="bg-green-600 text-white p-6 rounded-[2rem] shadow-2xl animate-in slide-in-from-top-4 border-none flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-white/20 rounded-2xl"><Sparkles className="h-6 w-6"/></div>
-                    <div>
-                        <h4 className="text-xl font-black">رابط تفعيل {lastInviteLink.name} جاهز</h4>
-                        <p className="text-xs font-bold opacity-80">انسخ الرابط وأرسله للمالك لتعيين كلمة المرور والدخول فوراً.</p>
-                    </div>
-                </div>
-                <div className="flex gap-3">
-                    <Button variant="ghost" onClick={() => setLastInviteLink(null)} className="text-white hover:bg-white/10 rounded-xl font-bold">إغلاق</Button>
-                    <Button onClick={() => { navigator.clipboard.writeText(lastInviteLink.link); toast({ title: '📋 تم النسخ' }); }} className="bg-white text-green-700 hover:bg-slate-100 rounded-xl font-black gap-2 h-12 px-8">
-                        <Link2 className="h-5 w-5" /> نسخ رابط التفعيل
-                    </Button>
-                </div>
-            </Card>
-        )}
-
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-[#1e1b4b]">
             <CardHeader className="p-10 pb-8 bg-indigo-950/60 border-b border-white/10">
                 <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
@@ -252,91 +167,42 @@ export default function DeveloperDashboard() {
             </CardHeader>
         </Card>
 
-        <Tabs defaultValue="requests" className="space-y-8">
-            <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 h-16 w-fit mx-auto flex gap-4">
-                <TabsTrigger value="companies" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><Building2 className="h-5 w-5"/> المنظمات</TabsTrigger>
-                <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><FileStack className="h-5 w-5"/> طلبات الانضمام</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="companies">
-                <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
-                    <CardHeader className="bg-slate-50 border-b p-8 px-12">
-                        <div className="relative w-full max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-950 opacity-40" /><Input placeholder="بحث باسم المنشأة..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold" /></div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">الإداري</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-50" /></TableCell></TableRow> :
-                                filteredCompanies.map(company => (
-                                    <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
-                                        <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail}</span></div></div></TableCell>
-                                        <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
-                                                {company.isActive ? 'ACTIVE' : 'LOCKED'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-left px-12">
-                                            <div className="flex items-center justify-end gap-3">
-                                                <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2">{isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} دخول</Button>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل ومزامنة</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3"><Trash2 className="h-4 w-4" /> حذف نهائياً</DropdownMenuItem></DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent value="requests">
-                <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
-                    <Table>
-                        <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة والحجم</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم (ID)</TableHead><TableHead className="font-black text-indigo-100 text-center">البريد الحقيقي</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {requests.map(req => (
-                                <TableRow key={req.id} className="h-32">
-                                    <TableCell className="px-12">
-                                        <div className="flex flex-col">
-                                            <span className="font-black text-2xl tracking-tight text-[#1e1b4b]">{req.companyName}</span>
-                                            <div className="flex gap-2 mt-1">
-                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold border-indigo-100">{activityTranslations[req.activity || 'general']}</Badge>
-                                                <Badge className="bg-indigo-50 text-indigo-600 border-none font-black flex items-center gap-1"><Users className="h-3 w-3"/> {req.employeeCountRange} موظف</Badge>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username}</Badge></TableCell>
-                                    <TableCell className="text-center">
-                                        <div className="flex flex-col items-center gap-1">
-                                            <Mail className="h-4 w-4 opacity-30 text-indigo-600" />
-                                            <span className="font-bold text-xs text-slate-600">{req.email}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-left px-12">
-                                        {req.status === 'pending' ? (
-                                            <Button 
-                                                onClick={() => handleActivateCompany(req)} 
-                                                disabled={isProcessing === req.id} 
-                                                className="rounded-2xl font-black gap-2 bg-green-600 h-12 px-8 shadow-lg"
-                                            >
-                                                {isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <CheckCircle2 className="h-4 w-4" />} 
-                                                تفعيل وإرسال رابط
-                                            </Button>
-                                        ) : <Badge className="bg-green-100 text-green-700 font-black px-6 py-2 rounded-full">ACTIVATED</Badge>}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Card>
-            </TabsContent>
-        </Tabs>
+        <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
+            <CardHeader className="bg-slate-50 border-b p-8 px-12">
+                <div className="relative w-full max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-950 opacity-40" /><Input placeholder="بحث باسم المنشأة..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold" /></div>
+            </CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">الإداري</TableHead><TableHead className="font-black text-indigo-100 text-center">الحالة</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-indigo-50" /></TableCell></TableRow> :
+                        filteredCompanies.map(company => (
+                            <TableRow key={company.id} className="h-28 border-slate-100 group transition-all">
+                                <TableCell className="px-12"><div className="flex items-center gap-4"><div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600"><Building2 className="h-6 w-6" /></div><div className="flex flex-col"><span className="font-black text-xl text-[#1e1b4b]">{company.name}</span><span className="font-mono text-xs text-primary font-black">@{company.adminEmail}</span></div></div></TableCell>
+                                <TableCell className="text-center"><p className="font-bold text-slate-700">{company.contactPhone || '-'}</p></TableCell>
+                                <TableCell className="text-center">
+                                    <Badge className={cn("px-6 py-1.5 rounded-full font-black text-[10px] border-2", company.isActive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
+                                        {company.isActive ? 'ACTIVE' : 'LOCKED'}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-left px-12">
+                                    <div className="flex items-center justify-end gap-3">
+                                        <Button onClick={() => handleSwitchToCompany(company)} variant="outline" className="rounded-xl font-bold h-10 gap-2">{isProcessing === company.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowRightLeft className="h-4 w-4"/>} دخول</Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" dir="rtl" className="w-56 rounded-2xl p-2 shadow-2xl"><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل ومزامنة</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3"><Trash2 className="h-4 w-4" /> حذف نهائياً</DropdownMenuItem></DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+        
         <CompanyRegistrationForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} company={selectedCompany} />
+        
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
                 <AlertDialogHeader>

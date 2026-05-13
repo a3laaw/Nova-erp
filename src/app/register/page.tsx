@@ -11,22 +11,20 @@ import {
     Building2, 
     ArrowRight,
     CheckCircle2,
-    ShieldCheck,
-    Users,
     Mail,
     User,
     Link2,
     Copy,
-    Sparkles
+    Sparkles,
+    ShieldCheck
 } from 'lucide-react';
-import { useFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
  * بوابة التأسيس الفوري (Instant Sovereign Setup v10.0)
- * لا تتطلب تدخل الأدمن؛ التفعيل يتم في أجزاء من الثانية.
+ * التفعيل يتم آلياً في أجزاء من الثانية دون تدخل الأدمن.
  */
 export default function RegisterPage() {
   const { toast } = useToast();
@@ -108,7 +106,7 @@ export default function RegisterPage() {
                             <Copy className="h-4 w-4" />
                         </Button>
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-medium italic">أرسلنا لك نسخة أيضاً على بريدك الإلكتروني {formData.email}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium italic">تم إرسال نسخة أيضاً إلى {formData.email}</p>
                 </div>
 
                 <div className="flex flex-col gap-3">
@@ -132,7 +130,7 @@ export default function RegisterPage() {
                 <div className="flex items-center gap-5">
                     <div className="p-4 bg-[#1e1b4b] rounded-[2rem] shadow-xl"><Rocket className="h-8 w-8 text-white" /></div>
                     <div className="text-right">
-                        <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">ابدأ منشأتك فوراً</CardTitle>
+                        <CardTitle className="text-2xl font-black text-[#1e1b4b] tracking-tighter">تأسيس منشأة فورية</CardTitle>
                         <CardDescription className="text-[#1e1b4b]/60 font-black mt-1 text-[10px] uppercase tracking-widest">تأسيس سحابي فوري ومستقر 100%</CardDescription>
                     </div>
                 </div>
@@ -143,7 +141,7 @@ export default function RegisterPage() {
         </CardHeader>
         
         <CardContent className="p-10">
-            <form onSubmit={handleSubmit} className="space-y-8">
+            <form onSubmit={handleSubmit} className="space-y-8" autoComplete="off">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6">
                         <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-indigo-600 pr-3 uppercase tracking-widest">هوية المنشأة</h3>
@@ -234,6 +232,7 @@ export default function RegisterPage() {
                                     onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
                                     className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-bold" 
                                     required 
+                                    autoComplete="off"
                                     placeholder="your@email.com" 
                                 />
                             </div>
@@ -248,6 +247,7 @@ export default function RegisterPage() {
                                     onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
                                     className="h-12 rounded-xl border-2 bg-white pr-10 dir-ltr font-black text-primary" 
                                     required 
+                                    autoComplete="off"
                                     placeholder="e.g. alaa" 
                                 />
                             </div>
