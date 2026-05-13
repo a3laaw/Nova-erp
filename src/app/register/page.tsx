@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -11,7 +12,8 @@ import {
     Building2, 
     ArrowRight,
     CheckCircle2,
-    ShieldCheck
+    ShieldCheck,
+    Users
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -20,8 +22,8 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * بوابة تسجيل المنشآت (Sovereign Registration Gateway)
- * تم تصفير الحقول تماماً وحذف التعقيدات التقنية لضمان تجربة SaaS احترافية.
+ * بوابة تسجيل المنشآت (Sovereign Registration Gateway v8.0)
+ * تم تصفير حقول الأمان (تلقائية بالكامل) وإضافة حقل حجم المنشأة.
  */
 export default function RegisterPage() {
   const { firestore } = useFirebase();
@@ -30,23 +32,21 @@ export default function RegisterPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // 🛡️ الحقول تبدأ فارغة تماماً لضمان تجربة مستخدم نظيفة
   const [formData, setFormData] = useState({
     companyName: '',
     activity: 'consulting',
+    employeeCountRange: '1-5', // القيمة الافتراضية
     contactName: '',
-    email: '', 
     username: '', 
     phone: '', 
-    adminPassword: '', 
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore) return;
 
-    if (!formData.username || !formData.adminPassword) {
-        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يجب اختيار اسم مستخدم وكلمة مرور لتأسيس الحساب.' });
+    if (!formData.username.trim()) {
+        toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار اسم مستخدم (ID) لتأسيس حسابك.' });
         return;
     }
 
@@ -74,7 +74,7 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-3xl font-black text-[#1e1b4b] mb-4 tracking-tighter">تم استلام طلبك!</h2>
                 <p className="text-[#1e1b4b]/70 font-bold mb-8 leading-relaxed">
-                    فريق Nova ERP سيقوم بمراجعة بياناتك وتهيئة نظامك السحابي المعزول خلال 24 ساعة كحد أقصى.
+                    فريق Nova ERP سيقوم بمراجعة طلبك وتهيئة نظامك السحابي المعزول وتوليد رابط تفعيلك خلال ساعات.
                 </p>
                 <Button asChild className="h-14 px-12 rounded-2xl bg-[#1e1b4b] text-white font-black hover:bg-black shadow-xl">
                     <Link href="/">العودة للرئيسية</Link>
@@ -119,18 +119,34 @@ export default function RegisterPage() {
                                     placeholder="أدخل الاسم التجاري..." 
                                 />
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">نوع النشاط</Label>
-                                <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
-                                    <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]">
-                                        <SelectValue placeholder="اختر النشاط..." />
-                                    </SelectTrigger>
-                                    <SelectContent dir="rtl">
-                                        <SelectItem value="consulting">استشارات هندسية</SelectItem>
-                                        <SelectItem value="construction">مقاولات وبناء</SelectItem>
-                                        <SelectItem value="general">تجارة عامة / مبيعات</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="grid gap-1.5">
+                                    <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">نوع النشاط</Label>
+                                    <Select value={formData.activity} onValueChange={(v) => setFormData(p => ({...p, activity: v}))}>
+                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]">
+                                            <SelectValue placeholder="النشاط..." />
+                                        </SelectTrigger>
+                                        <SelectContent dir="rtl">
+                                            <SelectItem value="consulting">استشارات هندسية</SelectItem>
+                                            <SelectItem value="construction">مقاولات وبناء</SelectItem>
+                                            <SelectItem value="general">تجارة عامة</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label className="text-[#1e1b4b] font-black text-[11px] pr-1">حجم الشركة</Label>
+                                    <Select value={formData.employeeCountRange} onValueChange={(v) => setFormData(p => ({...p, employeeCountRange: v}))}>
+                                        <SelectTrigger className="h-11 rounded-xl bg-white border-2 font-black text-[#1e1b4b]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent dir="rtl">
+                                            <SelectItem value="1-5">1 - 5 موظف</SelectItem>
+                                            <SelectItem value="5-11">5 - 11 موظف</SelectItem>
+                                            <SelectItem value="11-50">11 - 50 موظف</SelectItem>
+                                            <SelectItem value="100+">فوق 100 موظف</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -150,15 +166,14 @@ export default function RegisterPage() {
                                 />
                             </div>
                             <div className="grid gap-1.5">
-                                <Label htmlFor="email" className="text-[#1e1b4b] font-black text-[11px] pr-1">البريد الإلكتروني للتواصل *</Label>
+                                <Label htmlFor="phone" className="text-[#1e1b4b] font-black text-[11px] pr-1">رقم الهاتف (WhatsApp) *</Label>
                                 <Input 
-                                    id="email"
-                                    type="email" 
-                                    value={formData.email} 
-                                    onChange={e => setFormData(p => ({...p, email: e.target.value}))} 
-                                    className="h-11 rounded-xl bg-white border-2 font-bold dir-ltr" 
+                                    id="phone" 
+                                    value={formData.phone} 
+                                    onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
+                                    className="h-11 rounded-xl bg-white border-2 font-black dir-ltr text-right" 
                                     required 
-                                    placeholder="your@email.com" 
+                                    placeholder="965+ XXXX XXXX" 
                                 />
                             </div>
                         </div>
@@ -167,43 +182,20 @@ export default function RegisterPage() {
 
                 <div className="space-y-6">
                     <h3 className="font-black text-[#1e1b4b] text-[10px] border-r-4 border-purple-600 pr-3 uppercase tracking-widest">إعدادات حساب دخول المالك</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="username" className="text-[#1e1b4b] font-black text-[11px] pr-1">اسم المستخدم (Login ID) *</Label>
+                        <div className="relative">
                             <Input 
                                 id="username"
                                 value={formData.username} 
                                 onChange={e => setFormData(p => ({...p, username: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '')}))} 
-                                className="h-11 rounded-xl bg-white border-2 font-black text-primary dir-ltr" 
+                                className="h-12 rounded-xl border-2 border-slate-200 bg-white font-black text-primary dir-ltr" 
                                 required 
                                 autoComplete="off"
                                 placeholder="مثال: alaa" 
                             />
                         </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="phone" className="text-[#1e1b4b] font-black text-[11px] pr-1">رقم الهاتف (WhatsApp) *</Label>
-                            <Input 
-                                id="phone"
-                                value={formData.phone} 
-                                onChange={e => setFormData(p => ({...p, phone: e.target.value}))} 
-                                className="h-11 rounded-xl bg-white border-2 font-black dir-ltr" 
-                                required 
-                                placeholder="+965 XXXX XXXX" 
-                            />
-                        </div>
-                        <div className="grid gap-1.5 md:col-span-2">
-                            <Label htmlFor="adminPassword" className="text-[#1e1b4b] font-black text-[11px] pr-1">كلمة المرور التأسيسية *</Label>
-                            <Input 
-                                id="adminPassword"
-                                type="password" 
-                                value={formData.adminPassword} 
-                                onChange={e => setFormData(p => ({...p, adminPassword: e.target.value}))} 
-                                className="h-11 rounded-xl bg-white border-2 font-bold text-center" 
-                                required 
-                                autoComplete="new-password"
-                                placeholder="أدخل كلمة مرور قوية..." 
-                            />
-                        </div>
+                        <p className="text-[9px] text-muted-foreground font-bold pr-1">هذا هو المعرف الذي ستستخدمه دائماً للدخول إلى نظامك.</p>
                     </div>
                 </div>
             </form>

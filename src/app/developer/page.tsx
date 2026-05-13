@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -13,7 +14,8 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, ArrowRightLeft, 
     FileStack, Settings, Trash2, ShieldAlert, Sparkles, CheckCircle2,
-    Wrench, DatabaseZap, AlertCircle, ShieldCheck, ShieldX, Copy, Link2, Key
+    Wrench, DatabaseZap, AlertCircle, ShieldCheck, ShieldX, Copy, Link2, Key,
+    Users
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -137,12 +139,13 @@ export default function DeveloperDashboard() {
       const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
+      const randomPassword = Math.random().toString(36).slice(-12) + 'A1!'; // كلمة مرور عشوائية قوية
 
       // 2. محاولة الأتمتة الكاملة (Auth Creation)
       const authRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sovereignEmail, password: req.adminPassword, displayName: req.contactName, action: 'activate_invite' })
+        body: JSON.stringify({ email: sovereignEmail, password: randomPassword, displayName: req.contactName, action: 'activate_invite' })
       });
       const authResult = await authRes.json();
       
@@ -152,8 +155,12 @@ export default function DeveloperDashboard() {
 
       // 3. حقن مصفوفة Firebase والترخيص المبرمج
       batch.set(companyRef, {
-        name: req.companyName, activity: req.activity, adminEmail: sovereignEmail,
-        adminPassword: req.adminPassword, contactPhone: req.phone, isActive: true,
+        name: req.companyName, 
+        activity: req.activity,
+        employeeCountRange: req.employeeCountRange || '1-5',
+        adminEmail: sovereignEmail,
+        adminPassword: randomPassword, // تُحفظ كمرجع لإرسالها في الرابط
+        contactPhone: req.phone, isActive: true,
         subscriptionType: 'trial', trialEndDate: Timestamp.fromDate(trialEndDate),
         maxUsersLimit: 5, firebaseConfig: MASTER_FIREBASE_CONFIG, createdAt: serverTimestamp(),
       });
@@ -239,7 +246,7 @@ export default function DeveloperDashboard() {
             </CardHeader>
         </Card>
 
-        <Tabs defaultValue="companies" className="space-y-8">
+        <Tabs defaultValue="requests" className="space-y-8">
             <TabsList className="bg-indigo-950/40 p-1.5 rounded-3xl border border-white/10 h-16 w-fit mx-auto flex gap-4">
                 <TabsTrigger value="companies" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><Building2 className="h-5 w-5"/> المنظمات</TabsTrigger>
                 <TabsTrigger value="requests" className="rounded-2xl px-10 font-black text-lg gap-2 data-[state=active]:bg-indigo-600"><FileStack className="h-5 w-5"/> طلبات الانضمام</TabsTrigger>
@@ -284,12 +291,20 @@ export default function DeveloperDashboard() {
             <TabsContent value="requests">
                 <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-white/95">
                     <Table>
-                        <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
+                        <TableHeader className="bg-[#1e1b4b] h-16"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة والحجم</TableHead><TableHead className="font-black text-indigo-100 text-center">المستخدم (ID)</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">القرار</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {requests.map(req => (
                                 <TableRow key={req.id} className="h-32">
-                                    <TableCell className="px-12"><div className="flex flex-col"><span className="font-black text-2xl tracking-tight">{req.companyName}</span><Badge variant="outline" className="bg-white text-indigo-700 font-bold w-fit mt-1">{activityTranslations[req.activity || 'general']}</Badge></div></TableCell>
-                                    <TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username || req.email.split('@')[0]}</Badge></TableCell>
+                                    <TableCell className="px-12">
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-2xl tracking-tight text-[#1e1b4b]">{req.companyName}</span>
+                                            <div className="flex gap-2 mt-1">
+                                                <Badge variant="outline" className="bg-white text-indigo-700 font-bold border-indigo-100">{activityTranslations[req.activity || 'general']}</Badge>
+                                                <Badge className="bg-indigo-50 text-indigo-600 border-none font-black flex items-center gap-1"><Users className="h-3 w-3"/> {req.employeeCountRange} موظف</Badge>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center"><Badge variant="secondary" className="font-mono text-lg font-black text-primary">@{req.username}</Badge></TableCell>
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
                                             <Button 
