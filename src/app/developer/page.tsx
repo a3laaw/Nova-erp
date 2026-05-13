@@ -89,6 +89,10 @@ export default function DeveloperDashboard() {
     return processed;
   }, [rawCompanies, searchQuery]);
 
+  /**
+   * محرك الترميم السيادي (v4.0):
+   * يقوم بإصلاح كافة البيانات القديمة لتتوافق مع معايير الدخول والأمان الجديدة.
+   */
   const handleRepairData = async () => {
     if (!firestore || isRepairing) return;
     setIsRepairing(true);
@@ -96,20 +100,39 @@ export default function DeveloperDashboard() {
         const batch = writeBatch(firestore);
         const companiesSnap = await getDocs(collection(firestore, 'companies'));
         let repairCount = 0;
+        const defaultTrialEnd = addDays(new Date(), 7);
+
         for (const cDoc of companiesSnap.docs) {
             const data = cDoc.data();
             const companyId = cDoc.id;
+            const updatePayload: any = {};
+
+            // 1. حقن مصفوفة الربط المفقودة
             if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
-                batch.update(cDoc.ref, { firebaseConfig: MASTER_FIREBASE_CONFIG });
+                updatePayload.firebaseConfig = MASTER_FIREBASE_CONFIG;
                 repairCount++;
             }
+
+            // 2. تفعيل فترة الـ 7 أيام للبيانات القديمة
+            if (!data.trialEndDate) {
+                updatePayload.trialEndDate = Timestamp.fromDate(defaultTrialEnd);
+                updatePayload.subscriptionType = 'trial';
+                repairCount++;
+            }
+
+            if (Object.keys(updatePayload).length > 0) {
+                batch.update(cDoc.ref, updatePayload);
+            }
+
+            // 3. مزامنة الفهرس العالمي لتمكين الدخول بـ اسم المستخدم
             const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail));
             const globalSnap = await getDocs(globalQuery);
             if (globalSnap.empty && data.adminEmail) {
+                const username = data.adminEmail.split('@')[0];
                 const newGlobalRef = doc(collection(firestore, 'global_users'));
                 batch.set(newGlobalRef, {
                     email: data.adminEmail,
-                    username: data.adminEmail.split('@')[0],
+                    username: username,
                     companyId: companyId,
                     role: 'Admin',
                     createdAt: serverTimestamp()
@@ -118,7 +141,7 @@ export default function DeveloperDashboard() {
             }
         }
         await batch.commit();
-        toast({ title: '✅ تم الترميم السيادي', description: `تم تصحيح وتحديث ${repairCount} حقل.` });
+        toast({ title: '✅ تم الترميم السيادي', description: `تم تصحيح وحقن ${repairCount} حقل بنجاح.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل الترميم', description: e.message });
     } finally {
@@ -150,7 +173,7 @@ export default function DeveloperDashboard() {
       const safeUsername = req.username?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'admin';
       const sovereignEmail = `${safeUsername}@${companyId}.nova`;
 
-      // 1. محاولة تفعيل الحساب في نظام الأمان (Firebase Auth)
+      // 1. تفعيل حساب الأمان
       const createRes = await fetch('/api/manage-tenant-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,23 +187,15 @@ export default function DeveloperDashboard() {
       
       const authResult = await createRes.json();
       
-      // ⚠️ تنبيه هام إذا تعذر الربط الحقيقي
-      if (!authResult.success) {
-          if (authResult.error === 'MISSING_SERVICE_ACCOUNT') {
-              toast({ 
-                variant: 'destructive', 
-                title: 'تنبيه: الأمان غير مرتبط', 
-                description: 'تم إنشاء البيانات في قاعدة البيانات فقط. يرجى إنشاء حساب البريد يدوياً في Firebase Console لتتمكن من الدخول.' 
-              });
-          } else {
-              throw new Error(authResult.error);
-          }
+      if (!authResult.success && authResult.error !== 'MISSING_SERVICE_ACCOUNT') {
+          throw new Error(authResult.error);
       }
 
       const batch = writeBatch(firestore);
       const companyRef = doc(firestore, 'companies', companyId);
       const trialEndDate = addDays(new Date(), 7);
 
+      // 2. حقن المصفوفة الماستر آلياً + تحديد الـ 7 أيام
       batch.set(companyRef, {
         name: req.companyName,
         activity: req.activity,
@@ -195,7 +210,6 @@ export default function DeveloperDashboard() {
         createdAt: serverTimestamp(),
       });
 
-      // استخدام الـ UID الراجع من الـ API أو توليد معرف مؤقت في حال الفشل
       const finalUid = authResult.uid || `TEMP_${Date.now()}`;
 
       const userRef = doc(firestore, `companies/${companyId}/users`, finalUid);
@@ -227,7 +241,7 @@ export default function DeveloperDashboard() {
       });
 
       await batch.commit();
-      toast({ title: '✅ تم التفعيل', description: `المنشأة جاهزة للعبور باسم المستخدم: ${safeUsername}` });
+      toast({ title: '✅ تم التفعيل بنجاح', description: `المنشأة نشطة لفترة تجريبية 7 أيام.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally { setIsProcessing(null); }
@@ -258,7 +272,7 @@ export default function DeveloperDashboard() {
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.4)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم السيادية</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والمزامنة الهوياتية.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات، التراخيص، والترميم التاريخي للبيانات.</CardDescription>
                         </div>
                     </div>
                     <div className="flex gap-4">

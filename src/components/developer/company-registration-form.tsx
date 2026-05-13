@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -245,7 +244,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص السيادية.</DialogDescription>
                     </div>
                 </div>
-                <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10"><X className="h-5 w-5"/></Button>
+                <button type="button" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10 flex items-center justify-center transition-all"><X className="h-5 w-5"/></button>
             </div>
           </DialogHeader>
 

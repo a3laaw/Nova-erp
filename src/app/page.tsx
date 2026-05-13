@@ -15,8 +15,8 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v3.5):
- * تم تحصينها بمحرك تشخيص أعطال الأمان (Auth Diagnosis Engine).
+ * بوابة العبور السيادية (Sovereign Gateway v4.0):
+ * تدعم الدخول بـ "اسم المستخدم" فقط (مثل: nova1) وتتحقق من سلامة المزامنة السحابية.
  */
 export default function LoginPage() {
   const { login, user, loading, error: authError } = useAuth();
@@ -46,7 +46,7 @@ export default function LoginPage() {
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 1. محرك تحويل الهوية من الفهرس العالمي
+        // 🛡️ محرك تحويل الهوية الذكي (Look up email from username)
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -54,37 +54,41 @@ export default function LoginPage() {
                 limit(1)
             );
             const snap = await getDocs(globalQuery);
-            if (snap.empty) throw new Error('اسم المستخدم هذا غير مسجل في المنظومة.');
+            if (snap.empty) {
+                throw new Error('اسم المستخدم هذا غير مسجل في المنظومة حالياً.');
+            }
             finalEmail = snap.docs[0].data().email;
         }
 
-        // 2. محاولة الدخول الفعلية
+        // محاولة الدخول
         await login(finalEmail, password);
 
     } catch (error: any) {
         setLocalLoading(false);
         const errorCode = error.code || '';
         
-        // 🔍 محرك تشخيص الأعطال السيادي
-        if (errorCode.includes('user-not-found') || error.message?.includes('غير صحيح')) {
-            // فحص هل الحساب موجود في Firestore ولكنه مفقود من Auth؟
-            if (firestore) {
-                const checkEmail = identifier.includes('@') ? identifier : null;
-                const globalQuery = checkEmail 
-                    ? query(collection(firestore, 'global_users'), where('email', '==', checkEmail), limit(1))
-                    : query(collection(firestore, 'global_users'), where('username', '==', identifier), limit(1));
-                
-                const snap = await getDocs(globalQuery);
-                if (!snap.empty) {
-                    setDiagnosisMessage('⚠️ تنبيه أمني: حسابك موجود في قاعدة البيانات ولكن لم يتم تفعيله في نظام الأمان (Auth). يرجى التواصل مع المدير لتفعيله يدوياً.');
+        // 🔍 محرك تشخيص أعطال الأمان (Auth vs Firestore sync check)
+        if (firestore) {
+            const checkEmail = identifier.includes('@') ? identifier.trim().toLowerCase() : null;
+            const diagnosisQuery = checkEmail 
+                ? query(collection(firestore, 'global_users'), where('email', '==', checkEmail), limit(1))
+                : query(collection(firestore, 'global_users'), where('username', '==', identifier.trim().toLowerCase()), limit(1));
+            
+            const snap = await getDocs(diagnosisQuery);
+            if (!snap.empty) {
+                // الحساب موجود في DB ولكن فشل الدخول
+                if (errorCode === 'auth/invalid-credential' || error.message?.includes('غير صحيح')) {
+                    setDiagnosisMessage('⚠️ تنبيه: بياناتك موجودة في السجلات، ولكن كلمة المرور غير صحيحة أو أن الحساب لم يتم تفعيله سحابياً بعد (Firebase Auth). يرجى مراجعة المطور.');
                 }
+            } else {
+                setDiagnosisMessage('لا يوجد حساب مسجل بهذا الاسم. تأكد من كتابة اسم المستخدم بشكل صحيح.');
             }
         }
 
         toast({
             variant: 'destructive',
-            title: 'خطأ في الدخول',
-            description: error.message || 'البريد أو كلمة المرور غير صحيحة.'
+            title: 'تعذر الدخول',
+            description: error.message || 'بيانات الدخول غير صحيحة.'
         });
     }
   };
@@ -107,7 +111,7 @@ export default function LoginPage() {
         
         <CardContent className="p-8 space-y-6">
             {diagnosisMessage && (
-                <Alert variant="destructive" className="rounded-2xl bg-red-50 border-red-200 animate-bounce">
+                <Alert variant="destructive" className="rounded-2xl bg-red-50 border-red-200 animate-in fade-in slide-in-from-top-2">
                     <Info className="h-4 w-4" />
                     <AlertDescription className="text-[10px] font-black leading-relaxed">{diagnosisMessage}</AlertDescription>
                 </Alert>
