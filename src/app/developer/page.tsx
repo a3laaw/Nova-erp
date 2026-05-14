@@ -74,10 +74,6 @@ const MASTER_FIREBASE_CONFIG = {
   measurementId: "G-Q7DPZ802VJ"
 };
 
-/**
- * غرفة التحكم الرئيسية (V18.0 - Final Stability Release).
- * تم حذف مسميات "السيادية" تماماً وتبسيط واجهة تفعيل الحسابات.
- */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -89,10 +85,9 @@ export default function DeveloperDashboard() {
 
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
-  const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
+  const [activationResult, setActivationResult] = useState<{ email: string, pass: string } | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
-  // اشتراكات لحظية مستقرة
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
@@ -118,7 +113,7 @@ export default function DeveloperDashboard() {
   }, [companies, searchQuery]);
 
   const generateStrongPassword = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     let password = "";
     for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -126,9 +121,6 @@ export default function DeveloperDashboard() {
     setActivationPassword(password);
   };
 
-  /**
-   * محرك التفعيل الإداري:
-   */
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
     setIsProcessing(requestToActivate.id!);
@@ -155,8 +147,7 @@ export default function DeveloperDashboard() {
         if (result.success) {
             setActivationResult({
                 email: requestToActivate.email,
-                pass: activationPassword,
-                link: result.inviteLink
+                pass: activationPassword
             });
             toast({ title: '✅ تم تفعيل المنشأة بنجاح' });
         } else {
@@ -172,17 +163,14 @@ export default function DeveloperDashboard() {
   const handleDeleteCompany = async () => {
     if (!companyToDelete || !firestore || isProcessing) return;
     setIsProcessing(companyToDelete.id!);
-    
     try {
         const batch = writeBatch(firestore);
         batch.delete(doc(firestore, 'companies', companyToDelete.id!));
-        
         const globalIndexQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
         const globalSnap = await getDocs(globalIndexQuery);
         globalSnap.forEach(d => batch.delete(d.ref));
-
         await batch.commit();
-        toast({ title: 'تمت التصفية', description: 'تم مسح المنشأة وكافة فهارسها بنجاح.' });
+        toast({ title: 'تم الحذف', description: 'تم مسح المنشأة وكافة سجلاتها بنجاح.' });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل الحذف', description: e.message });
     } finally {
@@ -197,22 +185,18 @@ export default function DeveloperDashboard() {
     try {
         const batch = writeBatch(firestore);
         const companiesSnap = await getDocs(collection(firestore, 'companies'));
-        
         let count = 0;
         for (const cDoc of companiesSnap.docs) {
             const data = cDoc.data();
             const updates: any = {};
-            
             if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
                 updates.firebaseConfig = MASTER_FIREBASE_CONFIG;
                 updates.firebaseProjectId = MASTER_FIREBASE_CONFIG.projectId;
             }
-
             if (Object.keys(updates).length > 0) {
                 batch.update(cDoc.ref, updates);
                 count++;
             }
-
             const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail), limit(1));
             const globalSnap = await getDocs(globalQuery);
             if (globalSnap.empty && data.adminEmail) {
@@ -252,18 +236,16 @@ export default function DeveloperDashboard() {
                                 {systemStatus === 'READY' ? (
                                     <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة</Badge>
                                 ) : (
-                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> التفعيل يدوي</Badge>
+                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> تفعيل يدوي</Badge>
                                 )}
                             </CardTitle>
                             <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات والاحتضان السحابي الموحد.</CardDescription>
                         </div>
                     </div>
-                    <div className="flex gap-4">
-                        <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-indigo-400 text-indigo-400 hover:bg-white/10">
-                            {isProcessing === 'repair' ? <Loader2 className="animate-spin h-6 w-6"/> : <Wrench className="h-6 w-6" />}
-                            ترميم البيانات القديمة
-                        </Button>
-                    </div>
+                    <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-indigo-400 text-indigo-400 hover:bg-white/10">
+                        {isProcessing === 'repair' ? <Loader2 className="animate-spin h-6 w-6"/> : <Wrench className="h-6 w-6" />}
+                        ترميم البيانات القديمة
+                    </Button>
                 </div>
             </CardHeader>
         </Card>
@@ -273,7 +255,7 @@ export default function DeveloperDashboard() {
                 <AlertCircle className="h-6 w-6 text-red-600" />
                 <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة متوقف!</AlertTitle>
                 <AlertDescription className="text-red-700 font-bold text-sm leading-relaxed mt-2">
-                    لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بحفظ بيانات الشركة في Firestore، ولكن يجب تفعيل الحسابات يدوياً في الكونسول.
+                    لم يتم العثور على ملف <strong>service-account.json</strong> صالح. التفعيل سيكتفي بإنشاء سجلات Firestore؛ يجب تفعيل الإيميلات يدوياً في الكونسول.
                 </AlertDescription>
             </Alert>
         )}
@@ -333,7 +315,7 @@ export default function DeveloperDashboard() {
                                                 <UserPlus className="h-4 w-4" /> تفعيل الحساب
                                             </Button>
                                         ) : (
-                                            <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-black px-4 py-1.5 rounded-xl">تم التفعيل سابقاً</Badge>
+                                            <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-black px-4 py-1.5 rounded-xl">تم التفعيل</Badge>
                                         )}
                                     </TableCell>
                                 </TableRow>
@@ -357,7 +339,7 @@ export default function DeveloperDashboard() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة / البريد الرئيسي</TableHead><TableHead className="font-black text-indigo-100 text-center">حالة الحساب</TableHead><TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات التحكم</TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة / البريد الرئيسي</TableHead><TableHead className="font-black text-indigo-100 text-center">حالة الحساب</TableHead><TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">تحكم</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
@@ -382,7 +364,7 @@ export default function DeveloperDashboard() {
                                         <TableCell className="text-left px-12">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none"><DropdownMenuLabel className="font-black px-3 py-2">الإدارة العليا</DropdownMenuLabel><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50"><Trash2 className="h-4 w-4" /> تصفية المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
+                                                <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none"><DropdownMenuLabel className="font-black px-3 py-2">الإدارة العليا</DropdownMenuLabel><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50"><Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
@@ -394,15 +376,15 @@ export default function DeveloperDashboard() {
             </TabsContent>
         </Tabs>
 
-        {/* --- Modal التفعيل --- */}
+        {/* --- نافذة التفعيل --- */}
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <DialogHeader className="p-8 bg-slate-900 text-white relative text-right">
                     <div className="flex items-center gap-4 relative z-10">
                         <div className="p-3 bg-green-600 rounded-2xl text-white shadow-xl"><ShieldCheck className="h-8 w-8" /></div>
                         <div className="text-right">
-                            <DialogTitle className="text-2xl font-black text-white">تفعيل الحساب والاحتضان السحابي</DialogTitle>
-                            <DialogDescription className="text-indigo-200 font-bold">معالجة طلب المنشأة: {requestToActivate?.companyName}</DialogDescription>
+                            <DialogTitle className="text-2xl font-black text-white">تفعيل الحساب والاحتضان</DialogTitle>
+                            <DialogDescription className="text-indigo-200 font-bold">تجهيز بيانات الدخول لمنشأة: {requestToActivate?.companyName}</DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
@@ -420,33 +402,24 @@ export default function DeveloperDashboard() {
                                     <p className="font-mono font-bold">{requestToActivate?.phone}</p>
                                 </div>
                                 <div className="col-span-2 space-y-1 text-right">
-                                    <Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني</Label>
+                                    <Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني المعتمد</Label>
                                     <p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p>
                                 </div>
                             </div>
 
-                            <div className="space-y-6">
-                                <div className="grid gap-2 text-right">
-                                    <Label className="font-black text-gray-700 pr-1">كلمة المرور التأسيسية</Label>
-                                    <div className="flex gap-2">
-                                        <div className="relative flex-1">
-                                            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                            <Input 
-                                                value={activationPassword} 
-                                                onChange={(e) => setActivationPassword(e.target.value)}
-                                                className="h-12 rounded-xl pr-10 border-2 font-mono font-black"
-                                                placeholder="أدخل كلمة المرور أو ولدها آلياً..."
-                                            />
-                                        </div>
-                                        <Button 
-                                            type="button" 
-                                            variant="outline" 
-                                            onClick={generateStrongPassword}
-                                            className="h-12 rounded-xl border-2 font-bold gap-2 text-primary"
-                                        >
-                                            <PlusCircle className="h-4 w-4" /> توليد قوية
-                                        </Button>
+                            <div className="grid gap-2 text-right">
+                                <Label className="font-black text-gray-700 pr-1">كلمة المرور التأسيسية</Label>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                        <Input 
+                                            value={activationPassword} 
+                                            onChange={(e) => setActivationPassword(e.target.value)}
+                                            className="h-12 rounded-xl pr-10 border-2 font-mono font-black"
+                                            placeholder="أدخل كلمة المرور أو ولدها..."
+                                        />
                                     </div>
+                                    <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-12 rounded-xl border-2 font-bold gap-2 text-primary">توليد كلمة مرور</Button>
                                 </div>
                             </div>
                         </>
@@ -454,26 +427,16 @@ export default function DeveloperDashboard() {
                         <div className="space-y-8 animate-in zoom-in-95 duration-500">
                             <Alert className="rounded-3xl border-2 border-green-500 bg-green-50 p-6">
                                 <CheckCircle2 className="h-6 w-6 text-green-600" />
-                                <AlertTitle className="text-green-800 font-black text-lg">تم التأسيس والاحتضان بنجاح!</AlertTitle>
-                                <AlertDescription className="text-green-700 font-bold mt-2 leading-relaxed">
-                                    تم إنشاء حساب المالك السحابي وتأسيس قاعدة بيانات المنشأة. المنظومة جاهزة للعمل الآن.
-                                </AlertDescription>
+                                <AlertTitle className="text-green-800 font-black text-lg">تم التفعيل بنجاح!</AlertTitle>
+                                <AlertDescription className="text-green-700 font-bold mt-2 leading-relaxed">تم تأسيس قاعدة بيانات المنشأة وتفعيل صلاحيات المالك. المنظومة جاهزة للعمل.</AlertDescription>
                             </Alert>
 
                             <div className="space-y-4">
                                 <div className="p-6 bg-slate-900 rounded-[2rem] text-white shadow-2xl space-y-4">
-                                    <div className="flex justify-between border-b border-white/10 pb-3">
-                                        <span className="text-xs font-bold text-slate-400">اسم المستخدم للـ ID:</span>
-                                        <span className="font-mono font-black text-indigo-400">{requestToActivate?.username}</span>
-                                    </div>
-                                    <div className="flex justify-between border-b border-white/10 pb-3">
-                                        <span className="text-xs font-bold text-slate-400">كلمة المرور:</span>
-                                        <span className="font-mono font-black text-green-400">{activationResult.pass}</span>
-                                    </div>
+                                    <div className="flex justify-between border-b border-white/10 pb-3"><span className="text-xs font-bold text-slate-400">اسم المستخدم (ID):</span><span className="font-mono font-black text-indigo-400">{requestToActivate?.username}</span></div>
+                                    <div className="flex justify-between border-b border-white/10 pb-3"><span className="text-xs font-bold text-slate-400">كلمة المرور:</span><span className="font-mono font-black text-green-400">{activationResult.pass}</span></div>
                                 </div>
-                                <Button onClick={copyWelcomeMessage} className="w-full h-12 rounded-xl font-black gap-2 shadow-xl bg-green-600">
-                                    <Send className="h-4 w-4" /> نسخ رسالة الترحيب للواتساب
-                                </Button>
+                                <Button onClick={copyWelcomeMessage} className="w-full h-12 rounded-xl font-black gap-2 shadow-xl bg-green-600"><Send className="h-4 w-4" /> نسخ رسالة الترحيب للواتساب</Button>
                             </div>
                         </div>
                     )}
@@ -483,17 +446,12 @@ export default function DeveloperDashboard() {
                     {!activationResult ? (
                         <>
                             <Button variant="ghost" onClick={() => setRequestToActivate(null)} disabled={!!isProcessing} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                            <Button 
-                                onClick={handleActivateRequest} 
-                                disabled={!!isProcessing || !activationPassword} 
-                                className="flex-1 h-14 rounded-2xl font-black text-lg shadow-xl shadow-green-100 bg-green-600 hover:bg-green-700 gap-3"
-                            >
-                                {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
-                                تفعيل الحساب وإنشاء المنشأة
+                            <Button onClick={handleActivateRequest} disabled={!!isProcessing || !activationPassword} className="flex-1 h-14 rounded-2xl font-black text-lg shadow-xl bg-green-600 hover:bg-green-700 gap-3">
+                                {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />} تفعيل الحساب وإنشاء المنشأة
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق النافذة</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
@@ -502,13 +460,13 @@ export default function DeveloperDashboard() {
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
                 <AlertDialogHeader>
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldAlert className="h-10 w-10"/></div>
-                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الإجراء الإداري النهائي؟</AlertDialogTitle>
-                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. <br/><br/> <span className="font-black text-red-600 underline">تحذير: لا يمكن استعادة السجلات المالية أو ملفات الموظفين بعد الحذف.</span></AlertDialogDescription>
+                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><ShieldAlert className="h-10 w-10"/></div>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد حذف المنشأة نهائياً؟</AlertDialogTitle>
+                    <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">
                     <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteCompany} disabled={!!isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200"> {isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد الحذف النهائي'} </AlertDialogAction>
+                    <AlertDialogAction onClick={handleDeleteCompany} disabled={!!isProcessing} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : 'تأكيد الحذف'}</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

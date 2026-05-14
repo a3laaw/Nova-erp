@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان والتحكم السيادي الموحد (V17.0 - Final Stability Core).
- * تم تحصينه لمنع انهيار السيرفر (Error 500) عبر فحص استباقي لوجود "مفتاح السيادة".
+ * @fileOverview API الإدارة والتحكم في المنشآت (V19.0 - Stability Core).
+ * تم تحصينه لمنع انهيار السيرفر بسبب ملفات الأمان الفارغة أو غير الصالحة.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -31,31 +31,44 @@ export async function POST(request: NextRequest) {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     const hasServiceAccount = fs.existsSync(SERVICE_ACCOUNT_PATH);
 
-    // 🛡️ صمام الأمان السيادي: إذا كان ملف الأمان مفقوداً، نمنع محاولة الاتصال بـ Google لنتجنب خطأ الـ Token
-    if (!hasServiceAccount && action === 'instant_setup') {
-        return NextResponse.json({ 
-            success: false, 
-            error: "MISSING_CONFIG",
-            message: "⚠️ تنبيه سيادي: ملف الأمان (service-account.json) مفقود. يرجى رفعه لتفعيل الأتمتة الكاملة."
-        }, { status: 200 }); // نعيد 200 لضمان معالجة الرسالة في الواجهة بسلام دون انهيار
+    // 🛡️ فحص صحة وصلاحية ملف الأمان قبل محاولة الاتصال بـ Google
+    if (action === 'instant_setup') {
+        if (!hasServiceAccount) {
+            return NextResponse.json({ 
+                success: false, 
+                error: "MISSING_CONFIG",
+                message: "⚠️ تنبيه إداري: ملف الأمان (service-account.json) مفقود من جذر المشروع."
+            }, { status: 200 });
+        }
+        
+        try {
+            const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
+            const sa = JSON.parse(saContent);
+            
+            // التحقق من أن الملف ليس فارغاً ويحتوي على المفاتيح الأساسية
+            if (!sa.project_id || !sa.private_key) {
+                return NextResponse.json({ 
+                    success: false, 
+                    error: "INVALID_CONFIG",
+                    message: "⚠️ تنبيه: ملف الأمان موجود ولكنه غير صالح أو فارغ. يرجى تحميل ملف JSON الصحيح من Firebase Console."
+                }, { status: 200 });
+            }
+            
+            // تهيئة التطبيق إذا لم يكن مهيئاً
+            if (getApps().length === 0) {
+                initializeApp({ credential: cert(sa) });
+            }
+        } catch (e) {
+            return NextResponse.json({ 
+                success: false, 
+                error: "CONFIG_READ_ERROR",
+                message: "⚠️ خطأ في قراءة ملف الأمان. تأكد من رفعه بشكل صحيح كملف JSON."
+            }, { status: 200 });
+        }
     }
 
-    // تهيئة التطبيق السيادي فقط في حال توفر الملف
-    if (getApps().length === 0 && hasServiceAccount) {
-        const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
-        initializeApp({ credential: cert(sa) });
-    }
-
-    // --- 1. حفظ طلب الانضمام (بوابة العميل - لا تحتاج لملف الأمان) ---
-    if (action === 'add_request') {
-        // نستخدم Firebase Client SDK في الواجهة أو Firestore REST هنا للحفظ البسيط
-        // بما أننا في Route.ts، سنعتمد على أن الحفظ تم مسبقاً في صفحة التسجيل 
-        // أو نقوم هنا بتهيئة تطبيق بدون ملف أمان للقراءة/الكتابة فقط
-        return NextResponse.json({ success: true, message: "تم استقبال الطلب سيادياً." });
-    }
-
-    // --- 2. التفعيل السحابي (فقط إذا توفر الملف) ---
-    if (action === 'instant_setup' && hasServiceAccount) {
+    // --- 1. التفعيل والاحتضان السحابي ---
+    if (action === 'instant_setup') {
         const db = getFirestore();
         const auth = getAuth();
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
@@ -63,7 +76,7 @@ export async function POST(request: NextRequest) {
         const trialEndDate = new Date();
         trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-        // أ. إنشاء حساب المالك سحابياً
+        // أ. إنشاء حساب المالك في Authentication
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -78,13 +91,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // ب. تعيين الصلاحيات الماستر
+        // ب. تعيين صلاحيات المدير
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // ج. إنشاء وثيقة المنشأة وحقن الـ Config
+        // ج. إنشاء وثيقة المنشأة وحقن الإعدادات
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
             id: companyId,
@@ -101,7 +114,7 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // د. إنشاء ملف المالك داخل المنشأة
+        // د. إنشاء ملف المالك داخل مستخدمي المنشأة
         const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
         await tenantUserRef.set({
             uid: userRecord.uid,
@@ -113,7 +126,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // هـ. تسجيل الهوية في الفهرس العالمي
+        // هـ. تسجيل الهوية في الفهرس الموحد للعبور بالاسم
         const globalIndexRef = db.collection('global_users').doc();
         await globalIndexRef.set({
             email: sanitizedEmail,
@@ -123,7 +136,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // و. تحديث طلب الديمو
+        // و. تحديث طلب الانضمام
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
@@ -133,23 +146,20 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        const inviteLink = await auth.generatePasswordResetLink(sanitizedEmail);
-
         return NextResponse.json({ 
             success: true, 
             uid: userRecord.uid,
-            inviteLink,
-            message: "تم التأسيس اللحظي والاحتضان السحابي بنجاح."
+            message: "تم تأسيس وتفعيل المنشأة بنجاح."
         });
     }
 
-    return NextResponse.json({ success: false, error: "ACTION_NOT_READY" });
+    return NextResponse.json({ success: false, error: "ACTION_NOT_RECOGNIZED" });
 
   } catch (error: any) {
     console.error("Master API Error:", error);
     return NextResponse.json({ 
         success: false, 
-        error: error.message || "Unknown Sovereign Error" 
+        error: error.message || "Internal Server Error" 
     }, { status: 500 });
   }
 }
