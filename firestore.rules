@@ -3,49 +3,52 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- مساعدات الحوكمة السيادية ---
+    // --- مساعدات الحوكمة ---
     function isDeveloper() {
       return request.auth != null && 
              request.auth.token.role == 'Developer';
     }
 
-    // التحقق من أن المستخدم ينتمي لهذه الشركة تحديداً
     function belongsToCompany(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || request.auth.token.currentCompanyId == companyId);
     }
 
-    // --- 1. فهرس المستخدمين العالمي (للدخول فقط) ---
-    match /global_users/{docId} {
-      allow read: if true; // مسموح للكل لقراءة الفهرس عند تسجيل الدخول
-      allow write: if request.auth != null; // مسموح للمديرين الموثقين بالتسجيل
+    // --- 1. طلبات الانضمام (عام للكل للإرسال) ---
+    // هذا الممر يسمح للزوار بوضع طلباتهم ليراها المطور في غرفة التحكم
+    match /company_requests/{requestId} {
+      allow create: if true; 
+      allow read, write: if isDeveloper();
     }
 
-    // --- 2. بيانات المطورين (المشروع الماستر) ---
+    // --- 2. فهرس المستخدمين العالمي ---
+    match /global_users/{docId} {
+      allow read: if true; 
+      allow write: if isDeveloper(); 
+    }
+
+    // --- 3. بيانات المطورين ---
     match /developers/{uid} {
       allow read, write: if isDeveloper();
     }
 
-    // --- 3. بيانات الشركات المعزولة (The Isolated Tenants) ---
+    // --- 4. بيانات الشركات المعزولة (The Isolated Tenants) ---
     match /companies/{companyId} {
-      // المطور يقرأ الكل، المدير يقرأ شركته فقط
       allow read: if isDeveloper() || belongsToCompany(companyId);
       allow write: if isDeveloper() || (belongsToCompany(companyId) && request.auth.token.role == 'Admin');
       
-      // عزل كافة المجموعات الفرعية (عملاء، موظفين، محاسبة)
       match /{allSubcollections=**} {
         allow read, write: if isDeveloper() || belongsToCompany(companyId);
       }
     }
 
-    // --- 4. العدادات العالمية ---
+    // --- 5. العدادات ---
     match /counters/{doc} {
       allow read, write: if request.auth != null;
     }
 
-    // --- 5. القاعدة الصارمة لمنع التسريب ---
+    // --- 6. الحماية الافتراضية ---
     match /{document=**} {
-      // أي مجموعة لا تتبع هيكل /companies/ تُعامل كمعلومات سيادية
       allow read, write: if isDeveloper();
     }
   }
