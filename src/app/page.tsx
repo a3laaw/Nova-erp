@@ -10,15 +10,12 @@ import {
     Loader2, 
     ShieldCheck, 
     LogIn, 
-    Sparkles, 
     AlertCircle, 
     User, 
     Key, 
-    Mail, 
-    ArrowRight,
     Send,
-    Building2,
-    Database
+    Database,
+    ArrowRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -89,7 +86,7 @@ export default function LoginPage() {
       } finally { setLocalLoading(false); }
   };
 
-  const projectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
+  const currentProjectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
@@ -167,7 +164,7 @@ export default function LoginPage() {
             
             <div className="pt-4 flex items-center justify-center gap-2 opacity-20">
                 <Database className="h-3 w-3" />
-                <span className="text-[8px] font-mono font-bold">{projectId}</span>
+                <span className="text-[8px] font-mono font-bold">{currentProjectId}</span>
             </div>
         </CardContent>
       </Card>
