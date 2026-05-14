@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company, UserProfile } from '@/lib/types';
@@ -40,19 +40,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
-      // 1. فحص هل هو مطور (Root Admin)
-      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
-      if (devDoc.exists()) {
-        const devData = devDoc.data();
+      const sanitizedEmail = email.toLowerCase().trim();
+
+      // 🛡️ بروتوكول العبور السيادي (Sovereign Architect Bypass)
+      // إذا كان البريد هو بريدك الرسمي، نمنحك رتبة مطور آلياً لكسر نقطة الصفر
+      if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
+        const devRef = doc(firestore, 'developers', user.uid);
+        const devDoc = await getDoc(devRef);
+        
+        if (!devDoc.exists()) {
+            // تأسيس سجل المطور آلياً في أول دخول
+            await setDoc(devRef, {
+                uid: user.uid,
+                email: sanitizedEmail,
+                role: 'Developer',
+                fullName: 'Alaa Wahib',
+                isActive: true,
+                createdAt: serverTimestamp()
+            });
+        }
+
         return {
           user: { 
               id: user.uid, 
               uid: user.uid, 
-              email: user.email!, 
+              email: sanitizedEmail, 
               username: 'root', 
               role: 'Developer', 
               isActive: true, 
-              fullName: devData?.fullName || 'Alaa Wahib', 
+              fullName: 'Alaa Wahib', 
               isSuperAdmin: true, 
               currentCompanyId: null, 
               companyName: 'Nova ERP Platform' 
@@ -61,8 +77,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // 2. فحص الفهرس العالمي للمنشآت
-      const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email.toLowerCase()), limit(1));
+      // 1. فحص هل هو مطور مسجل مسبقاً
+      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
+      if (devDoc.exists()) {
+        const devData = devDoc.data();
+        return {
+          user: { ...devData, id: user.uid, uid: user.uid, email: user.email!, role: 'Developer', isSuperAdmin: true } as AuthenticatedUser,
+          company: null
+        };
+      }
+
+      // 2. فحص الفهرس العالمي للمنشآت (Tenant Path)
+      const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
       if (!globalSnap.empty) {
@@ -73,17 +99,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (tenantDoc.exists()) {
             const profile = validateUserProfile(tenantDoc.data());
             const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
-            const company: Company | null = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+            const company = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
             return {
-              user: { 
-                ...profile, 
-                uid: user.uid, 
-                id: tenantDoc.id, 
-                currentCompanyId: idx.companyId, 
-                companyName: company?.name || 'Nova Client',
-                isActive: profile.isActive ?? true 
-              } as AuthenticatedUser,
+              user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client' } as AuthenticatedUser,
               company
             };
         }
@@ -113,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const email = firebaseUser.email?.toLowerCase() || '';
+        const email = firebaseUser.email || '';
         const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, email);
 
         if (isMounted) {
@@ -126,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 user: null, 
                 company: null, 
                 loading: false, 
-                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول لهذا البريد.' 
+                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول.' 
             });
             clearSessionIndicators();
           }

@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -7,7 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي المتقدم (V29.0)
+ * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي المتقدم (V34.0)
+ * تم تحصين معالجة المفتاح الخاص لمنع أخطاء الـ PEM.
  */
 
 function getAdminApp() {
@@ -26,7 +26,11 @@ function getAdminApp() {
             throw new Error("INVALID_SERVICE_ACCOUNT_JSON");
         }
 
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        // 🛡️ معالج المفتاح الذكي لمنع خطأ PEM
+        serviceAccount.private_key = serviceAccount.private_key
+            .replace(/\\n/g, '\n')
+            .replace(/"/g, '')
+            .trim();
 
         return initializeApp({
             credential: cert(serviceAccount),
