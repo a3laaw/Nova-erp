@@ -57,8 +57,8 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 /**
- * غرفة التحكم الرئيسية (V29.0):
- * تم إصلاح كافة مراجع الأيقونات لضمان استقرار العرض.
+ * غرفة التحكم الرئيسية (V32.0):
+ * تم ترميم كافة الأيقونات والمراجع لضمان استقرار العرض 100%.
  */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -365,7 +365,7 @@ export default function DeveloperDashboard() {
                                 </div>
                             </div>
                             <Button onClick={copyWelcomeMessage} className="w-full h-14 rounded-2xl font-black text-lg gap-3 shadow-xl bg-green-600 hover:bg-green-700 transition-all">
-                                <Send className="h-5 w-5" /> نسخ رسالة الترحيب للواتساب
+                                <Send className="h-5 w-5" /> نسخ بيانات الدخول
                             </Button>
                         </div>
                     )}

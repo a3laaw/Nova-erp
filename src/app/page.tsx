@@ -27,6 +27,10 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
+/**
+ * بوابة العبور الموحدة (Unified Login Gateway):
+ * تم تحصينها لاستقبال المطورين ببريد رسمي @gmail.com والعملاء بـ @company.nova
+ */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore } = useFirebase();
@@ -37,7 +41,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
   const [localLoading, setLocalLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<{ message: string, email?: string, type: 'error' | 'manual_needed' | 'success' } | null>(null);
+  const [diagnosis, setDiagnosis] = useState<{ message: string, type: 'error' | 'success' } | null>(null);
 
   useEffect(() => {
     if (user && !loading) {
@@ -48,6 +52,7 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
+      // إذا لم يكن إيميلاً، نبحث في الفهرس العالمي عن اسم المستخدم
       if (!finalEmail.includes('@') && firestore) {
           const globalQuery = query(
               collection(firestore, 'global_users'), 
@@ -58,7 +63,7 @@ export default function LoginPage() {
           if (!snap.empty) {
               finalEmail = snap.docs[0].data().email;
           } else {
-              throw new Error('اسم المستخدم غير صحيح أو غير مسجل لدينا.');
+              throw new Error('اسم المستخدم غير مسجل في المنظومة.');
           }
       }
       return finalEmail;
@@ -77,7 +82,7 @@ export default function LoginPage() {
     } catch (error: any) {
         setLocalLoading(false);
         setDiagnosis({ type: 'error', message: error.message || 'بيانات الدخول غير صحيحة.' });
-        toast({ variant: 'destructive', title: 'تعذر الدخول', description: error.message });
+        toast({ variant: 'destructive', title: 'فشل الدخول', description: error.message });
     }
   };
 
@@ -93,9 +98,8 @@ export default function LoginPage() {
           await resetPassword(finalEmail);
           setDiagnosis({ 
               type: 'success', 
-              message: `تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني بنجاح. يرجى التحقق من صندوق الوارد (أو المجلد المزعج Spam).` 
+              message: `تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد: ${finalEmail}` 
           });
-          toast({ title: 'تم إرسال البريد', description: 'يرجى مراجعة بريدك الإلكتروني.' });
       } catch (error: any) {
           setDiagnosis({ type: 'error', message: error.message || 'فشل إرسال بريد إعادة التعيين.' });
       } finally {
@@ -113,11 +117,11 @@ export default function LoginPage() {
                 {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" /> : <Key className="h-10 w-10 text-primary" />}
             </div>
             <CardTitle className="text-3xl font-black tracking-tighter text-[#1e1b4b] flex items-center justify-center gap-2">
-                {mode === 'login' ? 'Nova ERP' : 'استعادة الحساب'}
+                {mode === 'login' ? 'Nova ERP' : 'استعادة الدخول'}
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
             <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">
-                {mode === 'login' ? 'بوابة الدخول الموحدة' : 'أدخل بريدك أو اسم المستخدم'}
+                {mode === 'login' ? 'بوابة الدخول الموحدة' : 'سيصلك رابط التعيين على بريدك'}
             </CardDescription>
         </CardHeader>
         
@@ -125,13 +129,10 @@ export default function LoginPage() {
             {diagnosis && (
                 <Alert variant={diagnosis.type === 'success' ? 'default' : 'destructive'} className={cn(
                     "rounded-2xl border-2 animate-in fade-in slide-in-from-top-2", 
-                    diagnosis.type === 'success' ? "bg-green-50 border-green-200 text-green-800" :
-                    diagnosis.type === 'manual_needed' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
+                    diagnosis.type === 'success' ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200"
                 )}>
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">
-                        {diagnosis.type === 'success' ? 'نجاح الإرسال' : 'تنبيه أمني'}
-                    </AlertTitle>
+                    <AlertTitle className="text-[11px] font-black">إشعار النظام</AlertTitle>
                     <AlertDescription className="text-[10px] font-black leading-relaxed mt-1">
                         {diagnosis.message}
                     </AlertDescription>
@@ -190,7 +191,7 @@ export default function LoginPage() {
             ) : (
                 <form onSubmit={handleResetPassword} className="space-y-6">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد المسجل</Label>
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">أدخل بريدك أو اسم المستخدم</Label>
                         <div className="relative group">
                             <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <Input 
@@ -199,7 +200,7 @@ export default function LoginPage() {
                                 onChange={e => setIdentifier(e.target.value)} 
                                 className="h-12 rounded-xl border-2 pr-10 bg-white/40 font-bold" 
                                 required 
-                                placeholder="your@email.com"
+                                placeholder="alaa.wahib"
                                 disabled={localLoading}
                             />
                         </div>
@@ -225,11 +226,11 @@ export default function LoginPage() {
             )}
 
             <div className="pt-6 border-t border-black/5 text-center">
-                <p className="text-[10px] font-bold text-slate-500 mb-3 uppercase">ليس لديك منشأة مسجلة؟</p>
+                <p className="text-[10px] font-bold text-slate-500 mb-3 uppercase">هل ترغب في تسجيل منشأة جديدة؟</p>
                 <Button asChild variant="ghost" className="w-full h-12 rounded-2xl border-2 border-white/60 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 gap-2">
                     <Link href="/register">
                         <Building2 className="h-4 w-4" />
-                        سجل منشأتك الآن
+                        سجل مكتبك الآن
                     </Link>
                 </Button>
             </div>
