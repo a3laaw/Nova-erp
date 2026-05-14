@@ -25,8 +25,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور الموحدة (Sovereign Login Gateway V51.0).
- * تم التحديث: توسيط النصوص، منع الإكمال التلقائي، ومزامنة حذف الخانات.
+ * بوابة العبور الموحدة (Sovereign Login Gateway V52.0).
+ * تم التحديث: محاذاة مركزية مطلقة، منع الإكمال التلقائي، وحل لغز الـ UID.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -49,6 +49,7 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       const input = id.trim().toLowerCase();
+      // استثناءات المطور
       if (input === 'alaa') return 'alaawaaheeb@gmail.com';
       if (input.includes('@')) return input;
       
@@ -135,7 +136,6 @@ export default function LoginPage() {
                     <div className="grid gap-2">
                         <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-center">اسم المستخدم أو البريد</Label>
                         <div className="relative">
-                            <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 opacity-0 group-focus-within:opacity-100 transition-opacity" />
                             <Input 
                                 value={identifier} 
                                 onChange={handleIdentifierChange} 
@@ -152,7 +152,6 @@ export default function LoginPage() {
                             <Label className="font-black text-[10px] uppercase tracking-widest">كلمة المرور</Label>
                         </div>
                         <div className="relative">
-                            <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 opacity-0 group-focus-within:opacity-100 transition-opacity" />
                             <Input 
                                 type="password" 
                                 value={password} 
@@ -178,7 +177,6 @@ export default function LoginPage() {
                     <div className="grid gap-2">
                         <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-center">أدخل بريدك الإلكتروني</Label>
                         <div className="relative">
-                            <Send className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <Input value={identifier} onChange={handleIdentifierChange} className="h-12 rounded-xl border-2 text-center font-bold" required placeholder="example@email.com" autoComplete="off" />
                         </div>
                     </div>

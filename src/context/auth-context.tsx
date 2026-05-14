@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
@@ -35,7 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ بروتوكول المعماري السيادي (Master Admin Only)
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -47,27 +46,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             currentCompanyId: null,
             companyName: 'Master Console'
         };
-        // تسجيل نشاط المطور في الخلفية
         setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
         return { user: devProfile, company: null };
     }
 
     try {
-        // 1. محاولة جلب المنشأة من الـ Claims أولاً (أسرع وأضمن)
-        const tokenResult = await firebaseUser.getIdTokenResult();
-        let companyId = tokenResult.claims.companyId as string || tokenResult.claims.currentCompanyId as string;
+        let companyId: string | null = null;
+        let globalUserData: any = null;
 
-        // 2. إذا لم توجد Claims (دخول لأول مرة)، نبحث في الفهرس العالمي
-        if (!companyId) {
-            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
-            const globalSnap = await getDocs(globalQuery);
-            if (!globalSnap.empty) {
-                companyId = globalSnap.docs[0].data().companyId;
+        // 1. البحث في الفهرس العالمي بالبريد (أضمن لفك لغز الـ UID المتغير)
+        const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
+        const globalSnap = await getDocs(globalQuery);
+        
+        if (!globalSnap.empty) {
+            const globalDoc = globalSnap.docs[0];
+            globalUserData = globalDoc.data();
+            companyId = globalUserData.companyId;
+
+            // 🛡️ محرك الإصلاح الذاتي (UID Repair Engine)
+            // إذا وجدنا أن المعرف في جوجل يختلف عن المعرف المسجل في الملف
+            if (globalUserData.uid !== firebaseUser.uid) {
+                console.log("Sovereign Repair: Updating UID linkage for account reset.");
+                const oldUid = globalUserData.uid;
+                
+                // تحديث المعرف في الفهرس العالمي
+                await updateDoc(globalDoc.ref, { uid: firebaseUser.uid });
+
+                // محاولة نقل/تحديث ملف المستخدم داخل المنشأة
+                if (companyId) {
+                    const oldTenantRef = doc(firestore, `companies/${companyId}/users/${oldUid}`);
+                    const oldTenantSnap = await getDoc(oldTenantRef);
+                    
+                    if (oldTenantSnap.exists()) {
+                        const userData = oldTenantSnap.data();
+                        const newTenantRef = doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`);
+                        await setDoc(newTenantRef, { ...userData, uid: firebaseUser.uid, id: firebaseUser.uid });
+                    }
+                }
             }
         }
         
         if (companyId) {
-            // جلب ملف المستخدم من داخل المنشأة المعزولة
             const tenantDoc = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
             
             if (tenantDoc.exists()) {

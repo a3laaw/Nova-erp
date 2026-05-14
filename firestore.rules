@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V50.0) ---
+    // --- 🛡️ بروتوكول المعماري السيادي (V52.0) ---
     // المطور الأصلي هو المتحكم الوحيد في البنية التحتية
     function isSovereignArchitect() {
       return request.auth != null && 
@@ -35,8 +35,8 @@ service cloud.firestore {
 
     // الفهرس العالمي للمستخدمين
     match /global_users/{docId} {
-      // السماح للمستخدم بقراءة سجله الخاص لمعرفة منشأته عند الدخول
-      allow read: if request.auth != null && (request.auth.uid == docId || isSovereignArchitect());
+      // 🛡️ تعديل سيادي: السماح بالبحث بالبريد لأي مستخدم موثق لتمكين الإصلاح الذاتي للارتباط
+      allow read: if request.auth != null;
       allow write: if isSovereignArchitect();
     }
     
