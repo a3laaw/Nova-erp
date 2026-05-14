@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Key, ExternalLink } from 'lucide-react';
+import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Key, Mail, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -16,20 +15,17 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
-/**
- * بوابة العبور الرئيسية (V30.0):
- * تم إصلاح خطأ استيراد cn المفقود وتحصين منطق الدخول للمطور الرسمي.
- */
 export default function LoginPage() {
-  const { login, user, loading } = useAuth();
+  const { login, resetPassword, user, loading } = useAuth();
   const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
   const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
   const [localLoading, setLocalLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<{ message: string, email?: string, type: 'error' | 'manual_needed' } | null>(null);
+  const [diagnosis, setDiagnosis] = useState<{ message: string, email?: string, type: 'error' | 'manual_needed' | 'success' } | null>(null);
 
   useEffect(() => {
     if (user && !loading) {
@@ -37,6 +33,24 @@ export default function LoginPage() {
         router.replace(target);
     }
   }, [user, loading, router]);
+
+  const resolveEmail = async (id: string) => {
+      let finalEmail = id.trim().toLowerCase();
+      if (!finalEmail.includes('@') && firestore) {
+          const globalQuery = query(
+              collection(firestore, 'global_users'), 
+              where('username', '==', finalEmail),
+              limit(1)
+          );
+          const snap = await getDocs(globalQuery);
+          if (!snap.empty) {
+              finalEmail = snap.docs[0].data().email;
+          } else {
+              throw new Error('اسم المستخدم غير صحيح أو غير مسجل لدينا.');
+          }
+      }
+      return finalEmail;
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,55 +60,35 @@ export default function LoginPage() {
     setDiagnosis(null);
 
     try {
-        let finalEmail = identifier.trim().toLowerCase();
-
-        // 🛡️ محرك تحويل الهوية الذكي (الدخول باسم المستخدم للمنشآت)
-        if (!finalEmail.includes('@') && firestore) {
-            const globalQuery = query(
-                collection(firestore, 'global_users'), 
-                where('username', '==', finalEmail),
-                limit(1)
-            );
-            const snap = await getDocs(globalQuery);
-            if (!snap.empty) {
-                finalEmail = snap.docs[0].data().email;
-            } else {
-                // إذا لم يوجد في الفهرس، نعتبره خطأ دخول بدلاً من الانهيار
-                throw new Error('بيانات الدخول غير صحيحة.');
-            }
-        }
-
+        const finalEmail = await resolveEmail(identifier);
         await login(finalEmail, password);
-
     } catch (error: any) {
         setLocalLoading(false);
-        
-        // 🔍 محرك تشخيص أعطال الأمان
-        if (firestore) {
-            const checkId = identifier.trim().toLowerCase();
-            const diagQuery = identifier.includes('@')
-                ? query(collection(firestore, 'global_users'), where('email', '==', checkId), limit(1))
-                : query(collection(firestore, 'global_users'), where('username', '==', checkId), limit(1));
-            
-            const snap = await getDocs(diagQuery);
-            if (!snap.empty) {
-                const userData = snap.docs[0].data();
-                setDiagnosis({
-                    type: 'manual_needed',
-                    message: 'تم العثور على منشأتك، ولكن حساب الأمان يحتاج لتفعيل يدوي في كونسول Google.',
-                    email: userData.email
-                });
-            } else {
-                setDiagnosis({ type: 'error', message: 'تأكد من كتابة اسم المستخدم وكلمة المرور بشكل صحيح، أو تأكد من وجود حساب المطور.' });
-            }
-        }
-
-        toast({
-            variant: 'destructive',
-            title: 'تعذر الدخول',
-            description: error.message || 'بيانات الدخول غير صحيحة.'
-        });
+        setDiagnosis({ type: 'error', message: error.message || 'بيانات الدخول غير صحيحة.' });
+        toast({ variant: 'destructive', title: 'تعذر الدخول', description: error.message });
     }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (localLoading || !identifier) return;
+
+      setLocalLoading(true);
+      setDiagnosis(null);
+
+      try {
+          const finalEmail = await resolveEmail(identifier);
+          await resetPassword(finalEmail);
+          setDiagnosis({ 
+              type: 'success', 
+              message: `تم إرسال رابط إعادة التعيين إلى بريدك الإلكتروني بنجاح. يرجى التحقق من صندوق الوارد (أو المجلد المزعج Spam).` 
+          });
+          toast({ title: 'تم إرسال البريد', description: 'يرجى مراجعة بريدك الإلكتروني.' });
+      } catch (error: any) {
+          setDiagnosis({ type: 'error', message: error.message || 'فشل إرسال بريد إعادة التعيين.' });
+      } finally {
+          setLocalLoading(false);
+      }
   };
 
   return (
@@ -104,83 +98,119 @@ export default function LoginPage() {
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40 bg-white/20">
             <div className="bg-white/60 p-4 rounded-3xl w-fit mx-auto mb-4 border border-white shadow-lg">
-                <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" />
+                {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" /> : <Key className="h-10 w-10 text-primary" />}
             </div>
             <CardTitle className="text-3xl font-black tracking-tighter text-[#1e1b4b] flex items-center justify-center gap-2">
-                Nova ERP
+                {mode === 'login' ? 'Nova ERP' : 'استعادة الحساب'}
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">بوابة الدخول الرسمية</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">
+                {mode === 'login' ? 'بوابة الدخول الموحدة' : 'أدخل بريدك أو اسم المستخدم'}
+            </CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
             {diagnosis && (
-                <Alert variant="destructive" className={cn("rounded-2xl border-2 animate-in fade-in slide-in-from-top-2", diagnosis.type === 'manual_needed' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200")}>
-                    <AlertCircle className={cn("h-4 w-4", diagnosis.type === 'manual_needed' ? "text-amber-600" : "text-red-600")} />
-                    <AlertTitle className="text-[11px] font-black">{diagnosis.type === 'manual_needed' ? 'تفعيل جزئي (يدوي)' : 'تشخيص أعطال العبور'}</AlertTitle>
-                    <AlertDescription className="text-[10px] font-black leading-relaxed space-y-3 mt-1">
-                        <p className={diagnosis.type === 'manual_needed' ? "text-amber-800" : "text-red-800"}>{diagnosis.message}</p>
-                        {diagnosis.type === 'manual_needed' && (
-                            <div className="space-y-2">
-                                <div className="p-2 bg-white rounded-lg border border-amber-100 flex items-center justify-between">
-                                    <span className="font-mono select-all text-[9px] text-amber-900">{diagnosis.email}</span>
-                                    <Key className="h-3 w-3 opacity-30 text-amber-600" />
-                                </div>
-                                <p className="text-[9px] text-amber-700 italic">يجب على المطور إضافة هذا البريد يدوياً في Firebase Console ليتمكن المالك من الدخول.</p>
-                            </div>
-                        )}
+                <Alert variant={diagnosis.type === 'error' ? 'destructive' : 'default'} className={cn(
+                    "rounded-2xl border-2 animate-in fade-in slide-in-from-top-2", 
+                    diagnosis.type === 'success' ? "bg-green-50 border-green-200 text-green-800" :
+                    diagnosis.type === 'manual_needed' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
+                )}>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle className="text-[11px] font-black">
+                        {diagnosis.type === 'success' ? 'نجاح الإرسال' : 'تنبيه أمني'}
+                    </AlertTitle>
+                    <AlertDescription className="text-[10px] font-black leading-relaxed mt-1">
+                        {diagnosis.message}
                     </AlertDescription>
                 </Alert>
             )}
 
-            <form onSubmit={handleLogin} className="space-y-5" autoComplete="on">
-                <div className="grid gap-2">
-                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم (Login ID)</Label>
-                    <div className="relative group">
-                        <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+            {mode === 'login' ? (
+                <form onSubmit={handleLogin} className="space-y-5">
+                    <div className="grid gap-2">
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد</Label>
+                        <div className="relative group">
+                            <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                            <Input 
+                                type="text" 
+                                value={identifier} 
+                                onChange={e => setIdentifier(e.target.value)} 
+                                className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 pr-10" 
+                                required 
+                                placeholder="Email or Username"
+                                disabled={localLoading}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <div className="flex justify-between items-center pr-1">
+                            <Label className="font-black text-[10px] uppercase tracking-widest text-[#1e1b4b]">كلمة المرور</Label>
+                            <button 
+                                type="button" 
+                                onClick={() => setMode('forgot-password')}
+                                className="text-[10px] font-black text-primary hover:underline"
+                            >
+                                نسيت كلمة المرور؟
+                            </button>
+                        </div>
                         <Input 
-                            type="text" 
-                            value={identifier} 
-                            onChange={e => setIdentifier(e.target.value)} 
-                            className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 pr-10" 
+                            type="password" 
+                            value={password} 
+                            onChange={e => setPassword(e.target.value)} 
+                            className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2" 
                             required 
-                            placeholder="e.g. alaa"
-                            disabled={localLoading || loading}
+                            placeholder="********"
+                            disabled={localLoading}
                         />
                     </div>
-                </div>
 
-                <div className="grid gap-2">
-                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">كلمة المرور</Label>
-                    <Input 
-                        type="password" 
-                        value={password} 
-                        onChange={e => setPassword(e.target.value)} 
-                        className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2 focus:border-primary/50 transition-all" 
-                        required 
-                        placeholder="********"
-                        disabled={localLoading || loading}
-                    />
-                </div>
+                    <Button 
+                        type="submit" 
+                        disabled={localLoading} 
+                        className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-4 border-black/30 mt-2 active:translate-y-1 active:border-b-0"
+                    >
+                        {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
+                        <span>دخول للنظام</span>
+                    </Button>
+                </form>
+            ) : (
+                <form onSubmit={handleResetPassword} className="space-y-6">
+                    <div className="grid gap-2">
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد المسجل</Label>
+                        <div className="relative group">
+                            <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input 
+                                type="text" 
+                                value={identifier} 
+                                onChange={e => setIdentifier(e.target.value)} 
+                                className="h-12 rounded-xl border-2 pr-10 bg-white/40 font-bold" 
+                                required 
+                                placeholder="your@email.com"
+                                disabled={localLoading}
+                            />
+                        </div>
+                    </div>
 
-                <Button 
-                    type="submit" 
-                    disabled={localLoading || loading} 
-                    className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-4 border-black/30 mt-2 active:translate-y-1 active:border-b-0"
-                >
-                    {localLoading || loading ? (
-                        <>
-                            <Loader2 className="animate-spin h-6 w-6" />
-                            <span>جاري التحقق...</span>
-                        </>
-                    ) : (
-                        <>
-                            <LogIn className="h-6 w-6" />
-                            <span>دخول للنظام</span>
-                        </>
-                    )}
-                </Button>
-            </form>
+                    <Button 
+                        type="submit" 
+                        disabled={localLoading || !identifier} 
+                        className="w-full h-14 rounded-2xl font-black text-lg gap-3 shadow-xl bg-primary text-white"
+                    >
+                        {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <Send className="h-6 w-6" />}
+                        إرسال رابط التعيين
+                    </Button>
+
+                    <button 
+                        type="button" 
+                        onClick={() => { setMode('login'); setDiagnosis(null); }}
+                        className="w-full text-xs font-black text-[#1e1b4b]/60 flex items-center justify-center gap-2 hover:text-[#1e1b4b]"
+                    >
+                        <ArrowRight className="h-3 w-3 rotate-180" /> العودة للدخول
+                    </button>
+                </form>
+            )}
 
             <div className="pt-6 border-t border-black/5 text-center">
                 <p className="text-[10px] font-bold text-slate-500 mb-3 uppercase">ليس لديك منشأة مسجلة؟</p>

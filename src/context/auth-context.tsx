@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
@@ -20,6 +19,7 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   refreshUserData: () => Promise<void>;
 }
 
@@ -38,13 +38,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, ...next }));
   }, []);
 
-  /**
-   * محرك المصادقة السيادي المطور (V30.0): 
-   * فك التداخل للسماح بالبريد الرسمي للمطور (Gmail) بالعبور.
-   */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
-      // 🛡️ المحطة 1: الفحص في الفهرس العالمي (الشركات السحابية)
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
@@ -72,8 +67,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // 🛠️ المحطة 2: وضع المطور الرسمي (Master Developer)
-      // تم إلغاء شرط .local للسماح ببريد الجيميل الرسمي بالدخول كمدير أعلى
       const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
       if (devDoc.exists()) {
         const devData = devDoc.data();
@@ -131,13 +124,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 user: null, 
                 company: null, 
                 loading: false, 
-                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول لهذا البريد في سجلات المطورين أو المنشآت.' 
+                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول لهذا البريد.' 
             });
             clearSessionIndicators();
           }
         }
       } catch (err: any) {
-        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر التحقق من الجلسة السيادية.' });
+        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر التحقق من الجلسة.' });
         clearSessionIndicators();
       } finally {
         if (isMounted) updateState({ loading: false });
@@ -157,6 +150,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error(mapFirebaseAuthError(err.code));
     }
   }, [masterAuth, updateState]);
+
+  const resetPassword = useCallback(async (email: string) => {
+    if (!masterAuth) throw new Error('خدمة المصادقة غير متاحة');
+    try {
+      await sendPasswordResetEmail(masterAuth, email.toLowerCase().trim());
+    } catch (err: any) {
+      throw new Error(mapFirebaseAuthError(err.code));
+    }
+  }, [masterAuth]);
 
   const logout = useCallback(async () => {
     if (!masterAuth) return;
@@ -181,13 +183,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [state.user, masterFirestore, fetchUserWithContext, updateState, setCurrentCompany]);
 
-  const ctx = useMemo(() => ({ ...state, login, logout, refreshUserData }), [state, login, logout, refreshUserData]);
+  const ctx = useMemo(() => ({ ...state, login, logout, resetPassword, refreshUserData }), [state, login, logout, resetPassword, refreshUserData]);
 
   return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
+  if (ctx === undefined) throw new Error('useAuth must be used within <AuthProvider>');
   return ctx;
 };
