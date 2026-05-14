@@ -3,20 +3,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V44.0) ---
-    // السلطة المطلقة لبريدك الشخصي لكسر أي حلقة مفرغة
+    // --- 🛡️ بروتوكول المعماري السيادي (V45.0) ---
+    // الحصانة المطلقة لبريدك الشخصي لكسر أي حلقة مفرغة
     function isSovereignArchitect() {
       return request.auth != null && 
-             (request.auth.token.role == 'Developer' || 
-              request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
+             (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
+              request.auth.token.role == 'Developer');
     }
 
     function belongsToCompany(companyId) {
       return request.auth != null && 
-             (request.auth.token.companyId == companyId || request.auth.token.currentCompanyId == companyId);
+             (request.auth.token.companyId == companyId || 
+              request.auth.token.currentCompanyId == companyId);
     }
 
-    // السماح لبريدك بالكتابة في مجموعة المطورين لتأسيس الجلسة الأولى
+    // السماح لك بالدخول والكتابة في كل مكان لتأسيس المنظومة
     match /developers/{uid} {
       allow read, write: if isSovereignArchitect() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
@@ -38,6 +39,7 @@ service cloud.firestore {
       allow read, write: if isSovereignArchitect();
     }
 
+    // القاعدة الذهبية: المعماري السيادي يملك الحق في كل شيء
     match /{document=**} {
       allow read, write: if isSovereignArchitect();
     }

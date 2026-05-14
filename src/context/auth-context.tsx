@@ -7,7 +7,7 @@ import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, 
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
-import { mapFirebaseAuthError, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
+import { setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -17,7 +17,6 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,8 +34,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
 
-    // 🛡️ الحصانة الدبلوماسية للمعمار علاء (V44.0)
-    // نمنحه الهوية والسيادة في الذاكرة فوراً لتجاوز مشاكل الرولز والقواعد
+    // 🛡️ الحصانة السيادية المطلقة (V45.0)
+    // إذا كان البريد هو بريدك الرسمي، نمنحك رتبة Developer في الذاكرة فوراً لكسر الحلقة المفرغة
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -48,8 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             currentCompanyId: null,
             companyName: 'Sovereign Control Centre'
         };
-        // محاولة التوثيق في الخلفية (اختيارية)
-        try { setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }); } catch(e){}
+        // محاولة تحديث السجل في الخلفية دون تعطيل الدخول
+        setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
         return { user: devProfile, company: null };
     }
 
@@ -71,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 };
             }
         }
-    } catch (e) { console.error("Identity error:", e); }
+    } catch (e) { console.error("Identity Error:", e); }
     return { user: null, company: null };
   }, []);
 
@@ -100,7 +99,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators();
           await signOut(masterAuth);
         }
-      } catch (err) { setError('فشل التحقق من الجلسة'); } finally { setLoading(false); }
+      } catch (err) { 
+        setError('فشل التحقق من الجلسة السيادية'); 
+      } finally { 
+        setLoading(false); 
+      }
     });
 
     return () => unsubscribe();
@@ -124,7 +127,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await sendPasswordResetEmail(masterAuth, email.toLowerCase().trim());
   };
 
-  const value = useMemo(() => ({ user, company, loading, error, login, logout, resetPassword, refreshUserData: async () => {} }), [user, company, loading, error, login, logout]);
+  const value = useMemo(() => ({ 
+    user, company, loading, error, login, logout, resetPassword 
+  }), [user, company, loading, error, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

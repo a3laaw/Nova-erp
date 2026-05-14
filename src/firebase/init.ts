@@ -6,7 +6,7 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 /**
- * 🛡️ محرك التهيئة السيادي الموحد (V42.0): 
+ * 🛡️ محرك التهيئة السيادي الموحد (V45.0): 
  * تم تثبيت الإعدادات لتعمل حصرياً على المشروع الأول (النجمة) لإنهاء الصداع الأزلي.
  */
 const firebaseConfig: FirebaseOptions = {
