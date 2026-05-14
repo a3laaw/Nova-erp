@@ -11,13 +11,12 @@ import path from 'path';
  */
 
 const MASTER_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-  projectId: "studio-8039389980-3d2d0",
-  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-  messagingSenderId: "828494117254",
-  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
-  measurementId: "G-Q7DPZ802VJ"
+  apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
+  authDomain: "nov-erp-1-25549967-c24e5.firebaseapp.com",
+  projectId: "nov-erp-1-25549967-c24e5",
+  storageBucket: "nov-erp-1-25549967-c24e5.firebasestorage.app",
+  messagingSenderId: "71297676078",
+  appId: "1:71297676078:web:b956ab00372e6ba237c0bf"
 };
 
 export async function POST(request: NextRequest) {
@@ -39,9 +38,18 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    // 2. فحص محتوى الملف (هل هو فارغ أو ناقص؟)
-    const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-    const sa = JSON.parse(saContent);
+    // 2. فحص محتوى الملف (هل هو JSON صالح؟)
+    let sa;
+    try {
+        const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
+        sa = JSON.parse(saContent);
+    } catch (parseError) {
+        return NextResponse.json({ 
+            success: false, 
+            error: "JSON_PARSE_ERROR",
+            message: "ملف service-account.json يحتوي على أخطاء في الصيغة (مثل التعليقات //). يرجى مسح محتوى الملف ولصق بيانات المفتاح الحقيقي كـ JSON نظيف فقط."
+        });
+    }
 
     if (!sa.private_key || sa.private_key.includes("ضع_هنا")) {
         return NextResponse.json({ 
