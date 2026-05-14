@@ -25,8 +25,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور السيادية الموحدة (V47.0):
- * تم إصلاح كافة الاستيرادات المفقودة (ReferenceErrors) وضمان استقرار الواجهة.
+ * بوابة العبور الموحدة (Sovereign Login V48.0):
+ * تم تحصين كافة الاستيرادات لضمان استقرار لؤلؤي تحت الضغط.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -49,7 +49,6 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       const input = id.trim().toLowerCase();
-      // 🛡️ ممر سيادي مباشر للمعمار علاء
       if (input === 'alaa' || input === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
       
       if (!input.includes('@') && firestore) {
@@ -58,7 +57,7 @@ export default function LoginPage() {
               const snap = await getDocs(q);
               if (!snap.empty) return snap.docs[0].data().email;
           } catch (e) { 
-              console.warn("Username lookup skipped."); 
+              console.warn("Username resolving skipped."); 
           }
       }
       return input;
@@ -77,7 +76,7 @@ export default function LoginPage() {
         setLocalLoading(false);
         let msg = 'بيانات الدخول غير صحيحة.';
         if (error.code === 'auth/invalid-credential') {
-            msg = 'خطأ سيادي: البريد أو كلمة المرور غير صحيحة. يرجى التأكد من إضافة الحساب في كونسول جوجل للمشروع الصحيح.';
+            msg = 'خطأ أمني: بيانات الدخول غير مطابقة للسجلات في مشروع النجمة الحالي.';
         }
         setErrorMsg(msg);
     }
@@ -90,7 +89,7 @@ export default function LoginPage() {
       try {
           const finalEmail = await resolveEmail(identifier);
           await resetPassword(finalEmail);
-          toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني لتغيير كلمة المرور.' });
+          toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني لتعيين كلمة مرور جديدة.' });
           setMode('login');
       } catch (error: any) {
           setErrorMsg(error.message);
@@ -107,7 +106,7 @@ export default function LoginPage() {
                 {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" /> : <Key className="h-10 w-10 text-primary" />}
             </div>
             <CardTitle className="text-3xl font-black text-[#1e1b4b]">Nova ERP</CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold uppercase tracking-widest text-[10px]">بوابة العبور الموحدة</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/60 font-bold uppercase tracking-widest text-[10px]">بوابة العبور السيادية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
@@ -130,7 +129,7 @@ export default function LoginPage() {
                                 onChange={e => setIdentifier(e.target.value)} 
                                 className="h-12 rounded-xl border-2 pr-10 dir-ltr font-black" 
                                 required 
-                                placeholder="Email or Username"
+                                placeholder="Username or Email"
                             />
                         </div>
                     </div>

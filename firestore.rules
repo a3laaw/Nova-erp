@@ -3,8 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V47.0) ---
-    // منح الحصانة لبريدك الشخصي لكسر أي حلقة مفرغة في المشروع الجديد
+    // --- 🛡️ بروتوكول المعماري السيادي (V48.0) ---
     function isSovereignArchitect() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 

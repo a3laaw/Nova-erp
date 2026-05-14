@@ -34,8 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
 
-    // 🛡️ الحصانة السيادية المطلقة (Bypass V47.0)
-    // نمنحك رتبة Developer في الذاكرة فوراً لكسر حلقة الخروج التلقائي
+    // 🛡️ بروتوكول العبور السيادي (V48.0): إيميل المطور هو الرتبة المطلقة
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -47,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             currentCompanyId: null,
             companyName: 'Sovereign Master Console'
         };
-        // محاولة إنشاء السجل في الخلفية دون انتظار لضمان بقاء الجلسة مفتوحة
+        // تحديث السجل في الخلفية دون تعطيل الدخول
         setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
         return { user: devProfile, company: null };
     }
@@ -71,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
     } catch (e) { 
-        console.warn("Identity context fetch skipped or failed."); 
+        console.warn("Identity context lookup failed, falling back to guest."); 
     }
     return { user: null, company: null };
   }, []);
@@ -102,7 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await signOut(masterAuth);
         }
       } catch (err) { 
-        console.error("Auth Loop Error:", err);
+        console.error("Auth Cycle Error:", err);
       } finally { 
         setLoading(false); 
       }
@@ -112,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext]);
 
   const login = useCallback(async (email: string, password: string) => {
-    if (!masterAuth) throw new Error('بوابة الدخول غير متصلة حالياً.');
+    if (!masterAuth) throw new Error('بوابة الدخول غير متصلة.');
     return signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
   }, [masterAuth]);
 
