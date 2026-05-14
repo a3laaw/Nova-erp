@@ -7,7 +7,7 @@ import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, 
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company, UserProfile } from '@/lib/types';
-import { mapFirebaseAuthError, validateUserProfile, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
+import { mapFirebaseAuthError, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -36,8 +36,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ استثناء المعماري (Architect Exception V41):
-      // بريدك الجيميل هو الماستر، والمنظومة ستمنحه صلاحية المطور "في الذاكرة" فوراً
+      // 🛡️ استثناء المعماري السيادي (Sovereign Architect Exception V42):
+      // بريدك الجيميل هو الماستر، نمنحه رتبة المطور "في الذاكرة" فوراً لكسر الحلقة المفرغة.
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile = {
             uid: firebaseUser.uid,
@@ -50,15 +50,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             companyName: 'Sovereign Control'
         };
 
-        // محاولة تحديث السجل في الخلفية
+        // تحديث سجل المطور في الخلفية
         try {
             await setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true });
-        } catch (e) { console.warn("Sovereign write skipped"); }
+        } catch (e) { console.warn("Auto-provisioning write skipped due to rules, but memory session is active."); }
 
         return { user: devProfile as AuthenticatedUser, company: null };
       }
 
-      // 1. البحث العادي للمستخدمين الآخرين
+      // 1. البحث للمستخدمين العاديين
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       

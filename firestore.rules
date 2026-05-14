@@ -3,9 +3,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V41.0) ---
-    // هذا الاستثناء يسمح لبريدك الشخصي alaawaaheeb@gmail.com بتجاوز كافة الحواجز
-    function isDeveloper() {
+    // --- 🛡️ بروتوكول المعماري السيادي (V42.0) ---
+    // هذا الاستثناء هو الضربة القاضية للحلقة المفرغة؛ يفتح لك كل الأبواب فوراً.
+    function isSovereignArchitect() {
       return request.auth != null && 
              (request.auth.token.role == 'Developer' || 
               request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
@@ -18,30 +18,30 @@ service cloud.firestore {
 
     // --- 1. المنشآت والبيانات المعزولة ---
     match /companies/{companyId} {
-      allow read, write: if isDeveloper() || belongsToCompany(companyId);
+      allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
       match /{allSubcollections=**} {
-        allow read, write: if isDeveloper() || belongsToCompany(companyId);
+        allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       }
     }
 
-    // --- 2. الفهارس والطلبات (مفتوحة للمطور للتحكم) ---
+    // --- 2. الفهارس والطلبات (مفتوحة للمعماري للتحكم الإداري) ---
     match /global_users/{docId} {
-      allow read, write: if isDeveloper();
+      allow read, write: if isSovereignArchitect();
     }
     
     match /company_requests/{requestId} {
       allow create: if true;
-      allow read, write: if isDeveloper();
+      allow read, write: if isSovereignArchitect();
     }
 
     match /developers/{uid} {
-      allow read, write: if isDeveloper() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
+      allow read, write: if isSovereignArchitect();
     }
 
     // --- 3. الحماية الافتراضية الشاملة ---
     match /{document=**} {
-      allow read, write: if isDeveloper();
+      allow read, write: if isSovereignArchitect();
     }
   }
 }

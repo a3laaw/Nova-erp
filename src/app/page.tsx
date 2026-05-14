@@ -29,8 +29,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور السيادية الموحدة (V40.0):
- * تم تحصين العبور لـ alaawaaheeb@gmail.com بشكل جذري.
+ * بوابة العبور السيادية الموحدة (V42.0):
+ * تم تحصين العبور لـ alaawaaheeb@gmail.com بشكل جذري مع إصلاح كافة الأيقونات والدوال.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -53,8 +53,9 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
+      
       // 🛡️ معالجة سيادية لبريدك الرسمي
-      if (finalEmail === 'alaa') return 'alaawaaheeb@gmail.com';
+      if (finalEmail === 'alaa' || finalEmail === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
       
       if (!finalEmail.includes('@') && firestore) {
           const globalQuery = query(
