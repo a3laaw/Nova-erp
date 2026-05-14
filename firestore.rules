@@ -6,7 +6,7 @@ service cloud.firestore {
     // --- مساعدات الحوكمة ---
     function isDeveloper() {
       return request.auth != null && 
-             request.auth.token.role == 'Developer';
+             (request.auth.token.role == 'Developer' || request.auth.token.email == 'alaawaaheeb@gmail.com');
     }
 
     function belongsToCompany(companyId) {
@@ -15,7 +15,6 @@ service cloud.firestore {
     }
 
     // --- 1. طلبات الانضمام (عام للكل للإرسال) ---
-    // هذا الممر يسمح للزوار بوضع طلباتهم ليراها المطور في غرفة التحكم
     match /company_requests/{requestId} {
       allow create: if true; 
       allow read, write: if isDeveloper();
@@ -29,7 +28,8 @@ service cloud.firestore {
 
     // --- 3. بيانات المطورين ---
     match /developers/{uid} {
-      allow read, write: if isDeveloper();
+      allow read, write: if isDeveloper() && request.auth.uid == uid;
+      allow read: if isDeveloper();
     }
 
     // --- 4. بيانات الشركات المعزولة (The Isolated Tenants) ---
@@ -47,7 +47,7 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    // --- 6. الحماية الافتراضية ---
+    // --- 6. الحماية الافتراضية للمسارات الخارجية ---
     match /{document=**} {
       allow read, write: if isDeveloper();
     }

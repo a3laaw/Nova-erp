@@ -10,14 +10,14 @@ import {
     Loader2, 
     ShieldCheck, 
     LogIn, 
-    Building2, 
     Sparkles, 
     AlertCircle, 
     User, 
     Key, 
     Mail, 
     ArrowRight,
-    Send 
+    Send,
+    Building2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -27,6 +27,10 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
+/**
+ * بوابة العبور الموحدة (Sovereign Gateway V37):
+ * تم استيراد كافة الأيقونات ودالة cn لضمان استقرار الواجهة 100%.
+ */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore } = useFirebase();
@@ -49,6 +53,7 @@ export default function LoginPage() {
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
       if (!finalEmail.includes('@') && firestore) {
+          // الحالات الاستثنائية للمطور
           if (finalEmail === 'alaa') return 'alaawaaheeb@gmail.com';
           
           const globalQuery = query(
@@ -97,6 +102,7 @@ export default function LoginPage() {
               type: 'success', 
               message: `تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد: ${finalEmail}` 
           });
+          toast({ title: 'تم الإرسال', description: 'يرجى مراجعة بريدك الإلكتروني.' });
       } catch (error: any) {
           setDiagnosis({ type: 'error', message: error.message || 'فشل إرسال بريد إعادة التعيين.' });
       } finally {

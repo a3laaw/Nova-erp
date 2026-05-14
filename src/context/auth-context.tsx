@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordRe
 import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
-import type { AuthenticatedUser, Company, UserProfile } from '@/lib/types';
+import type { AuthenticatedUser, Company } from '@/lib/types';
 import { mapFirebaseAuthError, validateUserProfile, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
 interface AuthContextType {
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const sanitizedEmail = email.toLowerCase().trim();
 
       // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V37):
-      // اعتماد بريدك الجيميل كمدير أعلى مطلق للمنظومة
+      // اعتماد بريدك الجيميل كمدير أعلى مطلق للمنظومة في المشروع الأول
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devRef = doc(firestore, 'developers', firebaseUser.uid);
         const devData = {
@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         await setDoc(devRef, devData, { merge: true });
 
+        // تحديث الفهرس العالمي لضمان الربط
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         await setDoc(globalRef, {
             email: sanitizedEmail,
