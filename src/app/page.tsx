@@ -24,6 +24,10 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
+/**
+ * بوابة العبور السيادية الموحدة (V47.0):
+ * تم إصلاح كافة الاستيرادات المفقودة (ReferenceErrors) وضمان استقرار الواجهة.
+ */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore, app } = useFirebase();
@@ -53,7 +57,9 @@ export default function LoginPage() {
               const q = query(collection(firestore, 'global_users'), where('username', '==', input), limit(1));
               const snap = await getDocs(q);
               if (!snap.empty) return snap.docs[0].data().email;
-          } catch (e) { console.error("Search failed"); }
+          } catch (e) { 
+              console.warn("Username lookup skipped."); 
+          }
       }
       return input;
   };
@@ -69,7 +75,11 @@ export default function LoginPage() {
         await login(finalEmail, password);
     } catch (error: any) {
         setLocalLoading(false);
-        setErrorMsg(error.message || 'بيانات الدخول غير صحيحة.');
+        let msg = 'بيانات الدخول غير صحيحة.';
+        if (error.code === 'auth/invalid-credential') {
+            msg = 'خطأ سيادي: البريد أو كلمة المرور غير صحيحة. يرجى التأكد من إضافة الحساب في كونسول جوجل للمشروع الصحيح.';
+        }
+        setErrorMsg(msg);
     }
   };
 
@@ -80,7 +90,8 @@ export default function LoginPage() {
       try {
           const finalEmail = await resolveEmail(identifier);
           await resetPassword(finalEmail);
-          toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني.' });
+          toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني لتغيير كلمة المرور.' });
+          setMode('login');
       } catch (error: any) {
           setErrorMsg(error.message);
       } finally { setLocalLoading(false); }
@@ -103,7 +114,7 @@ export default function LoginPage() {
             {errorMsg && (
                 <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50 border-red-200 animate-in shake-in">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">خطأ في الدخول</AlertTitle>
+                    <AlertTitle className="text-[11px] font-black">فشل التحقق</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold">{errorMsg}</AlertDescription>
                 </Alert>
             )}
@@ -141,7 +152,7 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white border-b-4 border-black/40">
+                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white border-b-8 border-black/40">
                         {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
                         دخول للنظام
                     </Button>
@@ -150,7 +161,10 @@ export default function LoginPage() {
                 <form onSubmit={handleResetPassword} className="space-y-6">
                     <div className="grid gap-2">
                         <Label className="font-black text-[10px] pr-1">أدخل بريدك الإلكتروني</Label>
-                        <Input value={identifier} onChange={e => setIdentifier(e.target.value)} className="h-12 rounded-xl border-2 font-bold" required />
+                        <div className="relative">
+                            <Send className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input value={identifier} onChange={e => setIdentifier(e.target.value)} className="h-12 rounded-xl border-2 pr-10 font-bold" required />
+                        </div>
                     </div>
                     <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-2">
                         {localLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}

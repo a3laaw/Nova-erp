@@ -6,7 +6,7 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 /**
- * 🛡️ محرك التهيئة السيادي الموحد (V46.0)
+ * 🛡️ محرك التهيئة السيادي الموحد (V47.0)
  * المشروع المعتمد: nov-erp-1-25549967-c24e5 (مشروع النجمة)
  */
 const firebaseConfig: FirebaseOptions = {

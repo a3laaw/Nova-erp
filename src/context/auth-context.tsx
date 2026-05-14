@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
 
-    // 🛡️ الحصانة السيادية المطلقة (Bypass V46.0)
+    // 🛡️ الحصانة السيادية المطلقة (Bypass V47.0)
     // نمنحك رتبة Developer في الذاكرة فوراً لكسر حلقة الخروج التلقائي
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {

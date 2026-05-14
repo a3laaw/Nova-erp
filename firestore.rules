@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V46.0) ---
+    // --- 🛡️ بروتوكول المعماري السيادي (V47.0) ---
     // منح الحصانة لبريدك الشخصي لكسر أي حلقة مفرغة في المشروع الجديد
     function isSovereignArchitect() {
       return request.auth != null && 
