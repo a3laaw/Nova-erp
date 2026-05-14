@@ -6,7 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ShieldCheck, LogIn, Building2, Sparkles, AlertCircle, User, Key, Mail, ArrowRight } from 'lucide-react';
+import { 
+    Loader2, 
+    ShieldCheck, 
+    LogIn, 
+    Building2, 
+    Sparkles, 
+    AlertCircle, 
+    User, 
+    Key, 
+    Mail, 
+    ArrowRight,
+    Send 
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -111,7 +123,7 @@ export default function LoginPage() {
         
         <CardContent className="p-8 space-y-6">
             {diagnosis && (
-                <Alert variant={diagnosis.type === 'error' ? 'destructive' : 'default'} className={cn(
+                <Alert variant={diagnosis.type === 'success' ? 'default' : 'destructive'} className={cn(
                     "rounded-2xl border-2 animate-in fade-in slide-in-from-top-2", 
                     diagnosis.type === 'success' ? "bg-green-50 border-green-200 text-green-800" :
                     diagnosis.type === 'manual_needed' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
