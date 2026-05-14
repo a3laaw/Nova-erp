@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -27,6 +26,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
+    // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 5 ثوانٍ، نظهر خيارات الإصلاح
     const timer = setTimeout(() => {
       setShowEmergencyExit(true);
     }, 5000);
@@ -38,6 +38,7 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
+  // 1. معالجة حالة التحميل
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#1e1b4b] relative overflow-hidden">
@@ -49,7 +50,7 @@ export default function DashboardLayout({
                 <Loader className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
             </div>
             <div className="text-center space-y-4">
-                <p className="text-white font-black text-2xl tracking-tighter">جاري استعادة جلسة العمل...</p>
+                <p className="text-white font-black text-2xl tracking-tighter">جاري استعادة الجلسة...</p>
                 {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl">
                         <div className="flex items-center gap-2 text-orange-400 justify-center mb-2">
@@ -70,6 +71,7 @@ export default function DashboardLayout({
     );
   }
 
+  // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e1b4b]">

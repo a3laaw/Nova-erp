@@ -14,7 +14,8 @@ import {
     Timestamp, 
     orderBy, 
     deleteField, 
-    getDoc 
+    getDoc,
+    limit
 } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -74,8 +75,8 @@ const MASTER_FIREBASE_CONFIG = {
 };
 
 /**
- * غرفة التحكم السيادية (V17.0 - Final Stability Release).
- * تم ترميم كافة الاستيرادات (Label, Activity, Alert) وتعريف كافة الدوال البرمجية.
+ * غرفة التحكم الرئيسية (V18.0 - Final Stability Release).
+ * تم حذف مسميات "السيادية" تماماً وتبسيط واجهة تفعيل الحسابات.
  */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -126,7 +127,7 @@ export default function DeveloperDashboard() {
   };
 
   /**
-   * 🛡️ محرك التفعيل السيادي (Activation Flow):
+   * محرك التفعيل الإداري:
    */
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
@@ -168,9 +169,6 @@ export default function DeveloperDashboard() {
     }
   };
 
-  /**
-   * 🛡️ محرك التصفية السيادية (Final Purge):
-   */
   const handleDeleteCompany = async () => {
     if (!companyToDelete || !firestore || isProcessing) return;
     setIsProcessing(companyToDelete.id!);
@@ -193,10 +191,6 @@ export default function DeveloperDashboard() {
     }
   };
 
-  /**
-   * 🛡️ محرك ترميم البيانات (Sovereign Repair):
-   * يقوم بحقن المصفوفة المفقودة ومزامنة الفهرس العالمي لكافة الشركات القديمة.
-   */
   const handleRepairData = async () => {
     if (!firestore || isProcessing) return;
     setIsProcessing('repair');
@@ -254,7 +248,7 @@ export default function DeveloperDashboard() {
                         <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.4)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
                         <div className="text-right">
                             <CardTitle className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
-                                غرفة التحكم السيادية
+                                غرفة التحكم الرئيسية
                                 {systemStatus === 'READY' ? (
                                     <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة</Badge>
                                 ) : (
@@ -307,7 +301,7 @@ export default function DeveloperDashboard() {
                                 <TableHead className="px-10 font-black text-right">المنشأة وصاحب الطلب</TableHead>
                                 <TableHead className="font-black text-center">التواصل</TableHead>
                                 <TableHead className="font-black text-center">التاريخ</TableHead>
-                                <TableHead className="text-left px-12 font-black">القرار السيادي</TableHead>
+                                <TableHead className="text-left px-12 font-black">القرار الإداري</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -363,7 +357,7 @@ export default function DeveloperDashboard() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة / البريد السيادي</TableHead><TableHead className="font-black text-indigo-100 text-center">حالة الحساب</TableHead><TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات السيادة</TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة / البريد الرئيسي</TableHead><TableHead className="font-black text-indigo-100 text-center">حالة الحساب</TableHead><TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">إجراءات التحكم</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
@@ -400,7 +394,7 @@ export default function DeveloperDashboard() {
             </TabsContent>
         </Tabs>
 
-        {/* --- Modal التفعيل السيادي --- */}
+        {/* --- Modal التفعيل --- */}
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <DialogHeader className="p-8 bg-slate-900 text-white relative text-right">
@@ -509,7 +503,7 @@ export default function DeveloperDashboard() {
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
                 <AlertDialogHeader>
                     <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner"><ShieldAlert className="h-10 w-10"/></div>
-                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الإجراء السيادي النهائي؟</AlertDialogTitle>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الإجراء الإداري النهائي؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. <br/><br/> <span className="font-black text-red-600 underline">تحذير: لا يمكن استعادة السجلات المالية أو ملفات الموظفين بعد الحذف.</span></AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">

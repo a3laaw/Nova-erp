@@ -128,7 +128,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         <DropdownMenuSeparator className="bg-slate-100 mx-2" />
                         <DropdownMenuItem onClick={onLogout} className="rounded-2xl py-3.5 font-black text-red-600 hover:text-white hover:bg-red-600 focus:bg-red-600 focus:text-white cursor-pointer mx-1 transition-all">
                             <User className="ml-2 h-4 w-4" />
-                            <span>تسجيل الخروج الآمن</span>
+                            <span>تسجيل الخروج</span>
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

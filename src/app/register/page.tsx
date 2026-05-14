@@ -80,26 +80,15 @@ export default function RegisterPage() {
         <div className="min-h-screen flex items-center justify-center p-4">
             <Card className="w-full max-w-lg rounded-[3.5rem] border-none shadow-2xl glass-effect p-12 text-center animate-in zoom-in-95">
                 <div className="bg-indigo-500/20 p-6 rounded-full w-fit mx-auto mb-6 border border-indigo-500/40 shadow-inner">
-                    <Clock className="h-16 w-16 text-indigo-600 animate-pulse" />
+                    <CheckCircle2 className="h-16 w-16 text-indigo-600 animate-bounce" />
                 </div>
-                <h2 className="text-3xl font-black text-[#1e1b4b] mb-2 tracking-tighter">طلبك قيد المراجعة السيادية</h2>
-                <p className="text-[#1e1b4b]/70 font-bold mb-8 leading-relaxed">
-                    شكراً لاهتمامك بـ Nova ERP. تم استلام بيانات منشأة **{formData.companyName}**.
-                    <br/>
-                    سيقوم فريقنا بمراجعة الطلب وتفعيل حسابك خلال دقائق، وستصلك رسالة التفعيل على بريدك الإلكتروني.
+                <h2 className="text-3xl font-black text-[#1e1b4b] mb-4 tracking-tighter">طلبك قيد المراجعة</h2>
+                <p className="text-[#1e1b4b]/70 font-bold mb-10 leading-relaxed text-lg">
+                    شكراً لاهتمامك بـ Nova ERP. تم استلام بيانات منشأة <span className="text-primary">**{formData.companyName}**</span>.
+                    <br/><br/>
+                    سيقوم فريقنا بمراجعة الطلب وتفعيل حسابك قريباً، وستصلك رسالة التفعيل والبيانات الرسمية على بريدك الإلكتروني.
                 </p>
                 
-                <div className="p-6 bg-white/60 rounded-3xl border-2 border-dashed border-indigo-500/30 mb-8 space-y-2">
-                    <p className="text-xs font-black text-indigo-700 uppercase tracking-widest flex items-center justify-center gap-2">
-                        <Sparkles className="h-4 w-4" /> ماذا يحدث الآن؟
-                    </p>
-                    <p className="text-[11px] text-muted-foreground font-medium italic leading-loose">
-                        1. يقوم المدير باعتماد طلبك وتأسيس المنشأة. <br/>
-                        2. ستصلك بيانات الدخول الرسمية. <br/>
-                        3. يمكنك الدخول وبدء العمل فوراً.
-                    </p>
-                </div>
-
                 <div className="flex flex-col gap-3">
                     <Button asChild variant="outline" className="h-14 rounded-2xl border-2 border-[#1e1b4b] text-[#1e1b4b] font-black hover:bg-indigo-50 shadow-sm">
                         <Link href="/">العودة لصفحة الدخول</Link>

@@ -240,8 +240,8 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <DatabaseZap className="h-8 w-8" />
                     </div>
                     <div className="text-right">
-                        <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل سيادة المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
-                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص السيادية.</DialogDescription>
+                        <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل بيانات المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
+                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص.</DialogDescription>
                     </div>
                 </div>
                 <button type="button" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10 flex items-center justify-center transition-all"><X className="h-5 w-5"/></button>
@@ -293,7 +293,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.nova" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور السيادية *</Label>
+                            <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور *</Label>
                             <div className="relative">
                                 <Input 
                                     id="adminPassword" 
@@ -395,7 +395,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                {isEditing ? 'حفظ ومزامنة الهوية السيادية' : 'تأسيس المنشأة وتفعيل التراخيص'}
+                {isEditing ? 'حفظ ومزامنة الهوية' : 'تأسيس المنشأة وتفعيل التراخيص'}
             </Button>
           </DialogFooter>
         </form>

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * غلاف لوحة تحكم المطور (Master Layout):
- * يتميز بنمط زجاجي مظلم يعكس قوة التحكم السيادي.
+ * يتميز بنمط زجاجي مظلم يعكس قوة التحكم الإداري.
  */
 export default function DeveloperLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
@@ -36,10 +36,10 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                 <Terminal className="h-6 w-6 text-white" />
             </div>
             <div className="flex flex-col">
-                <span className="font-black text-xl text-white tracking-tighter leading-none">غرفة التحكم السيادية</span>
+                <span className="font-black text-xl text-white tracking-tighter leading-none">غرفة التحكم الرئيسية</span>
                 <div className="flex items-center gap-2 mt-1">
                     <div className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Sovereign Admin Environment</span>
+                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Admin Environment</span>
                 </div>
             </div>
         </div>

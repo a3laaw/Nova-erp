@@ -15,8 +15,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 
 /**
- * بوابة العبور السيادية (Sovereign Gateway v11.0):
- * تم تحصينها بمحرك تشخيص ذكي يوجه المالك للتفعيل اليدوي في حال فشل الأتمتة.
+ * بوابة العبور الرئيسية (Unified Gateway v11.0).
  */
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -106,7 +105,7 @@ export default function LoginPage() {
                 Nova ERP
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">بوابة العبور السيادية</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">بوابة الدخول الرسمية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
