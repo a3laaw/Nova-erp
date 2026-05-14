@@ -9,14 +9,11 @@ import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company, UserProfile } from '@/lib/types';
 import { mapFirebaseAuthError, validateUserProfile, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
-interface AuthState {
+interface AuthContextType {
   user: AuthenticatedUser | null;
   company: Company | null;
   loading: boolean;
   error: string | null;
-}
-
-interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -30,65 +27,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { auth: masterAuth, firestore: masterFirestore } = useFirebase();
   const { setCurrentCompany } = useCompany();
   
-  const [state, setState] = useState<AuthState>({
-    user: null, company: null, loading: true, error: null
-  });
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const updateState = useCallback((next: Partial<AuthState>) => {
-    setState(prev => ({ ...prev, ...next }));
-  }, []);
-
-  const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
+  const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Resilient Architect Bypass):
-      // إذا كان البريد يحتوي على اسمك (alaawaaheeb)، نمنحك رتبة مطور فوراً لكسر نقطة الصفر.
-      if (sanitizedEmail.includes('alaawaaheeb')) {
-        const devRef = doc(firestore, 'developers', user.uid);
-        // نحدث السجل في قاعدة البيانات لضمان وجوده للأبد
-        await setDoc(devRef, {
-            uid: user.uid,
+      // 🛡️ بروتوكول المعماري السيادي (Resilient Architect Protocol V36):
+      // إذا كان البريد هو بريدك الرسمي، نمنحك رتبة مطور فوراً ونؤسس هويتك في قاعدة البيانات
+      if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
+        const devRef = doc(firestore, 'developers', firebaseUser.uid);
+        const devData = {
+            uid: firebaseUser.uid,
             email: sanitizedEmail,
-            role: 'Developer',
+            role: 'Developer' as const,
             fullName: 'Alaa Wahib (Master Admin)',
             isActive: true,
+            updatedAt: serverTimestamp()
+        };
+        
+        await setDoc(devRef, devData, { merge: true });
+
+        // تحديث الفهرس العالمي لضمان السيادة
+        const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
+        await setDoc(globalRef, {
+            email: sanitizedEmail,
+            username: 'alaa',
+            role: 'Developer',
+            uid: firebaseUser.uid,
             updatedAt: serverTimestamp()
         }, { merge: true });
 
         return {
           user: { 
-              id: user.uid, 
-              uid: user.uid, 
-              email: sanitizedEmail, 
-              role: 'Developer', 
-              isActive: true, 
-              fullName: 'Alaa Wahib', 
-              isSuperAdmin: true, 
+              ...devData,
+              id: firebaseUser.uid,
               currentCompanyId: null, 
-              companyName: 'Nova ERP Platform' 
+              companyName: 'Nova ERP Global Admin' 
           } as AuthenticatedUser,
           company: null
         };
       }
 
-      // 1. فحص الفهرس العالمي للمنشآت
+      // 1. فحص الفهرس العالمي للمنشآت للعملاء العاديين
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
       if (!globalSnap.empty) {
         const idx = globalSnap.docs[0].data();
-        const tenantUserPath = `companies/${idx.companyId}/users/${user.uid}`;
+        const tenantUserPath = `companies/${idx.companyId}/users/${firebaseUser.uid}`;
         const tenantDoc = await getDoc(doc(firestore, tenantUserPath));
         
         if (tenantDoc.exists()) {
             const profile = validateUserProfile(tenantDoc.data());
             const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
-            const company = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+            const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
             return {
-              user: { ...profile, uid: user.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: company?.name || 'Nova Client' } as AuthenticatedUser,
-              company
+              user: { ...profile, uid: firebaseUser.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: companyData?.name || 'Nova Client' } as AuthenticatedUser,
+              company: companyData
             };
         }
       }
@@ -101,55 +101,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
-      updateState({ loading: false });
+      setLoading(false);
       return;
     }
 
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
       try {
         if (!firebaseUser) {
-          updateState({ user: null, company: null, loading: false, error: null });
+          setUser(null);
+          setCompany(null);
+          setLoading(false);
           setCurrentCompany(null);
           clearSessionIndicators();
           return;
         }
 
-        const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
+        const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
-        if (user && user.isActive) {
-          setSessionIndicators(firebaseUser.uid, user.role);
-          updateState({ user, company, loading: false, error: null });
-          if (company) setCurrentCompany(company);
+        if (resolvedUser && resolvedUser.isActive) {
+          setSessionIndicators(firebaseUser.uid, resolvedUser.role);
+          setUser(resolvedUser);
+          setCompany(resolvedCompany);
+          if (resolvedCompany) setCurrentCompany(resolvedCompany);
         } else {
-          updateState({ 
-              user: null, 
-              company: null, 
-              loading: false, 
-              error: 'لم يتم العثور على صلاحيات دخول نشطة لهذا الحساب.' 
-          });
+          setUser(null);
+          setCompany(null);
+          setError('لم يتم العثور على صلاحيات دخول نشطة لهذا الحساب.');
           clearSessionIndicators();
         }
       } catch (err: any) {
-        updateState({ user: null, company: null, loading: false, error: 'تعذر التحقق من الجلسة السيادية.' });
+        setError('تعذر التحقق من الجلسة السيادية.');
         clearSessionIndicators();
       } finally {
-        updateState({ loading: false });
+        setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext, updateState]);
+  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext]);
 
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error('خدمة المصادقة غير متاحة');
-    updateState({ loading: true, error: null });
+    setLoading(true);
+    setError(null);
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (err: any) {
-      updateState({ loading: false });
+      setLoading(false);
       throw new Error(mapFirebaseAuthError(err.code));
     }
-  }, [masterAuth, updateState]);
+  }, [masterAuth]);
 
   const resetPassword = useCallback(async (email: string) => {
     if (!masterAuth) throw new Error('خدمة المصادقة غير متاحة');
@@ -164,28 +165,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!masterAuth) return;
     try { 
       await signOut(masterAuth);
-      updateState({ user: null, company: null, loading: false, error: null });
+      setUser(null);
+      setCompany(null);
+      setLoading(false);
       setCurrentCompany(null);
       clearSessionIndicators();
       router.replace('/');
     } catch (e) { console.error('Logout failed:', e); }
-  }, [masterAuth, router, setCurrentCompany, updateState]);
+  }, [masterAuth, router, setCurrentCompany]);
 
   const refreshUserData = useCallback(async () => {
-    if (!state.user || !masterFirestore) return;
-    updateState({ loading: true });
+    if (!user || !masterFirestore || !masterAuth?.currentUser) return;
+    setLoading(true);
     try {
-      const { user, company } = await fetchUserWithContext(masterFirestore, { uid: state.user.uid, email: state.user.email } as FirebaseUser, state.user.email);
-      updateState({ user, company, loading: false });
-      if (company) setCurrentCompany(company);
+      const res = await fetchUserWithContext(masterFirestore, masterAuth.currentUser, user.email);
+      setUser(res.user);
+      setCompany(res.company);
+      if (res.company) setCurrentCompany(res.company);
     } catch (e) {
-      updateState({ loading: false, error: 'فشل تحديث البيانات' });
+      setError('فشل تحديث البيانات');
+    } finally {
+      setLoading(false);
     }
-  }, [state.user, masterFirestore, fetchUserWithContext, updateState, setCurrentCompany]);
+  }, [user, masterFirestore, masterAuth, fetchUserWithContext, setCurrentCompany]);
 
-  const ctx = useMemo(() => ({ ...state, login, logout, resetPassword, refreshUserData }), [state, login, logout, resetPassword, refreshUserData]);
+  const ctxValue = useMemo(() => ({ 
+    user, 
+    company, 
+    loading, 
+    error, 
+    login, 
+    logout, 
+    resetPassword, 
+    refreshUserData 
+  }), [user, company, loading, error, login, logout, resetPassword, refreshUserData]);
 
-  return <AuthContext.Provider value={ctx}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={ctxValue}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

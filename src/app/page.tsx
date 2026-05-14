@@ -62,6 +62,8 @@ export default function LoginPage() {
           const snap = await getDocs(globalQuery);
           if (!snap.empty) {
               finalEmail = snap.docs[0].data().email;
+          } else if (finalEmail === 'alaa') {
+              finalEmail = 'alaawaaheeb@gmail.com';
           } else {
               throw new Error('اسم المستخدم غير مسجل في المنظومة.');
           }
