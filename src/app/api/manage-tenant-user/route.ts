@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase/firestore'; // Using Firestore directly for server-side
-import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { getFirestore as getAdminFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API إدارة المنشآت الموحد.
- * تم تحصينه بـ "نظام الحماية من القيم الفارغة" لمنع خطأ undefined في Firestore.
+ * API إدارة المنشآت الموحد.
+ * تم إصلاح تداخل المكتبات (FieldValue Error) وتحصين البيانات من الـ undefined.
  */
 
 function getAdminApp() {
@@ -77,11 +76,11 @@ export async function POST(request: NextRequest) {
             role: 'Admin'
         });
 
-        // 3. بناء سجل الشركة (🛡️ حماية الحقول من الـ undefined)
+        // 3. بناء سجل الشركة (تحصين الحقول واستخدام ServerTimestamp الصحيح)
         await db.collection('companies').doc(companyId).set({
             id: companyId,
             name: companyName || 'منشأة جديدة',
-            activity: activity || 'consulting', // 🛡️ القيمة الافتراضية تمنع انهيار Firestore
+            activity: activity || 'consulting',
             adminEmail: sanitizedEmail,
             isActive: true,
             createdAt: FieldValue.serverTimestamp(),
@@ -90,7 +89,7 @@ export async function POST(request: NextRequest) {
             subscriptionType: 'trial'
         });
 
-        // 4. إنشاء ملف المستخدم الداخلي
+        // 4. إنشاء ملف المستخدم الداخلي للشركة
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
@@ -102,7 +101,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. فهرس العبور العالمي
+        // 5. فهرس العبور الموحد (Global Index)
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             username: sanitizedEmail.split('@')[0],
@@ -112,7 +111,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث حالة الطلب
+        // 6. تحديث حالة الطلب الأصلي
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
