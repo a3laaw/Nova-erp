@@ -6,12 +6,11 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API إدارة المنشآت وحسابات المستخدمين.
+ * @fileOverview API إدارة المنشآت الموحد.
  * تم تحصينه ليعتمد كلياً على المشروع الحالي النشط لمنع خطأ NOT_FOUND.
  */
 
 function getAdminApp() {
-  // استخدام مشروع المتصفح كمرجع إلزامي لضمان توحيد الهوية
   const currentProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
   if (getApps().length === 0) {
@@ -22,11 +21,11 @@ function getAdminApp() {
         try {
             const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
             const parsed = JSON.parse(fileContent);
-            if (parsed.private_key && parsed.private_key.length > 50) {
+            if (parsed.private_key) {
                 serviceAccount = parsed;
             }
         } catch (e) {
-            console.warn("Invalid JSON in service-account.json");
+            console.warn("Invalid service-account.json format");
         }
     }
 
@@ -36,23 +35,10 @@ function getAdminApp() {
             projectId: currentProjectId
         });
     } else {
-        // خيار احتياطي يعتمد على متغيرات البيئة الفردية
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-        if (privateKey && privateKey.length > 50) {
-            return initializeApp({
-                credential: cert({
-                    projectId: currentProjectId || process.env.FIREBASE_PROJECT_ID,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                    privateKey: privateKey,
-                }),
-                projectId: currentProjectId
-            });
-        } else {
-            // تهيئة افتراضية للمشروع الحالي لضمان الوصول للبيانات حتى في الوضع اليدوي
-            return initializeApp({
-                projectId: currentProjectId,
-            });
-        }
+        // خيار الطوارئ: التهيئة بدون مفتاح أمان (لأغراض القراءة فقط)
+        return initializeApp({
+            projectId: currentProjectId,
+        });
     }
   }
   return getApp();
@@ -61,10 +47,7 @@ function getAdminApp() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { 
-        action, email, username, companyName, contactName, 
-        activity, employeeCountRange, password, requestId 
-    } = body;
+    const { action, email, companyName, contactName, activity, password, requestId } = body;
 
     const app = getAdminApp();
     const db = getFirestore(app);
@@ -74,20 +57,7 @@ export async function POST(request: NextRequest) {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. التحقق من صلاحية ملف الأمان (نظام Google)
-        try {
-            // محاولة جلب مستخدم واحد للتأكد أن المفتاح لديه صلاحيات Auth
-            await auth.listUsers(1); 
-        } catch (e: any) {
-            console.error("Auth Connectivity Error:", e.message);
-            return NextResponse.json({ 
-                success: false, 
-                error: "INVALID_CONFIG",
-                message: "ملف الأمان (Service Account) مفقود أو لا يملك صلاحيات تعديل المستخدمين. يرجى لصق بيانات المفتاح الخاص في ملف service-account.json أولاً."
-            });
-        }
-
-        // 2. إنشاء حساب المالك في Auth
+        // 1. إنشاء حساب المالك في Auth
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -101,13 +71,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 3. حقن الهوية داخل الحساب
+        // 2. حقن الهوية داخل الحساب
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // 4. بناء سجل الشركة في قاعدة البيانات
+        // 3. بناء سجل الشركة في قاعدة البيانات
         await db.collection('companies').doc(companyId).set({
             id: companyId,
             name: companyName,
@@ -118,18 +88,18 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // 5. إنشاء ملف المستخدم الداخلي المعزول
+        // 4. إنشاء ملف المستخدم الداخلي
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
             fullName: contactName,
-            username: username || sanitizedEmail.split('@')[0],
+            username: sanitizedEmail.split('@')[0],
             role: 'Admin',
             isActive: true,
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث حالة الطلب (نفس المشروع)
+        // 5. تحديث حالة الطلب (نفس المشروع المستهدف)
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             const requestSnap = await requestRef.get();
@@ -141,13 +111,16 @@ export async function POST(request: NextRequest) {
                     companyId: companyId
                 });
             } else {
-                console.warn(`Request document ${requestId} not found in project ${app.options.projectId}`);
+                return NextResponse.json({ 
+                    success: false, 
+                    error: "REQUEST_NOT_FOUND",
+                    message: "تم إنشاء الشركة ولكن لم نجد الطلب الأصلي لتحديث حالته." 
+                });
             }
         }
 
         return NextResponse.json({ 
             success: true, 
-            uid: userRecord.uid,
             message: "تم تأسيس المنشأة وتفعيل حساب المالك بنجاح."
         });
     }
@@ -155,7 +128,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "UNKNOWN_ACTION" });
 
   } catch (error: any) {
-    console.error("Critical API Error:", error);
+    console.error("API Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: "SERVER_ERROR",
