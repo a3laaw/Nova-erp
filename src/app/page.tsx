@@ -29,8 +29,9 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور السيادية الموحدة (V42.0):
+ * بوابة العبور السيادية الموحدة (V43.0):
  * تم تحصين العبور لـ alaawaaheeb@gmail.com بشكل جذري مع إصلاح كافة الأيقونات والدوال.
+ * هذا الملف تم تنظيفه بالكامل لضمان استقرار البناء.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -46,6 +47,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user && !loading) {
+        // توجيه سيادي فوري بناءً على الرتبة
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
@@ -54,7 +56,7 @@ export default function LoginPage() {
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
       
-      // 🛡️ معالجة سيادية لبريدك الرسمي
+      // 🛡️ معالجة سيادية لبريدك الرسمي لإنهاء التضارب
       if (finalEmail === 'alaa' || finalEmail === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
       
       if (!finalEmail.includes('@') && firestore) {
@@ -83,6 +85,7 @@ export default function LoginPage() {
     try {
         const finalEmail = await resolveEmail(identifier);
         await login(finalEmail, password);
+        // لا نقوم بضبط localLoading لـ false هنا لأن الـ useEffect سيتولى التوجيه
     } catch (error: any) {
         setLocalLoading(false);
         setDiagnosis({ type: 'error', message: error.message || 'بيانات الدخول غير صحيحة.' });
@@ -175,15 +178,18 @@ export default function LoginPage() {
                                 نسيت كلمة المرور؟
                             </button>
                         </div>
-                        <Input 
-                            type="password" 
-                            value={password} 
-                            onChange={e => setPassword(e.target.value)} 
-                            className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2" 
-                            required 
-                            placeholder="********"
-                            disabled={localLoading}
-                        />
+                        <div className="relative group">
+                            <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input 
+                                type="password" 
+                                value={password} 
+                                onChange={e => setPassword(e.target.value)} 
+                                className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2 pr-10" 
+                                required 
+                                placeholder="********"
+                                disabled={localLoading}
+                            />
+                        </div>
                     </div>
 
                     <Button 
@@ -244,7 +250,7 @@ export default function LoginPage() {
             
             <div className="pt-4 flex items-center justify-center gap-2 opacity-30">
                 <Database className="h-3 w-3" />
-                <span className="text-[8px] font-mono font-bold uppercase tracking-widest">Active Core: {projectId}</span>
+                <span className="text-[8px] font-mono font-bold uppercase tracking-widest">Active Project: {projectId}</span>
             </div>
         </CardContent>
       </Card>

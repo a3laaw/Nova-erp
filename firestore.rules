@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V42.0) ---
+    // --- 🛡️ بروتوكول المعماري السيادي (V43.0) ---
     // هذا الاستثناء هو الضربة القاضية للحلقة المفرغة؛ يفتح لك كل الأبواب فوراً.
     function isSovereignArchitect() {
       return request.auth != null && 
@@ -36,7 +36,7 @@ service cloud.firestore {
     }
 
     match /developers/{uid} {
-      allow read, write: if isSovereignArchitect();
+      allow read, write: if isSovereignArchitect() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
 
     // --- 3. الحماية الافتراضية الشاملة ---
