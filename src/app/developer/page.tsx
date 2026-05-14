@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
 import { 
@@ -11,11 +11,8 @@ import {
     getDocs, 
     query, 
     where, 
-    Timestamp, 
     orderBy, 
-    deleteField, 
-    getDoc,
-    limit
+    deleteField,
 } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,17 +20,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
-    MoreHorizontal, Settings, Trash2, CheckCircle2,
-    AlertCircle, ShieldCheck, Key, Activity, Rocket, 
-    UserPlus, Lock, Send, X, Phone, Mail, FileKey, ExternalLink
+    MoreHorizontal, Trash2, CheckCircle2,
+    AlertCircle, ShieldCheck, Activity, Rocket, 
+    UserPlus, Lock, Send, X, Key, ExternalLink
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
-import { useAuth } from '@/context/auth-context';
-import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -125,7 +120,7 @@ export default function DeveloperDashboard() {
                 email: requestToActivate.email,
                 pass: activationPassword
             });
-            toast({ title: 'تم تفعيل المنشأة بنجاح' });
+            toast({ title: 'تم تفعيل الحساب بنجاح' });
         } else {
             if (result.error === 'INVALID_CONFIG' || result.error === 'FILE_NOT_FOUND') {
                 setConfigError(result.message);
@@ -174,7 +169,7 @@ export default function DeveloperDashboard() {
                         <Terminal className="h-10 w-10 text-white" />
                     </div>
                     <div className="text-right">
-                        <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الرئيسية</CardTitle>
+                        <CardTitle className="text-4xl font-black text-white tracking-tighter">مركز التحكم الرئيسي</CardTitle>
                         <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت والاحتضان السحابي.</CardDescription>
                     </div>
                 </div>
@@ -184,7 +179,7 @@ export default function DeveloperDashboard() {
         <Tabs defaultValue="requests" className="w-full">
             <TabsList className="bg-white/10 p-1 rounded-2xl border border-white/10 mb-6 h-14">
                 <TabsTrigger value="requests" className="rounded-xl px-10 font-black gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-                    <Rocket className="h-4 w-4" /> طلبات الانضمام المعلقة
+                    <Rocket className="h-4 w-4" /> طلبات الانضمام
                 </TabsTrigger>
                 <TabsTrigger value="companies" className="rounded-xl px-10 font-black gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                     <Building2 className="h-4 w-4" /> المنشآت النشطة
@@ -280,7 +275,7 @@ export default function DeveloperDashboard() {
                                         <TableCell className="text-left px-12">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none"><DropdownMenuLabel className="font-black px-3 py-2">الإدارة العليا</DropdownMenuLabel><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50"><Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
+                                                <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none"><DropdownMenuLabel className="font-black px-3 py-2">الإدارة</DropdownMenuLabel><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50"><Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
@@ -309,15 +304,16 @@ export default function DeveloperDashboard() {
                     {configError && (
                         <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 p-6 animate-in slide-in-from-top-4">
                             <AlertCircle className="h-6 w-6 text-red-600" />
-                            <AlertTitle className="font-black text-red-800 text-lg">خلل في ملف الأمان!</AlertTitle>
+                            <AlertTitle className="font-black text-red-800 text-lg">خلل في إعدادات المفتاح!</AlertTitle>
                             <AlertDescription className="mt-2 space-y-4">
                                 <p className="text-red-700 font-bold">{configError}</p>
                                 <div className="p-4 bg-white rounded-2xl border border-red-100 space-y-3">
-                                    <p className="text-xs font-black text-slate-900">لحل هذه المشكلة يدوياً:</p>
+                                    <p className="text-xs font-black text-slate-900">لحل هذه المشكلة:</p>
                                     <ol className="text-xs list-decimal pr-5 space-y-2 text-slate-600">
-                                        <li>اذهب لـ <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 underline">Firebase Console</a>.</li>
-                                        <li>Project Settings -> Service Accounts -> Generate New Private Key.</li>
-                                        <li>انسخ محتوى الملف المحمّل وضعه داخل ملف <strong>service-account.json</strong> في المجلد الرئيسي للمشروع.</li>
+                                        <li>افتح ملف <strong>service-account.json</strong> الموجود في قائمة الملفات على اليسار.</li>
+                                        <li>امسح المحتوى الموجود بالكامل.</li>
+                                        <li>الصق بيانات المفتاح الحقيقي الذي حملته من Firebase Console.</li>
+                                        <li>احفظ الملف وحاول التفعيل مرة أخرى.</li>
                                     </ol>
                                 </div>
                             </AlertDescription>

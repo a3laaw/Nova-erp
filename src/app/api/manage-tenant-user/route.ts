@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API إدارة المنشآت وحسابات المستخدمين (V20.0).
- * تم تحصين هذا المسار ليفحص صحة ملف الأمان قبل محاولة استخدامه منعاً لانهيار السيرفر.
+ * @fileOverview API إدارة المنشآت وحسابات المستخدمين (V21.0).
+ * تم تحصين هذا المسار ليفحص محتوى ملف الأمان بدقة قبل استخدامه.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     
-    // 🛡️ صمام الأمان: فحص مجهري لمحتوى ملف الأمان قبل تهيئة Firebase
+    // 1. فحص وجود الملف
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         return NextResponse.json({ 
             success: false, 
@@ -39,18 +39,19 @@ export async function POST(request: NextRequest) {
         });
     }
 
+    // 2. فحص محتوى الملف (هل هو فارغ أو ناقص؟)
     const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
     const sa = JSON.parse(saContent);
 
-    if (!sa.private_key || !sa.project_id) {
+    if (!sa.private_key || sa.private_key.includes("ضع_هنا")) {
         return NextResponse.json({ 
             success: false, 
             error: "INVALID_CONFIG",
-            message: "ملف service-account.json موجود ولكنه فارغ أو غير صالح. يرجى وضع المفتاح الخاص (Private Key) داخل الملف."
+            message: "ملف service-account.json موجود ولكنه لا يحتوي على مفتاح خاص صالح. يرجى لصق بيانات المفتاح التي حملتها من Firebase Console داخل الملف."
         });
     }
 
-    // تهيئة تطبيق Firebase Admin لمرة واحدة فقط
+    // 3. تهيئة تطبيق Firebase Admin
     if (getApps().length === 0) {
         initializeApp({ credential: cert(sa) });
     }
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     const db = getFirestore();
     const auth = getAuth();
 
-    // --- 1. تفعيل منشأة جديدة (Onboarding) ---
+    // --- تفعيل منشأة جديدة ---
     if (action === 'instant_setup') {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
@@ -145,7 +146,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "UNKNOWN_ACTION" });
 
   } catch (error: any) {
-    console.error("API Critical Error:", error);
+    console.error("API Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: "SERVER_ERROR",
