@@ -3,8 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V43.0) ---
-    // هذا الاستثناء هو الضربة القاضية للحلقة المفرغة؛ يفتح لك كل الأبواب فوراً.
+    // --- 🛡️ بروتوكول المعماري السيادي (V44.0) ---
+    // السلطة المطلقة لبريدك الشخصي لكسر أي حلقة مفرغة
     function isSovereignArchitect() {
       return request.auth != null && 
              (request.auth.token.role == 'Developer' || 
@@ -16,7 +16,11 @@ service cloud.firestore {
              (request.auth.token.companyId == companyId || request.auth.token.currentCompanyId == companyId);
     }
 
-    // --- 1. المنشآت والبيانات المعزولة ---
+    // السماح لبريدك بالكتابة في مجموعة المطورين لتأسيس الجلسة الأولى
+    match /developers/{uid} {
+      allow read, write: if isSovereignArchitect() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
+    }
+
     match /companies/{companyId} {
       allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
@@ -25,7 +29,6 @@ service cloud.firestore {
       }
     }
 
-    // --- 2. الفهارس والطلبات (مفتوحة للمعماري للتحكم الإداري) ---
     match /global_users/{docId} {
       allow read, write: if isSovereignArchitect();
     }
@@ -35,11 +38,6 @@ service cloud.firestore {
       allow read, write: if isSovereignArchitect();
     }
 
-    match /developers/{uid} {
-      allow read, write: if isSovereignArchitect() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
-    }
-
-    // --- 3. الحماية الافتراضية الشاملة ---
     match /{document=**} {
       allow read, write: if isSovereignArchitect();
     }

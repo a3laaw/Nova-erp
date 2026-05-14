@@ -21,18 +21,12 @@ import {
     Database
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
-/**
- * بوابة العبور السيادية الموحدة (V43.0):
- * تم تحصين العبور لـ alaawaaheeb@gmail.com بشكل جذري مع إصلاح كافة الأيقونات والدوال.
- * هذا الملف تم تنظيفه بالكامل لضمان استقرار البناء.
- */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore, app } = useFirebase();
@@ -43,214 +37,137 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
   const [localLoading, setLocalLoading] = useState(false);
-  const [diagnosis, setDiagnosis] = useState<{ message: string, type: 'error' | 'success' } | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (user && !loading) {
-        // توجيه سيادي فوري بناءً على الرتبة
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
   }, [user, loading, router]);
 
   const resolveEmail = async (id: string) => {
-      let finalEmail = id.trim().toLowerCase();
+      const input = id.trim().toLowerCase();
+      // 🛡️ ممر سيادي مباشر للمعمار علاء
+      if (input === 'alaa' || input === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
       
-      // 🛡️ معالجة سيادية لبريدك الرسمي لإنهاء التضارب
-      if (finalEmail === 'alaa' || finalEmail === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
-      
-      if (!finalEmail.includes('@') && firestore) {
-          const globalQuery = query(
-              collection(firestore, 'global_users'), 
-              where('username', '==', finalEmail),
-              limit(1)
-          );
-          const snap = await getDocs(globalQuery);
-          if (!snap.empty) {
-              finalEmail = snap.docs[0].data().email;
-          } else {
-              throw new Error('اسم المستخدم غير مسجل. يرجى كتابة البريد الإلكتروني بالكامل.');
-          }
+      if (!input.includes('@') && firestore) {
+          try {
+              const q = query(collection(firestore, 'global_users'), where('username', '==', input), limit(1));
+              const snap = await getDocs(q);
+              if (!snap.empty) return snap.docs[0].data().email;
+          } catch (e) { console.error("Search failed"); }
       }
-      return finalEmail;
+      return input;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (localLoading) return;
-    
     setLocalLoading(true);
-    setDiagnosis(null);
+    setErrorMsg(null);
 
     try {
         const finalEmail = await resolveEmail(identifier);
         await login(finalEmail, password);
-        // لا نقوم بضبط localLoading لـ false هنا لأن الـ useEffect سيتولى التوجيه
     } catch (error: any) {
         setLocalLoading(false);
-        setDiagnosis({ type: 'error', message: error.message || 'بيانات الدخول غير صحيحة.' });
-        toast({ variant: 'destructive', title: 'فشل الدخول', description: error.message });
+        setErrorMsg(error.message || 'بيانات الدخول غير صحيحة.');
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
       e.preventDefault();
       if (localLoading || !identifier) return;
-
       setLocalLoading(true);
-      setDiagnosis(null);
-
       try {
           const finalEmail = await resolveEmail(identifier);
           await resetPassword(finalEmail);
-          setDiagnosis({ 
-              type: 'success', 
-              message: `تم إرسال رابط إعادة تعيين كلمة المرور إلى البريد: ${finalEmail}` 
-          });
-          toast({ title: 'تم الإرسال', description: 'يرجى مراجعة بريدك الإلكتروني.' });
+          toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني.' });
       } catch (error: any) {
-          setDiagnosis({ type: 'error', message: error.message || 'فشل إرسال بريد إعادة التعيين.' });
-      } finally {
-          setLocalLoading(false);
-      }
+          setErrorMsg(error.message);
+      } finally { setLocalLoading(false); }
   };
 
   const projectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ background: 'radial-gradient(circle at 50% 50%, #818cf8 0%, transparent 50%)' }} />
-      
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40 bg-white/20">
             <div className="bg-white/60 p-4 rounded-3xl w-fit mx-auto mb-4 border border-white shadow-lg">
                 {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" /> : <Key className="h-10 w-10 text-primary" />}
             </div>
-            <CardTitle className="text-3xl font-black tracking-tighter text-[#1e1b4b] flex items-center justify-center gap-2">
-                {mode === 'login' ? 'Nova ERP' : 'استعادة الدخول'}
-                <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-            </CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">
-                {mode === 'login' ? 'بوابة العبور الموحدة' : 'سيصلك رابط التعيين على بريدك'}
-            </CardDescription>
+            <CardTitle className="text-3xl font-black text-[#1e1b4b]">Nova ERP</CardTitle>
+            <CardDescription className="text-[#1e1b4b]/60 font-bold uppercase tracking-widest text-[10px]">بوابة العبور الموحدة</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
-            {diagnosis && (
-                <Alert variant={diagnosis.type === 'success' ? 'default' : 'destructive'} className={cn(
-                    "rounded-2xl border-2 animate-in fade-in slide-in-from-top-2", 
-                    diagnosis.type === 'success' ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200"
-                )}>
+            {errorMsg && (
+                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50 border-red-200 animate-in shake-in">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">إشعار النظام</AlertTitle>
-                    <AlertDescription className="text-[10px] font-black leading-relaxed mt-1">
-                        {diagnosis.message}
-                    </AlertDescription>
+                    <AlertTitle className="text-[11px] font-black">خطأ في الدخول</AlertTitle>
+                    <AlertDescription className="text-[10px] font-bold">{errorMsg}</AlertDescription>
                 </Alert>
             )}
 
             {mode === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-5">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم أو البريد</Label>
-                        <div className="relative group">
-                            <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest">اسم المستخدم أو البريد</Label>
+                        <div className="relative">
+                            <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <Input 
-                                type="text" 
                                 value={identifier} 
                                 onChange={e => setIdentifier(e.target.value)} 
-                                className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 pr-10" 
+                                className="h-12 rounded-xl border-2 pr-10 dir-ltr font-black" 
                                 required 
                                 placeholder="Email or Username"
-                                disabled={localLoading}
                             />
                         </div>
                     </div>
 
                     <div className="grid gap-2">
                         <div className="flex justify-between items-center pr-1">
-                            <Label className="font-black text-[10px] uppercase tracking-widest text-[#1e1b4b]">كلمة المرور</Label>
-                            <button 
-                                type="button" 
-                                onClick={() => setMode('forgot-password')}
-                                className="text-[10px] font-black text-primary hover:underline"
-                            >
-                                نسيت كلمة المرور؟
-                            </button>
+                            <Label className="font-black text-[10px] uppercase tracking-widest">كلمة المرور</Label>
+                            <button type="button" onClick={() => setMode('forgot-password')} className="text-[10px] font-black text-primary">نسيت كلمة المرور؟</button>
                         </div>
-                        <div className="relative group">
+                        <div className="relative">
                             <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <Input 
                                 type="password" 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
-                                className="h-12 rounded-xl border-white/60 bg-white/40 font-mono font-black text-center shadow-inner border-2 pr-10" 
+                                className="h-12 rounded-xl border-2 pr-10 font-mono text-center" 
                                 required 
-                                placeholder="********"
-                                disabled={localLoading}
                             />
                         </div>
                     </div>
 
-                    <Button 
-                        type="submit" 
-                        disabled={localLoading} 
-                        className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white hover:bg-black transition-all border-b-4 border-black/30 mt-2 active:translate-y-1 active:border-b-0"
-                    >
+                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white border-b-4 border-black/40">
                         {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
-                        <span>دخول للنظام</span>
+                        دخول للنظام
                     </Button>
                 </form>
             ) : (
                 <form onSubmit={handleResetPassword} className="space-y-6">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">أدخل بريدك أو اسم المستخدم</Label>
-                        <div className="relative group">
-                            <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input 
-                                type="text" 
-                                value={identifier} 
-                                onChange={e => setIdentifier(e.target.value)} 
-                                className="h-12 rounded-xl border-2 pr-10 bg-white/40 font-bold" 
-                                required 
-                                placeholder="Email or Username"
-                                disabled={localLoading}
-                            />
-                        </div>
+                        <Label className="font-black text-[10px] pr-1">أدخل بريدك الإلكتروني</Label>
+                        <Input value={identifier} onChange={e => setIdentifier(e.target.value)} className="h-12 rounded-xl border-2 font-bold" required />
                     </div>
-
-                    <Button 
-                        type="submit" 
-                        disabled={localLoading || !identifier} 
-                        className="w-full h-14 rounded-2xl font-black text-lg gap-3 shadow-xl bg-primary text-white"
-                    >
-                        {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <Send className="h-6 w-6" />}
+                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-2">
+                        {localLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
                         إرسال رابط التعيين
                     </Button>
-
-                    <button 
-                        type="button" 
-                        onClick={() => { setMode('login'); setDiagnosis(null); }}
-                        className="w-full text-xs font-black text-[#1e1b4b]/60 flex items-center justify-center gap-2 hover:text-[#1e1b4b]"
-                    >
+                    <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-black opacity-50 flex items-center justify-center gap-2">
                         <ArrowRight className="h-3 w-3 rotate-180" /> العودة للدخول
                     </button>
                 </form>
             )}
-
-            <div className="pt-6 border-t border-black/5 text-center">
-                <p className="text-[10px] font-bold text-slate-500 mb-3 uppercase">هل ترغب في تسجيل منشأة جديدة؟</p>
-                <Button asChild variant="ghost" className="w-full h-12 rounded-2xl border-2 border-white/60 bg-white/20 text-[#1e1b4b] font-black hover:bg-white/40 gap-2">
-                    <Link href="/register">
-                        <Building2 className="h-4 w-4" />
-                        سجل مكتبك الآن
-                    </Link>
-                </Button>
-            </div>
             
-            <div className="pt-4 flex items-center justify-center gap-2 opacity-30">
+            <div className="pt-4 flex items-center justify-center gap-2 opacity-20">
                 <Database className="h-3 w-3" />
-                <span className="text-[8px] font-mono font-bold uppercase tracking-widest">Active Project: {projectId}</span>
+                <span className="text-[8px] font-mono font-bold">{projectId}</span>
             </div>
         </CardContent>
       </Card>
