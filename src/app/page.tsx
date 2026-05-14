@@ -121,7 +121,7 @@ export default function LoginPage() {
                 <Sparkles className="h-5 w-5 text-primary animate-pulse" />
             </CardTitle>
             <CardDescription className="text-[#1e1b4b]/60 font-bold mt-1 uppercase tracking-widest text-[10px]">
-                {mode === 'login' ? 'بوابة الدخول الموحدة' : 'سيصلك رابط التعيين على بريدك'}
+                {mode === 'login' ? 'بوابة العبور الموحدة' : 'سيصلك رابط التعيين على بريدك'}
             </CardDescription>
         </CardHeader>
         

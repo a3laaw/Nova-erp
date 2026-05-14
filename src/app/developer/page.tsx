@@ -57,7 +57,7 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 /**
- * غرفة التحكم الرئيسية (V32.0):
+ * غرفة التحكم الرئيسية (V33.0):
  * تم ترميم كافة الأيقونات والمراجع لضمان استقرار العرض 100%.
  */
 export default function DeveloperDashboard() {

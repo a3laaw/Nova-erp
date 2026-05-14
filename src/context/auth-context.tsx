@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordRe
 import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
-import type { AuthenticatedUser, Company } from '@/lib/types';
+import type { AuthenticatedUser, Company, UserProfile } from '@/lib/types';
 import { mapFirebaseAuthError, validateUserProfile, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
 interface AuthState {
@@ -40,7 +40,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
-      const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email), limit(1));
+      // 1. فحص هل هو مطور (Root Admin)
+      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
+      if (devDoc.exists()) {
+        const devData = devDoc.data();
+        return {
+          user: { 
+              id: user.uid, 
+              uid: user.uid, 
+              email: user.email!, 
+              username: 'root', 
+              role: 'Developer', 
+              isActive: true, 
+              fullName: devData?.fullName || 'Alaa Wahib', 
+              isSuperAdmin: true, 
+              currentCompanyId: null, 
+              companyName: 'Nova ERP Platform' 
+          } as AuthenticatedUser,
+          company: null
+        };
+      }
+
+      // 2. فحص الفهرس العالمي للمنشآت
+      const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', email.toLowerCase()), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
       if (!globalSnap.empty) {
@@ -65,26 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               company
             };
         }
-      }
-
-      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
-      if (devDoc.exists()) {
-        const devData = devDoc.data();
-        return {
-          user: { 
-              id: user.uid, 
-              uid: user.uid, 
-              email: user.email!, 
-              username: 'root', 
-              role: 'Developer', 
-              isActive: true, 
-              fullName: devData?.fullName || 'Alaa Wahib', 
-              isSuperAdmin: true, 
-              currentCompanyId: null, 
-              companyName: 'Nova ERP Platform' 
-          } as AuthenticatedUser,
-          company: null
-        };
       }
     } catch (e) { 
         console.error("Identity Resolution Error:", e); 
