@@ -39,8 +39,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   /**
-   * محرك المصادقة السيادي: 
-   * الأولوية المطلقة لـ "الفهرس العالمي" لفك تداخل الحسابات وضمان الاستقرار.
+   * محرك المصادقة السيادي المطور (V30.0): 
+   * فك التداخل للسماح بالبريد الرسمي للمطور (Gmail) بالعبور.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, user: FirebaseUser, email: string) => {
     try {
@@ -72,26 +72,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // 🛠️ المحطة 2: وضع المطور (فقط إذا لم يكن في الفهرس العالمي)
-      if (email.endsWith('.local')) {
-        const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
-        if (devDoc.exists()) {
-          return {
-            user: { 
-                id: user.uid, 
-                uid: user.uid, 
-                email: user.email!, 
-                username: 'root', 
-                role: 'Developer', 
-                isActive: true, 
-                fullName: devDoc.data()?.fullName || 'Master Developer', 
-                isSuperAdmin: true, 
-                currentCompanyId: null, 
-                companyName: 'Nova ERP Platform' 
-            } as AuthenticatedUser,
-            company: null
-          };
-        }
+      // 🛠️ المحطة 2: وضع المطور الرسمي (Master Developer)
+      // تم إلغاء شرط .local للسماح ببريد الجيميل الرسمي بالدخول كمدير أعلى
+      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
+      if (devDoc.exists()) {
+        const devData = devDoc.data();
+        return {
+          user: { 
+              id: user.uid, 
+              uid: user.uid, 
+              email: user.email!, 
+              username: 'root', 
+              role: 'Developer', 
+              isActive: true, 
+              fullName: devData?.fullName || 'Alaa Wahib', 
+              isSuperAdmin: true, 
+              currentCompanyId: null, 
+              companyName: 'Nova ERP Platform' 
+          } as AuthenticatedUser,
+          company: null
+        };
       }
     } catch (e) { 
         console.error("Identity Resolution Error:", e); 
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 user: null, 
                 company: null, 
                 loading: false, 
-                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول لهذا البريد.' 
+                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول لهذا البريد في سجلات المطورين أو المنشآت.' 
             });
             clearSessionIndicators();
           }
@@ -152,7 +152,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateState({ loading: true, error: null });
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
-      // ملاحظة: loading سيتم إغلاقه عبر onAuthStateChanged لضمان ثبات التوجيه
     } catch (err: any) {
       updateState({ loading: false });
       throw new Error(mapFirebaseAuthError(err.code));

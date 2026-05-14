@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,8 +17,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور الرئيسية (Unified Gateway v12.0).
- * تم إصلاح خطأ ReferenceError واستكمال كافة المراجع التقنية.
+ * بوابة العبور الرئيسية (V30.0):
+ * تم إصلاح خطأ استيراد cn المفقود وتحصين منطق الدخول للمطور الرسمي.
  */
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -47,7 +48,7 @@ export default function LoginPage() {
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك تحويل الهوية الذكي (الدخول باسم المستخدم)
+        // 🛡️ محرك تحويل الهوية الذكي (الدخول باسم المستخدم للمنشآت)
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -55,10 +56,12 @@ export default function LoginPage() {
                 limit(1)
             );
             const snap = await getDocs(globalQuery);
-            if (snap.empty) {
-                throw new Error('اسم المستخدم هذا غير مسجل في المنظومة حالياً.');
+            if (!snap.empty) {
+                finalEmail = snap.docs[0].data().email;
+            } else {
+                // إذا لم يوجد في الفهرس، نعتبره خطأ دخول بدلاً من الانهيار
+                throw new Error('بيانات الدخول غير صحيحة.');
             }
-            finalEmail = snap.docs[0].data().email;
         }
 
         await login(finalEmail, password);
@@ -66,7 +69,7 @@ export default function LoginPage() {
     } catch (error: any) {
         setLocalLoading(false);
         
-        // 🔍 محرك تشخيص أعطال الأمان المتقدم
+        // 🔍 محرك تشخيص أعطال الأمان
         if (firestore) {
             const checkId = identifier.trim().toLowerCase();
             const diagQuery = identifier.includes('@')
@@ -78,11 +81,11 @@ export default function LoginPage() {
                 const userData = snap.docs[0].data();
                 setDiagnosis({
                     type: 'manual_needed',
-                    message: 'تم العثور على منشأتك في قاعدة البيانات، ولكن حساب الأمان لم يفعل بعد.',
+                    message: 'تم العثور على منشأتك، ولكن حساب الأمان يحتاج لتفعيل يدوي في كونسول Google.',
                     email: userData.email
                 });
             } else {
-                setDiagnosis({ type: 'error', message: 'تأكد من كتابة اسم المستخدم وكلمة المرور بشكل صحيح.' });
+                setDiagnosis({ type: 'error', message: 'تأكد من كتابة اسم المستخدم وكلمة المرور بشكل صحيح، أو تأكد من وجود حساب المطور.' });
             }
         }
 
@@ -123,10 +126,7 @@ export default function LoginPage() {
                                     <span className="font-mono select-all text-[9px] text-amber-900">{diagnosis.email}</span>
                                     <Key className="h-3 w-3 opacity-30 text-amber-600" />
                                 </div>
-                                <p className="text-[9px] text-amber-700 italic">يجب على المدير إضافة هذا البريد يدوياً في Firebase Console ليتمكن المالك من الدخول.</p>
-                                <Button asChild variant="link" className="h-auto p-0 text-[10px] font-black text-amber-900 underline gap-1">
-                                    <a href="https://console.firebase.google.com/" target="_blank"><ExternalLink className="h-3 w-3"/> فتح Firebase Console</a>
-                                </Button>
+                                <p className="text-[9px] text-amber-700 italic">يجب على المطور إضافة هذا البريد يدوياً في Firebase Console ليتمكن المالك من الدخول.</p>
                             </div>
                         )}
                     </AlertDescription>
