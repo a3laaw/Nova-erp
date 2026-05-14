@@ -6,8 +6,12 @@ import * as fs from 'fs';
 
 const SERVICE_ACCOUNT_PATH = './service-account.json';
 
+/**
+ * محرك تعميد المطور الرئيسي:
+ * تم تحديثه ليعتمد البريد الرسمي للمالك لضمان أعلى درجات السيادة والرقابة.
+ */
 async function setupDeveloper() {
-  const DEV_EMAIL = 'dev@nova-erp.local';
+  const DEV_EMAIL = 'ALAAWAAHEEB@GMAIL.COM'; // 🛡️ تعميدك كمدير أعلى للمنظومة
   const DEV_PASSWORD = 'Sovereign@2026';
 
   try {
@@ -16,20 +20,21 @@ async function setupDeveloper() {
     }
 
     if (getApps().length === 0) {
+        const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
         initializeApp({
-            credential: cert(SERVICE_ACCOUNT_PATH),
+            credential: cert(serviceAccount),
         });
     }
 
     const auth = getAuth();
     const db = getFirestore();
 
-    console.log('⏳ جاري تأسيس الحساب السيادي...');
+    console.log('⏳ جاري تأسيس حساب المدير الأعلى للمنظومة...');
 
     let userRecord;
     try {
         userRecord = await auth.getUserByEmail(DEV_EMAIL);
-        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث الصلاحيات وكلمة المرور...');
+        console.log('⚠️ الحساب موجود مسبقاً، جاري تحديث الصلاحيات الإدارية...');
         await auth.updateUser(userRecord.uid, {
             password: DEV_PASSWORD,
         });
@@ -38,7 +43,7 @@ async function setupDeveloper() {
             userRecord = await auth.createUser({
                 email: DEV_EMAIL,
                 password: DEV_PASSWORD,
-                displayName: 'Nova Developer',
+                displayName: 'Alaa Wahib - Master Admin',
                 emailVerified: true,
             });
         } else {
@@ -48,16 +53,18 @@ async function setupDeveloper() {
 
     if (!userRecord) throw new Error("فشل في إنشاء أو جلب المستخدم.");
 
+    // حقن رتبة المطور في التوكن (Custom Claims)
     await auth.setCustomUserClaims(userRecord.uid, {
       role: 'Developer',
       isSuperAdmin: true,
     });
 
+    // توثيق المطور في قاعدة البيانات
     await db.collection('developers').doc(userRecord.uid).set({
       uid: userRecord.uid,
       email: DEV_EMAIL,
       role: 'Developer',
-      fullName: 'Nova Developer',
+      fullName: 'Alaa Wahib',
       isActive: true,
       updatedAt: Timestamp.now(),
       createdAt: Timestamp.now(),
@@ -65,10 +72,10 @@ async function setupDeveloper() {
 
     console.log('');
     console.log('╔══════════════════════════════════════╗');
-    console.log('║    ✅ تم تفعيل الحساب السيادي بنجاح   ║');
+    console.log('║   ✅ تم تعميدك كمدير للمنظومة بنجاح  ║');
     console.log('╠══════════════════════════════════════╣');
-    console.log(`║  Email:    ${DEV_EMAIL}        ║`);
-    console.log(`║  Password: ${DEV_PASSWORD}           ║`);
+    console.log(`║ Email: ${DEV_EMAIL}    ║`);
+    console.log(`║ Password: ${DEV_PASSWORD}           ║`);
     console.log('╠══════════════════════════════════════╣');
     console.log('║  يمكنك الآن الدخول من الشاشة الرئيسية  ║');
     console.log('╚══════════════════════════════════════╝');
@@ -76,7 +83,7 @@ async function setupDeveloper() {
 
     process.exit(0);
   } catch (error: any) {
-    console.error('❌ فشل التأسيس:', error.message);
+    console.error('❌ فشل التعميد:', error.message);
     process.exit(1);
   }
 }

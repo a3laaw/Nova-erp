@@ -1,13 +1,13 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي (V28.0)
- * تم تحصينه لإظهار البريد المسؤول عن الصلاحيات في حال الفشل.
+ * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي المتقدم (V29.0)
  */
 
 function getAdminApp() {
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const app = getAdminApp();
     
-    // استخراج بريد حساب الخدمة للتشخيص في حال الخطأ
+    // استخراج بريد حساب الخدمة للتشخيص
     const saPath = path.join(process.cwd(), 'service-account.json');
     const saData = JSON.parse(fs.readFileSync(saPath, 'utf8'));
     serviceAccountEmail = saData.client_email;
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. إنشاء حساب المالك
+        // 1. إنشاء حساب المالك في Firebase Auth
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -74,13 +74,11 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. حقن الصلاحيات
+        // 2. حقن الصلاحيات (Claims)
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
-
-        const FieldValue = (await import('firebase-admin/firestore')).FieldValue;
 
         // 3. تأسيس سجل المنشأة
         await db.collection('companies').doc(companyId).set({
@@ -107,7 +105,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. تحديث الفهرس العالمي
+        // 5. تحديث الفهرس العالمي (Global Index)
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             username: sanitizedEmail.split('@')[0],
@@ -119,11 +117,15 @@ export async function POST(request: NextRequest) {
 
         // 6. تحديث حالة الطلب
         if (requestId) {
-            await db.collection('company_requests').doc(requestId).update({
-                status: 'activated',
-                activatedAt: FieldValue.serverTimestamp(),
-                companyId: companyId
-            });
+            const reqRef = db.collection('company_requests').doc(requestId);
+            const reqSnap = await reqRef.get();
+            if (reqSnap.exists) {
+                await reqRef.update({
+                    status: 'activated',
+                    activatedAt: FieldValue.serverTimestamp(),
+                    companyId: companyId
+                });
+            }
         }
 
         return NextResponse.json({ 
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
     
     let userMessage = error.message;
     if (error.message?.includes('insufficient permission') || error.code === 7) {
-        userMessage = `خطأ في صلاحيات Google IAM: يرجى الذهاب لـ Google Cloud Console وإعطاء صلاحية (Firebase Admin) لهذا البريد حصراً: [ ${serviceAccountEmail} ]`;
+        userMessage = `⚠️ خطأ في صلاحيات Google IAM: يرجى الذهاب لـ Google Cloud Console وإعطاء صلاحية (Firebase Admin) لهذا البريد حصراً: [ ${serviceAccountEmail} ]`;
     }
 
     return NextResponse.json({ 
