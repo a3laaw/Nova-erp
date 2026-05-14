@@ -25,8 +25,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور الموحدة (Sovereign Login V49.0):
- * تم تحديث التعرف على الهوية لتشمل alaawaaheeb1@gmail.com
+ * بوابة العبور الموحدة (Sovereign Login Gateway V50.0).
+ * تم تحديث الهوية السيادية لتكون حصراً لبريد واحد، والآخر عميل تجريبي.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -49,11 +49,11 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       const input = id.trim().toLowerCase();
-      // دعم الاختصار 'alaa' لكلا البريدين الماستر
+      // 'alaa' يشير دائماً للبريد السيادي الأصلي
       if (input === 'alaa') return 'alaawaaheeb@gmail.com';
-      if (input === 'alaawaaheeb@gmail.com' || input === 'alaawaaheeb1@gmail.com') return input;
+      if (input.includes('@')) return input;
       
-      if (!input.includes('@') && firestore) {
+      if (firestore) {
           try {
               const q = query(collection(firestore, 'global_users'), where('username', '==', input), limit(1));
               const snap = await getDocs(q);
@@ -78,9 +78,9 @@ export default function LoginPage() {
         setLocalLoading(false);
         let msg = 'بيانات الدخول غير صحيحة.';
         if (error.code === 'auth/invalid-credential') {
-            msg = 'خطأ أمني: بيانات الدخول غير مطابقة للسجلات في هذا المشروع.';
+            msg = 'خطأ أمني: بيانات الدخول لا تطابق السجلات في هذا المشروع.';
         } else if (error.code === 'auth/network-request-failed') {
-            msg = 'فشل الاتصال: يرجى التحقق من الإنترنت أو المحاولة لاحقاً.';
+            msg = 'فشل الاتصال: يرجى التحقق من الإنترنت.';
         }
         setErrorMsg(msg);
     }
@@ -100,7 +100,7 @@ export default function LoginPage() {
       } finally { setLocalLoading(false); }
   };
 
-  const currentProjectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
+  const currentProjectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
@@ -155,7 +155,7 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white border-b-8 border-black/40">
+                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-xl gap-4 shadow-xl bg-[#1e1b4b] text-white border-b-8 border-black/40 active:translate-y-1 active:border-b-0 transition-all">
                         {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
                         دخول للنظام
                     </Button>
@@ -163,10 +163,10 @@ export default function LoginPage() {
             ) : (
                 <form onSubmit={handleResetPassword} className="space-y-6">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1">أدخل بريدك الإلكتروني</Label>
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest">أدخل بريدك الإلكتروني</Label>
                         <div className="relative">
                             <Send className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input value={identifier} onChange={e => setIdentifier(e.target.value)} className="h-12 rounded-xl border-2 pr-10 font-bold" required />
+                            <Input value={identifier} onChange={e => setIdentifier(e.target.value)} className="h-12 rounded-xl border-2 pr-10 font-bold" required placeholder="example@email.com" />
                         </div>
                     </div>
                     <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-2">
@@ -185,6 +185,10 @@ export default function LoginPage() {
             </div>
         </CardContent>
       </Card>
+      
+      <div className="fixed bottom-10 left-10 z-0 opacity-10 no-print">
+          <p className="text-white font-black text-[100px] leading-none select-none">ERP</p>
+      </div>
     </div>
   );
 }

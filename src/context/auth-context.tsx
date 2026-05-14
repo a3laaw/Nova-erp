@@ -34,10 +34,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
-    const masterEmails = ['alaawaaheeb@gmail.com', 'alaawaaheeb1@gmail.com'];
-
-    // 🛡️ بروتوكول العبور السيادي المحدث (V49.0)
-    if (masterEmails.includes(sanitizedEmail)) {
+    
+    // 🛡️ بروتوكول المعماري السيادي (Master Admin Only)
+    if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
             id: firebaseUser.uid,
@@ -46,27 +45,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: 'Developer',
             isActive: true,
             currentCompanyId: null,
-            companyName: 'Sovereign Master Console'
+            companyName: 'Master Console'
         };
-        // تحديث السجل في الخلفية دون تعطيل الدخول
+        // تسجيل نشاط المطور في الخلفية
         setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
         return { user: devProfile, company: null };
     }
 
     try {
-        const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
-        const globalSnap = await getDocs(globalQuery);
+        // 1. محاولة جلب المنشأة من الـ Claims أولاً (أسرع وأضمن)
+        const tokenResult = await firebaseUser.getIdTokenResult();
+        let companyId = tokenResult.claims.companyId as string || tokenResult.claims.currentCompanyId as string;
+
+        // 2. إذا لم توجد Claims (دخول لأول مرة)، نبحث في الفهرس العالمي
+        if (!companyId) {
+            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
+            const globalSnap = await getDocs(globalQuery);
+            if (!globalSnap.empty) {
+                companyId = globalSnap.docs[0].data().companyId;
+            }
+        }
         
-        if (!globalSnap.empty) {
-            const idx = globalSnap.docs[0].data();
-            const tenantDoc = await getDoc(doc(firestore, `companies/${idx.companyId}/users/${firebaseUser.uid}`));
+        if (companyId) {
+            // جلب ملف المستخدم من داخل المنشأة المعزولة
+            const tenantDoc = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
             
             if (tenantDoc.exists()) {
-                const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
+                const companyDoc = await getDoc(doc(firestore, 'companies', companyId));
                 const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
                 return {
-                  user: { ...tenantDoc.data(), uid: firebaseUser.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: companyData?.name } as AuthenticatedUser,
+                  user: { ...tenantDoc.data(), uid: firebaseUser.uid, id: tenantDoc.id, currentCompanyId: companyId, companyName: companyData?.name } as AuthenticatedUser,
                   company: companyData
                 };
             }
@@ -109,6 +118,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setUser(null);
           clearSessionIndicators();
+          if (resolvedUser && !resolvedUser.isActive) {
+              setError("هذا الحساب معطل حالياً.");
+          }
           await signOut(masterAuth);
         }
       } catch (err) { 

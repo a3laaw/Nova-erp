@@ -3,26 +3,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V49.0) ---
-    // تم تحديث النواة لتشمل الهوية الجديدة (alaawaaheeb1)
+    // --- 🛡️ بروتوكول المعماري السيادي (V50.0) ---
+    // المطور الأصلي هو المتحكم الوحيد في البنية التحتية
     function isSovereignArchitect() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
-              request.auth.token.email.lower() == 'alaawaaheeb1@gmail.com' ||
               request.auth.token.role == 'Developer');
     }
 
+    // المستخدم ينتمي للمنشأة إذا كان الـ ID متطابق في التوكن أو البيانات
     function belongsToCompany(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
-              request.auth.token.currentCompanyId == companyId);
+              request.auth.token.currentCompanyId == companyId ||
+              resource.data.companyId == companyId);
     }
 
-    // السماح بالدخول والكتابة المطلقة لتأسيس المنظومة
+    // السماح للمطور بالدخول المطلق لتأسيس المنظومة
     match /developers/{uid} {
       allow read, write: if isSovereignArchitect();
     }
 
+    // المنشآت: المطور يرى الكل، والمستخدم يرى منشأته فقط
     match /companies/{companyId} {
       allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
@@ -31,10 +33,14 @@ service cloud.firestore {
       }
     }
 
+    // الفهرس العالمي للمستخدمين
     match /global_users/{docId} {
-      allow read, write: if isSovereignArchitect();
+      // السماح للمستخدم بقراءة سجله الخاص لمعرفة منشأته عند الدخول
+      allow read: if request.auth != null && (request.auth.uid == docId || isSovereignArchitect());
+      allow write: if isSovereignArchitect();
     }
     
+    // طلبات الانضمام: مفتوحة للجميع للإرسال، للمطور للمراجعة
     match /company_requests/{requestId} {
       allow create: if true;
       allow read, write: if isSovereignArchitect();
