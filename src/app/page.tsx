@@ -27,10 +27,6 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
-/**
- * بوابة العبور الموحدة (Unified Login Gateway):
- * تم تحصينها لاستقبال المطورين ببريد رسمي @gmail.com والعملاء بـ @company.nova
- */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore } = useFirebase();
@@ -52,8 +48,9 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
-      // إذا لم يكن إيميلاً، نبحث في الفهرس العالمي عن اسم المستخدم
       if (!finalEmail.includes('@') && firestore) {
+          if (finalEmail === 'alaa') return 'alaawaaheeb@gmail.com';
+          
           const globalQuery = query(
               collection(firestore, 'global_users'), 
               where('username', '==', finalEmail),
@@ -62,8 +59,6 @@ export default function LoginPage() {
           const snap = await getDocs(globalQuery);
           if (!snap.empty) {
               finalEmail = snap.docs[0].data().email;
-          } else if (finalEmail === 'alaa') {
-              finalEmail = 'alaawaaheeb@gmail.com';
           } else {
               throw new Error('اسم المستخدم غير مسجل في المنظومة.');
           }

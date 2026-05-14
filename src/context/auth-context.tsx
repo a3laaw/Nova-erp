@@ -36,22 +36,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Resilient Architect Protocol V36):
-      // إذا كان البريد هو بريدك الرسمي، نمنحك رتبة مطور فوراً ونؤسس هويتك في قاعدة البيانات
+      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V37):
+      // اعتماد بريدك الجيميل كمدير أعلى مطلق للمنظومة
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devRef = doc(firestore, 'developers', firebaseUser.uid);
         const devData = {
             uid: firebaseUser.uid,
             email: sanitizedEmail,
             role: 'Developer' as const,
-            fullName: 'Alaa Wahib (Master Admin)',
+            fullName: 'Alaa Wahib (Master Architect)',
             isActive: true,
             updatedAt: serverTimestamp()
         };
         
         await setDoc(devRef, devData, { merge: true });
 
-        // تحديث الفهرس العالمي لضمان السيادة
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         await setDoc(globalRef, {
             email: sanitizedEmail,
@@ -72,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // 1. فحص الفهرس العالمي للمنشآت للعملاء العاديين
+      // 1. فحص الفهرس العالمي للمنشآت
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
