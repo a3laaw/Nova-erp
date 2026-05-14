@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, deleteField } from 'firebase/firestore';
+import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, deleteField, getDoc } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -53,8 +53,8 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 /**
- * غرفة التحكم السيادية (V15.0 - Final Consolidated Suite):
- * تم ترميم كافة الاستيرادات وحل أخطاء الـ Token والـ ReferenceErrors بشكل نهائي.
+ * غرفة التحكم السيادية (V16.0 - Stable Sovereign Core):
+ * تم حل خطأ handleDeleteCompany وجميع مشاكل الاستيراد (ReferenceErrors) نهائياً.
  */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -73,7 +73,7 @@ export default function DeveloperDashboard() {
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
 
-  // اشتراكات لحظية مع استقرار القيود
+  // اشتراكات لحظية مستقرة
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
@@ -107,6 +107,10 @@ export default function DeveloperDashboard() {
     setActivationPassword(password);
   };
 
+  /**
+   * 🛡️ محرك التفعيل السيادي (Onboarding Engine):
+   * يقوم بإنشاء حساب الأمان، تأسيس سجل الشركة، وزرع ملف المالك في نبضة واحدة.
+   */
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
     setIsProcessing(requestToActivate.id!);
@@ -147,6 +151,35 @@ export default function DeveloperDashboard() {
     }
   };
 
+  /**
+   * 🛡️ محرك التصفية النهائية (Sovereign Purge):
+   * يمسح المنشأة وفهرسها العالمي من قاعدة البيانات.
+   */
+  const handleDeleteCompany = async () => {
+    if (!companyToDelete || !firestore || isProcessing) return;
+    setIsProcessing(companyToDelete.id!);
+    
+    try {
+        const batch = writeBatch(firestore);
+        
+        // 1. مسح سجل الشركة
+        batch.delete(doc(firestore, 'companies', companyToDelete.id!));
+        
+        // 2. مسح الفهرس العالمي للمالك
+        const globalIndexQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
+        const globalSnap = await getDocs(globalIndexQuery);
+        globalSnap.forEach(d => batch.delete(d.ref));
+
+        await batch.commit();
+        toast({ title: 'تمت التصفية', description: 'تم مسح المنشأة وكافة فهارسها بنجاح.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'فشل الحذف', description: e.message });
+    } finally {
+        setIsProcessing(null);
+        setCompanyToDelete(null);
+    }
+  };
+
   const copyWelcomeMessage = () => {
     if (!activationResult || !requestToActivate) return;
     const msg = `أهلاً بك في عائلة Nova ERP! 🚀\n\nتم تفعيل منشأتك: *${requestToActivate.companyName}*\n\nبيانات الدخول:\n👤 اسم المستخدم: ${requestToActivate.username}\n📧 البريد: ${activationResult.email}\n🔑 كلمة المرور: ${activationResult.pass}\n\nيرجى تفعيل حسابك عبر الرابط:\n${activationResult.link}\n\nنتمنى لك عملاً موفقاً!`;
@@ -183,7 +216,7 @@ export default function DeveloperDashboard() {
         {systemStatus === 'MANUAL_MODE' && (
             <Alert className="rounded-3xl border-2 border-red-500 bg-red-50/50 p-6 animate-in slide-in-from-top-4">
                 <AlertCircle className="h-6 w-6 text-red-600" />
-                <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة السحابي متوقف!</AlertTitle>
+                <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة متوقف!</AlertTitle>
                 <AlertDescription className="text-red-700 font-bold text-sm leading-relaxed mt-2">
                     لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بحفظ بيانات الشركة في Firestore، ولكن يجب عليك تفعيل حساب Authentication يدوياً في Firebase Console لكل منشأة جديدة لتمكينهم من الدخول.
                 </AlertDescription>
@@ -411,7 +444,7 @@ export default function DeveloperDashboard() {
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إإغلاق الغرفة السيادية</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق الغرفة السيادية</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
