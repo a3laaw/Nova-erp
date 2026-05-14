@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue, Timestamp } from 'firebase/admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
  * @fileOverview API الأمان السيادي الموحد (V13.0 - Fully Isolated Multi-tenancy).
- * تم تحديثه لدعم حفظ طلبات الانضمام (add_request) والتفعيل من قبل الأدمن.
+ * تم تصحيح مسارات الاستيراد لضمان استقرار البناء والربط السحابي.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -55,13 +55,6 @@ export async function POST(request: NextRequest) {
 
     // --- 1. حفظ طلب الانضمام (بوابة العميل) ---
     if (action === 'add_request') {
-        const adminApp = getApps().length > 0 ? getApps()[0] : null;
-        if (!adminApp && !hasServiceAccount) {
-            // إذا لم يتوفر ملف الأمان، نستخدم الطريقة اليدوية لحفظ الطلب عبر Firestore (إذا كان مسموحاً)
-            // لكن هنا نفضل التنبيه بأن السيرفر يحتاج تهيئة
-            throw new Error("سيرفر المنظومة يحتاج لتهيئة ملف الأمان (service-account.json) لاستقبال الطلبات.");
-        }
-        
         const db = getFirestore();
         await db.collection('company_requests').add({
             companyName,
