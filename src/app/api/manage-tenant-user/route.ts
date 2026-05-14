@@ -1,55 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore as getAdminFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore as getAdminFirestore, FieldValue } from 'firebase/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد - نسخة التحصين النهائية (V26.0)
- * تم دمج "مُعالج المفاتيح الذكي" لإصلاح أخطاء الـ PEM آلياً.
+ * محرك إدارة المنشآت الموحد - نسخة توحيد القطبية (V27.0)
+ * تم إلغاء الاعتماد على env في السيرفر والاعتماد كلياً على ملف المفتاح لمنع التضارب.
  */
 
 function getAdminApp() {
-  const currentProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-
   if (getApps().length === 0) {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     
-    let serviceAccount = null;
-    if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        try {
-            const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-            const parsed = JSON.parse(fileContent);
-            
-            if (parsed && parsed.private_key) {
-                // 🛡️ مُعالج المفاتيح الذكي: تصحيح الأسطر الجديدة لضمان قبول تنسيق PEM
-                // يقوم باستبدال رموز \n النصية بأسطر حقيقية، ويتحقق من ترويسة المفتاح
-                let key = parsed.private_key;
-                key = key.replace(/\\n/g, '\n');
-                
-                if (!key.includes('-----BEGIN PRIVATE KEY-----')) {
-                    key = `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----\n`;
-                }
-                
-                parsed.private_key = key;
-                serviceAccount = parsed;
-            }
-        } catch (e) {
-            console.error("Critical: Failed to parse service-account.json");
-        }
+    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+        throw new Error("MISSING_FILE");
     }
 
-    if (serviceAccount && serviceAccount.private_key) {
+    try {
+        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
+        const serviceAccount = JSON.parse(fileContent);
+        
+        if (!serviceAccount.private_key || !serviceAccount.project_id) {
+            throw new Error("INVALID_JSON_STRUCTURE");
+        }
+
+        // 🛡️ معالج المفاتيح الذكي: تصحيح الأسطر الجديدة لضمان قبول تنسيق PEM
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
+        // التأسيس السيادي المباشر باستخدام بيانات الملف حصراً لمنع تضارب الـ Project ID
         return initializeApp({
             credential: cert(serviceAccount),
-            projectId: currentProjectId
+            projectId: serviceAccount.project_id // توحيد القطبية هنا
         });
-    } else {
-        // Fallback: سيؤدي هذا لفشل التفعيل مع رسالة واضحة للمستخدم
-        return initializeApp({
-            projectId: currentProjectId,
-        });
+    } catch (e: any) {
+        console.error("Critical: Failed to initialize Firebase Admin:", e.message);
+        throw e;
     }
   }
   return getApp();
@@ -61,14 +48,14 @@ export async function POST(request: NextRequest) {
     const { action, email, companyName, contactName, activity, password, requestId } = body;
 
     const app = getAdminApp();
-    const db = getAdminFirestore(app);
+    const db = (await import('firebase-admin/firestore')).getFirestore(app);
     const auth = getAuth(app);
 
     if (action === 'instant_setup') {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. إنشاء حساب المالك في نظام الأمان
+        // 1. إنشاء حساب المالك في نظام الأمان (Authentication)
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -82,11 +69,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. حقن هوية المنشأة داخل الحساب
+        // 2. حقن هوية المنشأة داخل الحساب (Custom Claims)
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
+
+        const now = (await import('firebase-admin/firestore')).FieldValue.serverTimestamp();
 
         // 3. تأسيس سجل المنشأة
         await db.collection('companies').doc(companyId).set({
@@ -95,8 +84,8 @@ export async function POST(request: NextRequest) {
             activity: activity || 'consulting',
             adminEmail: sanitizedEmail,
             isActive: true,
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
+            createdAt: now,
+            updatedAt: now,
             maxUsersLimit: 5,
             subscriptionType: 'trial'
         });
@@ -110,7 +99,7 @@ export async function POST(request: NextRequest) {
             role: 'Admin',
             isActive: true,
             companyId: companyId,
-            createdAt: FieldValue.serverTimestamp()
+            createdAt: now
         });
 
         // 5. تحديث الفهرس العالمي (Global Index)
@@ -120,7 +109,7 @@ export async function POST(request: NextRequest) {
             companyId: companyId,
             uid: userRecord.uid,
             role: 'Admin',
-            createdAt: FieldValue.serverTimestamp()
+            createdAt: now
         });
 
         // 6. تحديث حالة الطلب الأصلي
@@ -128,14 +117,14 @@ export async function POST(request: NextRequest) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
                 status: 'activated',
-                activatedAt: FieldValue.serverTimestamp(),
+                activatedAt: now,
                 companyId: companyId
             });
         }
 
         return NextResponse.json({ 
             success: true, 
-            message: "تم تأسيس المنشأة وتفعيل الحساب بنجاح.",
+            message: "تم التفعيل بنجاح تام.",
             companyId: companyId
         });
     }
@@ -145,15 +134,15 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Activation Engine Error:", error);
     
-    // تشخيص ذكي لخطأ التنسيق (PEM)
-    const isPemError = error.message?.includes('PEM') || error.stack?.includes('PEM');
+    let userMessage = error.message;
+    if (error.message?.includes('insufficient permission')) {
+        userMessage = "خطأ في صلاحيات المفتاح: تأكد من أن حساب الخدمة في Console لديه دور (Firebase Admin).";
+    }
 
     return NextResponse.json({ 
         success: false, 
-        error: isPemError ? "INVALID_KEY_FORMAT" : (error.code || "ACTIVATION_FAILED"),
-        message: isPemError 
-            ? "خطأ في تنسيق مفتاح الأمان (PEM). يرجى استخراج مفتاح جديد من Console ولصقه بالكامل."
-            : error.message 
+        error: error.code || "ACTIVATION_FAILED",
+        message: userMessage
     }, { status: 500 });
   }
 }
