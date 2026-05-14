@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as fs from 'fs';
@@ -7,12 +7,13 @@ import path from 'path';
 
 /**
  * @fileOverview API إدارة المنشآت وحسابات المستخدمين.
- * تم تحصينه ليعتمد كلياً على المتغيرات الحقيقية للمشروع الحالي.
+ * تم تحصينه ليعتمد كلياً على المشروع الحالي النشط لمنع خطأ NOT_FOUND.
  */
 
-let adminApp: any;
-
 function getAdminApp() {
+  // استخدام مشروع المتصفح كمرجع إلزامي لضمان توحيد الهوية
+  const currentProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
   if (getApps().length === 0) {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     
@@ -21,7 +22,7 @@ function getAdminApp() {
         try {
             const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
             const parsed = JSON.parse(fileContent);
-            if (parsed.private_key && !parsed.private_key.includes("ضع_هنا")) {
+            if (parsed.private_key && parsed.private_key.length > 50) {
                 serviceAccount = parsed;
             }
         } catch (e) {
@@ -30,29 +31,31 @@ function getAdminApp() {
     }
 
     if (serviceAccount) {
-        adminApp = initializeApp({
+        return initializeApp({
             credential: cert(serviceAccount),
+            projectId: currentProjectId
         });
     } else {
-        // خيار احتياطي باستخدام المتغيرات الموجودة في .env.local
+        // خيار احتياطي يعتمد على متغيرات البيئة الفردية
         const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-        if (privateKey) {
-            adminApp = initializeApp({
+        if (privateKey && privateKey.length > 50) {
+            return initializeApp({
                 credential: cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    projectId: currentProjectId || process.env.FIREBASE_PROJECT_ID,
                     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
                     privateKey: privateKey,
                 }),
+                projectId: currentProjectId
             });
         } else {
-            // تهيئة افتراضية للمشروع الحالي لضمان عدم الانهيار عند غياب المفاتيح
-            adminApp = initializeApp({
-                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "studio-8039389980-3d2d0",
+            // تهيئة افتراضية للمشروع الحالي لضمان الوصول للبيانات حتى في الوضع اليدوي
+            return initializeApp({
+                projectId: currentProjectId,
             });
         }
     }
   }
-  return adminApp;
+  return getApp();
 }
 
 export async function POST(request: NextRequest) {
@@ -63,22 +66,24 @@ export async function POST(request: NextRequest) {
         activity, employeeCountRange, password, requestId 
     } = body;
 
-    getAdminApp();
-    const db = getFirestore();
-    const auth = getAuth();
+    const app = getAdminApp();
+    const db = getFirestore(app);
+    const auth = getAuth(app);
 
     if (action === 'instant_setup') {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. التحقق من صلاحية الاتصال بـ Auth (نظام Google)
+        // 1. التحقق من صلاحية ملف الأمان (نظام Google)
         try {
+            // محاولة جلب مستخدم واحد للتأكد أن المفتاح لديه صلاحيات Auth
             await auth.listUsers(1); 
         } catch (e: any) {
+            console.error("Auth Connectivity Error:", e.message);
             return NextResponse.json({ 
                 success: false, 
                 error: "INVALID_CONFIG",
-                message: "ملف الأمان service-account.json غير موجود أو غير صالح. يرجى لصق بيانات المفتاح الخاص فيه أولاً."
+                message: "ملف الأمان (Service Account) مفقود أو لا يملك صلاحيات تعديل المستخدمين. يرجى لصق بيانات المفتاح الخاص في ملف service-account.json أولاً."
             });
         }
 
@@ -110,6 +115,7 @@ export async function POST(request: NextRequest) {
             adminEmail: sanitizedEmail,
             isActive: true,
             createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
         });
 
         // 5. إنشاء ملف المستخدم الداخلي المعزول
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث حالة الطلب
+        // 6. تحديث حالة الطلب (نفس المشروع)
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             const requestSnap = await requestRef.get();
@@ -134,6 +140,8 @@ export async function POST(request: NextRequest) {
                     activatedAt: FieldValue.serverTimestamp(),
                     companyId: companyId
                 });
+            } else {
+                console.warn(`Request document ${requestId} not found in project ${app.options.projectId}`);
             }
         }
 
