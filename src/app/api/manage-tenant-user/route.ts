@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي المتقدم (V35.0)
- * تم تحصين معالجة المفتاح الخاص وتوضيح رسالة صلاحيات IAM.
+ * محرك إدارة المنشآت الموحد (V36.0):
+ * تم تحصين كشف الأخطاء وإرشاد المستخدم لحلها في IAM بوضوح لؤلؤي.
  */
 
 function getAdminApp() {
@@ -26,6 +26,7 @@ function getAdminApp() {
             throw new Error("INVALID_SERVICE_ACCOUNT_JSON");
         }
 
+        // تنظيف المفتاح الخاص من أي تنسيق خاطئ
         serviceAccount.private_key = serviceAccount.private_key
             .replace(/\\n/g, '\n')
             .replace(/"/g, '')
@@ -51,6 +52,7 @@ export async function POST(request: NextRequest) {
 
     const app = getAdminApp();
     
+    // جلب بريد حساب الخدمة للتشخيص
     const saPath = path.join(process.cwd(), 'service-account.json');
     const saData = JSON.parse(fs.readFileSync(saPath, 'utf8'));
     serviceAccountEmail = saData.client_email;
@@ -150,6 +152,6 @@ export async function POST(request: NextRequest) {
         error: "IAM_AUTH_FAILED",
         message: userMessage,
         targetEmail: serviceAccountEmail
-    }, { status: 500 });
+    }, { status: 200 }); // نرسل 200 لتظهر الرسالة للمستخدم في الـ Toast
   }
 }

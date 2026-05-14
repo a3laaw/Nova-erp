@@ -42,29 +42,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Bypass)
-      // إذا كان البريد هو بريدك الرسمي، نمنحك رتبة مطور آلياً لكسر نقطة الصفر
-      if (sanitizedEmail === 'alaawaaheeb@gmail.com' || sanitizedEmail === 'alaawaaheeb1@gmail.com') {
+      // 🛡️ بروتوكول المعماري السيادي (Resilient Architect Bypass):
+      // إذا كان البريد يحتوي على اسمك (alaawaaheeb)، نمنحك رتبة مطور فوراً لكسر نقطة الصفر.
+      if (sanitizedEmail.includes('alaawaaheeb')) {
         const devRef = doc(firestore, 'developers', user.uid);
-        const devDoc = await getDoc(devRef);
-        
-        if (!devDoc.exists()) {
-            await setDoc(devRef, {
-                uid: user.uid,
-                email: sanitizedEmail,
-                role: 'Developer',
-                fullName: 'Alaa Wahib (System Architect)',
-                isActive: true,
-                createdAt: serverTimestamp()
-            });
-        }
+        // نحدث السجل في قاعدة البيانات لضمان وجوده للأبد
+        await setDoc(devRef, {
+            uid: user.uid,
+            email: sanitizedEmail,
+            role: 'Developer',
+            fullName: 'Alaa Wahib (Master Admin)',
+            isActive: true,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
 
         return {
           user: { 
               id: user.uid, 
               uid: user.uid, 
               email: sanitizedEmail, 
-              username: 'architect', 
               role: 'Developer', 
               isActive: true, 
               fullName: 'Alaa Wahib', 
@@ -76,17 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // 1. فحص هل هو مطور مسجل مسبقاً
-      const devDoc = await getDoc(doc(firestore, 'developers', user.uid));
-      if (devDoc.exists()) {
-        const devData = devDoc.data();
-        return {
-          user: { ...devData, id: user.uid, uid: user.uid, email: user.email!, role: 'Developer', isSuperAdmin: true } as AuthenticatedUser,
-          company: null
-        };
-      }
-
-      // 2. فحص الفهرس العالمي للمنشآت
+      // 1. فحص الفهرس العالمي للمنشآت
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
@@ -119,45 +105,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    let isMounted = true;
     const unsubscribe = onAuthStateChanged(masterAuth, async (firebaseUser) => {
       try {
         if (!firebaseUser) {
-          if (isMounted) {
-            updateState({ user: null, company: null, loading: false, error: null });
-            setCurrentCompany(null);
-            clearSessionIndicators();
-          }
+          updateState({ user: null, company: null, loading: false, error: null });
+          setCurrentCompany(null);
+          clearSessionIndicators();
           return;
         }
 
-        const email = firebaseUser.email || '';
-        const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, email);
+        const { user, company } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
-        if (isMounted) {
-          if (user && user.isActive) {
-            setSessionIndicators(firebaseUser.uid, user.role);
-            updateState({ user, company, loading: false, error: null });
-            if (company) setCurrentCompany(company);
-          } else {
-            updateState({ 
-                user: null, 
-                company: null, 
-                loading: false, 
-                error: user ? 'حسابك غير مفعل حالياً.' : 'لم يتم العثور على صلاحيات دخول.' 
-            });
-            clearSessionIndicators();
-          }
+        if (user && user.isActive) {
+          setSessionIndicators(firebaseUser.uid, user.role);
+          updateState({ user, company, loading: false, error: null });
+          if (company) setCurrentCompany(company);
+        } else {
+          updateState({ 
+              user: null, 
+              company: null, 
+              loading: false, 
+              error: 'لم يتم العثور على صلاحيات دخول نشطة لهذا الحساب.' 
+          });
+          clearSessionIndicators();
         }
       } catch (err: any) {
-        if (isMounted) updateState({ user: null, company: null, loading: false, error: 'تعذر التحقق من الجلسة.' });
+        updateState({ user: null, company: null, loading: false, error: 'تعذر التحقق من الجلسة السيادية.' });
         clearSessionIndicators();
       } finally {
-        if (isMounted) updateState({ loading: false });
+        updateState({ loading: false });
       }
     });
 
-    return () => { isMounted = false; unsubscribe(); };
+    return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext, updateState]);
 
   const login = useCallback(async (email: string, password: string) => {
