@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- مساعدات الحوكمة ---
+    // --- مساعدات الحوكمة السيادية ---
     function isDeveloper() {
       return request.auth != null && 
              (request.auth.token.role == 'Developer' || request.auth.token.email == 'alaawaaheeb@gmail.com');
@@ -42,7 +42,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 5. العدادات ---
+    // --- 5. العدادات العامة ---
     match /counters/{doc} {
       allow read, write: if request.auth != null;
     }

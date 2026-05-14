@@ -36,29 +36,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V37):
-      // اعتماد بريدك الجيميل كمدير أعلى مطلق للمنظومة في المشروع الأول
+      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V38):
+      // بريدك الرسمي هو "المفتاح الماستر" للمنظومة بالكامل
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devRef = doc(firestore, 'developers', firebaseUser.uid);
         const devData = {
             uid: firebaseUser.uid,
             email: sanitizedEmail,
             role: 'Developer' as const,
-            fullName: 'Alaa Wahib (Master Architect)',
+            fullName: 'علاء وهيب (مدير عام المنظومة)',
             isActive: true,
-            updatedAt: serverTimestamp()
         };
         
-        await setDoc(devRef, devData, { merge: true });
+        // تحديث سجل المطور آلياً لضمان وجوده في Firestore
+        await setDoc(devRef, { ...devData, updatedAt: new Date() }, { merge: true });
 
-        // تحديث الفهرس العالمي لضمان الربط
+        // تحديث الفهرس العالمي لضمان إمكانية الدخول بالـ Username
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         await setDoc(globalRef, {
             email: sanitizedEmail,
             username: 'alaa',
             role: 'Developer',
             uid: firebaseUser.uid,
-            updatedAt: serverTimestamp()
+            updatedAt: new Date()
         }, { merge: true });
 
         return {
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // 1. فحص الفهرس العالمي للمنشآت
+      // 1. فحص الفهرس العالمي للمنشآت (Multi-Tenant Lookup)
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       

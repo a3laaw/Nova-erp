@@ -17,7 +17,8 @@ import {
     Mail, 
     ArrowRight,
     Send,
-    Building2
+    Building2,
+    Database
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -27,13 +28,9 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
-/**
- * بوابة العبور الموحدة (Sovereign Gateway V37):
- * تم استيراد كافة الأيقونات ودالة cn لضمان استقرار الواجهة 100%.
- */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
-  const { firestore } = useFirebase();
+  const { firestore, app } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -53,7 +50,7 @@ export default function LoginPage() {
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
       if (!finalEmail.includes('@') && firestore) {
-          // الحالات الاستثنائية للمطور
+          // الحالات السيادية للمطور والمديرين
           if (finalEmail === 'alaa') return 'alaawaaheeb@gmail.com';
           
           const globalQuery = query(
@@ -65,7 +62,7 @@ export default function LoginPage() {
           if (!snap.empty) {
               finalEmail = snap.docs[0].data().email;
           } else {
-              throw new Error('اسم المستخدم غير مسجل في المنظومة.');
+              throw new Error('اسم المستخدم غير مسجل. يرجى كتابة البريد الإلكتروني بالكامل.');
           }
       }
       return finalEmail;
@@ -109,6 +106,8 @@ export default function LoginPage() {
           setLocalLoading(false);
       }
   };
+
+  const projectId = (app as any)?.options?.projectId || 'Unknown';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
@@ -203,7 +202,7 @@ export default function LoginPage() {
                                 onChange={e => setIdentifier(e.target.value)} 
                                 className="h-12 rounded-xl border-2 pr-10 bg-white/40 font-bold" 
                                 required 
-                                placeholder="alaa.wahib"
+                                placeholder="Email or Username"
                                 disabled={localLoading}
                             />
                         </div>
@@ -236,6 +235,12 @@ export default function LoginPage() {
                         سجل مكتبك الآن
                     </Link>
                 </Button>
+            </div>
+            
+            {/* 🛡️ مؤشر المشروع السيادي لضمان الدقة */}
+            <div className="pt-4 flex items-center justify-center gap-2 opacity-30">
+                <Database className="h-3 w-3" />
+                <span className="text-[8px] font-mono font-bold uppercase tracking-widest">Active Core: {projectId}</span>
             </div>
         </CardContent>
       </Card>
