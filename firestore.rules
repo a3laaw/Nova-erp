@@ -3,10 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V48.0) ---
+    // --- 🛡️ بروتوكول المعماري السيادي (V49.0) ---
+    // تم تحديث النواة لتشمل الهوية الجديدة (alaawaaheeb1)
     function isSovereignArchitect() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
+              request.auth.token.email.lower() == 'alaawaaheeb1@gmail.com' ||
               request.auth.token.role == 'Developer');
     }
 
@@ -18,7 +20,7 @@ service cloud.firestore {
 
     // السماح بالدخول والكتابة المطلقة لتأسيس المنظومة
     match /developers/{uid} {
-      allow read, write: if isSovereignArchitect() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
+      allow read, write: if isSovereignArchitect();
     }
 
     match /companies/{companyId} {

@@ -25,8 +25,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور الموحدة (Sovereign Login V48.0):
- * تم تحصين كافة الاستيرادات لضمان استقرار لؤلؤي تحت الضغط.
+ * بوابة العبور الموحدة (Sovereign Login V49.0):
+ * تم تحديث التعرف على الهوية لتشمل alaawaaheeb1@gmail.com
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -49,7 +49,9 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       const input = id.trim().toLowerCase();
-      if (input === 'alaa' || input === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
+      // دعم الاختصار 'alaa' لكلا البريدين الماستر
+      if (input === 'alaa') return 'alaawaaheeb@gmail.com';
+      if (input === 'alaawaaheeb@gmail.com' || input === 'alaawaaheeb1@gmail.com') return input;
       
       if (!input.includes('@') && firestore) {
           try {
@@ -76,7 +78,9 @@ export default function LoginPage() {
         setLocalLoading(false);
         let msg = 'بيانات الدخول غير صحيحة.';
         if (error.code === 'auth/invalid-credential') {
-            msg = 'خطأ أمني: بيانات الدخول غير مطابقة للسجلات في مشروع النجمة الحالي.';
+            msg = 'خطأ أمني: بيانات الدخول غير مطابقة للسجلات في هذا المشروع.';
+        } else if (error.code === 'auth/network-request-failed') {
+            msg = 'فشل الاتصال: يرجى التحقق من الإنترنت أو المحاولة لاحقاً.';
         }
         setErrorMsg(msg);
     }

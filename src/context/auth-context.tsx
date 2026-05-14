@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,9 +34,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
+    const masterEmails = ['alaawaaheeb@gmail.com', 'alaawaaheeb1@gmail.com'];
 
-    // 🛡️ بروتوكول العبور السيادي (V48.0): إيميل المطور هو الرتبة المطلقة
-    if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
+    // 🛡️ بروتوكول العبور السيادي المحدث (V49.0)
+    if (masterEmails.includes(sanitizedEmail)) {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
             id: firebaseUser.uid,
@@ -70,10 +72,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
     } catch (e) { 
-        console.warn("Identity context lookup failed, falling back to guest."); 
+        console.warn("Identity context lookup failed:", e); 
     }
     return { user: null, company: null };
   }, []);
+
+  const refreshUserData = useCallback(async () => {
+    if (!masterAuth?.currentUser || !masterFirestore) return;
+    const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, masterAuth.currentUser, masterAuth.currentUser.email || '');
+    if (resolvedUser) {
+        setUser(resolvedUser);
+        setCompany(resolvedCompany);
+    }
+  }, [masterAuth, masterFirestore, fetchUserWithContext]);
 
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -129,8 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const value = useMemo(() => ({ 
-    user, company, loading, error, login, logout, resetPassword 
-  }), [user, company, loading, error, login, logout]);
+    user, company, loading, error, login, logout, resetPassword, refreshUserData
+  }), [user, company, loading, error, login, logout, refreshUserData]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
