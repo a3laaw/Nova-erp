@@ -71,13 +71,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. حقن الهوية داخل الحساب
+        // 2. حقن الهوية داخل الحساب (Custom Claims)
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // 3. بناء سجل الشركة في قاعدة البيانات
+        // 3. بناء سجل الشركة في قاعدة البيانات (في المشروع الموحد)
         await db.collection('companies').doc(companyId).set({
             id: companyId,
             name: companyName,
@@ -86,9 +86,11 @@ export async function POST(request: NextRequest) {
             isActive: true,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
+            maxUsersLimit: 5,
+            subscriptionType: 'trial'
         });
 
-        // 4. إنشاء ملف المستخدم الداخلي
+        // 4. إنشاء ملف المستخدم الداخلي داخل الشركة (Isolation Path)
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
@@ -96,10 +98,21 @@ export async function POST(request: NextRequest) {
             username: sanitizedEmail.split('@')[0],
             role: 'Admin',
             isActive: true,
+            companyId: companyId,
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. تحديث حالة الطلب (نفس المشروع المستهدف)
+        // 5. إنشاء فهرس العبور العالمي (Global Hub)
+        await db.collection('global_users').doc(userRecord.uid).set({
+            email: sanitizedEmail,
+            username: sanitizedEmail.split('@')[0],
+            companyId: companyId,
+            uid: userRecord.uid,
+            role: 'Admin',
+            createdAt: FieldValue.serverTimestamp()
+        });
+
+        // 6. تحديث حالة طلب الانضمام
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             const requestSnap = await requestRef.get();
@@ -110,25 +123,20 @@ export async function POST(request: NextRequest) {
                     activatedAt: FieldValue.serverTimestamp(),
                     companyId: companyId
                 });
-            } else {
-                return NextResponse.json({ 
-                    success: false, 
-                    error: "REQUEST_NOT_FOUND",
-                    message: "تم إنشاء الشركة ولكن لم نجد الطلب الأصلي لتحديث حالته." 
-                });
             }
         }
 
         return NextResponse.json({ 
             success: true, 
-            message: "تم تأسيس المنشأة وتفعيل حساب المالك بنجاح."
+            message: "تم تأسيس المنشأة وتفعيل حساب المالك بنجاح.",
+            companyId: companyId
         });
     }
 
     return NextResponse.json({ success: false, error: "UNKNOWN_ACTION" });
 
   } catch (error: any) {
-    console.error("API Error:", error);
+    console.error("Critical API Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: "SERVER_ERROR",
