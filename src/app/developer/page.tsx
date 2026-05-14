@@ -22,7 +22,8 @@ import {
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
     AlertCircle, ShieldCheck, Activity, Rocket, 
-    UserPlus, Lock, Send, X, Key, ExternalLink, RefreshCw
+    UserPlus, Lock, Send, X, Key, ExternalLink, RefreshCw,
+    User // 🛡️ تم إضافة الأيقونة المفقودة هنا
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -65,7 +66,6 @@ export default function DeveloperDashboard() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  const [configError, setConfigError] = useState<string | null>(null);
 
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
@@ -95,7 +95,6 @@ export default function DeveloperDashboard() {
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
     setIsProcessing(requestToActivate.id!);
-    setConfigError(null);
     
     try {
         const response = await fetch('/api/manage-tenant-user', {
@@ -219,7 +218,7 @@ export default function DeveloperDashboard() {
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
                                             <Button 
-                                                onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); setConfigError(null); }}
+                                                onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); }}
                                                 className="h-11 px-8 rounded-xl font-black bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 gap-2"
                                             >
                                                 <UserPlus className="h-4 w-4" /> مراجعة وتفعيل
@@ -350,7 +349,6 @@ export default function DeveloperDashboard() {
                                         <RefreshCw className="h-4 w-4" /> توليد تلقائي
                                     </Button>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground font-medium pr-2">سيتم إرسال هذه البيانات للمالك ليبدأ العمل فوراً.</p>
                             </div>
                         </>
                     ) : (
