@@ -12,7 +12,6 @@ import {
     query, 
     where, 
     orderBy, 
-    deleteField,
 } from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,9 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
-    AlertCircle, Activity, Rocket, 
-    UserPlus, Lock, Send, X, Key, RefreshCw,
-    User // 🛡️ استيراد الأيقونة المفقودة لضمان استقرار الواجهة
+    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User 
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +56,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
+/**
+ * غرفة التحكم الرئيسية - نظام الإدارة المركزي
+ */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -71,7 +71,6 @@ export default function DeveloperDashboard() {
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string } | null>(null);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
-  // اشتراك لحظي لضمان ثبات القراءات
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
@@ -83,9 +82,9 @@ export default function DeveloperDashboard() {
   }, [companies, searchQuery]);
 
   const generateStrongPassword = () => {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
     let password = "";
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       password += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setActivationPassword(password);
@@ -104,7 +103,7 @@ export default function DeveloperDashboard() {
                 companyName: requestToActivate.companyName,
                 contactName: requestToActivate.contactName,
                 email: requestToActivate.email,
-                activity: requestToActivate.activity || 'consulting', // 🛡️ تم إضافة هذا الحقل لحل خطأ undefined
+                activity: requestToActivate.activity || 'consulting',
                 password: activationPassword,
                 requestId: requestToActivate.id
             })
@@ -116,12 +115,18 @@ export default function DeveloperDashboard() {
                 email: requestToActivate.email,
                 pass: activationPassword
             });
-            toast({ title: 'تم تفعيل المنشأة بنجاح' });
+            toast({ title: 'تم التفعيل بنجاح' });
         } else {
             throw new Error(result.message || result.error);
         }
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
+        toast({ 
+            variant: 'destructive', 
+            title: 'فشل التفعيل', 
+            description: e.message.includes('PEM') 
+                ? 'خطأ في تنسيق مفتاح الأمان. يرجى إعادة رفع ملف service-account.json الأصلي بالكامل.' 
+                : e.message 
+        });
     } finally {
         setIsProcessing(null);
     }
@@ -132,15 +137,10 @@ export default function DeveloperDashboard() {
     setIsProcessing(companyToDelete.id!);
     try {
         const batch = writeBatch(firestore);
-        
-        // 1. حذف سجل الشركة
         batch.delete(doc(firestore, 'companies', companyToDelete.id!));
-        
-        // 2. حذف الفهرس العالمي للمالك
         const globalIndexQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
         const globalSnap = await getDocs(globalIndexQuery);
         globalSnap.forEach(d => batch.delete(d.ref));
-        
         await batch.commit();
         toast({ title: 'تم الحذف', description: 'تم مسح المنشأة وكافة سجلاتها بنجاح.' });
     } catch (e: any) {
@@ -168,7 +168,7 @@ export default function DeveloperDashboard() {
                     </div>
                     <div className="text-right">
                         <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الرئيسية</CardTitle>
-                        <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت، التفعيلات، ونظام الاحتضان السحابي.</CardDescription>
+                        <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت وتفعيل الحسابات الجديدة.</CardDescription>
                     </div>
                 </div>
             </CardHeader>
@@ -225,7 +225,7 @@ export default function DeveloperDashboard() {
                                             </Button>
                                         ) : (
                                             <Badge className="bg-blue-50 text-blue-700 border-blue-100 font-black px-4 py-1.5 rounded-xl flex items-center gap-2 w-fit">
-                                                <CheckCircle2 className="h-3 w-3"/> تم التأسيس
+                                                <CheckCircle2 className="h-3 w-3"/> تم التفعيل
                                             </Badge>
                                         )}
                                     </TableCell>
@@ -241,7 +241,7 @@ export default function DeveloperDashboard() {
                     <CardHeader className="bg-slate-50 border-b p-8 px-12 flex flex-row justify-between items-center">
                         <div className="relative w-full max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-950 opacity-40" />
-                            <Input placeholder="بحث باسم المنشأة أو البريد..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold" />
+                            <Input placeholder="بحث باسم المنشأة..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold" />
                         </div>
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <Activity className="h-3 w-3" />
@@ -260,7 +260,7 @@ export default function DeveloperDashboard() {
                             </TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /></TableCell></TableRow> :
-                                filteredCompanies.length === 0 ? <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic">لا توجد منشآت نشطة حالياً.</TableCell></TableRow> :
+                                filteredCompanies.length === 0 ? <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد منشآت نشطة حالياً.</TableCell></TableRow> :
                                 filteredCompanies.map(company => (
                                     <TableRow key={company.id} className="h-24 border-slate-100 group transition-all border-b">
                                         <TableCell className="px-12">
@@ -286,11 +286,7 @@ export default function DeveloperDashboard() {
                                                     <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm group-hover:bg-white transition-all"><MoreHorizontal className="h-5 w-5" /></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none">
-                                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">لوحة التحكم</DropdownMenuLabel>
-                                                    <DropdownMenuItem className="rounded-xl py-3 font-bold gap-3 focus:bg-indigo-50">
-                                                        <Activity className="h-4 w-4" /> مراقبة نشاط المنشأة
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إدارة المنشأة</DropdownMenuLabel>
                                                     <DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50">
                                                         <Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً
                                                     </DropdownMenuItem>
@@ -306,7 +302,7 @@ export default function DeveloperDashboard() {
             </TabsContent>
         </Tabs>
 
-        {/* --- نافذة تفعيل الحسابات الجديدة --- */}
+        {/* --- نافذة تفعيل الحسابات --- */}
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <DialogHeader className="p-8 bg-slate-900 text-white text-right">
@@ -328,7 +324,7 @@ export default function DeveloperDashboard() {
                                     <p className="font-black text-xl text-slate-900">{requestToActivate?.contactName}</p>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني المعتمد</Label>
+                                    <Label className="text-[10px] font-black uppercase text-slate-400">البريد المعتمد</Label>
                                     <p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p>
                                 </div>
                             </div>
@@ -342,7 +338,7 @@ export default function DeveloperDashboard() {
                                             value={activationPassword} 
                                             onChange={(e) => setActivationPassword(e.target.value)}
                                             className="h-12 rounded-xl pr-10 border-2 font-mono font-black text-lg text-primary"
-                                            placeholder="أدخل كلمة المرور أو ولدها..."
+                                            placeholder="أدخل كلمة المرور..."
                                         />
                                     </div>
                                     <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-12 rounded-xl border-2 font-bold gap-2 text-primary hover:bg-primary/5">
@@ -356,7 +352,7 @@ export default function DeveloperDashboard() {
                             <div className="p-8 bg-green-50 rounded-[2rem] border-2 border-green-200 text-center space-y-2">
                                 <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
                                 <h3 className="text-2xl font-black text-green-800">تم التفعيل بنجاح!</h3>
-                                <p className="text-sm font-bold text-green-700">تم تأسيس قاعدة البيانات وحساب المالك الموحد.</p>
+                                <p className="text-sm font-bold text-green-700">تم تأسيس قاعدة البيانات وحساب المالك.</p>
                             </div>
 
                             <div className="p-8 bg-slate-900 rounded-[2rem] text-white shadow-2xl space-y-4">
@@ -391,13 +387,13 @@ export default function DeveloperDashboard() {
             </DialogContent>
         </Dialog>
 
-        {/* --- تأكيد الحذف النهائي --- */}
+        {/* --- تأكيد الحذف --- */}
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
                     <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد حذف المنشأة؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">
-                        أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. سيتم مسح كافة البيانات والعملاء والقيود المرتبطة بها. لا يمكن التراجع عن هذا الإجراء.
+                        أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. سيتم مسح كافة البيانات المرتبطة بها نهائياً.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">
@@ -411,3 +407,4 @@ export default function DeveloperDashboard() {
     </div>
   );
 }
+

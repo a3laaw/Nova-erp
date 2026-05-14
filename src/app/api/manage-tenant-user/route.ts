@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * API إدارة المنشآت الموحد.
- * تم إصلاح تداخل المكتبات (FieldValue Error) وتحصين البيانات من الـ undefined.
+ * محرك إدارة المنشآت الموحد.
+ * تم تحصينه بـ "مُعالج المفاتيح الذكي" لحل مشكلة الـ PEM وتنسيق المفتاح الخاص.
  */
 
 function getAdminApp() {
@@ -21,11 +21,14 @@ function getAdminApp() {
         try {
             const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
             const parsed = JSON.parse(fileContent);
-            if (parsed.private_key) {
+            
+            if (parsed && parsed.private_key) {
+                // 🛡️ مُعالج المفاتيح الذكي: تصحيح الأسطر الجديدة لضمان قبول تنسيق PEM
+                parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
                 serviceAccount = parsed;
             }
         } catch (e) {
-            console.warn("Invalid service-account.json format");
+            console.error("Critical: Failed to parse service-account.json");
         }
     }
 
@@ -35,6 +38,7 @@ function getAdminApp() {
             projectId: currentProjectId
         });
     } else {
+        // Fallback to environment credentials if file is missing/invalid
         return initializeApp({
             projectId: currentProjectId,
         });
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. إنشاء حساب المالك في Auth
+        // 1. إنشاء حساب المالك في نظام الأمان
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -70,13 +74,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. حقن الهوية داخل الحساب (Custom Claims)
+        // 2. حقن هوية المنشأة داخل الحساب
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // 3. بناء سجل الشركة (تحصين الحقول واستخدام ServerTimestamp الصحيح)
+        // 3. تأسيس سجل المنشأة
         await db.collection('companies').doc(companyId).set({
             id: companyId,
             name: companyName || 'منشأة جديدة',
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
             subscriptionType: 'trial'
         });
 
-        // 4. إنشاء ملف المستخدم الداخلي للشركة
+        // 4. إنشاء ملف المستخدم الداخلي
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
@@ -101,7 +105,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. فهرس العبور الموحد (Global Index)
+        // 5. تحديث الفهرس العالمي
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             username: sanitizedEmail.split('@')[0],
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث حالة الطلب الأصلي
+        // 6. إغلاق الطلب بنجاح
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
@@ -123,18 +127,18 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ 
             success: true, 
-            message: "تم التأسيس بنجاح.",
+            message: "تم تأسيس المنشأة وتفعيل الحساب بنجاح.",
             companyId: companyId
         });
     }
 
-    return NextResponse.json({ success: false, error: "UNKNOWN_ACTION" });
+    return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND" });
 
   } catch (error: any) {
-    console.error("API Activation Error:", error);
+    console.error("Sovereign Activation Error:", error);
     return NextResponse.json({ 
         success: false, 
-        error: "SERVER_ERROR",
+        error: error.code || "ACTIVATION_FAILED",
         message: error.message 
     }, { status: 500 });
   }
