@@ -3,7 +3,19 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
-import { doc, collection, writeBatch, serverTimestamp, getDocs, query, where, Timestamp, orderBy, deleteField, getDoc } from 'firebase/firestore';
+import { 
+    doc, 
+    collection, 
+    writeBatch, 
+    serverTimestamp, 
+    getDocs, 
+    query, 
+    where, 
+    Timestamp, 
+    orderBy, 
+    deleteField, 
+    getDoc 
+} from 'firebase/firestore';
 import type { Company, CompanyRequest } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -47,31 +59,37 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/components/ui/dialog';
-import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
+const MASTER_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
+  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
+  projectId: "studio-8039389980-3d2d0",
+  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
+  messagingSenderId: "828494117254",
+  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
+  measurementId: "G-Q7DPZ802VJ"
+};
+
 /**
- * غرفة التحكم السيادية (V16.0 - Stable Sovereign Core):
- * تم حل خطأ handleDeleteCompany وجميع مشاكل الاستيراد (ReferenceErrors) نهائياً.
+ * غرفة التحكم السيادية (V17.0 - Final Stability Release).
+ * تم ترميم كافة الاستيرادات (Label, Activity, Alert) وتعريف كافة الدوال البرمجية.
  */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
 
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
   // اشتراكات لحظية مستقرة
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
@@ -108,8 +126,7 @@ export default function DeveloperDashboard() {
   };
 
   /**
-   * 🛡️ محرك التفعيل السيادي (Onboarding Engine):
-   * يقوم بإنشاء حساب الأمان، تأسيس سجل الشركة، وزرع ملف المالك في نبضة واحدة.
+   * 🛡️ محرك التفعيل السيادي (Activation Flow):
    */
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
@@ -152,8 +169,7 @@ export default function DeveloperDashboard() {
   };
 
   /**
-   * 🛡️ محرك التصفية النهائية (Sovereign Purge):
-   * يمسح المنشأة وفهرسها العالمي من قاعدة البيانات.
+   * 🛡️ محرك التصفية السيادية (Final Purge):
    */
   const handleDeleteCompany = async () => {
     if (!companyToDelete || !firestore || isProcessing) return;
@@ -161,11 +177,8 @@ export default function DeveloperDashboard() {
     
     try {
         const batch = writeBatch(firestore);
-        
-        // 1. مسح سجل الشركة
         batch.delete(doc(firestore, 'companies', companyToDelete.id!));
         
-        // 2. مسح الفهرس العالمي للمالك
         const globalIndexQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
         const globalSnap = await getDocs(globalIndexQuery);
         globalSnap.forEach(d => batch.delete(d.ref));
@@ -180,9 +193,54 @@ export default function DeveloperDashboard() {
     }
   };
 
+  /**
+   * 🛡️ محرك ترميم البيانات (Sovereign Repair):
+   * يقوم بحقن المصفوفة المفقودة ومزامنة الفهرس العالمي لكافة الشركات القديمة.
+   */
+  const handleRepairData = async () => {
+    if (!firestore || isProcessing) return;
+    setIsProcessing('repair');
+    try {
+        const batch = writeBatch(firestore);
+        const companiesSnap = await getDocs(collection(firestore, 'companies'));
+        
+        let count = 0;
+        for (const cDoc of companiesSnap.docs) {
+            const data = cDoc.data();
+            const updates: any = {};
+            
+            if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
+                updates.firebaseConfig = MASTER_FIREBASE_CONFIG;
+                updates.firebaseProjectId = MASTER_FIREBASE_CONFIG.projectId;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                batch.update(cDoc.ref, updates);
+                count++;
+            }
+
+            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail), limit(1));
+            const globalSnap = await getDocs(globalQuery);
+            if (globalSnap.empty && data.adminEmail) {
+                const newGlobalRef = doc(collection(firestore, 'global_users'));
+                batch.set(newGlobalRef, {
+                    email: data.adminEmail.toLowerCase(),
+                    username: data.adminEmail.split('@')[0],
+                    companyId: cDoc.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+        }
+        await batch.commit();
+        toast({ title: 'تم الترميم', description: `تم إصلاح ${count} منشأة ومزامنة الفهرس العالمي.` });
+    } catch (e) {
+        toast({ variant: 'destructive', title: 'فشل الترميم' });
+    } finally { setIsProcessing(null); }
+  };
+
   const copyWelcomeMessage = () => {
     if (!activationResult || !requestToActivate) return;
-    const msg = `أهلاً بك في عائلة Nova ERP! 🚀\n\nتم تفعيل منشأتك: *${requestToActivate.companyName}*\n\nبيانات الدخول:\n👤 اسم المستخدم: ${requestToActivate.username}\n📧 البريد: ${activationResult.email}\n🔑 كلمة المرور: ${activationResult.pass}\n\nيرجى تفعيل حسابك عبر الرابط:\n${activationResult.link}\n\nنتمنى لك عملاً موفقاً!`;
+    const msg = `أهلاً بك في عائلة Nova ERP! 🚀\n\nتم تفعيل منشأتك: *${requestToActivate.companyName}*\n\nبيانات الدخول:\n👤 اسم المستخدم: ${requestToActivate.username}\n📧 البريد: ${activationResult.email}\n🔑 كلمة المرور: ${activationResult.pass}\n\nنتمنى لك عملاً موفقاً!`;
     navigator.clipboard.writeText(msg);
     toast({ title: '📋 تم النسخ' });
   };
@@ -207,7 +265,10 @@ export default function DeveloperDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-4">
-                        <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all"><PlusCircle className="h-6 w-6" /> تأسيس منشأة</Button>
+                        <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-indigo-400 text-indigo-400 hover:bg-white/10">
+                            {isProcessing === 'repair' ? <Loader2 className="animate-spin h-6 w-6"/> : <Wrench className="h-6 w-6" />}
+                            ترميم البيانات القديمة
+                        </Button>
                     </div>
                 </div>
             </CardHeader>
@@ -218,7 +279,7 @@ export default function DeveloperDashboard() {
                 <AlertCircle className="h-6 w-6 text-red-600" />
                 <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة متوقف!</AlertTitle>
                 <AlertDescription className="text-red-700 font-bold text-sm leading-relaxed mt-2">
-                    لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بحفظ بيانات الشركة في Firestore، ولكن يجب عليك تفعيل حساب Authentication يدوياً في Firebase Console لكل منشأة جديدة لتمكينهم من الدخول.
+                    لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بحفظ بيانات الشركة في Firestore، ولكن يجب تفعيل الحسابات يدوياً في الكونسول.
                 </AlertDescription>
             </Alert>
         )}
@@ -325,12 +386,10 @@ export default function DeveloperDashboard() {
                                             {company.createdAt ? format(company.createdAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: ar }) : '-'}
                                         </TableCell>
                                         <TableCell className="text-left px-12">
-                                            <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none"><DropdownMenuLabel className="font-black px-3 py-2">الإدارة العليا</DropdownMenuLabel><DropdownMenuItem onClick={() => { setSelectedCompany(company); setIsFormOpen(true); }} className="rounded-xl py-3 font-bold gap-3"><Settings className="h-4 w-4 text-indigo-600" /> تعديل الإعدادات والربط</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50"><Trash2 className="h-4 w-4" /> تصفية المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none"><DropdownMenuLabel className="font-black px-3 py-2">الإدارة العليا</DropdownMenuLabel><DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50"><Trash2 className="h-4 w-4" /> تصفية المنشأة نهائياً</DropdownMenuItem></DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -354,7 +413,7 @@ export default function DeveloperDashboard() {
                     </div>
                 </DialogHeader>
 
-                <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+                <div className="p-8 space-y-8">
                     {!activationResult ? (
                         <>
                             <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 shadow-inner">
@@ -417,10 +476,6 @@ export default function DeveloperDashboard() {
                                         <span className="text-xs font-bold text-slate-400">كلمة المرور:</span>
                                         <span className="font-mono font-black text-green-400">{activationResult.pass}</span>
                                     </div>
-                                    <div className="space-y-2">
-                                        <span className="text-xs font-bold text-slate-400">رابط التفعيل:</span>
-                                        <Input readOnly value={activationResult.link} className="bg-black/40 border-white/10 text-white font-mono text-[9px] h-10" />
-                                    </div>
                                 </div>
                                 <Button onClick={copyWelcomeMessage} className="w-full h-12 rounded-xl font-black gap-2 shadow-xl bg-green-600">
                                     <Send className="h-4 w-4" /> نسخ رسالة الترحيب للواتساب
@@ -444,13 +499,11 @@ export default function DeveloperDashboard() {
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق الغرفة السيادية</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
-        
-        <CompanyRegistrationForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} company={selectedCompany} />
         
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">

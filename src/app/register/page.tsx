@@ -20,12 +20,15 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
- * بوابة طلب الانضمام (Sovereign Request Gateway v15.0)
- * تم ترميمها لتكون أكثر استقراراً في معالجة الأخطاء السحابية.
+ * بوابة طلب الانضمام (Sovereign Request Gateway v17.0).
+ * تم ترميمها لتتوافق مع فلسفة: طلب -> تدقيق -> تفعيل.
  */
 export default function RegisterPage() {
+  const { firestore } = useFirebase();
   const { toast } = useToast();
   
   const [isSaving, setIsSaving] = useState(false);
@@ -43,6 +46,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!firestore) return;
     
     if (!formData.username.trim() || !formData.email.trim() || !formData.companyName.trim()) {
         toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى تعبئة كافة الحقول المطلوبة.' });
@@ -51,32 +55,20 @@ export default function RegisterPage() {
 
     setIsSaving(true);
     try {
-        const response = await fetch('/api/manage-tenant-user', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                action: 'add_request',
-                ...formData
-            })
+        // 1. حفظ الطلب في Firestore (لا يحتاج لمفتاح أمان)
+        await addDoc(collection(firestore, 'company_requests'), {
+            ...formData,
+            status: 'pending',
+            createdAt: serverTimestamp()
         });
 
-        const result = await response.json();
-        
-        if (result.success) {
-            setIsSubmitted(true);
-            toast({ title: '✅ تم إرسال طلبك بنجاح' });
-        } else {
-            // معالجة خطأ غياب ملف الأمان بشكل سيادي
-            if (result.error === 'MISSING_CONFIG') {
-                throw new Error(result.message);
-            }
-            throw new Error(result.error || result.message);
-        }
+        setIsSubmitted(true);
+        toast({ title: '✅ تم إرسال طلبك بنجاح' });
     } catch (error: any) {
         toast({ 
             variant: 'destructive', 
-            title: 'تنبيه إداري', 
-            description: error.message || 'يرجى مراجعة مدير النظام لإتمام الإعدادات.' 
+            title: 'فشل الإرسال', 
+            description: error.message || 'حدث خطأ أثناء محاولة إرسال الطلب.' 
         });
     } finally {
         setIsSaving(false);
@@ -102,8 +94,8 @@ export default function RegisterPage() {
                         <Sparkles className="h-4 w-4" /> ماذا يحدث الآن؟
                     </p>
                     <p className="text-[11px] text-muted-foreground font-medium italic leading-loose">
-                        1. يقوم المدير باعتماد طلبك. <br/>
-                        2. ستصلك دعوة رسمية لتعيين كلمة المرور. <br/>
+                        1. يقوم المدير باعتماد طلبك وتأسيس المنشأة. <br/>
+                        2. ستصلك بيانات الدخول الرسمية. <br/>
                         3. يمكنك الدخول وبدء العمل فوراً.
                     </p>
                 </div>
