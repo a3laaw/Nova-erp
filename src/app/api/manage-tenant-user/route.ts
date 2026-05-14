@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API إدارة المنشآت وحسابات المستخدمين (V21.0 - Identity Sync)
- * تم حذف كافة القيم الصلبة لضمان التزامن مع المشروع الحالي.
+ * @fileOverview API إدارة المنشآت وحسابات المستخدمين.
+ * تم تحصينه ليعتمد كلياً على المتغيرات الحقيقية للمشروع الحالي.
  */
 
-// تهيئة Firebase Admin باستخدام ملف الأمان أو متغيرات البيئة
 let adminApp: any;
 
 function getAdminApp() {
   if (getApps().length === 0) {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     
-    // التحقق من وجود مفتاح حقيقي داخل ملف الأمان
     let serviceAccount = null;
     if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
         try {
             const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
             const parsed = JSON.parse(fileContent);
-            if (parsed.private_key && parsed.private_key !== "ضع_هنا_محتوى_الملف_الحقيقي") {
+            if (parsed.private_key && !parsed.private_key.includes("ضع_هنا")) {
                 serviceAccount = parsed;
             }
         } catch (e) {
@@ -36,7 +34,7 @@ function getAdminApp() {
             credential: cert(serviceAccount),
         });
     } else {
-        // خيار احتياطي باستخدام متغيرات البيئة (للكلاود)
+        // خيار احتياطي باستخدام المتغيرات الموجودة في .env.local
         const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
         if (privateKey) {
             adminApp = initializeApp({
@@ -47,9 +45,9 @@ function getAdminApp() {
                 }),
             });
         } else {
-            // تهيئة افتراضية للمشروع المحلي (تسمح لبعض العمليات بالعمل)
+            // تهيئة افتراضية للمشروع الحالي لضمان عدم الانهيار عند غياب المفاتيح
             adminApp = initializeApp({
-                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "nova-erp-project",
+                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "studio-8039389980-3d2d0",
             });
         }
     }
@@ -73,18 +71,18 @@ export async function POST(request: NextRequest) {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. فحص وجود ملف الأمان قبل محاولة الاتصال بـ Auth (منع الخطأ 500)
+        // 1. التحقق من صلاحية الاتصال بـ Auth (نظام Google)
         try {
             await auth.listUsers(1); 
         } catch (e: any) {
             return NextResponse.json({ 
                 success: false, 
                 error: "INVALID_CONFIG",
-                message: "ملف الأمان service-account.json غير صالح أو غير موجود. يرجى رفعه لتتمكن من إنشاء حسابات الملاك آلياً."
+                message: "ملف الأمان service-account.json غير موجود أو غير صالح. يرجى لصق بيانات المفتاح الخاص فيه أولاً."
             });
         }
 
-        // 2. إنشاء حساب المالك
+        // 2. إنشاء حساب المالك في Auth
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -98,33 +96,23 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
+        // 3. حقن الهوية داخل الحساب
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // 3. بناء إعدادات Firebase للمنشأة الجديدة (ديناميكياً من البيئة الحالية)
-        const currentConfig = {
-            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-        };
-
-        // 4. إنشاء سجل الشركة
+        // 4. بناء سجل الشركة في قاعدة البيانات
         await db.collection('companies').doc(companyId).set({
             id: companyId,
             name: companyName,
             activity,
             adminEmail: sanitizedEmail,
             isActive: true,
-            firebaseConfig: currentConfig,
             createdAt: FieldValue.serverTimestamp(),
         });
 
-        // 5. إنشاء ملف المستخدم الداخلي
+        // 5. إنشاء ملف المستخدم الداخلي المعزول
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
@@ -135,7 +123,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث طلب الانضمام (مع معالجة الخطأ NOT_FOUND)
+        // 6. تحديث حالة الطلب
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             const requestSnap = await requestRef.get();
@@ -146,8 +134,6 @@ export async function POST(request: NextRequest) {
                     activatedAt: FieldValue.serverTimestamp(),
                     companyId: companyId
                 });
-            } else {
-                console.warn(`Request document ${requestId} not found on server, but company was created.`);
             }
         }
 
