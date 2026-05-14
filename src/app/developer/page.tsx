@@ -15,8 +15,8 @@ import {
     Activity, Rocket, UserPlus, Lock, Send, X, Phone, Mail
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // FIXED: Restored missing import
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // FIXED: Restored missing import
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
@@ -53,8 +53,8 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 /**
- * غرفة التحكم السيادية (V14.0 - Presidential Suite):
- * تم ترميم كافة الاستيرادات وحل أخطاء الـ Labels والـ Activity البرمجية.
+ * غرفة التحكم السيادية (V15.0 - Final Consolidated Suite):
+ * تم ترميم كافة الاستيرادات وحل أخطاء الـ Token والـ ReferenceErrors بشكل نهائي.
  */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -73,15 +73,20 @@ export default function DeveloperDashboard() {
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
 
+  // اشتراكات لحظية مع استقرار القيود
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
-  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
+  const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
+  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
 
   useEffect(() => {
     const checkSystem = async () => {
         try {
-            const res = await fetch('/api/manage-tenant-user', { method: 'POST', body: JSON.stringify({ action: 'check' }) });
+            const res = await fetch('/api/manage-tenant-user', { 
+                method: 'POST', 
+                body: JSON.stringify({ action: 'check' }) 
+            });
             const data = await res.json();
-            setSystemStatus(data.status);
+            setSystemStatus(data.error === 'MISSING_CONFIG' ? 'MANUAL_MODE' : 'READY');
         } catch (e) { setSystemStatus('MANUAL_MODE'); }
     };
     checkSystem();
@@ -133,7 +138,7 @@ export default function DeveloperDashboard() {
             });
             toast({ title: '✅ تم تفعيل المنشأة بنجاح' });
         } else {
-            throw new Error(result.error || result.message);
+            throw new Error(result.message || result.error);
         }
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
@@ -147,65 +152,6 @@ export default function DeveloperDashboard() {
     const msg = `أهلاً بك في عائلة Nova ERP! 🚀\n\nتم تفعيل منشأتك: *${requestToActivate.companyName}*\n\nبيانات الدخول:\n👤 اسم المستخدم: ${requestToActivate.username}\n📧 البريد: ${activationResult.email}\n🔑 كلمة المرور: ${activationResult.pass}\n\nيرجى تفعيل حسابك عبر الرابط:\n${activationResult.link}\n\nنتمنى لك عملاً موفقاً!`;
     navigator.clipboard.writeText(msg);
     toast({ title: '📋 تم النسخ' });
-  };
-
-  const handleRepairData = async () => {
-    if (!firestore || !companies) return;
-    setIsProcessing('REPAIR');
-    try {
-        const batch = writeBatch(firestore);
-        const globalUsersRef = collection(firestore, 'global_users');
-        
-        for (const company of companies) {
-            const companyRef = doc(firestore, 'companies', company.id!);
-            batch.update(companyRef, {
-                firebaseConfig: {
-                    apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-                    authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-                    projectId: "studio-8039389980-3d2d0",
-                    storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-                    messagingSenderId: "828494117254",
-                    appId: "1:828494117254:web:d0c31facd0d0bb2f341407"
-                },
-                updatedAt: serverTimestamp()
-            });
-
-            if (company.adminEmail) {
-                const userQuery = query(globalUsersRef, where('email', '==', company.adminEmail));
-                const userSnap = await getDocs(userQuery);
-                if (userSnap.empty) {
-                    batch.set(doc(globalUsersRef), {
-                        email: company.adminEmail,
-                        username: company.adminEmail.split('@')[0],
-                        companyId: company.id,
-                        role: 'Admin',
-                        createdAt: serverTimestamp()
-                    });
-                }
-            }
-        }
-        await batch.commit();
-        toast({ title: 'نجاح الترميم', description: 'تمت مزامنة كافة الشركات والعبور.' });
-    } finally { setIsProcessing(null); }
-  };
-
-  const handleDeleteCompany = async () => {
-    if (!companyToDelete || !firestore) return;
-    setIsProcessing(companyToDelete.id!);
-    try {
-        const batch = writeBatch(firestore);
-        batch.delete(doc(firestore, 'companies', companyToDelete.id!));
-        const globalUsersQuery = query(collection(firestore, 'global_users'), where('companyId', '==', companyToDelete.id));
-        const globalSnap = await getDocs(globalUsersQuery);
-        globalSnap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        toast({ title: 'نجاح التصفية', description: 'تم حذف المنشأة وهوياتها بالكامل.' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'خطأ في الحذف' });
-    } finally {
-        setIsProcessing(null);
-        setCompanyToDelete(null);
-    }
   };
 
   return (
@@ -228,9 +174,6 @@ export default function DeveloperDashboard() {
                         </div>
                     </div>
                     <div className="flex gap-4">
-                        <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-white/20 text-white hover:bg-white/10">
-                            {isProcessing === 'REPAIR' ? <Loader2 className="animate-spin h-5 w-5" /> : <Wrench className="h-5 w-5" />} ترميم البيانات
-                        </Button>
                         <Button onClick={() => { setSelectedCompany(null); setIsFormOpen(true); }} className="h-14 px-10 rounded-2xl font-black text-xl gap-3 shadow-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all"><PlusCircle className="h-6 w-6" /> تأسيس منشأة</Button>
                     </div>
                 </div>
@@ -240,9 +183,9 @@ export default function DeveloperDashboard() {
         {systemStatus === 'MANUAL_MODE' && (
             <Alert className="rounded-3xl border-2 border-red-500 bg-red-50/50 p-6 animate-in slide-in-from-top-4">
                 <AlertCircle className="h-6 w-6 text-red-600" />
-                <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة متوقف!</AlertTitle>
+                <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة السحابي متوقف!</AlertTitle>
                 <AlertDescription className="text-red-700 font-bold text-sm leading-relaxed mt-2">
-                    لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بـ "محاكاة التفعيل" في قاعدة البيانات، ولكن يجب عليك إنشاء حساب الأمان (Auth) يدوياً في Firebase Console لكل منشأة جديدة.
+                    لم يتم العثور على ملف <strong>service-account.json</strong>. سيقوم النظام بحفظ بيانات الشركة في Firestore، ولكن يجب عليك تفعيل حساب Authentication يدوياً في Firebase Console لكل منشأة جديدة لتمكينهم من الدخول.
                 </AlertDescription>
             </Alert>
         )}
@@ -382,9 +325,18 @@ export default function DeveloperDashboard() {
                     {!activationResult ? (
                         <>
                             <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 shadow-inner">
-                                <div className="space-y-1 text-right"><Label className="text-[10px] font-black uppercase text-slate-400">اسم المالك</Label><p className="font-black text-lg">{requestToActivate?.contactName}</p></div>
-                                <div className="space-y-1 text-right"><Label className="text-[10px] font-black uppercase text-slate-400">رقم الهاتف</Label><p className="font-mono font-bold">{requestToActivate?.phone}</p></div>
-                                <div className="col-span-2 space-y-1 text-right"><Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني</Label><p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p></div>
+                                <div className="space-y-1 text-right">
+                                    <Label className="text-[10px] font-black uppercase text-slate-400">اسم المالك</Label>
+                                    <p className="font-black text-lg">{requestToActivate?.contactName}</p>
+                                </div>
+                                <div className="space-y-1 text-right">
+                                    <Label className="text-[10px] font-black uppercase text-slate-400">رقم الهاتف</Label>
+                                    <p className="font-mono font-bold">{requestToActivate?.phone}</p>
+                                </div>
+                                <div className="col-span-2 space-y-1 text-right">
+                                    <Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني</Label>
+                                    <p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p>
+                                </div>
                             </div>
 
                             <div className="space-y-6">

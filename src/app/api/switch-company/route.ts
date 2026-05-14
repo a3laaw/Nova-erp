@@ -5,8 +5,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API سيادي لتبديل الشركة للمطور.
- * تم تحديثه لضمان إرجاع JSON دائماً ومنع انهيار الواجهة في وضع المحاكاة.
+ * @fileOverview API سيادي لتبديل الشركة للمطور (V15.0).
+ * تم تحصينه لمنع خطأ الـ Token في حال غياب ملف الأمان.
  */
 
 export async function POST(request: NextRequest) {
@@ -14,20 +14,7 @@ export async function POST(request: NextRequest) {
     const { uid, companyId, companyName } = await request.json();
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
-    let useSimulation = false;
-
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        useSimulation = true;
-    } else {
-        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-        const sa = JSON.parse(fileContent || '{}');
-        if (!sa || Object.keys(sa).length === 0 || !sa.project_id) {
-            useSimulation = true;
-        }
-    }
-
-    // 🛡️ بروتوكول التجاوز السيادي: إرجاع JSON ناجح لتمكين تجربة المستخدم
-    if (useSimulation) {
         return NextResponse.json({ 
             success: true, 
             simulated: true,
@@ -54,10 +41,9 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    // 🛡️ حماية نهائية: إرجاع JSON حتى في حالة الخطأ
     return NextResponse.json({ 
         success: false, 
         error: error.message || "Internal Sovereign Error" 
-    }, { status: 200 }); // إرجاع 200 لضمان معالجة الرسالة في الواجهة
+    }, { status: 200 }); 
   }
 }

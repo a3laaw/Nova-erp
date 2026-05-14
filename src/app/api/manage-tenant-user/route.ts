@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد (V14.0 - Critical Stability Fix).
- * تم تحصين المحرك ليعيد أخطاء واضحة في حال غياب المفاتيح بدلاً من انهيار السيرفر.
+ * @fileOverview API الأمان السيادي الموحد (V15.0 - Final Stability Fix).
+ * تم تحصين المحرك لمنع خطأ 500 (Access Token) عبر فحص استباقي للمفاتيح.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -31,13 +31,13 @@ export async function POST(request: NextRequest) {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     const hasServiceAccount = fs.existsSync(SERVICE_ACCOUNT_PATH);
 
-    // 🛡️ صمام الأمان: منع محاولة استخدام Admin SDK بدون مفتاح لضمان عدم حدوث Error 500
+    // 🛡️ صمام الأمان السيادي: منع محاولة الاتصال بـ Google في حال غياب المفتاح
     if (!hasServiceAccount) {
         return NextResponse.json({ 
             success: false, 
             error: "MISSING_CONFIG",
-            message: "⚠️ تنبيه سيادي: ملف الأمان (service-account.json) غير متوفر في جذر المشروع. يرجى من مدير النظام رفع الملف لتفعيل الأتمتة الكاملة."
-        }, { status: 200 }); // نعيد 200 لكي نعالج الرسالة في الواجهة بسلام
+            message: "⚠️ تنبيه سيادي: ملف الأمان (service-account.json) مفقود من السيرفر. محرك الأتمتة متوقف حالياً؛ يرجى رفع الملف لتفعيل التأسيس اللحظي."
+        }, { status: 200 }); // نعيد 200 لضمان معالجة الرسالة في الواجهة بسلام
     }
 
     // تهيئة التطبيق إذا لم يكن مهيئاً
@@ -157,6 +157,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error("Sovereign Multi-tenant Setup Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+        success: false, 
+        error: error.message || "Internal Sovereign Error",
+        message: "حدث خطأ غير متوقع أثناء معالجة الطلب."
+    }, { status: 500 });
   }
 }

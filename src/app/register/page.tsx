@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * بوابة طلب الانضمام (Sovereign Request Gateway v14.0)
+ * بوابة طلب الانضمام (Sovereign Request Gateway v15.0)
  * تم ترميمها لتكون أكثر استقراراً في معالجة الأخطاء السحابية.
  */
 export default function RegisterPage() {
@@ -70,7 +70,7 @@ export default function RegisterPage() {
             if (result.error === 'MISSING_CONFIG') {
                 throw new Error(result.message);
             }
-            throw new Error(result.error);
+            throw new Error(result.error || result.message);
         }
     } catch (error: any) {
         toast({ 
