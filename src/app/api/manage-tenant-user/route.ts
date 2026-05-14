@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الإدارة والتحكم في المنشآت (V19.0 - Stability Core).
- * تم تحصينه لمنع انهيار السيرفر بسبب ملفات الأمان الفارغة أو غير الصالحة.
+ * @fileOverview API إدارة المنشآت وحسابات المستخدمين (V20.0).
+ * تم تحصين هذا المسار ليفحص صحة ملف الأمان قبل محاولة استخدامه منعاً لانهيار السيرفر.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -29,54 +29,43 @@ export async function POST(request: NextRequest) {
     } = body;
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
-    const hasServiceAccount = fs.existsSync(SERVICE_ACCOUNT_PATH);
-
-    // 🛡️ فحص صحة وصلاحية ملف الأمان قبل محاولة الاتصال بـ Google
-    if (action === 'instant_setup') {
-        if (!hasServiceAccount) {
-            return NextResponse.json({ 
-                success: false, 
-                error: "MISSING_CONFIG",
-                message: "⚠️ تنبيه إداري: ملف الأمان (service-account.json) مفقود من جذر المشروع."
-            }, { status: 200 });
-        }
-        
-        try {
-            const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-            const sa = JSON.parse(saContent);
-            
-            // التحقق من أن الملف ليس فارغاً ويحتوي على المفاتيح الأساسية
-            if (!sa.project_id || !sa.private_key) {
-                return NextResponse.json({ 
-                    success: false, 
-                    error: "INVALID_CONFIG",
-                    message: "⚠️ تنبيه: ملف الأمان موجود ولكنه غير صالح أو فارغ. يرجى تحميل ملف JSON الصحيح من Firebase Console."
-                }, { status: 200 });
-            }
-            
-            // تهيئة التطبيق إذا لم يكن مهيئاً
-            if (getApps().length === 0) {
-                initializeApp({ credential: cert(sa) });
-            }
-        } catch (e) {
-            return NextResponse.json({ 
-                success: false, 
-                error: "CONFIG_READ_ERROR",
-                message: "⚠️ خطأ في قراءة ملف الأمان. تأكد من رفعه بشكل صحيح كملف JSON."
-            }, { status: 200 });
-        }
+    
+    // 🛡️ صمام الأمان: فحص مجهري لمحتوى ملف الأمان قبل تهيئة Firebase
+    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+        return NextResponse.json({ 
+            success: false, 
+            error: "FILE_NOT_FOUND",
+            message: "ملف الأمان (service-account.json) غير موجود في مجلد المشروع."
+        });
     }
 
-    // --- 1. التفعيل والاحتضان السحابي ---
+    const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
+    const sa = JSON.parse(saContent);
+
+    if (!sa.private_key || !sa.project_id) {
+        return NextResponse.json({ 
+            success: false, 
+            error: "INVALID_CONFIG",
+            message: "ملف service-account.json موجود ولكنه فارغ أو غير صالح. يرجى وضع المفتاح الخاص (Private Key) داخل الملف."
+        });
+    }
+
+    // تهيئة تطبيق Firebase Admin لمرة واحدة فقط
+    if (getApps().length === 0) {
+        initializeApp({ credential: cert(sa) });
+    }
+
+    const db = getFirestore();
+    const auth = getAuth();
+
+    // --- 1. تفعيل منشأة جديدة (Onboarding) ---
     if (action === 'instant_setup') {
-        const db = getFirestore();
-        const auth = getAuth();
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         const trialEndDate = new Date();
         trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-        // أ. إنشاء حساب المالك في Authentication
+        // أ. إنشاء الحساب في نظام Authentication
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -91,13 +80,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // ب. تعيين صلاحيات المدير
+        // ب. تعيين الأدوار (Claims)
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // ج. إنشاء وثيقة المنشأة وحقن الإعدادات
+        // ج. تأسيس وثيقة الشركة
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
             id: companyId,
@@ -114,7 +103,7 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // د. إنشاء ملف المالك داخل مستخدمي المنشأة
+        // د. إنشاء ملف المستخدم الإداري داخل المنشأة
         const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
         await tenantUserRef.set({
             uid: userRecord.uid,
@@ -126,7 +115,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // هـ. تسجيل الهوية في الفهرس الموحد للعبور بالاسم
+        // هـ. تحديث الفهرس العالمي للدخول
         const globalIndexRef = db.collection('global_users').doc();
         await globalIndexRef.set({
             email: sanitizedEmail,
@@ -136,7 +125,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // و. تحديث طلب الانضمام
+        // و. تحديث حالة الطلب
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
@@ -149,17 +138,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ 
             success: true, 
             uid: userRecord.uid,
-            message: "تم تأسيس وتفعيل المنشأة بنجاح."
+            message: "تم تأسيس المنشأة وتفعيل حساب المالك بنجاح."
         });
     }
 
-    return NextResponse.json({ success: false, error: "ACTION_NOT_RECOGNIZED" });
+    return NextResponse.json({ success: false, error: "UNKNOWN_ACTION" });
 
   } catch (error: any) {
-    console.error("Master API Error:", error);
+    console.error("API Critical Error:", error);
     return NextResponse.json({ 
         success: false, 
-        error: error.message || "Internal Server Error" 
+        error: "SERVER_ERROR",
+        message: error.message 
     }, { status: 500 });
   }
 }

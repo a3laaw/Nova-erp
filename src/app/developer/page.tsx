@@ -23,9 +23,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
-    MoreHorizontal, Settings, Trash2, ShieldAlert, CheckCircle2,
-    Wrench, AlertCircle, ShieldCheck, ShieldX, Copy, Key,
-    Activity, Rocket, UserPlus, Lock, Send, X, Phone, Mail
+    MoreHorizontal, Settings, Trash2, CheckCircle2,
+    AlertCircle, ShieldCheck, Key, Activity, Rocket, 
+    UserPlus, Lock, Send, X, Phone, Mail, FileKey, ExternalLink
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,24 +64,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-const MASTER_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-  projectId: "studio-8039389980-3d2d0",
-  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-  messagingSenderId: "828494117254",
-  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
-  measurementId: "G-Q7DPZ802VJ"
-};
-
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
-  const { user: currentUser } = useAuth();
   const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
-  const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
@@ -91,20 +80,6 @@ export default function DeveloperDashboard() {
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
   const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
   const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
-
-  useEffect(() => {
-    const checkSystem = async () => {
-        try {
-            const res = await fetch('/api/manage-tenant-user', { 
-                method: 'POST', 
-                body: JSON.stringify({ action: 'check' }) 
-            });
-            const data = await res.json();
-            setSystemStatus(data.error === 'MISSING_CONFIG' ? 'MANUAL_MODE' : 'READY');
-        } catch (e) { setSystemStatus('MANUAL_MODE'); }
-    };
-    checkSystem();
-  }, []);
 
   const filteredCompanies = useMemo(() => {
     if (!companies) return [];
@@ -124,6 +99,7 @@ export default function DeveloperDashboard() {
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
     setIsProcessing(requestToActivate.id!);
+    setConfigError(null);
     
     try {
         const response = await fetch('/api/manage-tenant-user', {
@@ -149,8 +125,11 @@ export default function DeveloperDashboard() {
                 email: requestToActivate.email,
                 pass: activationPassword
             });
-            toast({ title: '✅ تم تفعيل المنشأة بنجاح' });
+            toast({ title: 'تم تفعيل المنشأة بنجاح' });
         } else {
+            if (result.error === 'INVALID_CONFIG' || result.error === 'FILE_NOT_FOUND') {
+                setConfigError(result.message);
+            }
             throw new Error(result.message || result.error);
         }
     } catch (e: any) {
@@ -179,96 +158,33 @@ export default function DeveloperDashboard() {
     }
   };
 
-  const handleRepairData = async () => {
-    if (!firestore || isProcessing) return;
-    setIsProcessing('repair');
-    try {
-        const batch = writeBatch(firestore);
-        const companiesSnap = await getDocs(collection(firestore, 'companies'));
-        let count = 0;
-        for (const cDoc of companiesSnap.docs) {
-            const data = cDoc.data();
-            const updates: any = {};
-            if (!data.firebaseConfig || !data.firebaseConfig.apiKey) {
-                updates.firebaseConfig = MASTER_FIREBASE_CONFIG;
-                updates.firebaseProjectId = MASTER_FIREBASE_CONFIG.projectId;
-            }
-            if (Object.keys(updates).length > 0) {
-                batch.update(cDoc.ref, updates);
-                count++;
-            }
-            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', data.adminEmail), limit(1));
-            const globalSnap = await getDocs(globalQuery);
-            if (globalSnap.empty && data.adminEmail) {
-                const newGlobalRef = doc(collection(firestore, 'global_users'));
-                batch.set(newGlobalRef, {
-                    email: data.adminEmail.toLowerCase(),
-                    username: data.adminEmail.split('@')[0],
-                    companyId: cDoc.id,
-                    createdAt: serverTimestamp()
-                });
-            }
-        }
-        await batch.commit();
-        toast({ title: 'تم الترميم', description: `تم إصلاح ${count} منشأة ومزامنة الفهرس العالمي.` });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'فشل الترميم' });
-    } finally { setIsProcessing(null); }
-  };
-
   const copyWelcomeMessage = () => {
     if (!activationResult || !requestToActivate) return;
     const msg = `أهلاً بك في عائلة Nova ERP! 🚀\n\nتم تفعيل منشأتك: *${requestToActivate.companyName}*\n\nبيانات الدخول:\n👤 اسم المستخدم: ${requestToActivate.username}\n📧 البريد: ${activationResult.email}\n🔑 كلمة المرور: ${activationResult.pass}\n\nنتمنى لك عملاً موفقاً!`;
     navigator.clipboard.writeText(msg);
-    toast({ title: '📋 تم النسخ' });
+    toast({ title: 'تم النسخ' });
   };
 
   return (
     <div className="space-y-10" dir="rtl">
-        <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-[#1e1b4b]">
-            <CardHeader className="p-10 pb-8 bg-indigo-950/60 border-b border-white/10">
-                <div className="flex flex-col lg:flex-row justify-between items-center gap-8">
-                    <div className="flex items-center gap-6">
-                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-[0_0_40px_rgba(79,70,229,0.4)] border-2 border-white/20"><Terminal className="h-10 w-10 text-white" /></div>
-                        <div className="text-right">
-                            <CardTitle className="text-4xl font-black text-white tracking-tighter flex items-center gap-3">
-                                غرفة التحكم الرئيسية
-                                {systemStatus === 'READY' ? (
-                                    <Badge className="bg-green-600 rounded-full font-black text-[9px] gap-1 px-3"><ShieldCheck className="h-3 w-3"/> الأتمتة نشطة</Badge>
-                                ) : (
-                                    <Badge variant="destructive" className="animate-pulse rounded-full font-black text-[9px] gap-1 px-3"><ShieldX className="h-3 w-3"/> تفعيل يدوي</Badge>
-                                )}
-                            </CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنظمات والاحتضان السحابي الموحد.</CardDescription>
-                        </div>
+        <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-slate-900">
+            <CardHeader className="p-10 pb-8 bg-slate-950/60 border-b border-white/10">
+                <div className="flex items-center gap-6">
+                    <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-xl border-2 border-white/20">
+                        <Terminal className="h-10 w-10 text-white" />
                     </div>
-                    <Button onClick={handleRepairData} disabled={!!isProcessing} variant="outline" className="h-14 px-8 rounded-2xl font-black text-lg gap-3 border-indigo-400 text-indigo-400 hover:bg-white/10">
-                        {isProcessing === 'repair' ? <Loader2 className="animate-spin h-6 w-6"/> : <Wrench className="h-6 w-6" />}
-                        ترميم البيانات القديمة
-                    </Button>
+                    <div className="text-right">
+                        <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الرئيسية</CardTitle>
+                        <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت والاحتضان السحابي.</CardDescription>
+                    </div>
                 </div>
             </CardHeader>
         </Card>
 
-        {systemStatus === 'MANUAL_MODE' && (
-            <Alert className="rounded-3xl border-2 border-red-500 bg-red-50/50 p-6 animate-in slide-in-from-top-4">
-                <AlertCircle className="h-6 w-6 text-red-600" />
-                <AlertTitle className="text-red-800 font-black text-lg">تنبيه: محرك الأتمتة متوقف!</AlertTitle>
-                <AlertDescription className="text-red-700 font-bold text-sm leading-relaxed mt-2">
-                    لم يتم العثور على ملف <strong>service-account.json</strong> صالح. التفعيل سيكتفي بإنشاء سجلات Firestore؛ يجب تفعيل الإيميلات يدوياً في الكونسول.
-                </AlertDescription>
-            </Alert>
-        )}
-
         <Tabs defaultValue="requests" className="w-full">
             <TabsList className="bg-white/10 p-1 rounded-2xl border border-white/10 mb-6 h-14">
                 <TabsTrigger value="requests" className="rounded-xl px-10 font-black gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
-                    <Rocket className="h-4 w-4" /> طلبات الديمو المعلقة
-                    {requests.filter(r => r.status === 'pending').length > 0 && (
-                        <Badge className="bg-red-500 text-white h-5 w-5 p-0 flex items-center justify-center rounded-full mr-2">
-                            {requests.filter(r => r.status === 'pending').length}
-                        </Badge>
-                    )}
+                    <Rocket className="h-4 w-4" /> طلبات الانضمام المعلقة
                 </TabsTrigger>
                 <TabsTrigger value="companies" className="rounded-xl px-10 font-black gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
                     <Building2 className="h-4 w-4" /> المنشآت النشطة
@@ -280,10 +196,10 @@ export default function DeveloperDashboard() {
                     <Table>
                         <TableHeader className="bg-slate-100">
                             <TableRow>
-                                <TableHead className="px-10 font-black text-right">المنشأة وصاحب الطلب</TableHead>
+                                <TableHead className="px-10 font-black text-right">المنشأة</TableHead>
                                 <TableHead className="font-black text-center">التواصل</TableHead>
                                 <TableHead className="font-black text-center">التاريخ</TableHead>
-                                <TableHead className="text-left px-12 font-black">القرار الإداري</TableHead>
+                                <TableHead className="text-left px-12 font-black">الإجراء</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -293,7 +209,7 @@ export default function DeveloperDashboard() {
                                 <TableRow key={req.id} className="h-24 group transition-all border-b">
                                     <TableCell className="px-10">
                                         <div className="flex flex-col">
-                                            <span className="font-black text-xl text-[#1e1b4b]">{req.companyName}</span>
+                                            <span className="font-black text-xl text-slate-900">{req.companyName}</span>
                                             <span className="text-xs font-bold text-primary">{req.contactName}</span>
                                         </div>
                                     </TableCell>
@@ -309,8 +225,8 @@ export default function DeveloperDashboard() {
                                     <TableCell className="text-left px-12">
                                         {req.status === 'pending' ? (
                                             <Button 
-                                                onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); }}
-                                                className="h-11 px-8 rounded-xl font-black bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 gap-2 active:scale-95 transition-all"
+                                                onClick={() => { setRequestToActivate(req); setActivationResult(null); setActivationPassword(''); setConfigError(null); }}
+                                                className="h-11 px-8 rounded-xl font-black bg-green-600 hover:bg-green-700 shadow-lg shadow-green-100 gap-2"
                                             >
                                                 <UserPlus className="h-4 w-4" /> تفعيل الحساب
                                             </Button>
@@ -329,7 +245,7 @@ export default function DeveloperDashboard() {
                 <Card className="rounded-[3.5rem] border-none shadow-xl overflow-hidden bg-white/95">
                     <CardHeader className="bg-slate-50 border-b p-8 px-12 flex flex-row justify-between items-center">
                         <div className="relative w-full max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-indigo-950 opacity-40" />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-950 opacity-40" />
                             <Input placeholder="بحث باسم المنشأة..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-12 rounded-2xl bg-white border-2 border-indigo-100 font-bold" />
                         </div>
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -339,7 +255,7 @@ export default function DeveloperDashboard() {
                     </CardHeader>
                     <CardContent className="p-0">
                         <Table>
-                            <TableHeader className="bg-[#1e1b4b]"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة / البريد الرئيسي</TableHead><TableHead className="font-black text-indigo-100 text-center">حالة الحساب</TableHead><TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">تحكم</TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-slate-900"><TableRow className="border-none"><TableHead className="px-12 font-black text-white text-right">المنظمة / البريد الرئيسي</TableHead><TableHead className="font-black text-indigo-100 text-center">حالة الحساب</TableHead><TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead><TableHead className="text-left px-12 font-black text-indigo-100">تحكم</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto" /></TableCell></TableRow> :
                                 filteredCompanies.map(company => (
@@ -348,7 +264,7 @@ export default function DeveloperDashboard() {
                                             <div className="flex items-center gap-4">
                                                 <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-sm"><Building2 className="h-6 w-6" /></div>
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-xl text-[#1e1b4b]">{company.name}</span>
+                                                    <span className="font-black text-xl text-slate-900">{company.name}</span>
                                                     <span className="font-mono text-xs text-primary font-black">{company.adminEmail}</span>
                                                 </div>
                                             </div>
@@ -379,35 +295,53 @@ export default function DeveloperDashboard() {
         {/* --- نافذة التفعيل --- */}
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                <DialogHeader className="p-8 bg-slate-900 text-white relative text-right">
-                    <div className="flex items-center gap-4 relative z-10">
+                <DialogHeader className="p-8 bg-slate-900 text-white text-right">
+                    <div className="flex items-center gap-4">
                         <div className="p-3 bg-green-600 rounded-2xl text-white shadow-xl"><ShieldCheck className="h-8 w-8" /></div>
                         <div className="text-right">
-                            <DialogTitle className="text-2xl font-black text-white">تفعيل الحساب والاحتضان</DialogTitle>
-                            <DialogDescription className="text-indigo-200 font-bold">تجهيز بيانات الدخول لمنشأة: {requestToActivate?.companyName}</DialogDescription>
+                            <DialogTitle className="text-2xl font-black text-white">تفعيل منشأة جديدة</DialogTitle>
+                            <DialogDescription className="text-indigo-200 font-bold">للمنشأة: {requestToActivate?.companyName}</DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
                 <div className="p-8 space-y-8">
+                    {configError && (
+                        <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 p-6 animate-in slide-in-from-top-4">
+                            <AlertCircle className="h-6 w-6 text-red-600" />
+                            <AlertTitle className="font-black text-red-800 text-lg">خلل في ملف الأمان!</AlertTitle>
+                            <AlertDescription className="mt-2 space-y-4">
+                                <p className="text-red-700 font-bold">{configError}</p>
+                                <div className="p-4 bg-white rounded-2xl border border-red-100 space-y-3">
+                                    <p className="text-xs font-black text-slate-900">لحل هذه المشكلة يدوياً:</p>
+                                    <ol className="text-xs list-decimal pr-5 space-y-2 text-slate-600">
+                                        <li>اذهب لـ <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 underline">Firebase Console</a>.</li>
+                                        <li>Project Settings -> Service Accounts -> Generate New Private Key.</li>
+                                        <li>انسخ محتوى الملف المحمّل وضعه داخل ملف <strong>service-account.json</strong> في المجلد الرئيسي للمشروع.</li>
+                                    </ol>
+                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     {!activationResult ? (
                         <>
                             <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 shadow-inner">
-                                <div className="space-y-1 text-right">
+                                <div className="space-y-1">
                                     <Label className="text-[10px] font-black uppercase text-slate-400">اسم المالك</Label>
                                     <p className="font-black text-lg">{requestToActivate?.contactName}</p>
                                 </div>
-                                <div className="space-y-1 text-right">
+                                <div className="space-y-1">
                                     <Label className="text-[10px] font-black uppercase text-slate-400">رقم الهاتف</Label>
                                     <p className="font-mono font-bold">{requestToActivate?.phone}</p>
                                 </div>
-                                <div className="col-span-2 space-y-1 text-right">
+                                <div className="col-span-2 space-y-1">
                                     <Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني المعتمد</Label>
                                     <p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p>
                                 </div>
                             </div>
 
-                            <div className="grid gap-2 text-right">
+                            <div className="grid gap-2">
                                 <Label className="font-black text-gray-700 pr-1">كلمة المرور التأسيسية</Label>
                                 <div className="flex gap-2">
                                     <div className="relative flex-1">
@@ -419,7 +353,7 @@ export default function DeveloperDashboard() {
                                             placeholder="أدخل كلمة المرور أو ولدها..."
                                         />
                                     </div>
-                                    <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-12 rounded-xl border-2 font-bold gap-2 text-primary">توليد كلمة مرور</Button>
+                                    <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-12 rounded-xl border-2 font-bold gap-2 text-primary">توليد تلقائي</Button>
                                 </div>
                             </div>
                         </>
@@ -427,17 +361,15 @@ export default function DeveloperDashboard() {
                         <div className="space-y-8 animate-in zoom-in-95 duration-500">
                             <Alert className="rounded-3xl border-2 border-green-500 bg-green-50 p-6">
                                 <CheckCircle2 className="h-6 w-6 text-green-600" />
-                                <AlertTitle className="text-green-800 font-black text-lg">تم التفعيل بنجاح!</AlertTitle>
-                                <AlertDescription className="text-green-700 font-bold mt-2 leading-relaxed">تم تأسيس قاعدة بيانات المنشأة وتفعيل صلاحيات المالك. المنظومة جاهزة للعمل.</AlertDescription>
+                                <AlertTitle className="text-green-800 font-black text-lg">تم تفعيل المنشأة بنجاح!</AlertTitle>
+                                <AlertDescription className="text-green-700 font-bold mt-2 leading-relaxed">تم تأسيس قاعدة البيانات وتفعيل صلاحيات المالك. المنظومة جاهزة للعمل.</AlertDescription>
                             </Alert>
 
-                            <div className="space-y-4">
-                                <div className="p-6 bg-slate-900 rounded-[2rem] text-white shadow-2xl space-y-4">
-                                    <div className="flex justify-between border-b border-white/10 pb-3"><span className="text-xs font-bold text-slate-400">اسم المستخدم (ID):</span><span className="font-mono font-black text-indigo-400">{requestToActivate?.username}</span></div>
-                                    <div className="flex justify-between border-b border-white/10 pb-3"><span className="text-xs font-bold text-slate-400">كلمة المرور:</span><span className="font-mono font-black text-green-400">{activationResult.pass}</span></div>
-                                </div>
-                                <Button onClick={copyWelcomeMessage} className="w-full h-12 rounded-xl font-black gap-2 shadow-xl bg-green-600"><Send className="h-4 w-4" /> نسخ رسالة الترحيب للواتساب</Button>
+                            <div className="p-6 bg-slate-900 rounded-[2rem] text-white shadow-2xl space-y-4">
+                                <div className="flex justify-between border-b border-white/10 pb-3"><span className="text-xs font-bold text-slate-400">اسم المستخدم:</span><span className="font-mono font-black text-indigo-400">{requestToActivate?.username}</span></div>
+                                <div className="flex justify-between border-b border-white/10 pb-3"><span className="text-xs font-bold text-slate-400">كلمة المرور:</span><span className="font-mono font-black text-green-400">{activationResult.pass}</span></div>
                             </div>
+                            <Button onClick={copyWelcomeMessage} className="w-full h-14 rounded-2xl font-black gap-2 shadow-xl bg-green-600"><Send className="h-4 w-4" /> نسخ رسالة الترحيب للواتساب</Button>
                         </div>
                     )}
                 </div>
@@ -447,21 +379,20 @@ export default function DeveloperDashboard() {
                         <>
                             <Button variant="ghost" onClick={() => setRequestToActivate(null)} disabled={!!isProcessing} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
                             <Button onClick={handleActivateRequest} disabled={!!isProcessing || !activationPassword} className="flex-1 h-14 rounded-2xl font-black text-lg shadow-xl bg-green-600 hover:bg-green-700 gap-3">
-                                {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />} تفعيل الحساب وإنشاء المنشأة
+                                {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />} تفعيل المنشأة الآن
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق النافذة</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
         
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
-            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
+            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>
-                    <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><ShieldAlert className="h-10 w-10"/></div>
-                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد حذف المنشأة نهائياً؟</AlertDialogTitle>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد حذف المنشأة؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2 text-slate-600">أنت على وشك حذف منشأة <strong>"{companyToDelete?.name}"</strong> بالكامل. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-8 gap-3">
