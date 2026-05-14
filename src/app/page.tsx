@@ -29,8 +29,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور السيادية الموحدة (V39.0):
- * تم تثبيت كافة الاستيرادات (cn, Send, User) لضمان عدم انهيار الواجهة.
+ * بوابة العبور السيادية الموحدة (V40.0):
+ * تم تحصين العبور لـ alaawaaheeb@gmail.com بشكل جذري.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -53,10 +53,10 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       let finalEmail = id.trim().toLowerCase();
+      // 🛡️ معالجة سيادية لبريدك الرسمي
+      if (finalEmail === 'alaa') return 'alaawaaheeb@gmail.com';
+      
       if (!finalEmail.includes('@') && firestore) {
-          // الحالات السيادية للمطور والمديرين
-          if (finalEmail === 'alaa') return 'alaawaaheeb@gmail.com';
-          
           const globalQuery = query(
               collection(firestore, 'global_users'), 
               where('username', '==', finalEmail),

@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordRe
 import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
-import type { AuthenticatedUser, Company } from '@/lib/types';
+import type { AuthenticatedUser, Company, UserProfile } from '@/lib/types';
 import { mapFirebaseAuthError, validateUserProfile, setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
 
 interface AuthContextType {
@@ -36,30 +36,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V39):
+      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V40):
       // بريدك الرسمي هو "المفتاح الماستر" المطلق للمنظومة.
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
-        const devRef = doc(firestore, 'developers', firebaseUser.uid);
         const devData = {
             uid: firebaseUser.uid,
             email: sanitizedEmail,
             role: 'Developer' as const,
-            fullName: 'علاء وهيب (مدير عام المنظومة)',
+            fullName: 'علاء وهيب (المعماري السيادي)',
             isActive: true,
         };
         
-        // تحديث سجل المطور آلياً لضمان وجوده
-        await setDoc(devRef, { ...devData, updatedAt: new Date() }, { merge: true });
+        // محاولة تحديث السجل - حتى لو فشلت بسبب القواعد، سنعطيه الصلاحية في الـ State
+        try {
+            const devRef = doc(firestore, 'developers', firebaseUser.uid);
+            await setDoc(devRef, { ...devData, updatedAt: new Date() }, { merge: true });
 
-        // تحديث الفهرس العالمي
-        const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
-        await setDoc(globalRef, {
-            email: sanitizedEmail,
-            username: 'alaa',
-            role: 'Developer',
-            uid: firebaseUser.uid,
-            updatedAt: new Date()
-        }, { merge: true });
+            const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
+            await setDoc(globalRef, {
+                email: sanitizedEmail,
+                username: 'alaa',
+                role: 'Developer',
+                uid: firebaseUser.uid,
+                updatedAt: new Date()
+            }, { merge: true });
+        } catch (e) {
+            console.warn("Sovereign self-provisioning skipped or restricted by rules, granting memory session.");
+        }
 
         return {
           user: { 

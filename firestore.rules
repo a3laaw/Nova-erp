@@ -6,7 +6,8 @@ service cloud.firestore {
     // --- مساعدات الحوكمة السيادية ---
     function isDeveloper() {
       return request.auth != null && 
-             (request.auth.token.role == 'Developer' || request.auth.token.email == 'alaawaaheeb@gmail.com');
+             (request.auth.token.role == 'Developer' || 
+              request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
 
     function belongsToCompany(companyId) {
@@ -23,13 +24,12 @@ service cloud.firestore {
     // --- 2. فهرس المستخدمين العالمي ---
     match /global_users/{docId} {
       allow read: if true; 
-      allow write: if isDeveloper(); 
+      allow write: if isDeveloper() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com'); 
     }
 
     // --- 3. بيانات المطورين ---
     match /developers/{uid} {
-      allow read, write: if isDeveloper() && request.auth.uid == uid;
-      allow read: if isDeveloper();
+      allow read, write: if isDeveloper() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
 
     // --- 4. بيانات الشركات المعزولة (The Isolated Tenants) ---
