@@ -3,7 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- مساعدات الحوكمة السيادية ---
+    // --- 🛡️ بروتوكول المعماري السيادي (V41.0) ---
+    // هذا الاستثناء يسمح لبريدك الشخصي alaawaaheeb@gmail.com بتجاوز كافة الحواجز
     function isDeveloper() {
       return request.auth != null && 
              (request.auth.token.role == 'Developer' || 
@@ -15,39 +16,30 @@ service cloud.firestore {
              (request.auth.token.companyId == companyId || request.auth.token.currentCompanyId == companyId);
     }
 
-    // --- 1. طلبات الانضمام (عام للكل للإرسال) ---
-    match /company_requests/{requestId} {
-      allow create: if true; 
-      allow read, write: if isDeveloper();
-    }
-
-    // --- 2. فهرس المستخدمين العالمي ---
-    match /global_users/{docId} {
-      allow read: if true; 
-      allow write: if isDeveloper() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com'); 
-    }
-
-    // --- 3. بيانات المطورين ---
-    match /developers/{uid} {
-      allow read, write: if isDeveloper() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
-    }
-
-    // --- 4. بيانات الشركات المعزولة (The Isolated Tenants) ---
+    // --- 1. المنشآت والبيانات المعزولة ---
     match /companies/{companyId} {
-      allow read: if isDeveloper() || belongsToCompany(companyId);
-      allow write: if isDeveloper() || (belongsToCompany(companyId) && request.auth.token.role == 'Admin');
+      allow read, write: if isDeveloper() || belongsToCompany(companyId);
       
       match /{allSubcollections=**} {
         allow read, write: if isDeveloper() || belongsToCompany(companyId);
       }
     }
 
-    // --- 5. العدادات العامة ---
-    match /counters/{doc} {
-      allow read, write: if request.auth != null;
+    // --- 2. الفهارس والطلبات (مفتوحة للمطور للتحكم) ---
+    match /global_users/{docId} {
+      allow read, write: if isDeveloper();
+    }
+    
+    match /company_requests/{requestId} {
+      allow create: if true;
+      allow read, write: if isDeveloper();
     }
 
-    // --- 6. الحماية الافتراضية للمسارات الخارجية ---
+    match /developers/{uid} {
+      allow read, write: if isDeveloper() || (request.auth != null && request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
+    }
+
+    // --- 3. الحماية الافتراضية الشاملة ---
     match /{document=**} {
       allow read, write: if isDeveloper();
     }

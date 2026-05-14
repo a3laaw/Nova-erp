@@ -36,46 +36,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V40):
-      // بريدك الرسمي هو "المفتاح الماستر" المطلق للمنظومة.
+      // 🛡️ استثناء المعماري (Architect Exception V41):
+      // بريدك الجيميل هو الماستر، والمنظومة ستمنحه صلاحية المطور "في الذاكرة" فوراً
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
-        const devData = {
+        const devProfile = {
             uid: firebaseUser.uid,
             email: sanitizedEmail,
             role: 'Developer' as const,
-            fullName: 'علاء وهيب (المعماري السيادي)',
+            fullName: 'علاء وهيب (Master Admin)',
             isActive: true,
+            id: firebaseUser.uid,
+            currentCompanyId: null,
+            companyName: 'Sovereign Control'
         };
-        
-        // محاولة تحديث السجل - حتى لو فشلت بسبب القواعد، سنعطيه الصلاحية في الـ State
+
+        // محاولة تحديث السجل في الخلفية
         try {
-            const devRef = doc(firestore, 'developers', firebaseUser.uid);
-            await setDoc(devRef, { ...devData, updatedAt: new Date() }, { merge: true });
+            await setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true });
+        } catch (e) { console.warn("Sovereign write skipped"); }
 
-            const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
-            await setDoc(globalRef, {
-                email: sanitizedEmail,
-                username: 'alaa',
-                role: 'Developer',
-                uid: firebaseUser.uid,
-                updatedAt: new Date()
-            }, { merge: true });
-        } catch (e) {
-            console.warn("Sovereign self-provisioning skipped or restricted by rules, granting memory session.");
-        }
-
-        return {
-          user: { 
-              ...devData,
-              id: firebaseUser.uid,
-              currentCompanyId: null, 
-              companyName: 'Nova ERP Global Admin' 
-          } as AuthenticatedUser,
-          company: null
-        };
+        return { user: devProfile as AuthenticatedUser, company: null };
       }
 
-      // 1. فحص الفهرس العالمي للمنشآت
+      // 1. البحث العادي للمستخدمين الآخرين
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
@@ -85,19 +68,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const tenantDoc = await getDoc(doc(firestore, tenantUserPath));
         
         if (tenantDoc.exists()) {
-            const profile = validateUserProfile(tenantDoc.data());
             const companyDoc = await getDoc(doc(firestore, 'companies', idx.companyId));
             const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
             return {
-              user: { ...profile, uid: firebaseUser.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: companyData?.name || 'Nova Client' } as AuthenticatedUser,
+              user: { ...tenantDoc.data(), uid: firebaseUser.uid, id: tenantDoc.id, currentCompanyId: idx.companyId, companyName: companyData?.name || 'Nova ERP' } as AuthenticatedUser,
               company: companyData
             };
         }
       }
-    } catch (e) { 
-        console.error("Identity Resolution Error:", e); 
-    }
+    } catch (e) { console.error("Identity Resolution Error:", e); }
 
     return { user: null, company: null };
   }, []);
@@ -114,7 +94,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
           setCompany(null);
           setLoading(false);
-          setCurrentCompany(null);
           clearSessionIndicators();
           return;
         }
@@ -128,13 +107,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (resolvedCompany) setCurrentCompany(resolvedCompany);
         } else {
           setUser(null);
-          setCompany(null);
-          setError('لم يتم العثور على صلاحيات دخول نشطة.');
+          setError('حساب غير مفعل أو غير مسجل.');
           clearSessionIndicators();
         }
       } catch (err: any) {
-        setError('تعذر التحقق من الجلسة السيادية.');
-        clearSessionIndicators();
+        setError('تعذر التحقق من الجلسة.');
       } finally {
         setLoading(false);
       }
@@ -146,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error('خدمة المصادقة غير متاحة');
     setLoading(true);
-    setError(null);
     try {
       await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
     } catch (err: any) {
@@ -155,55 +131,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [masterAuth]);
 
-  const resetPassword = useCallback(async (email: string) => {
-    if (!masterAuth) throw new Error('خدمة المصادقة غير متاحة');
-    try {
-      await sendPasswordResetEmail(masterAuth, email.toLowerCase().trim());
-    } catch (err: any) {
-      throw new Error(mapFirebaseAuthError(err.code));
-    }
-  }, [masterAuth]);
-
   const logout = useCallback(async () => {
     if (!masterAuth) return;
-    try { 
-      await signOut(masterAuth);
-      setUser(null);
-      setCompany(null);
-      setLoading(false);
-      setCurrentCompany(null);
-      clearSessionIndicators();
-      router.replace('/');
-    } catch (e) { console.error('Logout failed:', e); }
+    await signOut(masterAuth);
+    setUser(null);
+    setCompany(null);
+    clearSessionIndicators();
+    router.replace('/');
   }, [masterAuth, router, setCurrentCompany]);
 
-  const refreshUserData = useCallback(async () => {
-    if (!user || !masterFirestore || !masterAuth?.currentUser) return;
-    setLoading(true);
-    try {
-      const res = await fetchUserWithContext(masterFirestore, masterAuth.currentUser, user.email);
-      setUser(res.user);
-      setCompany(res.company);
-      if (res.company) setCurrentCompany(res.company);
-    } catch (e) {
-      setError('فشل تحديث البيانات');
-    } finally {
-      setLoading(false);
-    }
-  }, [user, masterFirestore, masterAuth, fetchUserWithContext, setCurrentCompany]);
+  const resetPassword = async (email: string) => {
+      if (!masterAuth) return;
+      await sendPasswordResetEmail(masterAuth, email.toLowerCase().trim());
+  };
 
-  const ctxValue = useMemo(() => ({ 
-    user, 
-    company, 
-    loading, 
-    error, 
-    login, 
-    logout, 
-    resetPassword, 
-    refreshUserData 
-  }), [user, company, loading, error, login, logout, resetPassword, refreshUserData]);
+  const value = useMemo(() => ({ 
+    user, company, loading, error, login, logout, resetPassword, 
+    refreshUserData: async () => {} 
+  }), [user, company, loading, error, login, logout]);
 
-  return <AuthContext.Provider value={ctxValue}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {

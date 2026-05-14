@@ -6,8 +6,8 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 /**
- * 🛡️ محرك التهيئة السيادي الموحد (V39.0): 
- * تم تثبيت الإعدادات برمجياً لضمان العمل حصرياً على المشروع (nov-erp-1-25549967-c24e5).
+ * 🛡️ محرك التهيئة السيادي الموحد (V41.0): 
+ * تم تثبيت الإعدادات لتعمل حصرياً على المشروع الأول (النجمة).
  */
 const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
