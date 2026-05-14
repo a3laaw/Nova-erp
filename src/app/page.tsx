@@ -25,8 +25,8 @@ import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور الموحدة (Sovereign Login Gateway V50.0).
- * تم تحديث الهوية السيادية لتكون حصراً لبريد واحد، والآخر عميل تجريبي.
+ * بوابة العبور الموحدة (Sovereign Login Gateway V51.0).
+ * تم التحديث: توسيط النصوص، منع الإكمال التلقائي، ومزامنة حذف الخانات.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -49,7 +49,6 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       const input = id.trim().toLowerCase();
-      // 'alaa' يشير دائماً للبريد السيادي الأصلي
       if (input === 'alaa') return 'alaawaaheeb@gmail.com';
       if (input.includes('@')) return input;
       
@@ -63,6 +62,15 @@ export default function LoginPage() {
           }
       }
       return input;
+  };
+
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const val = e.target.value;
+      setIdentifier(val);
+      // 🛡️ القاعدة السيادية: إذا تم مسح اليوزر، يتم مسح الباسورد فوراً
+      if (val === '') {
+          setPassword('');
+      }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -123,35 +131,40 @@ export default function LoginPage() {
             )}
 
             {mode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-5">
+                <form onSubmit={handleLogin} className="space-y-5" autoComplete="off">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest">اسم المستخدم أو البريد</Label>
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-center">اسم المستخدم أو البريد</Label>
                         <div className="relative">
-                            <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 opacity-0 group-focus-within:opacity-100 transition-opacity" />
                             <Input 
                                 value={identifier} 
-                                onChange={e => setIdentifier(e.target.value)} 
-                                className="h-12 rounded-xl border-2 pr-10 dir-ltr font-black" 
+                                onChange={handleIdentifierChange} 
+                                className="h-12 rounded-xl border-2 text-center font-black text-primary focus:placeholder:opacity-0" 
                                 required 
                                 placeholder="Username or Email"
+                                autoComplete="off"
                             />
                         </div>
                     </div>
 
                     <div className="grid gap-2">
-                        <div className="flex justify-between items-center pr-1">
+                        <div className="flex justify-center items-center">
                             <Label className="font-black text-[10px] uppercase tracking-widest">كلمة المرور</Label>
-                            <button type="button" onClick={() => setMode('forgot-password')} className="text-[10px] font-black text-primary">نسيت كلمة المرور؟</button>
                         </div>
                         <div className="relative">
-                            <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Key className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 opacity-0 group-focus-within:opacity-100 transition-opacity" />
                             <Input 
                                 type="password" 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
-                                className="h-12 rounded-xl border-2 pr-10 font-mono text-center" 
+                                className="h-12 rounded-xl border-2 font-mono text-center text-lg" 
                                 required 
+                                placeholder="••••••••"
+                                autoComplete="new-password"
                             />
+                        </div>
+                        <div className="flex justify-center mt-1">
+                             <button type="button" onClick={() => setMode('forgot-password')} className="text-[10px] font-black text-primary hover:underline">نسيت كلمة المرور؟</button>
                         </div>
                     </div>
 
@@ -161,12 +174,12 @@ export default function LoginPage() {
                     </Button>
                 </form>
             ) : (
-                <form onSubmit={handleResetPassword} className="space-y-6">
+                <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest">أدخل بريدك الإلكتروني</Label>
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-center">أدخل بريدك الإلكتروني</Label>
                         <div className="relative">
                             <Send className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input value={identifier} onChange={e => setIdentifier(e.target.value)} className="h-12 rounded-xl border-2 pr-10 font-bold" required placeholder="example@email.com" />
+                            <Input value={identifier} onChange={handleIdentifierChange} className="h-12 rounded-xl border-2 text-center font-bold" required placeholder="example@email.com" autoComplete="off" />
                         </div>
                     </div>
                     <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-2">
