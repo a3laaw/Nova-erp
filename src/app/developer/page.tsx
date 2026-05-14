@@ -21,15 +21,14 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
-    AlertCircle, ShieldCheck, Activity, Rocket, 
-    UserPlus, Lock, Send, X, Key, ExternalLink, RefreshCw,
-    User // 🛡️ تم إضافة الأيقونة المفقودة هنا
+    AlertCircle, Activity, Rocket, 
+    UserPlus, Lock, Send, X, Key, RefreshCw,
+    User // 🛡️ استيراد الأيقونة المفقودة لضمان استقرار الواجهة
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,6 +104,7 @@ export default function DeveloperDashboard() {
                 companyName: requestToActivate.companyName,
                 contactName: requestToActivate.contactName,
                 email: requestToActivate.email,
+                activity: requestToActivate.activity || 'consulting', // 🛡️ تم إضافة هذا الحقل لحل خطأ undefined
                 password: activationPassword,
                 requestId: requestToActivate.id
             })
@@ -311,7 +311,7 @@ export default function DeveloperDashboard() {
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <DialogHeader className="p-8 bg-slate-900 text-white text-right">
                     <div className="flex items-center gap-4">
-                        <div className="p-3 bg-green-600 rounded-2xl text-white shadow-xl"><ShieldCheck className="h-8 w-8" /></div>
+                        <div className="p-3 bg-green-600 rounded-2xl text-white shadow-xl"><CheckCircle2 className="h-8 w-8" /></div>
                         <div className="text-right">
                             <DialogTitle className="text-2xl font-black text-white">تفعيل الحساب السحابي</DialogTitle>
                             <DialogDescription className="text-indigo-200 font-bold">للمنشأة: {requestToActivate?.companyName}</DialogDescription>
@@ -381,7 +381,7 @@ export default function DeveloperDashboard() {
                         <>
                             <Button variant="ghost" onClick={() => setRequestToActivate(null)} disabled={!!isProcessing} className="rounded-xl font-bold h-12 px-8 text-slate-500">إلغاء</Button>
                             <Button onClick={handleActivateRequest} disabled={!!isProcessing || !activationPassword} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-xl bg-indigo-600 hover:bg-indigo-700 gap-3">
-                                {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <ShieldCheck className="h-6 w-6" />} تفعيل المنشأة الآن
+                                {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Rocket className="h-6 w-6" />} تفعيل المنشأة الآن
                             </Button>
                         </>
                     ) : (

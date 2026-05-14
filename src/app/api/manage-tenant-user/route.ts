@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase/firestore'; // Using Firestore directly for server-side
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
  * @fileOverview API إدارة المنشآت الموحد.
- * تم تحصينه ليعتمد كلياً على المشروع الحالي النشط لمنع خطأ NOT_FOUND.
+ * تم تحصينه بـ "نظام الحماية من القيم الفارغة" لمنع خطأ undefined في Firestore.
  */
 
 function getAdminApp() {
@@ -35,7 +36,6 @@ function getAdminApp() {
             projectId: currentProjectId
         });
     } else {
-        // خيار الطوارئ: التهيئة بدون مفتاح أمان (لأغراض القراءة فقط)
         return initializeApp({
             projectId: currentProjectId,
         });
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const { action, email, companyName, contactName, activity, password, requestId } = body;
 
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminFirestore(app);
     const auth = getAuth(app);
 
     if (action === 'instant_setup') {
@@ -77,11 +77,11 @@ export async function POST(request: NextRequest) {
             role: 'Admin'
         });
 
-        // 3. بناء سجل الشركة في قاعدة البيانات (في المشروع الموحد)
+        // 3. بناء سجل الشركة (🛡️ حماية الحقول من الـ undefined)
         await db.collection('companies').doc(companyId).set({
             id: companyId,
-            name: companyName,
-            activity,
+            name: companyName || 'منشأة جديدة',
+            activity: activity || 'consulting', // 🛡️ القيمة الافتراضية تمنع انهيار Firestore
             adminEmail: sanitizedEmail,
             isActive: true,
             createdAt: FieldValue.serverTimestamp(),
@@ -90,11 +90,11 @@ export async function POST(request: NextRequest) {
             subscriptionType: 'trial'
         });
 
-        // 4. إنشاء ملف المستخدم الداخلي داخل الشركة (Isolation Path)
+        // 4. إنشاء ملف المستخدم الداخلي
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
-            fullName: contactName,
+            fullName: contactName || 'المالك',
             username: sanitizedEmail.split('@')[0],
             role: 'Admin',
             isActive: true,
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. إنشاء فهرس العبور العالمي (Global Hub)
+        // 5. فهرس العبور العالمي
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             username: sanitizedEmail.split('@')[0],
@@ -112,23 +112,19 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث حالة طلب الانضمام
+        // 6. تحديث حالة الطلب
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
-            const requestSnap = await requestRef.get();
-            
-            if (requestSnap.exists) {
-                await requestRef.update({
-                    status: 'activated',
-                    activatedAt: FieldValue.serverTimestamp(),
-                    companyId: companyId
-                });
-            }
+            await requestRef.update({
+                status: 'activated',
+                activatedAt: FieldValue.serverTimestamp(),
+                companyId: companyId
+            });
         }
 
         return NextResponse.json({ 
             success: true, 
-            message: "تم تأسيس المنشأة وتفعيل حساب المالك بنجاح.",
+            message: "تم التأسيس بنجاح.",
             companyId: companyId
         });
     }
@@ -136,7 +132,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "UNKNOWN_ACTION" });
 
   } catch (error: any) {
-    console.error("Critical API Error:", error);
+    console.error("API Activation Error:", error);
     return NextResponse.json({ 
         success: false, 
         error: "SERVER_ERROR",
