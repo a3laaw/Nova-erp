@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي المتقدم (V34.0)
- * تم تحصين معالجة المفتاح الخاص لمنع أخطاء الـ PEM.
+ * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي المتقدم (V35.0)
+ * تم تحصين معالجة المفتاح الخاص وتوضيح رسالة صلاحيات IAM.
  */
 
 function getAdminApp() {
@@ -26,7 +26,6 @@ function getAdminApp() {
             throw new Error("INVALID_SERVICE_ACCOUNT_JSON");
         }
 
-        // 🛡️ معالج المفتاح الذكي لمنع خطأ PEM
         serviceAccount.private_key = serviceAccount.private_key
             .replace(/\\n/g, '\n')
             .replace(/"/g, '')
@@ -52,7 +51,6 @@ export async function POST(request: NextRequest) {
 
     const app = getAdminApp();
     
-    // استخراج بريد حساب الخدمة للتشخيص
     const saPath = path.join(process.cwd(), 'service-account.json');
     const saData = JSON.parse(fs.readFileSync(saPath, 'utf8'));
     serviceAccountEmail = saData.client_email;
@@ -122,14 +120,11 @@ export async function POST(request: NextRequest) {
         // 6. تحديث حالة الطلب
         if (requestId) {
             const reqRef = db.collection('company_requests').doc(requestId);
-            const reqSnap = await reqRef.get();
-            if (reqSnap.exists) {
-                await reqRef.update({
-                    status: 'activated',
-                    activatedAt: FieldValue.serverTimestamp(),
-                    companyId: companyId
-                });
-            }
+            await reqRef.update({
+                status: 'activated',
+                activatedAt: FieldValue.serverTimestamp(),
+                companyId: companyId
+            });
         }
 
         return NextResponse.json({ 
@@ -145,7 +140,8 @@ export async function POST(request: NextRequest) {
     console.error("IAM PERMISSION ERROR:", error);
     
     let userMessage = error.message;
-    if (error.message?.includes('insufficient permission') || error.code === 7) {
+    // التحقق من خطأ الصلاحيات 7 (PERMISSION_DENIED)
+    if (error.message?.includes('insufficient permission') || error.code === 7 || error.status === 403) {
         userMessage = `⚠️ خطأ في صلاحيات Google IAM: يرجى الذهاب لـ Google Cloud Console وإعطاء صلاحية (Firebase Admin) لهذا البريد حصراً: [ ${serviceAccountEmail} ]`;
     }
 

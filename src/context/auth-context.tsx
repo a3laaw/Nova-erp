@@ -42,19 +42,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول العبور السيادي (Sovereign Architect Bypass)
+      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Bypass)
       // إذا كان البريد هو بريدك الرسمي، نمنحك رتبة مطور آلياً لكسر نقطة الصفر
-      if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
+      if (sanitizedEmail === 'alaawaaheeb@gmail.com' || sanitizedEmail === 'alaawaaheeb1@gmail.com') {
         const devRef = doc(firestore, 'developers', user.uid);
         const devDoc = await getDoc(devRef);
         
         if (!devDoc.exists()) {
-            // تأسيس سجل المطور آلياً في أول دخول
             await setDoc(devRef, {
                 uid: user.uid,
                 email: sanitizedEmail,
                 role: 'Developer',
-                fullName: 'Alaa Wahib',
+                fullName: 'Alaa Wahib (System Architect)',
                 isActive: true,
                 createdAt: serverTimestamp()
             });
@@ -65,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               id: user.uid, 
               uid: user.uid, 
               email: sanitizedEmail, 
-              username: 'root', 
+              username: 'architect', 
               role: 'Developer', 
               isActive: true, 
               fullName: 'Alaa Wahib', 
@@ -87,7 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // 2. فحص الفهرس العالمي للمنشآت (Tenant Path)
+      // 2. فحص الفهرس العالمي للمنشآت
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
