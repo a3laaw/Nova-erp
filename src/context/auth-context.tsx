@@ -36,8 +36,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const sanitizedEmail = email.toLowerCase().trim();
 
-      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V38):
-      // بريدك الرسمي هو "المفتاح الماستر" للمنظومة بالكامل
+      // 🛡️ بروتوكول المعماري السيادي (Sovereign Architect Protocol V39):
+      // بريدك الرسمي هو "المفتاح الماستر" المطلق للمنظومة.
       if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devRef = doc(firestore, 'developers', firebaseUser.uid);
         const devData = {
@@ -48,10 +48,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isActive: true,
         };
         
-        // تحديث سجل المطور آلياً لضمان وجوده في Firestore
+        // تحديث سجل المطور آلياً لضمان وجوده
         await setDoc(devRef, { ...devData, updatedAt: new Date() }, { merge: true });
 
-        // تحديث الفهرس العالمي لضمان إمكانية الدخول بالـ Username
+        // تحديث الفهرس العالمي
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         await setDoc(globalRef, {
             email: sanitizedEmail,
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
       }
 
-      // 1. فحص الفهرس العالمي للمنشآت (Multi-Tenant Lookup)
+      // 1. فحص الفهرس العالمي للمنشآت
       const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
       const globalSnap = await getDocs(globalQuery);
       
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setUser(null);
           setCompany(null);
-          setError('لم يتم العثور على صلاحيات دخول نشطة لهذا الحساب.');
+          setError('لم يتم العثور على صلاحيات دخول نشطة.');
           clearSessionIndicators();
         }
       } catch (err: any) {

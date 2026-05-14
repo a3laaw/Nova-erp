@@ -28,6 +28,10 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { cn } from '@/lib/utils';
 
+/**
+ * بوابة العبور السيادية الموحدة (V39.0):
+ * تم تثبيت كافة الاستيرادات (cn, Send, User) لضمان عدم انهيار الواجهة.
+ */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore, app } = useFirebase();
@@ -107,7 +111,7 @@ export default function LoginPage() {
       }
   };
 
-  const projectId = (app as any)?.options?.projectId || 'Unknown';
+  const projectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
@@ -237,7 +241,6 @@ export default function LoginPage() {
                 </Button>
             </div>
             
-            {/* 🛡️ مؤشر المشروع السيادي لضمان الدقة */}
             <div className="pt-4 flex items-center justify-center gap-2 opacity-30">
                 <Database className="h-3 w-3" />
                 <span className="text-[8px] font-mono font-bold uppercase tracking-widest">Active Core: {projectId}</span>
