@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد (V13.0 - Fully Isolated Multi-tenancy).
- * تم تصحيح مسارات الاستيراد لضمان استقرار البناء والربط السحابي.
+ * @fileOverview API الأمان السيادي الموحد (V14.0 - Critical Initialization Fix).
+ * تم ترميم محرك التأسيس لضمان تهيئة التطبيق حتى في غياب ملف الأمان.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -23,26 +23,35 @@ const MASTER_FIREBASE_CONFIG = {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, email, username, companyName, contactName, phone, activity, employeeCountRange, password, requestId, uid, displayName } = body;
+    const { 
+        action, email, username, companyName, contactName, phone, 
+        activity, employeeCountRange, password, requestId, uid 
+    } = body;
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     let hasServiceAccount = false;
 
     if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
         try {
+            const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
             const sa = JSON.parse(fileContent || '{}');
             if (sa && sa.project_id && sa.private_key) {
                 hasServiceAccount = true;
             }
         } catch (e) {
-            console.error("Invalid Service Account JSON");
+            console.error("Invalid Service Account JSON Format");
         }
     }
 
-    if (getApps().length === 0 && hasServiceAccount) {
-        const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
-        initializeApp({ credential: cert(sa) });
+    // 🛡️ صمام الأمان: ضمان تهيئة التطبيق مهما كانت الظروف
+    if (getApps().length === 0) {
+        if (hasServiceAccount) {
+            const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
+            initializeApp({ credential: cert(sa) });
+        } else {
+            // تفعيل "وضع الحماية" باستخدام معرف المشروع فقط (يسمح بـ add_request في بيئات معينة)
+            initializeApp({ projectId: MASTER_FIREBASE_CONFIG.projectId });
+        }
     }
 
     if (action === 'check') {
@@ -73,7 +82,9 @@ export async function POST(request: NextRequest) {
 
     // --- 2. التفعيل السيادي (بوابة المطور) ---
     if (action === 'instant_setup') {
-        if (!hasServiceAccount) throw new Error("محرك الأتمتة غير مفعل. يرجى رفع ملف الأمان أولاً.");
+        if (!hasServiceAccount) {
+            throw new Error("محرك الأتمتة غير مفعل (الملف مفقود). يرجى تفعيل الحساب يدوياً في الكونسول أولاً.");
+        }
 
         const auth = getAuth();
         const db = getFirestore();

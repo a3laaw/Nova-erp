@@ -52,6 +52,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
+/**
+ * غرفة التحكم السيادية (V14.0 - Presidential Suite):
+ * تم ترميم كافة الاستيرادات وحل أخطاء الـ Labels والـ Activity البرمجية.
+ */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
@@ -65,15 +69,12 @@ export default function DeveloperDashboard() {
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [systemStatus, setSystemStatus] = useState<'READY' | 'MANUAL_MODE'>('MANUAL_MODE');
 
-  // --- ميزات تفعيل الحسابات الجديدة (The Activation Hub) ---
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string, link: string } | null>(null);
 
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
-  
-  const requestsQuery = useMemo(() => [orderBy('createdAt', 'desc')], []);
-  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', requestsQuery);
+  const { data: requests, loading: requestsLoading } = useSubscription<CompanyRequest>(firestore, 'company_requests', [orderBy('createdAt', 'desc')]);
 
   useEffect(() => {
     const checkSystem = async () => {
@@ -458,7 +459,7 @@ export default function DeveloperDashboard() {
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إإغلاق الغرفة السيادية</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق الغرفة السيادية</Button>
                     )}
                 </DialogFooter>
             </DialogContent>
