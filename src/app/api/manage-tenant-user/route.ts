@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
-import * as fs from 'fs';
-import path from 'path';
 
 /**
- * @fileOverview API إدارة المنشآت وحسابات المستخدمين (V21.0).
- * تم تحصين هذا المسار ليفحص محتوى ملف الأمان بدقة قبل استخدامه.
+ * @fileOverview API إدارة المنشآت وحسابات المستخدمين (V22.0 - Environment Variables)
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -19,6 +16,24 @@ const MASTER_FIREBASE_CONFIG = {
   appId: "1:71297676078:web:b956ab00372e6ba237c0bf"
 };
 
+// تهيئة Firebase Admin باستخدام Environment Variables
+let adminApp: any;
+
+function getAdminApp() {
+  if (getApps().length === 0) {
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+    adminApp = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: privateKey,
+      }),
+    });
+  }
+  return adminApp;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -27,43 +42,8 @@ export async function POST(request: NextRequest) {
         activity, employeeCountRange, password, requestId 
     } = body;
 
-    const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
-    
-    // 1. فحص وجود الملف
-    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        return NextResponse.json({ 
-            success: false, 
-            error: "FILE_NOT_FOUND",
-            message: "ملف الأمان (service-account.json) غير موجود في مجلد المشروع."
-        });
-    }
-
-    // 2. فحص محتوى الملف (هل هو JSON صالح؟)
-    let sa;
-    try {
-        const saContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-        sa = JSON.parse(saContent);
-    } catch (parseError) {
-        return NextResponse.json({ 
-            success: false, 
-            error: "JSON_PARSE_ERROR",
-            message: "ملف service-account.json يحتوي على أخطاء في الصيغة (مثل التعليقات //). يرجى مسح محتوى الملف ولصق بيانات المفتاح الحقيقي كـ JSON نظيف فقط."
-        });
-    }
-
-    if (!sa.private_key || sa.private_key.includes("ضع_هنا")) {
-        return NextResponse.json({ 
-            success: false, 
-            error: "INVALID_CONFIG",
-            message: "ملف service-account.json موجود ولكنه لا يحتوي على مفتاح خاص صالح. يرجى لصق بيانات المفتاح التي حملتها من Firebase Console داخل الملف."
-        });
-    }
-
-    // 3. تهيئة تطبيق Firebase Admin
-    if (getApps().length === 0) {
-        initializeApp({ credential: cert(sa) });
-    }
-
+    // تهيئة Firebase Admin
+    getAdminApp();
     const db = getFirestore();
     const auth = getAuth();
 
@@ -74,7 +54,7 @@ export async function POST(request: NextRequest) {
         const trialEndDate = new Date();
         trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-        // أ. إنشاء الحساب في نظام Authentication
+        // أ. إنشاء الحساب في Authentication
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -89,13 +69,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // ب. تعيين الأدوار (Claims)
+        // ب. تعيين الأدوار
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // ج. تأسيس وثيقة الشركة
+        // ج. إنشاء الشركة
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
             id: companyId,
@@ -112,29 +92,19 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // د. إنشاء ملف المستخدم الإداري داخل المنشأة
+        // د. إنشاء ملف المستخدم
         const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
         await tenantUserRef.set({
             uid: userRecord.uid,
             email: sanitizedEmail,
             fullName: contactName,
-            username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
+            username: username?.toLowerCase().replace(/[^a-z0-9]/g, '') || '',
             role: 'Admin',
             isActive: true,
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // هـ. تحديث الفهرس العالمي للدخول
-        const globalIndexRef = db.collection('global_users').doc();
-        await globalIndexRef.set({
-            email: sanitizedEmail,
-            username: username.toLowerCase().replace(/[^a-z0-9]/g, ''),
-            companyId,
-            uid: userRecord.uid,
-            createdAt: FieldValue.serverTimestamp()
-        });
-
-        // و. تحديث حالة الطلب
+        // هـ. تحديث الفهرس
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
