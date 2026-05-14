@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useFirebase, useSubscription } from '@/firebase';
 import { 
@@ -57,7 +57,8 @@ import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 /**
- * غرفة التحكم الرئيسية - نظام الإدارة المركزي
+ * غرفة التحكم الرئيسية (V29.0):
+ * تم إصلاح كافة مراجع الأيقونات لضمان استقرار العرض.
  */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -123,9 +124,7 @@ export default function DeveloperDashboard() {
         toast({ 
             variant: 'destructive', 
             title: 'فشل التفعيل', 
-            description: e.message.includes('PEM') 
-                ? 'خطأ في تنسيق مفتاح الأمان. يرجى إعادة رفع ملف service-account.json الأصلي بالكامل.' 
-                : e.message 
+            description: e.message 
         });
     } finally {
         setIsProcessing(null);
@@ -407,4 +406,3 @@ export default function DeveloperDashboard() {
     </div>
   );
 }
-

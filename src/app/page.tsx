@@ -13,9 +13,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
+import { cn } from '@/lib/utils';
 
 /**
- * بوابة العبور الرئيسية (Unified Gateway v11.0).
+ * بوابة العبور الرئيسية (Unified Gateway v12.0).
+ * تم إصلاح خطأ ReferenceError واستكمال كافة المراجع التقنية.
  */
 export default function LoginPage() {
   const { login, user, loading } = useAuth();
@@ -45,7 +47,7 @@ export default function LoginPage() {
     try {
         let finalEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك تحويل الهوية الذكي
+        // 🛡️ محرك تحويل الهوية الذكي (الدخول باسم المستخدم)
         if (!finalEmail.includes('@') && firestore) {
             const globalQuery = query(
                 collection(firestore, 'global_users'), 
@@ -133,7 +135,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleLogin} className="space-y-5" autoComplete="on">
                 <div className="grid gap-2">
-                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم فقط (Login ID)</Label>
+                    <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-[#1e1b4b]">اسم المستخدم (Login ID)</Label>
                     <div className="relative group">
                         <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
                         <Input 
@@ -142,7 +144,7 @@ export default function LoginPage() {
                             onChange={e => setIdentifier(e.target.value)} 
                             className="h-12 rounded-xl border-white/60 bg-white/40 dir-ltr font-black text-base shadow-inner border-2 pr-10" 
                             required 
-                            placeholder="e.g. nova1"
+                            placeholder="e.g. alaa"
                             disabled={localLoading || loading}
                         />
                     </div>
