@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore as getAdminFirestore, FieldValue } from 'firebase/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد - نسخة توحيد القطبية (V27.0)
- * تم إلغاء الاعتماد على env في السيرفر والاعتماد كلياً على ملف المفتاح لمنع التضارب.
+ * محرك إدارة المنشآت الموحد - نسخة التشخيص الرقابي (V28.0)
+ * تم تحصينه لإظهار البريد المسؤول عن الصلاحيات في حال الفشل.
  */
 
 function getAdminApp() {
@@ -15,7 +15,7 @@ function getAdminApp() {
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
     
     if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        throw new Error("MISSING_FILE");
+        throw new Error("MISSING_SERVICE_ACCOUNT_FILE");
     }
 
     try {
@@ -23,19 +23,17 @@ function getAdminApp() {
         const serviceAccount = JSON.parse(fileContent);
         
         if (!serviceAccount.private_key || !serviceAccount.project_id) {
-            throw new Error("INVALID_JSON_STRUCTURE");
+            throw new Error("INVALID_SERVICE_ACCOUNT_JSON");
         }
 
-        // 🛡️ معالج المفاتيح الذكي: تصحيح الأسطر الجديدة لضمان قبول تنسيق PEM
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
 
-        // التأسيس السيادي المباشر باستخدام بيانات الملف حصراً لمنع تضارب الـ Project ID
         return initializeApp({
             credential: cert(serviceAccount),
-            projectId: serviceAccount.project_id // توحيد القطبية هنا
+            projectId: serviceAccount.project_id
         });
     } catch (e: any) {
-        console.error("Critical: Failed to initialize Firebase Admin:", e.message);
+        console.error("Critical: Admin Init Failed:", e.message);
         throw e;
     }
   }
@@ -43,19 +41,26 @@ function getAdminApp() {
 }
 
 export async function POST(request: NextRequest) {
+  let serviceAccountEmail = "Unknown";
   try {
     const body = await request.json();
     const { action, email, companyName, contactName, activity, password, requestId } = body;
 
     const app = getAdminApp();
-    const db = (await import('firebase-admin/firestore')).getFirestore(app);
+    
+    // استخراج بريد حساب الخدمة للتشخيص في حال الخطأ
+    const saPath = path.join(process.cwd(), 'service-account.json');
+    const saData = JSON.parse(fs.readFileSync(saPath, 'utf8'));
+    serviceAccountEmail = saData.client_email;
+
+    const db = getFirestore(app);
     const auth = getAuth(app);
 
     if (action === 'instant_setup') {
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         
-        // 1. إنشاء حساب المالك في نظام الأمان (Authentication)
+        // 1. إنشاء حساب المالك
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -69,13 +74,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. حقن هوية المنشأة داخل الحساب (Custom Claims)
+        // 2. حقن الصلاحيات
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        const now = (await import('firebase-admin/firestore')).FieldValue.serverTimestamp();
+        const FieldValue = (await import('firebase-admin/firestore')).FieldValue;
 
         // 3. تأسيس سجل المنشأة
         await db.collection('companies').doc(companyId).set({
@@ -84,8 +89,8 @@ export async function POST(request: NextRequest) {
             activity: activity || 'consulting',
             adminEmail: sanitizedEmail,
             isActive: true,
-            createdAt: now,
-            updatedAt: now,
+            createdAt: FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
             maxUsersLimit: 5,
             subscriptionType: 'trial'
         });
@@ -99,32 +104,31 @@ export async function POST(request: NextRequest) {
             role: 'Admin',
             isActive: true,
             companyId: companyId,
-            createdAt: now
+            createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. تحديث الفهرس العالمي (Global Index)
+        // 5. تحديث الفهرس العالمي
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             username: sanitizedEmail.split('@')[0],
             companyId: companyId,
             uid: userRecord.uid,
             role: 'Admin',
-            createdAt: now
+            createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. تحديث حالة الطلب الأصلي
+        // 6. تحديث حالة الطلب
         if (requestId) {
-            const requestRef = db.collection('company_requests').doc(requestId);
-            await requestRef.update({
+            await db.collection('company_requests').doc(requestId).update({
                 status: 'activated',
-                activatedAt: now,
+                activatedAt: FieldValue.serverTimestamp(),
                 companyId: companyId
             });
         }
 
         return NextResponse.json({ 
             success: true, 
-            message: "تم التفعيل بنجاح تام.",
+            message: "تم تفعيل المنشأة بنجاح.",
             companyId: companyId
         });
     }
@@ -132,17 +136,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND" });
 
   } catch (error: any) {
-    console.error("Activation Engine Error:", error);
+    console.error("IAM PERMISSION ERROR:", error);
     
     let userMessage = error.message;
-    if (error.message?.includes('insufficient permission')) {
-        userMessage = "خطأ في صلاحيات المفتاح: تأكد من أن حساب الخدمة في Console لديه دور (Firebase Admin).";
+    if (error.message?.includes('insufficient permission') || error.code === 7) {
+        userMessage = `خطأ في صلاحيات Google IAM: يرجى الذهاب لـ Google Cloud Console وإعطاء صلاحية (Firebase Admin) لهذا البريد حصراً: [ ${serviceAccountEmail} ]`;
     }
 
     return NextResponse.json({ 
         success: false, 
-        error: error.code || "ACTIVATION_FAILED",
-        message: userMessage
+        error: "IAM_AUTH_FAILED",
+        message: userMessage,
+        targetEmail: serviceAccountEmail
     }, { status: 500 });
   }
 }
