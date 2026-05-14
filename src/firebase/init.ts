@@ -5,19 +5,22 @@ import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
+/**
+ * محرك التهيئة اللحظي: 
+ * يعتمد على متغيرات البيئة لضمان التوافق التام مع المشروع الحالي.
+ */
 const firebaseConfig: FirebaseOptions = {
-  apiKey: "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
-  authDomain: "studio-8039389980-3d2d0.firebaseapp.com",
-  projectId: "studio-8039389980-3d2d0",
-  storageBucket: "studio-8039389980-3d2d0.firebasestorage.app",
-  messagingSenderId: "828494117254",
-  appId: "1:828494117254:web:d0c31facd0d0bb2f341407",
-  measurementId: "G-Q7DPZ802VJ"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCX4Zms4_pkTGy0chAJPyF6P6g9XCRAXk8",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "studio-8039389980-3d2d0.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "studio-8039389980-3d2d0",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "studio-8039389980-3d2d0.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "828494117254",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:828494117254:web:d0c31facd0d0bb2f341407",
 };
 
 function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore; storage: FirebaseStorage; } | null {
   if (!firebaseConfig.projectId) {
-    console.warn("Firebase projectId is missing in config. Firebase will not be initialized.");
+    console.warn("Firebase config is missing. System in restricted mode.");
     return null;
   }
   
@@ -29,7 +32,6 @@ function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firest
   return { app, auth, firestore, storage };
 }
 
-// This function ensures Firebase is initialized only once.
 const getFirebaseServicesSingleton = (() => {
   let firebase: ReturnType<typeof initializeFirebase> | null = null;
   let initialized = false;
