@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * @fileOverview API الأمان السيادي الموحد (V14.0 - Critical Initialization Fix).
- * تم ترميم محرك التأسيس لضمان تهيئة التطبيق حتى في غياب ملف الأمان.
+ * @fileOverview API الأمان السيادي الموحد (V14.0 - Critical Stability Fix).
+ * تم تحصين المحرك ليعيد أخطاء واضحة في حال غياب المفاتيح بدلاً من انهيار السيرفر.
  */
 
 const MASTER_FIREBASE_CONFIG = {
@@ -25,46 +25,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
         action, email, username, companyName, contactName, phone, 
-        activity, employeeCountRange, password, requestId, uid 
+        activity, employeeCountRange, password, requestId 
     } = body;
 
     const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
-    let hasServiceAccount = false;
+    const hasServiceAccount = fs.existsSync(SERVICE_ACCOUNT_PATH);
 
-    if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        try {
-            const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-            const sa = JSON.parse(fileContent || '{}');
-            if (sa && sa.project_id && sa.private_key) {
-                hasServiceAccount = true;
-            }
-        } catch (e) {
-            console.error("Invalid Service Account JSON Format");
-        }
-    }
-
-    // 🛡️ صمام الأمان: ضمان تهيئة التطبيق مهما كانت الظروف
-    if (getApps().length === 0) {
-        if (hasServiceAccount) {
-            const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
-            initializeApp({ credential: cert(sa) });
-        } else {
-            // تفعيل "وضع الحماية" باستخدام معرف المشروع فقط (يسمح بـ add_request في بيئات معينة)
-            initializeApp({ projectId: MASTER_FIREBASE_CONFIG.projectId });
-        }
-    }
-
-    if (action === 'check') {
+    // 🛡️ صمام الأمان: منع محاولة استخدام Admin SDK بدون مفتاح لضمان عدم حدوث Error 500
+    if (!hasServiceAccount) {
         return NextResponse.json({ 
-            success: true, 
-            status: hasServiceAccount ? 'READY' : 'MANUAL_MODE',
-            projectId: MASTER_FIREBASE_CONFIG.projectId
-        });
+            success: false, 
+            error: "MISSING_CONFIG",
+            message: "⚠️ تنبيه سيادي: ملف الأمان (service-account.json) غير متوفر في جذر المشروع. يرجى من مدير النظام رفع الملف لتفعيل الأتمتة الكاملة."
+        }, { status: 200 }); // نعيد 200 لكي نعالج الرسالة في الواجهة بسلام
     }
+
+    // تهيئة التطبيق إذا لم يكن مهيئاً
+    if (getApps().length === 0) {
+        const sa = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
+        initializeApp({ credential: cert(sa) });
+    }
+
+    const db = getFirestore();
+    const auth = getAuth();
 
     // --- 1. حفظ طلب الانضمام (بوابة العميل) ---
     if (action === 'add_request') {
-        const db = getFirestore();
         await db.collection('company_requests').add({
             companyName,
             activity,
@@ -82,12 +68,6 @@ export async function POST(request: NextRequest) {
 
     // --- 2. التفعيل السيادي (بوابة المطور) ---
     if (action === 'instant_setup') {
-        if (!hasServiceAccount) {
-            throw new Error("محرك الأتمتة غير مفعل (الملف مفقود). يرجى تفعيل الحساب يدوياً في الكونسول أولاً.");
-        }
-
-        const auth = getAuth();
-        const db = getFirestore();
         const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
         const sanitizedEmail = email?.toLowerCase().trim();
         const trialEndDate = new Date();
@@ -108,13 +88,13 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // ب. تعيين الصلاحيات الماستر للمنشأة (Tenant ID)
+        // ب. تعيين الصلاحيات الماستر
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: companyId,
             role: 'Admin'
         });
 
-        // ج. إنشاء وثيقة المنشأة السيادية
+        // ج. إنشاء وثيقة المنشأة وحقن الـ Config
         const companyRef = db.collection('companies').doc(companyId);
         await companyRef.set({
             id: companyId,
@@ -122,7 +102,6 @@ export async function POST(request: NextRequest) {
             activity: activity || 'general',
             employeeCountRange: employeeCountRange || '1-5',
             adminEmail: sanitizedEmail,
-            contactPhone: phone,
             isActive: true,
             subscriptionType: 'trial',
             trialEndDate: Timestamp.fromDate(trialEndDate),
@@ -132,7 +111,7 @@ export async function POST(request: NextRequest) {
             updatedAt: FieldValue.serverTimestamp(),
         });
 
-        // د. إنشاء ملف المستخدم داخل المنشأة (The Owner Profile)
+        // د. إنشاء ملف المالك داخل المنشأة
         const tenantUserRef = db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid);
         await tenantUserRef.set({
             uid: userRecord.uid,
@@ -144,7 +123,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // هـ. تسجيل الهوية في الفهرس العالمي للدخول السريع
+        // هـ. تسجيل الهوية في الفهرس العالمي
         const globalIndexRef = db.collection('global_users').doc();
         await globalIndexRef.set({
             email: sanitizedEmail,
@@ -154,7 +133,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // و. تحديث طلب الديمو الأصلي
+        // و. تحديث طلب الديمو
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
@@ -178,6 +157,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error("Sovereign Multi-tenant Setup Error:", error);
-    return NextResponse.json({ success: false, error: error.message });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

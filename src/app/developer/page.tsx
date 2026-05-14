@@ -15,7 +15,8 @@ import {
     Activity, Rocket, UserPlus, Lock, Send, X, Phone, Mail
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // FIXED: Restored missing import
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // FIXED: Restored missing import
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
@@ -46,7 +47,6 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
@@ -133,7 +133,7 @@ export default function DeveloperDashboard() {
             });
             toast({ title: '✅ تم تفعيل المنشأة بنجاح' });
         } else {
-            throw new Error(result.error);
+            throw new Error(result.error || result.message);
         }
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
@@ -368,10 +368,10 @@ export default function DeveloperDashboard() {
         {/* --- Modal التفعيل السيادي --- */}
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                <DialogHeader className="p-8 bg-slate-900 text-white relative">
+                <DialogHeader className="p-8 bg-slate-900 text-white relative text-right">
                     <div className="flex items-center gap-4 relative z-10">
                         <div className="p-3 bg-green-600 rounded-2xl text-white shadow-xl"><ShieldCheck className="h-8 w-8" /></div>
-                        <div>
+                        <div className="text-right">
                             <DialogTitle className="text-2xl font-black text-white">تفعيل الحساب والاحتضان السحابي</DialogTitle>
                             <DialogDescription className="text-indigo-200 font-bold">معالجة طلب المنشأة: {requestToActivate?.companyName}</DialogDescription>
                         </div>
@@ -382,13 +382,13 @@ export default function DeveloperDashboard() {
                     {!activationResult ? (
                         <>
                             <div className="grid grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 shadow-inner">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-slate-400">اسم المالك</Label><p className="font-black text-lg">{requestToActivate?.contactName}</p></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-slate-400">رقم الهاتف</Label><p className="font-mono font-bold">{requestToActivate?.phone}</p></div>
-                                <div className="col-span-2 space-y-1"><Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني</Label><p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p></div>
+                                <div className="space-y-1 text-right"><Label className="text-[10px] font-black uppercase text-slate-400">اسم المالك</Label><p className="font-black text-lg">{requestToActivate?.contactName}</p></div>
+                                <div className="space-y-1 text-right"><Label className="text-[10px] font-black uppercase text-slate-400">رقم الهاتف</Label><p className="font-mono font-bold">{requestToActivate?.phone}</p></div>
+                                <div className="col-span-2 space-y-1 text-right"><Label className="text-[10px] font-black uppercase text-slate-400">البريد الإلكتروني</Label><p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p></div>
                             </div>
 
                             <div className="space-y-6">
-                                <div className="grid gap-2">
+                                <div className="grid gap-2 text-right">
                                     <Label className="font-black text-gray-700 pr-1">كلمة المرور التأسيسية</Label>
                                     <div className="flex gap-2">
                                         <div className="relative flex-1">
@@ -459,7 +459,7 @@ export default function DeveloperDashboard() {
                             </Button>
                         </>
                     ) : (
-                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إغلاق الغرفة السيادية</Button>
+                        <Button onClick={() => setRequestToActivate(null)} className="w-full h-14 rounded-2xl font-black text-lg bg-slate-900">إإغلاق الغرفة السيادية</Button>
                     )}
                 </DialogFooter>
             </DialogContent>

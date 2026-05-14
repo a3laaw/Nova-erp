@@ -22,8 +22,8 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
- * بوابة طلب الانضمام (Sovereign Request Gateway v11.0)
- * تم ترميمها لتكون "طلب ديمو" بانتظار تفعيل الأدمن من الغرفة السيادية.
+ * بوابة طلب الانضمام (Sovereign Request Gateway v14.0)
+ * تم ترميمها لتكون أكثر استقراراً في معالجة الأخطاء السحابية.
  */
 export default function RegisterPage() {
   const { toast } = useToast();
@@ -66,10 +66,18 @@ export default function RegisterPage() {
             setIsSubmitted(true);
             toast({ title: '✅ تم إرسال طلبك بنجاح' });
         } else {
+            // معالجة خطأ غياب ملف الأمان بشكل سيادي
+            if (result.error === 'MISSING_CONFIG') {
+                throw new Error(result.message);
+            }
             throw new Error(result.error);
         }
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الإرسال', description: error.message || 'يرجى مراجعة الدعم الفني.' });
+        toast({ 
+            variant: 'destructive', 
+            title: 'تنبيه إداري', 
+            description: error.message || 'يرجى مراجعة مدير النظام لإتمام الإعدادات.' 
+        });
     } finally {
         setIsSaving(false);
     }
