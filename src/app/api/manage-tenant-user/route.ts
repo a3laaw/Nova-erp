@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد.
- * تم تحصينه بـ "مُعالج المفاتيح الذكي" لحل مشكلة الـ PEM وتنسيق المفتاح الخاص.
+ * محرك إدارة المنشآت الموحد - نسخة التحصين النهائية (V26.0)
+ * تم دمج "مُعالج المفاتيح الذكي" لإصلاح أخطاء الـ PEM آلياً.
  */
 
 function getAdminApp() {
@@ -24,7 +24,15 @@ function getAdminApp() {
             
             if (parsed && parsed.private_key) {
                 // 🛡️ مُعالج المفاتيح الذكي: تصحيح الأسطر الجديدة لضمان قبول تنسيق PEM
-                parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+                // يقوم باستبدال رموز \n النصية بأسطر حقيقية، ويتحقق من ترويسة المفتاح
+                let key = parsed.private_key;
+                key = key.replace(/\\n/g, '\n');
+                
+                if (!key.includes('-----BEGIN PRIVATE KEY-----')) {
+                    key = `-----BEGIN PRIVATE KEY-----\n${key}\n-----END PRIVATE KEY-----\n`;
+                }
+                
+                parsed.private_key = key;
                 serviceAccount = parsed;
             }
         } catch (e) {
@@ -32,13 +40,13 @@ function getAdminApp() {
         }
     }
 
-    if (serviceAccount) {
+    if (serviceAccount && serviceAccount.private_key) {
         return initializeApp({
             credential: cert(serviceAccount),
             projectId: currentProjectId
         });
     } else {
-        // Fallback to environment credentials if file is missing/invalid
+        // Fallback: سيؤدي هذا لفشل التفعيل مع رسالة واضحة للمستخدم
         return initializeApp({
             projectId: currentProjectId,
         });
@@ -93,7 +101,7 @@ export async function POST(request: NextRequest) {
             subscriptionType: 'trial'
         });
 
-        // 4. إنشاء ملف المستخدم الداخلي
+        // 4. إنشاء ملف المستخدم الداخلي للشركة
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             uid: userRecord.uid,
             email: sanitizedEmail,
@@ -105,7 +113,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 5. تحديث الفهرس العالمي
+        // 5. تحديث الفهرس العالمي (Global Index)
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             username: sanitizedEmail.split('@')[0],
@@ -115,7 +123,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 6. إغلاق الطلب بنجاح
+        // 6. تحديث حالة الطلب الأصلي
         if (requestId) {
             const requestRef = db.collection('company_requests').doc(requestId);
             await requestRef.update({
@@ -135,11 +143,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND" });
 
   } catch (error: any) {
-    console.error("Sovereign Activation Error:", error);
+    console.error("Activation Engine Error:", error);
+    
+    // تشخيص ذكي لخطأ التنسيق (PEM)
+    const isPemError = error.message?.includes('PEM') || error.stack?.includes('PEM');
+
     return NextResponse.json({ 
         success: false, 
-        error: error.code || "ACTIVATION_FAILED",
-        message: error.message 
+        error: isPemError ? "INVALID_KEY_FORMAT" : (error.code || "ACTIVATION_FAILED"),
+        message: isPemError 
+            ? "خطأ في تنسيق مفتاح الأمان (PEM). يرجى استخراج مفتاح جديد من Console ولصقه بالكامل."
+            : error.message 
     }, { status: 500 });
   }
 }
