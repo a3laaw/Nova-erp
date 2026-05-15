@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
-import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 export default function DashboardLayout({
   children,
@@ -60,7 +59,7 @@ export default function DashboardLayout({
                         <Button onClick={() => window.location.reload()} variant="outline" className="h-11 rounded-xl font-bold gap-2 text-white border-white/40 hover:bg-white/20">
                             <RefreshCcw className="h-4 w-4" /> تحديث الصفحة
                         </Button>
-                        <Button onClick={handleSafeExit} variant="ghost" className="h-11 rounded-xl font-black gap-2 text-red-400 hover:bg-red-500/10">
+                        <Button onClick={handleSafeExit} variant="ghost" className="h-11 rounded-xl font-black gap-2 text-red-400 hover:bg-red-50/10">
                             <LogOut className="h-4 w-4" /> خروج آمن وإصلاح
                         </Button>
                     </div>
@@ -75,7 +74,7 @@ export default function DashboardLayout({
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e293b]">
-        <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
+        <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
         </div>
         <h2 className="text-3xl font-black text-white tracking-tighter">انتهت جلسة العمل</h2>
@@ -100,7 +99,6 @@ export default function DashboardLayout({
               {children}
             </main>
             <OfflineIndicator />
-            <SystemExpertChatWidget />
           </SidebarInset>
       </SidebarProvider>
     </div>
