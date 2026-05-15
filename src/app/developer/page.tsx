@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
-    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User 
+    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User, Settings2, Pencil
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,11 +55,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 
-/**
- * غرفة التحكم الرئيسية (V33.0):
- * تم ترميم كافة الأيقونات والمراجع لضمان استقرار العرض 100%.
- */
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
@@ -70,6 +67,9 @@ export default function DeveloperDashboard() {
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string } | null>(null);
+  
+  const [companyToEdit, setCompanyToEdit] = useState<Company | null>(null);
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
   const { data: companies, loading: companiesLoading } = useSubscription<Company>(firestore, 'companies', []);
@@ -112,20 +112,13 @@ export default function DeveloperDashboard() {
 
         const result = await response.json();
         if (result.success) {
-            setActivationResult({
-                email: requestToActivate.email,
-                pass: activationPassword
-            });
+            setActivationResult({ email: requestToActivate.email, pass: activationPassword });
             toast({ title: 'تم التفعيل بنجاح' });
         } else {
             throw new Error(result.message || result.error);
         }
     } catch (e: any) {
-        toast({ 
-            variant: 'destructive', 
-            title: 'فشل التفعيل', 
-            description: e.message 
-        });
+        toast({ variant: 'destructive', title: 'فشل التفعيل', description: e.message });
     } finally {
         setIsProcessing(null);
     }
@@ -157,18 +150,28 @@ export default function DeveloperDashboard() {
     toast({ title: 'تم النسخ' });
   };
 
+  const handleEditCompany = (company: Company) => {
+    setCompanyToEdit(company);
+    setIsEditFormOpen(true);
+  };
+
   return (
     <div className="space-y-10" dir="rtl">
         <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden bg-slate-900">
             <CardHeader className="p-10 pb-8 bg-slate-950/60 border-b border-white/10">
-                <div className="flex items-center gap-6">
-                    <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-xl border-2 border-white/20">
-                        <Terminal className="h-10 w-10 text-white" />
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-6">
+                        <div className="p-4 bg-indigo-600 rounded-[2.2rem] shadow-xl border-2 border-white/20">
+                            <Terminal className="h-10 w-10 text-white" />
+                        </div>
+                        <div className="text-right text-white">
+                            <CardTitle className="text-4xl font-black tracking-tighter">غرفة التحكم الرئيسية</CardTitle>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت وتفعيل الحسابات الجديدة.</CardDescription>
+                        </div>
                     </div>
-                    <div className="text-right">
-                        <CardTitle className="text-4xl font-black text-white tracking-tighter">غرفة التحكم الرئيسية</CardTitle>
-                        <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت وتفعيل الحسابات الجديدة.</CardDescription>
-                    </div>
+                    <Button onClick={() => { setCompanyToEdit(null); setIsEditFormOpen(true); }} className="h-12 px-8 rounded-2xl font-black gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-900/40">
+                        <PlusCircle className="h-5 w-5" /> إضافة منشأة يدوياً
+                    </Button>
                 </div>
             </CardHeader>
         </Card>
@@ -188,10 +191,10 @@ export default function DeveloperDashboard() {
                     <Table>
                         <TableHeader className="bg-slate-100">
                             <TableRow>
-                                <TableHead className="px-10 font-black text-right">المنشأة والمالك</TableHead>
-                                <TableHead className="font-black text-center">التواصل</TableHead>
-                                <TableHead className="font-black text-center">التاريخ</TableHead>
-                                <TableHead className="text-left px-12 font-black">الإجراء</TableHead>
+                                <TableHead className="px-10 font-black text-right text-slate-900">المنشأة والمالك</TableHead>
+                                <TableHead className="font-black text-center text-slate-900">التواصل</TableHead>
+                                <TableHead className="font-black text-center text-slate-900">التاريخ</TableHead>
+                                <TableHead className="text-left px-12 font-black text-slate-900">الإجراء</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -286,6 +289,10 @@ export default function DeveloperDashboard() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none">
                                                     <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إدارة المنشأة</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => handleEditCompany(company)} className="rounded-xl py-3 font-bold gap-3">
+                                                        <Pencil className="h-4 w-4 text-indigo-600" /> تعديل إعدادات المنشأة
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
                                                     <DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50">
                                                         <Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً
                                                     </DropdownMenuItem>
@@ -301,7 +308,14 @@ export default function DeveloperDashboard() {
             </TabsContent>
         </Tabs>
 
-        {/* --- نافذة تفعيل الحسابات --- */}
+        {isEditFormOpen && (
+            <CompanyRegistrationForm 
+                isOpen={isEditFormOpen} 
+                onClose={() => { setIsEditFormOpen(false); setCompanyToEdit(null); }} 
+                company={companyToEdit} 
+            />
+        )}
+
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
             <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <DialogHeader className="p-8 bg-slate-900 text-white text-right">
@@ -386,7 +400,6 @@ export default function DeveloperDashboard() {
             </DialogContent>
         </Dialog>
 
-        {/* --- تأكيد الحذف --- */}
         <AlertDialog open={!!companyToDelete} onOpenChange={() => setCompanyToDelete(null)}>
             <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl bg-white">
                 <AlertDialogHeader>

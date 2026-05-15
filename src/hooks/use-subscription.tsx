@@ -28,7 +28,6 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
-    // نستخدم Hash للقيود لمنع إعادة التشغيل اللانهائية عند الرندرة
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
@@ -43,12 +42,10 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        // تحديد ما إذا كانت المجموعة عالمية (Master) أم تابعة لمنشأة (Tenant)
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ منع التشغيل إذا لم يستقر معرّف الشركة للمجموعات التابعة (حل مشكلة الـ Permissions)
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;
@@ -60,7 +57,6 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        // دعم الـ Collection Group بفلترة الشركة إجبارياً للامتثال لقواعد الحماية
         if (isGroup && tenantId) {
             finalPath = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
@@ -92,7 +88,6 @@ export function useSubscription<T extends { id?: string }>(
                     console.error(`Firestore Subscription Error [${finalPath}]:`, err);
                     setError(err);
                     setLoading(false); 
-                    // إذا فشل بسبب الصلاحيات، نعيد مصفوفة فارغة لفك جمود الواجهة
                     setData([]);
                 }
             );

@@ -55,6 +55,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry, Employee } from '@/lib/types';
 import { formatCurrency, cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
@@ -190,6 +191,12 @@ export default function ChartOfAccountsPage() {
     
     const loading = accountsLoading || entriesLoading;
 
+    const closeDialog = useCallback(() => {
+        setIsFormOpen(false);
+        setEditingAccount(null);
+        setParentAccount(null);
+    }, []);
+
     const accountBalances = useMemo(() => {
         if (!accounts || !journalEntries) return new Map<string, number>();
         const directBalances = new Map<string, number>();
@@ -267,7 +274,7 @@ export default function ChartOfAccountsPage() {
             const batch = writeBatch(firestore);
             const coaPath = getTenantPath('chartOfAccounts', user.currentCompanyId);
             const existingAccountsSnap = await getDocs(query(collection(firestore, coaPath)));
-            existingAccountsSnap.forEach(doc => batch.delete(doc.ref));
+            existingSnap.forEach(doc => batch.delete(doc.ref));
 
             defaultChartOfAccounts.forEach(account => {
                 batch.set(doc(collection(firestore, coaPath)), { ...account, companyId: user.currentCompanyId });

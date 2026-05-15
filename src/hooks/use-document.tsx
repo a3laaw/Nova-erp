@@ -28,8 +28,7 @@ export function useDocument<T extends { id?: string }>(
       return;
     }
 
-    // التحقق من نوع المجموعة
-    const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+    const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
     const isMasterCollection = masterCollections.some(mc => docPath.startsWith(mc));
     const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
 
@@ -56,7 +55,7 @@ export function useDocument<T extends { id?: string }>(
           (err) => {
             console.error(`Error listening to doc [${finalPath}]:`, err);
             setError(err);
-            setLoading(false); // فك القفل لضمان استقرار الواجهة
+            setLoading(false);
           }
         );
 
