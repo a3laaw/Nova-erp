@@ -35,6 +35,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
+    // 🛡️ بروتوكول المطور الأعلى (Master Architect)
+    // حساب واحد فقط يملك السيادة المطلقة على البنية التحتية
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -54,7 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let companyId: string | null = null;
         let globalUserData: any = null;
 
-        // 1. البحث في الفهرس العالمي بالبريد (أضمن لفك لغز الـ UID المتغير)
+        // 1. البحث في الفهرس العالمي بالبريد
         const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
         
@@ -63,24 +65,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             globalUserData = globalDoc.data();
             companyId = globalUserData.companyId;
 
-            // 🛡️ محرك الإصلاح الذاتي (UID Repair Engine)
-            // إذا وجدنا أن المعرف في جوجل يختلف عن المعرف المسجل في الملف
+            // محرك الإصلاح الذاتي للـ UID (في حال المسح والإعادة)
             if (globalUserData.uid !== firebaseUser.uid) {
-                console.log("Sovereign Repair: Updating UID linkage for account reset.");
+                console.log("Sovereign Repair: Updating UID linkage.");
                 const oldUid = globalUserData.uid;
-                
-                // تحديث المعرف في الفهرس العالمي
                 await updateDoc(globalDoc.ref, { uid: firebaseUser.uid });
-
-                // محاولة نقل/تحديث ملف المستخدم داخل المنشأة
                 if (companyId) {
                     const oldTenantRef = doc(firestore, `companies/${companyId}/users/${oldUid}`);
                     const oldTenantSnap = await getDoc(oldTenantRef);
-                    
                     if (oldTenantSnap.exists()) {
                         const userData = oldTenantSnap.data();
-                        const newTenantRef = doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`);
-                        await setDoc(newTenantRef, { ...userData, uid: firebaseUser.uid, id: firebaseUser.uid });
+                        await setDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`), { ...userData, uid: firebaseUser.uid, id: firebaseUser.uid });
                     }
                 }
             }

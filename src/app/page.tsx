@@ -11,22 +11,22 @@ import {
     ShieldCheck, 
     LogIn, 
     AlertCircle, 
-    User, 
-    Key, 
     Send,
     Database,
-    ArrowRight
+    ArrowRight,
+    PlusCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
 
 /**
- * بوابة العبور الموحدة (Sovereign Login Gateway V52.0).
- * تم التحديث: محاذاة مركزية مطلقة، منع الإكمال التلقائي، وحل لغز الـ UID.
+ * بوابة العبور الموحدة (Sovereign Login Gateway V53.0).
+ * تم التحديث: إضافة زر "انضمام المنشأة" بشكل بارز وتوسيط العناصر.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -49,8 +49,8 @@ export default function LoginPage() {
 
   const resolveEmail = async (id: string) => {
       const input = id.trim().toLowerCase();
-      // استثناءات المطور
-      if (input === 'alaa') return 'alaawaaheeb@gmail.com';
+      // استثناء المطور الرئيسي فقط
+      if (input === 'alaa' || input === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
       if (input.includes('@')) return input;
       
       if (firestore) {
@@ -68,7 +68,7 @@ export default function LoginPage() {
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setIdentifier(val);
-      // 🛡️ القاعدة السيادية: إذا تم مسح اليوزر، يتم مسح الباسورد فوراً
+      // 🛡️ الربط الذكي: إذا تم مسح اليوزر يتم مسح الباسورد فوراً
       if (val === '') {
           setPassword('');
       }
@@ -87,9 +87,7 @@ export default function LoginPage() {
         setLocalLoading(false);
         let msg = 'بيانات الدخول غير صحيحة.';
         if (error.code === 'auth/invalid-credential') {
-            msg = 'خطأ أمني: بيانات الدخول لا تطابق السجلات في هذا المشروع.';
-        } else if (error.code === 'auth/network-request-failed') {
-            msg = 'فشل الاتصال: يرجى التحقق من الإنترنت.';
+            msg = 'خطأ أمني: بيانات الدخول لا تطابق السجلات.';
         }
         setErrorMsg(msg);
     }
@@ -109,22 +107,22 @@ export default function LoginPage() {
       } finally { setLocalLoading(false); }
   };
 
-  const currentProjectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967';
+  const currentProjectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
         <CardHeader className="py-10 px-8 text-center border-b border-white/40 bg-white/20">
             <div className="bg-white/60 p-4 rounded-3xl w-fit mx-auto mb-4 border border-white shadow-lg">
-                {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" /> : <Key className="h-10 w-10 text-primary" />}
+                {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-[#1e1b4b]" /> : <Send className="h-10 w-10 text-primary" />}
             </div>
             <CardTitle className="text-3xl font-black text-[#1e1b4b]">Nova ERP</CardTitle>
-            <CardDescription className="text-[#1e1b4b]/60 font-bold uppercase tracking-widest text-[10px]">بوابة العبور السيادية</CardDescription>
+            <CardDescription className="text-[#1e1b4b]/60 font-black uppercase tracking-widest text-[10px]">بوابة العبور السيادية</CardDescription>
         </CardHeader>
         
         <CardContent className="p-8 space-y-6">
             {errorMsg && (
-                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50 border-red-200 animate-in shake-in">
+                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50 border-red-200">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="text-[11px] font-black">فشل التحقق</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold">{errorMsg}</AlertDescription>
@@ -132,9 +130,9 @@ export default function LoginPage() {
             )}
 
             {mode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-5" autoComplete="off">
+                <form onSubmit={handleLogin} className="space-y-6" autoComplete="off">
                     <div className="grid gap-2">
-                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-center">اسم المستخدم أو البريد</Label>
+                        <Label className="font-black text-[10px] pr-1 uppercase tracking-widest text-center text-slate-500">اسم المستخدم أو البريد</Label>
                         <div className="relative">
                             <Input 
                                 value={identifier} 
@@ -148,9 +146,7 @@ export default function LoginPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <div className="flex justify-center items-center">
-                            <Label className="font-black text-[10px] uppercase tracking-widest">كلمة المرور</Label>
-                        </div>
+                        <Label className="font-black text-[10px] uppercase tracking-widest text-center text-slate-500">كلمة المرور</Label>
                         <div className="relative">
                             <Input 
                                 type="password" 
@@ -171,6 +167,19 @@ export default function LoginPage() {
                         {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
                         دخول للنظام
                     </Button>
+
+                    {/* 🛡️ قسم طلب انضمام المنشأة - مبرز بوضوح سيادي 🛡️ */}
+                    <div className="pt-6 border-t border-black/5 mt-2 flex flex-col items-center gap-4">
+                        <div className="text-center w-full">
+                            <p className="text-[11px] font-bold text-slate-500 mb-4">هل تملك منشأة هندسية أو تجارية؟</p>
+                            <Button asChild variant="outline" className="w-full h-14 rounded-2xl border-2 border-dashed border-primary/40 text-primary font-black gap-3 hover:bg-primary/10 transition-all hover:scale-[1.02] shadow-sm">
+                                <Link href="/register">
+                                    <PlusCircle className="h-6 w-6" />
+                                    اطلب انضمام منشأتك الآن
+                                </Link>
+                            </Button>
+                        </div>
+                    </div>
                 </form>
             ) : (
                 <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
