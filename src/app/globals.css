@@ -48,17 +48,17 @@
 
   body {
     background-color: #F8FAFC;
-    /* 🎨 Sovereign Fluid Mesh V62.0: 20% Lighter Grays Intertwined with Tech Orange */
+    /* 🎨 Sovereign Ultra-Luminous Mesh V63.0: 40% Lighter Base than original */
     background-image: 
-      radial-gradient(at 0% 0%, #64748B 0px, transparent 65%),       /* Lighter Slate 500 */
-      radial-gradient(at 100% 0%, #CBD5E1 0px, transparent 60%),     /* Lighter Slate 300 */
-      radial-gradient(at 100% 100%, #F1F5F9 0px, transparent 70%),   /* Clean Base */
-      radial-gradient(at 0% 100%, #94A3B8 0px, transparent 60%),     /* Medium Soft Gray */
-      radial-gradient(at 35% 35%, rgba(255, 122, 0, 0.22) 0px, transparent 65%), /* Vivid Orange Streak */
-      radial-gradient(at 75% 65%, rgba(255, 166, 17, 0.12) 0px, transparent 55%); /* Warm Gold Blend */
+      radial-gradient(at 0% 0%, #E2E8F0 0px, transparent 65%),       /* Ultra Light Slate 200 */
+      radial-gradient(at 100% 0%, #F1F5F9 0px, transparent 60%),     /* Luminous Slate 100 */
+      radial-gradient(at 100% 100%, #F8FAFC 0px, transparent 70%),   /* Pure Ice Base */
+      radial-gradient(at 0% 100%, #CBD5E1 0px, transparent 60%),     /* Soft Pearl Gray */
+      radial-gradient(at 35% 35%, rgba(255, 122, 0, 0.15) 0px, transparent 65%), /* Subtle Orange Pulse */
+      radial-gradient(at 75% 65%, rgba(255, 166, 17, 0.08) 0px, transparent 55%); /* Whispering Gold Blend */
     background-attachment: fixed;
     background-size: 200% 200%;
-    animation: mesh-flow 18s ease-in-out infinite;
+    animation: mesh-flow 22s ease-in-out infinite;
     color: #1E293B;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
