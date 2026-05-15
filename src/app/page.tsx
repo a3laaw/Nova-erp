@@ -12,7 +12,6 @@ import {
     LogIn, 
     AlertCircle, 
     Send,
-    Database,
     ArrowRight,
     PlusCircle
 } from 'lucide-react';
@@ -21,16 +20,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 
 /**
- * بوابة العبور الموحدة (Sovereign Login Gateway V53.0).
- * تم التحديث: إضافة زر "انضمام المنشأة" بشكل بارز وتوسيط العناصر.
+ * بوابة العبور الموحدة (Sovereign Login Gateway V54.0).
+ * تم التطهير: إزالة النصوص التعريفية وكود المشروع بناءً على طلبك.
+ * تم الحفاظ على: التوسيط، منع Autofill، ومسح الباسورد المرتبط.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
-  const { firestore, app } = useFirebase();
+  const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -107,8 +106,6 @@ export default function LoginPage() {
       } finally { setLocalLoading(false); }
   };
 
-  const currentProjectId = (app as any)?.options?.projectId || 'nov-erp-1-25549967-c24e5';
-
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       <Card className="w-full max-w-md rounded-[2.5rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
@@ -168,10 +165,8 @@ export default function LoginPage() {
                         دخول للنظام
                     </Button>
 
-                    {/* 🛡️ قسم طلب انضمام المنشأة - مبرز بوضوح سيادي 🛡️ */}
                     <div className="pt-6 border-t border-black/5 mt-2 flex flex-col items-center gap-4">
                         <div className="text-center w-full">
-                            <p className="text-[11px] font-bold text-slate-500 mb-4">هل تملك منشأة هندسية أو تجارية؟</p>
                             <Button asChild variant="outline" className="w-full h-14 rounded-2xl border-2 border-dashed border-primary/40 text-primary font-black gap-3 hover:bg-primary/10 transition-all hover:scale-[1.02] shadow-sm">
                                 <Link href="/register">
                                     <PlusCircle className="h-6 w-6" />
@@ -198,11 +193,6 @@ export default function LoginPage() {
                     </button>
                 </form>
             )}
-            
-            <div className="pt-4 flex items-center justify-center gap-2 opacity-20">
-                <Database className="h-3 w-3" />
-                <span className="text-[8px] font-mono font-bold">{currentProjectId}</span>
-            </div>
         </CardContent>
       </Card>
       
