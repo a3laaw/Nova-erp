@@ -44,7 +44,7 @@ export default function LoginPage() {
       const val = e.target.value;
       setIdentifier(val);
       if (val === '') {
-          setPassword(''); // 🛡️ الارتباط الذكي للحذف
+          setPassword('');
       }
   };
 
@@ -78,12 +78,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       <Card className="w-full max-w-md rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
-        <CardHeader className="py-12 px-8 text-center border-b border-orange-100 bg-white/40">
+        <CardHeader className="py-12 px-8 text-center border-b border-orange-100 bg-white/20">
             <div className="bg-primary p-5 rounded-[2rem] w-fit mx-auto mb-6 shadow-xl shadow-orange-200 border-4 border-white">
                 {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-white" /> : <Send className="h-10 w-10 text-white" />}
             </div>
             <CardTitle className="text-4xl font-black text-slate-900 tracking-tighter">Nova ERP</CardTitle>
-            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">SaaS Enterprise Edition</CardDescription>
+            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">Corporate Suite</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8 bg-white/20">

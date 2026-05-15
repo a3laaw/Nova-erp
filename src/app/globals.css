@@ -6,31 +6,31 @@
 
 @layer base {
   :root {
-    /* SaaS Enterprise Design System Colors - Orange & Gold Theme */
-    --background: 210 40% 98%; /* #F8FAFC Neutral */
+    /* SaaS Enterprise Design System - Professional Corporate Theme */
+    --background: 210 40% 98%; /* #F4F5F7 */
     --foreground: 222 47% 11%;
     --card: 0 0% 100% / 0.7;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
-    --primary: 31 92% 51%; /* #F5820D Primary Orange */
+    --primary: 29 100% 50%; /* #FF7A00 Tech Orange */
     --primary-foreground: 210 40% 98%;
     
-    --secondary: 37 100% 53%; /* #FFA611 Secondary Orange */
+    --secondary: 214 32% 91%; /* #E2E8F0 Deep Slate */
     --secondary-foreground: 222 47% 11%;
     
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
     
-    --accent: 45 100% 58%; /* #FFCB2B Tertiary Gold */
+    --accent: 45 100% 98%; /* #FFFDF9 Warm Ivory */
     --accent-foreground: 222 47% 11%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 31 92% 51%;
+    --ring: 29 100% 50%;
     --radius: 2rem;
   }
 }
@@ -39,18 +39,25 @@
   * { 
     @apply border-border; 
     /* 🛡️ إخفاء شريط التمرير عالمياً مع الحفاظ على الوظيفة */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; 
+    -ms-overflow-style: none;
   }
 
   *::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+    display: none;
   }
 
   body {
-    /* خلفية دافئة واحترافية متوافقة مع التصميم الجديد */
-    background: linear-gradient(135deg, #f8fafc 0%, #fff7ed 50%, #fef3c7 100%);
+    background-color: #F4F5F7;
+    background-image: 
+      radial-gradient(at 0% 0%, #E2E8F0 0px, transparent 50%),
+      radial-gradient(at 100% 0%, #FFFDF9 0px, transparent 50%),
+      radial-gradient(at 100% 100%, #E2E8F0 0px, transparent 50%),
+      radial-gradient(at 0% 100%, #FFFDF9 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(255, 122, 0, 0.08) 0px, transparent 50%);
     background-attachment: fixed;
+    background-size: 200% 200%;
+    animation: mesh-flow 25s ease infinite;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -59,23 +66,29 @@
   }
 }
 
+@keyframes mesh-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 8px 32px 0 rgba(245, 130, 13, 0.05);
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(100px); /* Ultra-high blur for matte finish */
+    -webkit-backdrop-filter: blur(100px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.03);
   }
 
   .nav-capsule-active {
-    background: #F5820D !important;
+    background: #FF7A00 !important;
     @apply text-white font-black scale-[1.02] shadow-lg border-none;
   }
 
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.5) !important;
-    border: 1px solid rgba(245, 130, 13, 0.1) !important;
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
     @apply text-slate-700 font-bold hover:bg-orange-50 hover:text-primary transition-all duration-300;
   }
 }
