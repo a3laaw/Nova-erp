@@ -50,13 +50,12 @@ export function getTenantPath(path: string, tenantId: string | null | undefined)
   if (!tenantId) return path;
   
   // مجموعات مشروع الماستر (لا يتم عزلها لأنها عالمية للإدارة والمطور)
-  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+  const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
   
   const isMaster = masterCollections.some(mc => path.startsWith(mc));
   if (isMaster) return path;
 
   // توجيه كافة البيانات إلى: companies/{tenantId}/{collectionName}
-  // إذا كان المسار يبدأ بـ companies بالفعل، نتركه كما هو لخدمة المطور
   if (path.startsWith('companies/')) return path;
 
   return `companies/${tenantId}/${path}`;

@@ -20,19 +20,28 @@ import type {
 const EMPTY_CONSTRAINTS: any[] = [];
 
 /**
- * محرك البيانات التحليلية اللحظي المطور:
+ * محرك البيانات التحليلية اللحظي المطور (V66.0):
  * تم تحصينه بـ "حواجز الحماية" لمنع طلب البيانات قبل استقرار هوية المنشأة.
  */
 export function useAnalyticalData() {
   const { firestore } = useFirebase();
   const { user, loading: authLoading } = useAuth();
 
-  // 🛡️ صمام أمان: إذا لم تكتمل المصادقة، لا تبدأ جلب البيانات
-  const canFetch = !!firestore && !!user?.currentCompanyId;
+  // 🛡️ صمام أمان سيادي: لا تبدأ جلب البيانات إلا بعد استقرار هوية المنشأة (Tenant ID)
+  const tenantId = user?.currentCompanyId;
+  const canFetch = !!firestore && !!tenantId;
 
   const { data: journalEntries = [], loading: jesLoading } = useSubscription<JournalEntry>(firestore, canFetch ? 'journalEntries' : null);
   const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, canFetch ? 'clients' : null);
-  const { data: rawTransactions = [], loading: txsLoading } = useSubscription<ClientTransaction>(firestore, canFetch ? 'transactions' : null, EMPTY_CONSTRAINTS, true);
+  
+  // 🛡️ معالجة معاملات العملاء (Collection Group) بفلترة الشركة إجبارياً
+  const { data: rawTransactions = [], loading: txsLoading } = useSubscription<ClientTransaction>(
+      firestore, 
+      canFetch ? 'transactions' : null, 
+      EMPTY_CONSTRAINTS, 
+      true
+  );
+
   const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, canFetch ? 'employees' : null);
   const { data: departments = [], loading: deptsLoading } = useSubscription<Department>(firestore, canFetch ? 'departments' : null);
   const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, canFetch ? 'chartOfAccounts' : null);
@@ -50,10 +59,8 @@ export function useAnalyticalData() {
   }, [rawTransactions]);
 
   const loading = 
-    authLoading || !canFetch ||
-    jesLoading || clientsLoading || txsLoading || 
-    employeesLoading || deptsLoading || accountsLoading || 
-    apptsLoading || projectsLoading || rfqsLoading || posLoading;
+    authLoading || 
+    (canFetch && (jesLoading || clientsLoading || txsLoading || employeesLoading || deptsLoading || accountsLoading || apptsLoading || projectsLoading || rfqsLoading || posLoading));
 
   return { 
     journalEntries,
