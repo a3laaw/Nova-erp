@@ -88,9 +88,8 @@ const navItems = {
     },
     { 
       label: 'CRM و إدارة العملاء',
-      icon: FileSignature,
+      icon: UsersRound,
       roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
-      hrefPrefix: '/dashboard/contracts',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
         { href: '/dashboard/clients?view=prospective', label: 'العملاء المحتملون', icon: Search },
@@ -102,7 +101,6 @@ const navItems = {
       label: 'المحاسبة والمالية', 
       icon: Landmark, 
       roles: ['Developer', 'Admin', 'Accountant'],
-      hrefPrefix: '/dashboard/accounting',
       children: [
         { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
         { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية العامة', icon: BookOpen },
@@ -120,7 +118,6 @@ const navItems = {
       label: 'المقاولات والقياسات',
       icon: PencilRuler,
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
-      hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
         { href: '/dashboard/construction/projects', label: 'المشاريع التنفيذية', icon: Briefcase },
@@ -132,7 +129,6 @@ const navItems = {
       label: 'المخازن والمشتريات',
       icon: Package,
       roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
-      hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Package },
         { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام (GRN)', icon: FileCheck },
@@ -147,7 +143,6 @@ const navItems = {
       label: 'تقارير الأداء الفني',
       icon: BarChart3,
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
-      hrefPrefix: '/dashboard/reports/operational-hub',
       children: [
         { href: '/dashboard/reports/operational-hub', label: 'الذكاء العملياتي (COO)', icon: Activity },
         { href: '/dashboard/construction/field-visits/reports', label: 'الأداء الميداني', icon: MapPin },
@@ -157,12 +152,11 @@ const navItems = {
       label: 'شؤون الموظفين (HR)', 
       icon: Users, 
       roles: ['Developer', 'Admin', 'HR'],
-      hrefPrefix: '/dashboard/hr',
       children: [
         { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
         { href: '/dashboard/hr/leaves', label: 'طلبات الإجازات', icon: CalendarCheck },
         { href: '/dashboard/hr/permissions', label: 'إدارة الاستئذانات', icon: Clock },
-        { href: '/dashboard/hr/permissions', label: 'رواتب الموظفين', icon: Banknote },
+        { href: '/dashboard/hr/payroll', label: 'رواتب الموظفين', icon: Banknote },
         { href: '/dashboard/hr/reports', label: 'تقارير الموارد البشرية', icon: FileText },
       ]
     },
@@ -170,7 +164,6 @@ const navItems = {
       label: 'الإعدادات والبيانات', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
-      hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings/branding', label: 'الهوية البصرية', icon: Palette },
         { href: '/dashboard/settings/reference-data', label: 'البيانات المرجعية', icon: Network },
@@ -194,7 +187,6 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
         "my-2 h-11 rounded-xl transition-all duration-300 flex items-center w-full px-4",
         "group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
         isActive ? "nav-capsule-active" : "nav-capsule",
-        "text-[#1E293B]", // 🛡️ Force dark text consistently
         className
       )}
       asChild={asChild}
@@ -220,7 +212,17 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   const { setOpenMobile, state } = useSidebar();
   const Icon = item.icon;
   if (item.roles && !item.roles.includes(userRole)) return null;
-  const isActive = item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : (item.href ? currentPath === item.href : false);
+
+  // 🛡️ ذكاء التنشيط السيادي: تفعيل الأب إذا كان أي ابن نشطاً
+  const isAnyChildActive = React.useMemo(() => {
+    if (!item.children) return false;
+    return item.children.some((child: any) => {
+        const baseUrl = child.href.split('?')[0];
+        return currentPath.startsWith(baseUrl);
+    });
+  }, [item.children, currentPath]);
+
+  const isActive = item.href ? currentPath === item.href : isAnyChildActive;
 
   if (!item.children && item.href) {
     return (
@@ -230,7 +232,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <span className="flex-1 text-right truncate text-[13px] font-bold group-data-[collapsible=icon]:hidden">
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0 text-[#1E293B]", isActive ? "opacity-100" : "opacity-60")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -249,11 +251,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <BaseSidebarMenuButton 
                       isActive={isActive} 
                       className={cn(
-                        "my-2 size-12 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto text-[#1E293B]",
+                        "my-2 size-12 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto",
                         isActive ? "nav-capsule-active" : "nav-capsule"
                       )}
                     >
-                      {Icon && <Icon className={cn("size-5 text-[#1E293B]", isActive ? "opacity-100" : "opacity-60")} />}
+                      {Icon && <Icon className="size-5" />}
                     </BaseSidebarMenuButton>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
@@ -267,7 +269,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer focus:bg-slate-100 text-[#1E293B]">
                     <Link href={child.href} className="flex items-center justify-between w-full">
                         <span className="font-bold text-xs">{child.label}</span>
-                        {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40 text-[#1E293B]" />}
+                        {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
                     </Link>
                     </DropdownMenuItem>
                 ))}
@@ -284,18 +286,18 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full">
-                <ChevronLeft className="h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20 text-[#1E293B]" />
-                <span className="text-right truncate text-[13px] font-bold flex-1 text-[#1E293B]">
+                <ChevronLeft className="h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20" />
+                <span className="text-right truncate text-[13px] font-bold flex-1">
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-[#1E293B]", isActive ? "opacity-100" : "opacity-60")} />}
+                {Icon && <Icon className="size-5 shrink-0 ml-3" />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 border-none pr-4">
               {item.children.map((child: any) => {
-                const isChildActive = currentPath === child.href;
+                const isChildActive = currentPath === child.href.split('?')[0];
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
@@ -306,8 +308,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className="text-[11px] font-bold truncate flex-1 text-right text-[#1E293B]">{child.label}</span>
-                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3 text-[#1E293B]", isChildActive ? "opacity-100" : "opacity-40")} />}
+                            <span className="text-[11px] font-bold truncate flex-1 text-right">{child.label}</span>
+                            {child.icon && <child.icon className="h-4 w-4 ml-3" />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>

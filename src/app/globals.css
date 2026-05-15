@@ -48,14 +48,14 @@
 
   body {
     background-color: #F8FAFC;
-    /* 🎨 Sovereign Ultra-Luminous Mesh V63.0: 40% Lighter Base than original */
+    /* 🎨 Sovereign Ultra-Luminous Mesh V63.0 */
     background-image: 
-      radial-gradient(at 0% 0%, #E2E8F0 0px, transparent 65%),       /* Ultra Light Slate 200 */
-      radial-gradient(at 100% 0%, #F1F5F9 0px, transparent 60%),     /* Luminous Slate 100 */
-      radial-gradient(at 100% 100%, #F8FAFC 0px, transparent 70%),   /* Pure Ice Base */
-      radial-gradient(at 0% 100%, #CBD5E1 0px, transparent 60%),     /* Soft Pearl Gray */
-      radial-gradient(at 35% 35%, rgba(255, 122, 0, 0.15) 0px, transparent 65%), /* Subtle Orange Pulse */
-      radial-gradient(at 75% 65%, rgba(255, 166, 17, 0.08) 0px, transparent 55%); /* Whispering Gold Blend */
+      radial-gradient(at 0% 0%, #E2E8F0 0px, transparent 65%),
+      radial-gradient(at 100% 0%, #F1F5F9 0px, transparent 60%),
+      radial-gradient(at 100% 100%, #F8FAFC 0px, transparent 70%),
+      radial-gradient(at 0% 100%, #CBD5E1 0px, transparent 60%),
+      radial-gradient(at 35% 35%, rgba(255, 122, 0, 0.15) 0px, transparent 65%),
+      radial-gradient(at 75% 65%, rgba(255, 166, 17, 0.08) 0px, transparent 55%);
     background-attachment: fixed;
     background-size: 200% 200%;
     animation: mesh-flow 22s ease-in-out infinite;
@@ -96,17 +96,33 @@
   .nav-capsule {
     background: rgba(255, 255, 255, 0.18) !important;
     border: 1px solid rgba(255, 255, 255, 0.25) !important;
-    @apply text-[#1E293B] font-bold transition-all duration-300 shadow-sm mb-1.5;
+    color: #1E293B !important;
+    @apply font-bold transition-all duration-300 shadow-sm mb-1.5;
   }
 
-  /* Navigation Items - Ice-White Reactive State (Active/Hover) */
-  .nav-capsule:hover, .nav-capsule-active {
-    background: rgba(255, 255, 255, 0.98) !important; /* Solid Ice-White */
-    @apply text-[#1E293B] font-black scale-[1.02] border-none shadow-md;
+  /* Navigation Items - Silver-White Hover State */
+  .nav-capsule:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    color: #1E293B !important;
+    @apply font-black scale-[1.02] border-none shadow-md;
+  }
+
+  /* 🟠 Sovereign Active State - Tech Orange Background with Black Text */
+  .nav-capsule-active {
+    background: #FF7A00 !important; /* Tech Orange */
+    color: #1E293B !important; /* Black/Navy text for visibility */
+    @apply font-black scale-[1.02] border-none shadow-lg !important;
+  }
+
+  /* Ensure icons and text stay black in the sidebar regardless of state */
+  .nav-capsule svg, .nav-capsule-active svg {
+    color: #1E293B !important;
+    opacity: 1 !important;
+    transition: all 0.3s ease;
   }
 
   .nav-capsule-active {
-    @apply border-r-4 border-[#FF7A00] !important; 
+    @apply border-r-4 border-[#1E293B] !important; 
   }
 }
 
