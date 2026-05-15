@@ -6,25 +6,31 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    /* SaaS Enterprise Design System Colors */
+    --background: 210 40% 98%; /* #F8FAFC Neutral */
     --foreground: 222 47% 11%;
-    --card: 0 0% 100% / 0.4;
+    --card: 0 0% 100% / 0.7;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 221.2 83.2% 53.3%; /* Blue-Indigo Professional */
+    
+    --primary: 31 92% 51%; /* #F5820D Primary Orange */
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
+    
+    --secondary: 37 100% 53%; /* #FFA611 Secondary Orange */
     --secondary-foreground: 222 47% 11%;
+    
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    
+    --accent: 45 100% 58%; /* #FFCB2B Tertiary Gold */
     --accent-foreground: 222 47% 11%;
+    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 31 92% 51%;
     --radius: 2rem;
   }
 }
@@ -42,7 +48,8 @@
   }
 
   body {
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 50%, #f0f9ff 100%);
+    /* خلفية دافئة واحترافية متوافقة مع التصميم الجديد */
+    background: linear-gradient(135deg, #f8fafc 0%, #fff7ed 50%, #fef3c7 100%);
     background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
@@ -54,11 +61,22 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px 0 rgba(245, 130, 13, 0.05);
+  }
+
+  .nav-capsule-active {
+    background: #F5820D !important;
+    @apply text-white font-black scale-[1.02] shadow-lg border-none;
+  }
+
+  .nav-capsule {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border: 1px solid rgba(245, 130, 13, 0.1) !important;
+    @apply text-slate-700 font-bold hover:bg-orange-50 hover:text-primary transition-all duration-300;
   }
 }
 

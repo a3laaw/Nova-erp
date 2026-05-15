@@ -13,7 +13,8 @@ import {
     AlertCircle, 
     Send,
     ArrowRight,
-    PlusCircle
+    PlusCircle,
+    Key
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,11 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
-/**
- * بوابة العبور الموحدة (Sovereign Login Gateway V55.0).
- * تم التطهير البصري: إخفاء شريط التمرير، وتوسيط المحتوى، ومنع الإكمال التلقائي تماماً.
- */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
   const { firestore } = useFirebase();
@@ -45,23 +43,6 @@ export default function LoginPage() {
     }
   }, [user, loading, router]);
 
-  const resolveEmail = async (id: string) => {
-      const input = id.trim().toLowerCase();
-      if (input === 'alaa' || input === 'alaawaaheeb@gmail.com') return 'alaawaaheeb@gmail.com';
-      if (input.includes('@')) return input;
-      
-      if (firestore) {
-          try {
-              const q = query(collection(firestore, 'global_users'), where('username', '==', input), limit(1));
-              const snap = await getDocs(q);
-              if (!snap.empty) return snap.docs[0].data().email;
-          } catch (e) { 
-              console.warn("Username resolving skipped."); 
-          }
-      }
-      return input;
-  };
-
   const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setIdentifier(val);
@@ -77,15 +58,10 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     try {
-        const finalEmail = await resolveEmail(identifier);
-        await login(finalEmail, password);
+        await login(identifier.trim().toLowerCase(), password);
     } catch (error: any) {
         setLocalLoading(false);
-        let msg = 'بيانات الدخول غير صحيحة.';
-        if (error.code === 'auth/invalid-credential') {
-            msg = 'خطأ أمني: بيانات الدخول لا تطابق السجلات.';
-        }
-        setErrorMsg(msg);
+        setErrorMsg('بيانات الدخول غير صحيحة.');
     }
   };
 
@@ -94,9 +70,8 @@ export default function LoginPage() {
       if (localLoading || !identifier) return;
       setLocalLoading(true);
       try {
-          const finalEmail = await resolveEmail(identifier);
-          await resetPassword(finalEmail);
-          toast({ title: 'تم الإرسال', description: 'راجع بريدك الإلكتروني لتعيين كلمة مرور جديدة.' });
+          await resetPassword(identifier.trim().toLowerCase());
+          toast({ title: 'تم الإرسال', description: 'راجع بريدك لإعادة تعيين كلمة المرور.' });
           setMode('login');
       } catch (error: any) {
           setErrorMsg(error.message);
@@ -106,19 +81,19 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       <Card className="w-full max-w-md rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
-        <CardHeader className="py-12 px-8 text-center border-b border-black/5">
-            <div className="bg-white p-5 rounded-[2rem] w-fit mx-auto mb-6 shadow-xl border border-slate-100">
-                {mode === 'login' ? <ShieldCheck className="h-12 w-12 text-primary" /> : <Send className="h-12 w-12 text-primary" />}
+        <CardHeader className="py-12 px-8 text-center border-b border-orange-100 bg-white/40">
+            <div className="bg-primary p-5 rounded-[2rem] w-fit mx-auto mb-6 shadow-xl shadow-orange-200 border-4 border-white">
+                {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-white" /> : <Send className="h-10 w-10 text-white" />}
             </div>
             <CardTitle className="text-4xl font-black text-slate-900 tracking-tighter">Nova ERP</CardTitle>
-            <CardDescription className="text-slate-500 font-bold mt-2 uppercase tracking-widest text-[11px]">نظام الإدارة السيادي</CardDescription>
+            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">SaaS Enterprise Edition</CardDescription>
         </CardHeader>
         
-        <CardContent className="p-10 space-y-8">
+        <CardContent className="p-10 space-y-8 bg-white/20">
             {errorMsg && (
-                <Alert variant="destructive" className="rounded-2xl border-2 bg-red-50 border-red-200 animate-in slide-in-from-top-2">
+                <Alert variant="destructive" className="rounded-2xl border-2 animate-in slide-in-from-top-2">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">فشل التحقق</AlertTitle>
+                    <AlertTitle className="text-[11px] font-black">خطأ في التحقق</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold">{errorMsg}</AlertDescription>
                 </Alert>
             )}
@@ -130,7 +105,7 @@ export default function LoginPage() {
                         <Input 
                             value={identifier} 
                             onChange={handleIdentifierChange} 
-                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/50 focus:bg-white transition-all shadow-inner" 
+                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all shadow-inner border-orange-50" 
                             required 
                             placeholder="Username / Email"
                             autoComplete="off"
@@ -143,7 +118,7 @@ export default function LoginPage() {
                             type="password" 
                             value={password} 
                             onChange={e => setPassword(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/50 focus:bg-white transition-all shadow-inner" 
+                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white transition-all shadow-inner border-orange-50" 
                             required 
                             placeholder="••••••••"
                             autoComplete="new-password"
@@ -153,12 +128,12 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={localLoading} className="w-full h-16 rounded-[2rem] font-black text-2xl gap-4 shadow-xl bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all">
+                    <Button type="submit" disabled={localLoading} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all border-none">
                         {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
                         دخول للنظام
                     </Button>
 
-                    <div className="pt-8 border-t border-black/5 flex flex-col items-center">
+                    <div className="pt-8 border-t border-orange-100 flex flex-col items-center">
                         <Button asChild variant="ghost" className="text-slate-500 font-bold gap-2 hover:bg-primary/5 rounded-xl h-10 px-6 transition-all group">
                             <Link href="/register">
                                 <PlusCircle className="h-4 w-4 group-hover:rotate-90 transition-transform" />
@@ -171,7 +146,7 @@ export default function LoginPage() {
                 <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
                     <div className="grid gap-3">
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني المسجل</Label>
-                        <Input value={identifier} onChange={handleIdentifierChange} className="h-14 rounded-2xl border-2 text-center font-bold text-lg" required placeholder="example@email.com" autoComplete="off" />
+                        <Input value={identifier} onChange={handleIdentifierChange} className="h-14 rounded-2xl border-2 text-center font-bold text-lg border-orange-50 bg-white/60" required placeholder="your@email.com" autoComplete="off" />
                     </div>
                     <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
                         {localLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
@@ -184,10 +159,6 @@ export default function LoginPage() {
             )}
         </CardContent>
       </Card>
-      
-      <div className="fixed bottom-10 left-10 z-0 opacity-5 select-none pointer-events-none">
-          <p className="text-[#1e1b4b] font-black text-[150px] leading-none">ERP</p>
-      </div>
     </div>
   );
 }
