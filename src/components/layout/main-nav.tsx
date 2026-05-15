@@ -184,8 +184,8 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
     <BaseSidebarMenuButton
       isActive={isActive}
       className={cn(
-        "my-2 h-11 rounded-xl transition-all duration-300 flex items-center w-full px-4",
-        "group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
+        "my-2 h-12 rounded-xl transition-all duration-300 flex items-center w-full px-4",
+        "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
         isActive ? "nav-capsule-active" : "nav-capsule",
         className
       )}
@@ -200,7 +200,7 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="left" align="center" className="font-black bg-[#FF7A00] text-white border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
+          <TooltipContent side="left" align="center" className="font-black bg-[#FF7A00] text-[#1E293B] border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -213,7 +213,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   const Icon = item.icon;
   if (item.roles && !item.roles.includes(userRole)) return null;
 
-  // 🛡️ ذكاء التنشيط السيادي: تفعيل الأب إذا كان أي ابن نشطاً
   const isAnyChildActive = React.useMemo(() => {
     if (!item.children) return false;
     return item.children.some((child: any) => {
@@ -229,10 +228,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            <span className="flex-1 text-right truncate text-[13px] font-bold group-data-[collapsible=icon]:hidden">
+            <span className="flex-1 text-right truncate text-[13px] font-black group-data-[collapsible=icon]:hidden">
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0")} />}
+            {Icon && <Icon className={cn("size-6 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -251,28 +250,34 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <BaseSidebarMenuButton 
                       isActive={isActive} 
                       className={cn(
-                        "my-2 size-12 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto",
+                        "my-2 size-14 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto shadow-sm border",
                         isActive ? "nav-capsule-active" : "nav-capsule"
                       )}
                     >
-                      {Icon && <Icon className="size-5" />}
+                      {Icon && <Icon className="size-6" />}
                     </BaseSidebarMenuButton>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="font-black bg-[#1E293B] text-white border-none rounded-lg">{item.label}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <DropdownMenuContent side="left" align="start" className="w-64 rounded-2xl p-2 shadow-2xl bg-white/95 backdrop-blur-xl border-slate-200 text-slate-900" dir="rtl">
-              <DropdownMenuLabel className="font-black text-slate-400 text-[10px] uppercase tracking-widest px-3 py-2 border-b border-slate-100 mb-1">{item.label}</DropdownMenuLabel>
+            <DropdownMenuContent side="left" align="start" className="w-72 rounded-[1.8rem] p-2 shadow-[0_20px_50px_rgba(0,0,0,0.15)] bg-white/95 backdrop-blur-xl border-slate-200 text-slate-900" dir="rtl">
+              <DropdownMenuLabel className="font-black text-slate-400 text-[10px] uppercase tracking-widest px-4 py-3 border-b border-slate-100 mb-2">{item.label}</DropdownMenuLabel>
               <ScrollArea className="max-h-[70vh]">
-                {item.children.map((child: any) => (
-                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer focus:bg-slate-100 text-[#1E293B]">
-                    <Link href={child.href} className="flex items-center justify-between w-full">
-                        <span className="font-bold text-xs">{child.label}</span>
-                        {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
-                    </Link>
-                    </DropdownMenuItem>
-                ))}
+                {item.children.map((child: any) => {
+                    const isChildActive = currentPath === child.href.split('?')[0];
+                    return (
+                        <DropdownMenuItem key={child.href} asChild className={cn(
+                            "rounded-xl py-3 px-4 cursor-pointer mb-1 transition-all",
+                            isChildActive ? "bg-[#FF7A00]/10 text-[#1E293B] font-black" : "hover:bg-slate-100 text-[#1E293B]"
+                        )}>
+                            <Link href={child.href} className="flex items-center justify-between w-full">
+                                <span className="font-black text-xs">{child.label}</span>
+                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-[#1E293B]" : "opacity-40")} />}
+                            </Link>
+                        </DropdownMenuItem>
+                    );
+                })}
               </ScrollArea>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -287,10 +292,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full">
                 <ChevronLeft className="h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20" />
-                <span className="text-right truncate text-[13px] font-bold flex-1">
+                <span className="text-right truncate text-[13px] font-black flex-1">
                     {item.label}
                 </span>
-                {Icon && <Icon className="size-5 shrink-0 ml-3" />}
+                {Icon && <Icon className="size-6 shrink-0 ml-3" />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -308,7 +313,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className="text-[11px] font-bold truncate flex-1 text-right">{child.label}</span>
+                            <span className="text-[11px] font-black truncate flex-1 text-right">{child.label}</span>
                             {child.icon && <child.icon className="h-4 w-4 ml-3" />}
                         </div>
                       </Link>
@@ -356,7 +361,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
 
       <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2">
         <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/20 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-            <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-white font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
+            <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-[#1E293B] font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">

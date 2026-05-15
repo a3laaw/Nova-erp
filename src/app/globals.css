@@ -94,8 +94,8 @@
 
   /* Navigation Items - Translucent Base */
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.18) !important;
-    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    background: rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.8) !important;
     color: #1E293B !important;
     @apply font-bold transition-all duration-300 shadow-sm mb-1.5;
   }
@@ -114,13 +114,14 @@
     @apply font-black scale-[1.02] border-none shadow-lg !important;
   }
 
-  /* Ensure icons and text stay black in the sidebar regardless of state */
+  /* Ensure icons and text stay black regardless of state */
   .nav-capsule svg, .nav-capsule-active svg {
     color: #1E293B !important;
     opacity: 1 !important;
     transition: all 0.3s ease;
   }
 
+  /* Active Sidebar indicator */
   .nav-capsule-active {
     @apply border-r-4 border-[#1E293B] !important; 
   }
