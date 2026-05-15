@@ -35,7 +35,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
         <header className={cn("sticky top-0 z-30 flex h-20 items-center gap-4 bg-transparent px-8 sm:h-auto sm:border-0 no-print", className)}>
             <div className="flex items-center gap-6">
                 <div className="bg-white/60 dark:bg-slate-900/60 p-2.5 rounded-2xl border border-white/80 dark:border-white/10 backdrop-blur-xl shadow-lg transition-transform active:scale-95">
-                    <SidebarTrigger className="text-[#1e1b4b] dark:text-white size-5" />
+                    <SidebarTrigger className="text-foreground size-5" />
                 </div>
                 <div className="hidden md:flex flex-col gap-1">
                     <Breadcrumbs />
@@ -48,7 +48,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         variant="ghost" 
                         size="icon" 
                         onClick={toggleTheme} 
-                        className="rounded-full h-10 w-10 text-[#1e1b4b] dark:text-white hover:bg-white/40 dark:hover:bg-white/10 transition-all active:scale-90"
+                        className="rounded-full h-10 w-10 text-foreground hover:bg-white/40 dark:hover:bg-white/10 transition-all active:scale-90"
                         title="تبديل المظهر"
                     >
                         {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
@@ -58,7 +58,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-[#1e1b4b] dark:text-white hover:bg-white/40 dark:hover:bg-white/10 transition-all active:scale-90">
+                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-foreground hover:bg-white/40 dark:hover:bg-white/10 transition-all active:scale-90">
                                 <CalendarDays className="h-5 w-5" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -89,7 +89,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     <Button 
                         variant="ghost" 
                         onClick={toggleLanguage} 
-                        className="h-10 px-4 rounded-full text-[#1e1b4b] dark:text-white hover:bg-primary/5 transition-all flex items-center gap-2 group relative overflow-hidden"
+                        className="h-10 px-4 rounded-full text-foreground hover:bg-primary/5 transition-all flex items-center gap-2 group relative overflow-hidden"
                     >
                         <Globe className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform" />
                         <span className="text-[10px] font-black uppercase tracking-tighter">
@@ -113,12 +113,12 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     <DropdownMenuContent className="w-64 rounded-[2.2rem] p-2 shadow-[0_25px_60px_rgba(0,0,0,0.2)] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-white/40 dark:border-white/10" align="end" forceMount dir="rtl" style={{ pointerEvents: 'auto' }}>
                         <DropdownMenuLabel className="font-normal p-5">
                             <div className="flex flex-col space-y-2 text-right">
-                                <p className="text-sm font-black text-[#1e1b4b] dark:text-white leading-none">{currentUser.fullName}</p>
-                                <p className="text-[9px] font-mono text-slate-400 bg-slate-50 dark:bg-white/5 p-1.5 rounded-lg border border-slate-100 dark:border-white/10">{currentUser.email}</p>
+                                <p className="text-sm font-black text-foreground leading-none">{currentUser.fullName}</p>
+                                <p className="text-[9px] font-mono text-muted-foreground bg-slate-50 dark:bg-white/5 p-1.5 rounded-lg border border-slate-100 dark:border-white/10">{currentUser.email}</p>
                             </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-slate-100 dark:bg-white/10 mx-2" />
-                        <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1 transition-colors text-[#1e1b4b] dark:text-white">
+                        <DropdownMenuItem asChild className="rounded-2xl py-3.5 font-bold cursor-pointer hover:bg-primary/5 mx-1 transition-colors text-foreground">
                             <Link href="/dashboard/settings" className="flex items-center gap-3">
                                 <User className="h-4 w-4 opacity-40" />
                                 <span>إعدادات الملف الشخصي</span>

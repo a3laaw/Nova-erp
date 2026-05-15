@@ -133,12 +133,13 @@
   [data-theme='dark'] .nav-capsule {
     background: rgba(255, 255, 255, 0.03) !important;
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    color: rgba(255, 255, 255, 0.7) !important;
+    color: hsl(var(--foreground)) !important;
   }
 
   .nav-capsule:hover {
     background: rgba(255, 255, 255, 0.9) !important;
     @apply font-black scale-[1.02] border-none shadow-md;
+    color: #1E293B !important;
   }
 
   [data-theme='dark'] .nav-capsule:hover {
