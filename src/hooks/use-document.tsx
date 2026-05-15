@@ -10,7 +10,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف استماع لوثيقة واحدة:
- * يدعم التبديل السيادي وتوجيه المسار آلياً لمسار الشركة المختارة.
+ * يدعم التبديل السيادي وتوجيه المسار آلياً لمسار الشركة المختارة وحل مشكلة الـ Deadlock.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -28,31 +28,43 @@ export function useDocument<T extends { id?: string }>(
       return;
     }
 
-    setLoading(true);
+    // التحقق من نوع المجموعة
+    const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+    const isMasterCollection = masterCollections.some(mc => docPath.startsWith(mc));
+    const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
 
-    // --- 🛡️ Tenant Path Resolution ---
-    const tenantId = user?.currentCompanyId || null;
+    if (!isMasterCollection && !tenantId) {
+        setLoading(true);
+        return;
+    }
+
+    setLoading(true);
     const finalPath = getTenantPath(docPath, tenantId);
 
-    const unsubscribe = onSnapshot(
-      doc(firestore, finalPath),
-      (snapshot) => {
-        if (snapshot.exists()) {
-          setData({ id: snapshot.id, ...snapshot.data() } as T);
-        } else {
-          setData(null);
-        }
-        setLoading(false);
-        setError(null);
-      },
-      (err) => {
-        console.error(`Error listening to doc ${finalPath}:`, err);
-        setError(err);
-        setLoading(false);
-      }
-    );
+    try {
+        const unsubscribe = onSnapshot(
+          doc(firestore, finalPath),
+          (snapshot) => {
+            if (snapshot.exists()) {
+              setData({ id: snapshot.id, ...snapshot.data() } as T);
+            } else {
+              setData(null);
+            }
+            setLoading(false);
+            setError(null);
+          },
+          (err) => {
+            console.error(`Error listening to doc [${finalPath}]:`, err);
+            setError(err);
+            setLoading(false); // فك القفل لضمان استقرار الواجهة
+          }
+        );
 
-    return () => unsubscribe();
+        return () => unsubscribe();
+    } catch (err: any) {
+        setLoading(false);
+        setError(err);
+    }
   }, [firestore, docPath, user?.currentCompanyId]);
 
   return { data, loading, error };

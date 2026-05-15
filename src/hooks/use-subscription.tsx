@@ -15,7 +15,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف اشتراك لحظي مطور (Sovereign Real-time Hook):
- * تم تحصينه لمنع التحميل اللانهائي وتكرار الاتصالات غير الضرورية.
+ * تم تحصينه لمنع التحميل اللانهائي وتكرار الاتصالات غير الضرورية مع دعم كامل للـ Multi-tenancy.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -28,7 +28,7 @@ export function useSubscription<T extends { id?: string }>(
     const [error, setError] = useState<Error | null>(null);
     const { user } = useAuth();
 
-    // 🛡️ استخدام مرجع للقيود لمنع إعادة التشغيل بسبب مصفوفات القيود المنشأة داخلياً
+    // استخدام مرجع للقيود لمنع إعادة التشغيل اللانهائية
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
     
@@ -37,23 +37,30 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
-        const isMasterCollection = collectionPath && masterCollections.includes(collectionPath);
-        const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
-        
         if (!firestore || !collectionPath) {
             setLoading(false);
             setData([]);
             return;
         }
 
+        // تحديد ما إذا كانت المجموعة عالمية (Master) أم تابعة لمنشأة (Tenant)
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+        const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
+        const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
+        
+        // منع التشغيل إذا لم يستقر معرّف الشركة للمجموعات التابعة
+        if (!isMasterCollection && !tenantId) {
+            setLoading(true); // ننتظر استقرار الهوية
+            return;
+        }
+
         setLoading(true);
         setError(null);
         
-        // --- 🛡️ محرك التوجيه السيادي (Tenant Routing) ---
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
+        // دعم الـ Collection Group بفلترة الشركة
         if (isGroup && tenantId) {
             finalPath = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));
@@ -84,7 +91,7 @@ export function useSubscription<T extends { id?: string }>(
                 (err) => {
                     console.error(`Firestore Subscription Error [${finalPath}]:`, err);
                     setError(err);
-                    setLoading(false);
+                    setLoading(false); // فك قفل التحميل عند الخطأ
                 }
             );
 

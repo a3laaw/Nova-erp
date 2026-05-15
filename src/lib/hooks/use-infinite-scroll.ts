@@ -13,16 +13,24 @@ import {
   type QueryConstraint,
 } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
+import { getTenantPath } from '@/lib/utils';
 
 const PAGE_SIZE = 15;
 const EMPTY_CONSTRAINTS: QueryConstraint[] = [];
 
+/**
+ * محرك التمرير اللانهائي المطور (Sovereign Infinite Scroll):
+ * تم تحصينه ليدعم عزل الشركات (Tenant Routing) آلياً.
+ */
 export function useInfiniteScroll<T extends { id?: string }>(
   collectionPath: string | null,
   constraints: QueryConstraint[] = EMPTY_CONSTRAINTS,
   orderByField: string = 'createdAt'
 ) {
   const { firestore } = useFirebase();
+  const { user } = useAuth();
+  
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -32,8 +40,12 @@ export function useInfiniteScroll<T extends { id?: string }>(
   
   const isFetching = useRef(false);
 
+  // 🛡️ محرك التوجيه السيادي
+  const tenantId = user?.currentCompanyId || null;
+  const finalPath = collectionPath ? getTenantPath(collectionPath, tenantId) : null;
+
   const fetchMore = useCallback(() => {
-    if (!firestore || !collectionPath || isFetching.current || !hasMore) return;
+    if (!firestore || !finalPath || isFetching.current || !hasMore) return;
 
     isFetching.current = true;
     setLoadingMore(true);
@@ -48,7 +60,7 @@ export function useInfiniteScroll<T extends { id?: string }>(
       queryConstraints.push(startAfter(lastVisible));
     }
 
-    const q = query(collection(firestore, collectionPath), ...queryConstraints);
+    const q = query(collection(firestore, finalPath), ...queryConstraints);
     getDocs(q).then(snapshot => {
       const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
       setItems(prev => [...prev, ...newItems]);
@@ -60,17 +72,23 @@ export function useInfiniteScroll<T extends { id?: string }>(
         setHasMore(false);
       }
     }).catch(error => {
-      console.error(`Error fetching from ${collectionPath}:`, error);
+      console.error(`Infinite Scroll Error [${finalPath}]:`, error);
+      setHasMore(false); // وقف المحاولة عند الخطأ
     }).finally(() => {
       setLoadingMore(false);
       isFetching.current = false;
     });
 
-  }, [firestore, collectionPath, JSON.stringify(constraints), orderByField, lastVisible, hasMore]);
+  }, [firestore, finalPath, constraints, orderByField, lastVisible, hasMore]);
   
-  // Effect for resetting and initial fetch
+  // إعادة التأسيس عند تغيير المسار أو الفلاتر
   useEffect(() => {
-    if (!firestore || !collectionPath) return;
+    if (!firestore || !finalPath) {
+        if (!collectionPath) {
+            setLoading(false);
+        }
+        return;
+    }
 
     setItems([]);
     setLastVisible(null);
@@ -84,7 +102,7 @@ export function useInfiniteScroll<T extends { id?: string }>(
       limit(PAGE_SIZE),
     ];
 
-    const q = query(collection(firestore, collectionPath), ...queryConstraints);
+    const q = query(collection(firestore, finalPath), ...queryConstraints);
     getDocs(q).then(snapshot => {
         const newItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
         setItems(newItems);
@@ -96,15 +114,15 @@ export function useInfiniteScroll<T extends { id?: string }>(
             setHasMore(false);
         }
     }).catch(error => {
-        console.error(`Error fetching from ${collectionPath}:`, error);
+        console.error(`Initial Fetch Error [${finalPath}]:`, error);
+        setHasMore(false);
     }).finally(() => {
         setLoading(false);
         isFetching.current = false;
     });
     
-  }, [collectionPath, JSON.stringify(constraints), orderByField, firestore]);
+  }, [finalPath, JSON.stringify(constraints.map(c => c.toString())), orderByField, firestore]);
 
-  // Intersection Observer Effect
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -116,15 +134,8 @@ export function useInfiniteScroll<T extends { id?: string }>(
     );
 
     const loader = loaderRef.current;
-    if (loader) {
-      observer.observe(loader);
-    }
-
-    return () => {
-      if (loader) {
-        observer.unobserve(loader);
-      }
-    };
+    if (loader) observer.observe(loader);
+    return () => { if (loader) observer.unobserve(loader); };
   }, [hasMore, loadingMore, loading, fetchMore]);
 
   return { items, setItems, loading, loadingMore, hasMore, loaderRef };
