@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-type Theme = 'default' | 'glass';
+type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
   theme: Theme;
@@ -13,12 +13,12 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
-  // 🛡️ التأسيس السيادي: جعل الوضع الزجاجي هو الافتراضي
-  const [theme, setThemeState] = useState<Theme>('glass');
+  // الوضع المضيء هو الافتراضي، ويمكن التبديل للمظلم
+  const [theme, setThemeState] = useState<Theme>('light');
 
   useEffect(() => {
     const saved = localStorage.getItem('nova_theme') as Theme;
-    const initialTheme = saved || 'glass';
+    const initialTheme = saved || 'light';
     document.documentElement.setAttribute('data-theme', initialTheme);
     setThemeState(initialTheme);
   }, []);
@@ -30,7 +30,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const toggleTheme = () => {
-    const nextTheme = theme === 'default' ? 'glass' : 'default';
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(nextTheme);
   };
 

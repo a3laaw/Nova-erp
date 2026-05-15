@@ -6,32 +6,58 @@
 
 @layer base {
   :root {
-    /* Sovereign High-Contrast Luminous Theme */
+    /* ⚪ Sovereign Light Theme - Luminous Style */
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
-    --card: 0 0% 100% / 0.4; /* Ultra-light frosted glass */
+    --card: 0 0% 100% / 0.4;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    
-    --primary: 29 100% 50%; /* Tech Orange #FF7A00 */
+    --primary: 29 100% 50%; /* Tech Orange */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 215 25% 27%; /* Charcoal Grey #4A5568 */
+    --secondary: 215 25% 27%;
     --secondary-foreground: 210 40% 98%;
-    
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    
-    --accent: 217 33% 17%; /* Deep Slate Navy #1E293B */
+    --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
-    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 29 100% 50%;
     --radius: 1.5rem;
+    
+    --mesh-color-1: #E2E8F0;
+    --mesh-color-2: #F1F5F9;
+    --mesh-color-3: #CBD5E1;
+    --mesh-glow: rgba(255, 122, 0, 0.15);
+  }
+
+  [data-theme='dark'] {
+    /* ⚫ Sovereign Dark Theme - Deep Slate Pro */
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 6% / 0.7;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 4%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 45 100% 58%; /* Gold Yellow #FFCB2B */
+    --primary-foreground: 222 47% 11%;
+    --secondary: 29 91% 50%; /* Deep Orange #F5820D */
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --border: 217 33% 15%;
+    --input: 217 33% 15%;
+    --ring: 45 100% 58%;
+
+    --mesh-color-1: #0F172A;
+    --mesh-color-2: #1E293B;
+    --mesh-color-3: #020617;
+    --mesh-glow: rgba(245, 130, 13, 0.1);
   }
 }
 
@@ -47,19 +73,18 @@
   }
 
   body {
-    background-color: #F8FAFC;
-    /* 🎨 Sovereign Ultra-Luminous Mesh V63.0 */
+    background-color: hsl(var(--background));
     background-image: 
-      radial-gradient(at 0% 0%, #E2E8F0 0px, transparent 65%),
-      radial-gradient(at 100% 0%, #F1F5F9 0px, transparent 60%),
-      radial-gradient(at 100% 100%, #F8FAFC 0px, transparent 70%),
-      radial-gradient(at 0% 100%, #CBD5E1 0px, transparent 60%),
-      radial-gradient(at 35% 35%, rgba(255, 122, 0, 0.15) 0px, transparent 65%),
-      radial-gradient(at 75% 65%, rgba(255, 166, 17, 0.08) 0px, transparent 55%);
+      radial-gradient(at 0% 0%, var(--mesh-color-1) 0px, transparent 65%),
+      radial-gradient(at 100% 0%, var(--mesh-color-2) 0px, transparent 60%),
+      radial-gradient(at 100% 100%, var(--mesh-color-3) 0px, transparent 70%),
+      radial-gradient(at 0% 100%, var(--mesh-color-1) 0px, transparent 60%),
+      radial-gradient(at 35% 35%, var(--mesh-glow) 0px, transparent 65%),
+      radial-gradient(at 75% 65%, var(--mesh-glow) 0px, transparent 55%);
     background-attachment: fixed;
     background-size: 200% 200%;
-    animation: mesh-flow 22s ease-in-out infinite;
-    color: #1E293B;
+    animation: mesh-flow 25s ease-in-out infinite;
+    color: hsl(var(--foreground));
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
@@ -74,65 +99,77 @@
 }
 
 @layer components {
-  /* Luminous Silver-Slate Frosted Glass Sidebar (40% Opacity) */
+  /* 🧊 Universal Glassmorphism Sidebar */
   .sidebar-glass {
-    background: rgba(255, 255, 255, 0.35) !important; 
-    backdrop-filter: blur(40px) saturate(200%);
-    -webkit-backdrop-filter: blur(40px) saturate(200%);
-    border-left: 1px solid rgba(255, 255, 255, 0.4) !important;
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.03);
+    background: rgba(255, 255, 255, 0.3) !important; 
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.02);
   }
 
-  /* Luminous Frosted Widget Cards */
+  [data-theme='dark'] .sidebar-glass {
+    background: rgba(15, 23, 42, 0.6) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.05) !important;
+    box-shadow: -10px 0 50px rgba(0, 0, 0, 0.4);
+  }
+
   .glass-effect {
-    background: rgba(255, 255, 255, 0.45);
+    background: hsla(var(--card));
     backdrop-filter: blur(20px) brightness(1.1);
     -webkit-backdrop-filter: blur(20px) brightness(1.1);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
   }
 
-  /* Navigation Items - Translucent Base */
+  /* 🏷️ Navigation Capsules */
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.6) !important;
-    border: 1px solid rgba(255, 255, 255, 0.8) !important;
-    color: #1E293B !important;
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    color: hsl(var(--foreground)) !important;
     @apply font-bold transition-all duration-300 shadow-sm mb-1.5;
   }
 
-  /* Navigation Items - Silver-White Hover State */
+  [data-theme='dark'] .nav-capsule {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+
   .nav-capsule:hover {
-    background: rgba(255, 255, 255, 0.95) !important;
-    color: #1E293B !important;
+    background: rgba(255, 255, 255, 0.9) !important;
     @apply font-black scale-[1.02] border-none shadow-md;
   }
 
-  /* 🟠 Sovereign Active State - Tech Orange Background with Black Text */
+  [data-theme='dark'] .nav-capsule:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+  }
+
+  /* 🟠 Active State - Sovereign Orange */
   .nav-capsule-active {
     background: #FF7A00 !important; /* Tech Orange */
-    color: #1E293B !important; /* Black/Navy text for visibility */
+    color: #1E293B !important;
     @apply font-black scale-[1.02] border-none shadow-lg !important;
   }
 
-  /* Ensure icons and text stay black regardless of state */
+  [data-theme='dark'] .nav-capsule-active {
+    background: #F5820D !important; /* Deep Orange from Image */
+    color: #0F172A !important;
+    @apply border-r-4 border-white !important;
+  }
+
   .nav-capsule svg, .nav-capsule-active svg {
-    color: #1E293B !important;
+    color: currentColor !important;
     opacity: 1 !important;
-    transition: all 0.3s ease;
   }
 
-  /* Active Sidebar indicator */
-  .nav-capsule-active {
-    @apply border-r-4 border-[#1E293B] !important; 
+  /* 📈 Dashboard Stats specific classes */
+  .stat-card-glow {
+    @apply transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl;
   }
 }
 
-/* 🛡️ Sovereign UI Layering Fixes */
-[data-radix-portal] {
-  z-index: 999999 !important;
-}
-
-[data-radix-popper-content-wrapper] {
-  pointer-events: auto !important;
-  z-index: 999999 !important;
-}
+/* 🛡️ Sovereign UI Overlays */
+[data-radix-portal] { z-index: 999999 !important; }
+[data-radix-popper-content-wrapper] { pointer-events: auto !important; z-index: 999999 !important; }
