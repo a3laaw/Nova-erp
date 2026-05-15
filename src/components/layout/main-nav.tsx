@@ -259,11 +259,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 <TooltipContent side="left" className="font-black bg-[#1E293B] text-white border-none rounded-lg">{item.label}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <DropdownMenuContent side="left" align="start" className="w-64 rounded-2xl p-2 shadow-2xl bg-[#1E293B]/95 backdrop-blur-xl border-white/10 text-white" dir="rtl">
-              <DropdownMenuLabel className="font-black text-white/40 text-[10px] uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-1">{item.label}</DropdownMenuLabel>
+            <DropdownMenuContent side="left" align="start" className="w-64 rounded-2xl p-2 shadow-2xl bg-white/95 backdrop-blur-xl border-slate-200 text-slate-900" dir="rtl">
+              <DropdownMenuLabel className="font-black text-slate-400 text-[10px] uppercase tracking-widest px-3 py-2 border-b border-slate-100 mb-1">{item.label}</DropdownMenuLabel>
               <ScrollArea className="max-h-[70vh]">
                 {item.children.map((child: any) => (
-                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer focus:bg-white/10 focus:text-white">
+                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer focus:bg-slate-100">
                     <Link href={child.href} className="flex items-center justify-between w-full">
                         <span className="font-bold text-xs">{child.label}</span>
                         {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
@@ -300,8 +300,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-xl py-2 h-9 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "bg-white text-[#1E293B] font-black shadow-lg" 
-                          : "text-white/40 hover:text-white hover:bg-white/5"
+                          ? "bg-[#FF7A00] text-white font-black shadow-lg" 
+                          : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
@@ -331,7 +331,7 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
     <>
       <SidebarHeader className="p-6 mb-4 group-data-[collapsible=icon]:p-3">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black text-white tracking-tighter group-data-[collapsible=icon]:text-xl">Nova</span>
+          <span className="text-3xl font-black text-[#1E293B] tracking-tighter group-data-[collapsible=icon]:text-xl">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
               <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#FF7A00]">ENTERPRISE</span>
           </div>
@@ -352,12 +352,12 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2">
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/10 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-            <div className="w-10 h-10 bg-white/90 rounded-xl flex items-center justify-center text-[#1E293B] font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
+        <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/20 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
+            <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-white font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
             <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
-                <p className="text-xs font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-xs font-black truncate text-slate-800 leading-none mb-1">{currentUser.fullName}</p>
                 <p className="text-[8px] truncate font-black uppercase tracking-widest text-[#FF7A00]">{currentUser.role}</p>
             </div>
         </div>

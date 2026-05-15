@@ -6,16 +6,16 @@
 
 @layer base {
   :root {
-    /* Sovereign High-Contrast Corporate Theme */
+    /* Sovereign High-Contrast Luminous Theme */
     --background: 210 40% 98%;
     --foreground: 222 47% 11%;
-    --card: 0 0% 100% / 0.5; /* Higher transparency for frosted effect */
+    --card: 0 0% 100% / 0.4; /* Ultra-light frosted glass */
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
     --primary: 29 100% 50%; /* Tech Orange #FF7A00 */
-    --primary-foreground: 210 40% 98%;
+    --primary-foreground: 0 0% 100%;
     
     --secondary: 215 25% 27%; /* Charcoal Grey #4A5568 */
     --secondary-foreground: 210 40% 98%;
@@ -48,16 +48,16 @@
 
   body {
     background-color: #F1F5F9;
-    /* High-Contrast Dynamic Mesh Gradient */
+    /* High-Contrast Dynamic Mesh Gradient with Vivid Orange Streaks */
     background-image: 
-      radial-gradient(at 0% 0%, #4A5568 0px, transparent 50%),
+      radial-gradient(at 0% 0%, #4A5568 0px, transparent 55%),
       radial-gradient(at 100% 0%, #94A3B8 0px, transparent 50%),
-      radial-gradient(at 100% 100%, #F1F5F9 0px, transparent 50%),
+      radial-gradient(at 100% 100%, #F1F5F9 0px, transparent 60%),
       radial-gradient(at 0% 100%, #94A3B8 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(255, 122, 0, 0.15) 0px, transparent 60%);
+      radial-gradient(at 50% 50%, rgba(255, 122, 0, 0.25) 0px, transparent 70%);
     background-attachment: fixed;
     background-size: 200% 200%;
-    animation: mesh-flow 20s ease-in-out infinite;
+    animation: mesh-flow 15s ease-in-out infinite;
     color: #1E293B;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -73,45 +73,47 @@
 }
 
 @layer components {
-  /* Premium Glassmorphism Sidebar */
+  /* Luminous Silver-Slate Frosted Glass Sidebar (40% Opacity) */
   .sidebar-glass {
-    background: rgba(30, 41, 59, 0.75) !important; /* #1E293B with 75% opacity */
-    backdrop-filter: blur(40px) saturate(150%);
-    -webkit-backdrop-filter: blur(40px) saturate(150%);
-    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);
+    background: rgba(148, 163, 184, 0.35) !important; /* Silver-Slate base */
+    backdrop-filter: blur(35px) saturate(180%);
+    -webkit-backdrop-filter: blur(35px) saturate(180%);
+    border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.05);
   }
 
-  /* Frosted Glass Widget Cards */
+  /* Luminous Frosted Widget Cards */
   .glass-effect {
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(25px) brightness(1.1);
-    -webkit-backdrop-filter: blur(25px) brightness(1.1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.05);
+    background: rgba(255, 255, 255, 0.45);
+    backdrop-filter: blur(20px) brightness(1.1);
+    -webkit-backdrop-filter: blur(20px) brightness(1.1);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03);
   }
 
-  /* Navigation Items - Silver Glow State */
+  /* Navigation Items - Ice-White Reactive State */
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    @apply text-slate-300 font-bold transition-all duration-300;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    @apply text-slate-800 font-bold transition-all duration-300;
   }
 
   .nav-capsule:hover, .nav-capsule-active {
-    background: rgba(255, 255, 255, 0.95) !important;
+    background: rgba(255, 255, 255, 0.98) !important; /* Ice-White */
     @apply text-[#1E293B] font-black scale-[1.03] border-none;
-    box-shadow: 0 0 20px rgba(255, 255, 255, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2);
+    box-shadow: 
+      0 0 25px rgba(255, 255, 255, 0.6), 
+      inset 0 0 12px rgba(255, 255, 255, 0.5);
   }
 
   .nav-capsule-active {
-    background: #FF7A00 !important;
+    background: #FF7A00 !important; /* Vivid Tech Orange for Active */
     @apply text-white;
-    box-shadow: 0 10px 25px rgba(255, 122, 0, 0.3);
+    box-shadow: 0 10px 25px rgba(255, 122, 0, 0.4);
   }
 }
 
-/* 🛡️ Sovereign UI Layering */
+/* 🛡️ Sovereign UI Layering Fixes */
 [data-radix-portal] {
   z-index: 999999 !important;
 }

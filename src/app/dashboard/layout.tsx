@@ -41,16 +41,16 @@ export default function DashboardLayout({
   // 1. معالجة حالة التحميل
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#1e1b4b] relative overflow-hidden">
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#1e293b] relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-6">
             <div className="relative">
-                <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-white animate-spin shadow-[0_0_30px_rgba(255,255,255,0.1)]" />
-                <Loader className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
+                <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.1)]" />
+                <Loader className="h-10 w-10 text-primary absolute inset-0 m-auto animate-pulse" />
             </div>
             <div className="text-center space-y-4">
-                <p className="text-white font-black text-2xl tracking-tighter">جاري استعادة الجلسة...</p>
+                <p className="text-white font-black text-2xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
                 {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl">
                         <div className="flex items-center gap-2 text-orange-400 justify-center mb-2">
@@ -60,7 +60,7 @@ export default function DashboardLayout({
                         <Button onClick={() => window.location.reload()} variant="outline" className="h-11 rounded-xl font-bold gap-2 text-white border-white/40 hover:bg-white/20">
                             <RefreshCcw className="h-4 w-4" /> تحديث الصفحة
                         </Button>
-                        <Button onClick={handleSafeExit} variant="ghost" className="h-11 rounded-xl font-black gap-2 text-red-400 hover:bg-red-50/10">
+                        <Button onClick={handleSafeExit} variant="ghost" className="h-11 rounded-xl font-black gap-2 text-red-400 hover:bg-red-500/10">
                             <LogOut className="h-4 w-4" /> خروج آمن وإصلاح
                         </Button>
                     </div>
@@ -74,13 +74,13 @@ export default function DashboardLayout({
   // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e1b4b]">
-        <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-50/20 mb-4">
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e293b]">
+        <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
         </div>
         <h2 className="text-3xl font-black text-white tracking-tighter">انتهت جلسة العمل</h2>
-        <p className="text-white/60 max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك.</p>
-        <Button onClick={handleSafeExit} className="bg-white text-indigo-950 font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-slate-100 active:scale-95 transition-all">بوابة الدخول</Button>
+        <p className="text-white/60 max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك المعزولة.</p>
+        <Button onClick={handleSafeExit} className="bg-primary text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-orange-600 active:scale-95 transition-all">بوابة الدخول</Button>
       </div>
     );
   }
@@ -96,7 +96,7 @@ export default function DashboardLayout({
           </Sidebar>
           <SidebarInset className="flex flex-col h-screen min-w-0 w-full bg-transparent">
             <Header currentUser={user} onLogout={handleSafeExit} className="no-print bg-transparent border-none" />
-            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-w-0">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-w-0 scrollbar-none">
               {children}
             </main>
             <OfflineIndicator />
