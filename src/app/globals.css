@@ -73,11 +73,11 @@
 }
 
 @layer components {
-  /* Luminous Silver-Slate Frosted Glass Sidebar (40% Opacity) */
+  /* Luminous Silver-Slate Frosted Glass Sidebar (35% Opacity) */
   .sidebar-glass {
-    background: rgba(148, 163, 184, 0.35) !important; /* Silver-Slate base */
-    backdrop-filter: blur(35px) saturate(180%);
-    -webkit-backdrop-filter: blur(35px) saturate(180%);
+    background: rgba(148, 163, 184, 0.25) !important; /* Light Silver-Slate base */
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
     border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
     box-shadow: -10px 0 30px rgba(0, 0, 0, 0.05);
   }
@@ -91,25 +91,26 @@
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.03);
   }
 
-  /* Navigation Items - Ice-White Reactive State */
+  /* Navigation Items - Translucent Base */
   .nav-capsule {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    @apply text-slate-800 font-bold transition-all duration-300;
+    background: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    @apply text-[#1E293B] font-bold transition-all duration-300 shadow-sm;
   }
 
+  /* Navigation Items - Ice-White Reactive State (Active/Hover) */
   .nav-capsule:hover, .nav-capsule-active {
-    background: rgba(255, 255, 255, 0.98) !important; /* Ice-White */
-    @apply text-[#1E293B] font-black scale-[1.03] border-none;
+    background: rgba(255, 255, 255, 0.98) !important; /* Solid Ice-White */
+    @apply text-[#1E293B] font-black scale-[1.02] border-none;
     box-shadow: 
-      0 0 25px rgba(255, 255, 255, 0.6), 
-      inset 0 0 12px rgba(255, 255, 255, 0.5);
+      0 10px 30px rgba(255, 255, 255, 0.6), 
+      inset 0 0 15px rgba(255, 255, 255, 0.8),
+      0 4px 15px rgba(255, 122, 0, 0.1); /* Subtle orange glow on active */
   }
 
+  /* Optional: Extreme Glow for active item */
   .nav-capsule-active {
-    background: #FF7A00 !important; /* Vivid Tech Orange for Active */
-    @apply text-white;
-    box-shadow: 0 10px 25px rgba(255, 122, 0, 0.4);
+    @apply border-r-4 border-[#FF7A00]; /* Thin orange stripe on the right for active */
   }
 }
 

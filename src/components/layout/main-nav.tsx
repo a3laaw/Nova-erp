@@ -292,21 +292,21 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 space-y-1 border-none pr-4">
+            <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 border-none pr-4">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-xl py-2 h-9 transition-all border border-transparent flex items-center justify-between px-4",
+                        "rounded-xl py-2 h-10 transition-all border border-transparent flex items-center justify-start px-4",
                         isChildActive 
-                          ? "bg-[#FF7A00] text-white font-black shadow-lg" 
-                          : "text-slate-600 hover:text-slate-900 hover:bg-white/40"
+                          ? "nav-capsule-active" 
+                          : "nav-capsule"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className="text-[11px] font-bold truncate">{child.label}</span>
-                            {child.icon && <child.icon className="h-3.5 w-3.5 ml-3 opacity-30" />}
+                            <span className="text-[11px] font-bold truncate flex-1 text-right">{child.label}</span>
+                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "opacity-100" : "opacity-40")} />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
