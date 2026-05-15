@@ -6,39 +6,38 @@
 
 @layer base {
   :root {
-    /* SaaS Enterprise Design System - Professional Corporate Theme */
-    --background: 210 40% 98%; /* #F4F5F7 */
+    /* Sovereign High-Contrast Corporate Theme */
+    --background: 210 40% 98%;
     --foreground: 222 47% 11%;
-    --card: 0 0% 100% / 0.7;
+    --card: 0 0% 100% / 0.5; /* Higher transparency for frosted effect */
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     
-    --primary: 29 100% 50%; /* #FF7A00 Tech Orange */
+    --primary: 29 100% 50%; /* Tech Orange #FF7A00 */
     --primary-foreground: 210 40% 98%;
     
-    --secondary: 214 32% 91%; /* #E2E8F0 Deep Slate */
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 215 25% 27%; /* Charcoal Grey #4A5568 */
+    --secondary-foreground: 210 40% 98%;
     
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
     
-    --accent: 45 100% 98%; /* #FFFDF9 Warm Ivory */
-    --accent-foreground: 222 47% 11%;
+    --accent: 217 33% 17%; /* Deep Slate Navy #1E293B */
+    --accent-foreground: 210 40% 98%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 29 100% 50%;
-    --radius: 2rem;
+    --radius: 1.5rem;
   }
 }
 
 @layer base {
   * { 
     @apply border-border; 
-    /* 🛡️ إخفاء شريط التمرير عالمياً مع الحفاظ على الوظيفة */
     scrollbar-width: none; 
     -ms-overflow-style: none;
   }
@@ -48,17 +47,18 @@
   }
 
   body {
-    background-color: #F4F5F7;
+    background-color: #F1F5F9;
+    /* High-Contrast Dynamic Mesh Gradient */
     background-image: 
-      radial-gradient(at 0% 0%, #E2E8F0 0px, transparent 50%),
-      radial-gradient(at 100% 0%, #FFFDF9 0px, transparent 50%),
-      radial-gradient(at 100% 100%, #E2E8F0 0px, transparent 50%),
-      radial-gradient(at 0% 100%, #FFFDF9 0px, transparent 50%),
-      radial-gradient(at 50% 50%, rgba(255, 122, 0, 0.08) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, #4A5568 0px, transparent 50%),
+      radial-gradient(at 100% 0%, #94A3B8 0px, transparent 50%),
+      radial-gradient(at 100% 100%, #F1F5F9 0px, transparent 50%),
+      radial-gradient(at 0% 100%, #94A3B8 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(255, 122, 0, 0.15) 0px, transparent 60%);
     background-attachment: fixed;
     background-size: 200% 200%;
-    animation: mesh-flow 25s ease infinite;
-    color: #1e1b4b;
+    animation: mesh-flow 20s ease-in-out infinite;
+    color: #1E293B;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
@@ -73,36 +73,50 @@
 }
 
 @layer components {
+  /* Premium Glassmorphism Sidebar */
+  .sidebar-glass {
+    background: rgba(30, 41, 59, 0.75) !important; /* #1E293B with 75% opacity */
+    backdrop-filter: blur(40px) saturate(150%);
+    -webkit-backdrop-filter: blur(40px) saturate(150%);
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Frosted Glass Widget Cards */
   .glass-effect {
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(100px); /* Ultra-high blur for matte finish */
-    -webkit-backdrop-filter: blur(100px);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.03);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(25px) brightness(1.1);
+    -webkit-backdrop-filter: blur(25px) brightness(1.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.05);
+  }
+
+  /* Navigation Items - Silver Glow State */
+  .nav-capsule {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    @apply text-slate-300 font-bold transition-all duration-300;
+  }
+
+  .nav-capsule:hover, .nav-capsule-active {
+    background: rgba(255, 255, 255, 0.95) !important;
+    @apply text-[#1E293B] font-black scale-[1.03] border-none;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.4), inset 0 0 10px rgba(255, 255, 255, 0.2);
   }
 
   .nav-capsule-active {
     background: #FF7A00 !important;
-    @apply text-white font-black scale-[1.02] shadow-lg border-none;
-  }
-
-  .nav-capsule {
-    background: rgba(255, 255, 255, 0.4) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    @apply text-slate-700 font-bold hover:bg-orange-50 hover:text-primary transition-all duration-300;
+    @apply text-white;
+    box-shadow: 0 10px 25px rgba(255, 122, 0, 0.3);
   }
 }
 
-/* 🛡️ Sovereign UI Protection Layer */
+/* 🛡️ Sovereign UI Layering */
 [data-radix-portal] {
   z-index: 999999 !important;
 }
 
-[data-radix-popper-content-wrapper], 
-[role="listbox"], 
-[role="combobox"], 
-[data-radix-select-content],
-[data-radix-popover-content] {
+[data-radix-popper-content-wrapper] {
   pointer-events: auto !important;
   z-index: 999999 !important;
 }

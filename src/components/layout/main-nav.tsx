@@ -37,7 +37,6 @@ import {
   LayoutGrid,
   FileSignature,
   Landmark,
-  Users,
   PencilRuler,
   Settings2,
   ChevronLeft,
@@ -71,7 +70,8 @@ import {
   FileCheck,
   ArrowUpFromLine,
   ArrowLeftRight,
-  RotateCcw as ReturnIcon
+  RotateCcw as ReturnIcon,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -191,8 +191,8 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
     <BaseSidebarMenuButton
       isActive={isActive}
       className={cn(
-        "my-2 h-12 rounded-full transition-all duration-300 flex items-center w-full px-4",
-        "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:!rounded-full",
+        "my-2 h-11 rounded-xl transition-all duration-300 flex items-center w-full px-4",
+        "group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
         isActive ? "nav-capsule-active" : "nav-capsule",
         className
       )}
@@ -207,7 +207,7 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="left" align="center" className="font-black bg-[#1e1b4b] text-white border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
+          <TooltipContent side="left" align="center" className="font-black bg-[#FF7A00] text-white border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -223,14 +223,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   if (!item.children && item.href) {
     return (
-      <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0">
+      <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            <div className="w-4 h-4 invisible group-data-[collapsible=icon]:hidden" />
-            <span className="flex-1 text-right truncate text-sm font-black group-data-[collapsible=icon]:hidden text-[#1e1b4b]">
+            <span className="flex-1 text-right truncate text-[13px] font-bold group-data-[collapsible=icon]:hidden">
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
+            {Icon && <Icon className={cn("size-5 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "opacity-100" : "opacity-60")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -240,7 +239,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   if (item.children) {
     if (state === 'collapsed') {
       return (
-        <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0">
+        <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
           <DropdownMenu>
             <TooltipProvider>
               <Tooltip>
@@ -249,25 +248,25 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     <BaseSidebarMenuButton 
                       isActive={isActive} 
                       className={cn(
-                        "my-2 size-14 rounded-full flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto",
+                        "my-2 size-12 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto",
                         isActive ? "nav-capsule-active" : "nav-capsule"
                       )}
                     >
-                      {Icon && <Icon className={cn("size-5 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
+                      {Icon && <Icon className={cn("size-5", isActive ? "opacity-100" : "opacity-60")} />}
                     </BaseSidebarMenuButton>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="left" className="font-black bg-[#1e1b4b] text-white border-none rounded-lg">{item.label}</TooltipContent>
+                <TooltipContent side="left" className="font-black bg-[#1E293B] text-white border-none rounded-lg">{item.label}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <DropdownMenuContent side="left" align="start" className="w-64 rounded-2xl p-2 shadow-2xl bg-white/95 backdrop-blur-xl border-none" dir="rtl">
-              <DropdownMenuLabel className="font-black text-[#1e1b4b] text-xs px-3 py-2 border-b mb-1">{item.label}</DropdownMenuLabel>
+            <DropdownMenuContent side="left" align="start" className="w-64 rounded-2xl p-2 shadow-2xl bg-[#1E293B]/95 backdrop-blur-xl border-white/10 text-white" dir="rtl">
+              <DropdownMenuLabel className="font-black text-white/40 text-[10px] uppercase tracking-widest px-3 py-2 border-b border-white/5 mb-1">{item.label}</DropdownMenuLabel>
               <ScrollArea className="max-h-[70vh]">
                 {item.children.map((child: any) => (
-                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer">
-                    <Link href={child.href} className="flex items-center justify-between w-full text-[#1e1b4b]">
+                    <DropdownMenuItem key={child.href} asChild className="rounded-xl py-2.5 cursor-pointer focus:bg-white/10 focus:text-white">
+                    <Link href={child.href} className="flex items-center justify-between w-full">
                         <span className="font-bold text-xs">{child.label}</span>
-                        {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40 text-[#1e1b4b]" />}
+                        {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40" />}
                     </Link>
                     </DropdownMenuItem>
                 ))}
@@ -279,35 +278,35 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     }
 
     return (
-      <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
+      <Collapsible defaultOpen={isActive} className="group/collapsible px-3">
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full">
-                <ChevronLeft className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20 text-[#1e1b4b]" />
-                <span className="text-right truncate text-sm font-black flex-1 text-[#1e1b4b]">
+                <ChevronLeft className="h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20" />
+                <span className="text-right truncate text-[13px] font-bold flex-1">
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-5 shrink-0 ml-3 text-[#1e1b4b]", isActive ? "opacity-100" : "opacity-60")} />}
+                {Icon && <Icon className={cn("size-5 shrink-0 ml-3", isActive ? "opacity-100" : "opacity-60")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-4 space-y-2 border-none pr-4">
+            <SidebarMenuSub className="mt-1 mb-2 space-y-1 border-none pr-4">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href;
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
-                        "rounded-full py-2.5 h-10 transition-all border border-transparent flex items-center justify-between px-4",
+                        "rounded-xl py-2 h-9 transition-all border border-transparent flex items-center justify-between px-4",
                         isChildActive 
-                          ? "bg-white text-[#1e1b4b] font-black shadow-md" 
-                          : "bg-white/10 hover:bg-white/20 text-[#1e1b4b]"
+                          ? "bg-white text-[#1E293B] font-black shadow-lg" 
+                          : "text-white/40 hover:text-white hover:bg-white/5"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className="text-xs font-black truncate text-[#1e1b4b]">{child.label}</span>
-                            {child.icon && <child.icon className="h-4 w-4 ml-3 opacity-40 text-[#1e1b4b]" />}
+                            <span className="text-[11px] font-bold truncate">{child.label}</span>
+                            {child.icon && <child.icon className="h-3.5 w-3.5 ml-3 opacity-30" />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -330,17 +329,17 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
 
   return (
     <>
-      <SidebarHeader className="p-8 mb-6 group-data-[collapsible=icon]:p-4 group-data-[collapsible=icon]:mb-2">
+      <SidebarHeader className="p-6 mb-4 group-data-[collapsible=icon]:p-3">
         <div className="flex flex-col items-center">
-          <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-lg">Nova</span>
+          <span className="text-3xl font-black text-white tracking-tighter group-data-[collapsible=icon]:text-xl">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#1e1b4b]/40">PURPLE SUITE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#FF7A00]">ENTERPRISE</span>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent className="scrollbar-none">
-        <SidebarMenu className="gap-1">
+        <SidebarMenu className="gap-0.5">
           {currentNavItems.map((item, index) => (
             <NavItem 
                 key={`${item.href || item.label}-${index}`} 
@@ -352,14 +351,14 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-6 mt-auto group-data-[collapsible=icon]:p-2">
-        <div className="bg-white/30 border border-white/40 rounded-[2.5rem] p-5 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/40 transition-all cursor-pointer group-data-[collapsible=icon]:rounded-2xl group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[#1e1b4b] font-black shadow-lg group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:rounded-xl">
+      <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/10 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
+            <div className="w-10 h-10 bg-white/90 rounded-xl flex items-center justify-center text-[#1E293B] font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
                 {currentUser.fullName?.charAt(0) || 'N'}
             </div>
-            <div className="mr-4 text-right overflow-hidden group-data-[state=collapsed]:hidden flex-1 group-data-[collapsible=icon]:hidden">
-                <p className="text-sm font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[9px] truncate font-black uppercase tracking-widest text-[#1e1b4b]/60">{currentUser.role}</p>
+            <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
+                <p className="text-xs font-black truncate text-white leading-none mb-1">{currentUser.fullName}</p>
+                <p className="text-[8px] truncate font-black uppercase tracking-widest text-[#FF7A00]">{currentUser.role}</p>
             </div>
         </div>
       </SidebarFooter>
