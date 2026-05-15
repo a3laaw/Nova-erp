@@ -35,7 +35,7 @@ const StatCard = ({ title, value, icon, description, colorClass, loading, subTex
         </CardHeader>
         <CardContent className="pt-2">
             {loading ? <Skeleton className="h-10 w-32" /> : (
-                <div className={cn("text-3xl font-black font-mono tracking-tighter", colorClass.includes('purple') ? 'text-[#7209B7]' : 'text-slate-900')}>
+                <div className={cn("text-3xl font-black font-mono tracking-tighter text-slate-900")}>
                     {typeof value === 'number' ? formatCurrency(value) : value}
                 </div>
             )}
@@ -74,7 +74,7 @@ export default function DashboardPage() {
                                 <BellRing className="h-4 w-4" /> سجل التنبيهات
                             </Link>
                         </Button>
-                        <Button asChild className="h-11 px-10 rounded-2xl font-black gap-2 bg-[#7209B7] text-white shadow-xl hover:scale-105 transition-transform border-none">
+                        <Button asChild className="h-11 px-10 rounded-2xl font-black gap-2 bg-primary text-white shadow-xl hover:scale-105 transition-transform border-none">
                             <Link href="/dashboard/clients/new">
                                 <PlusCircle className="h-5 w-5" /> إضافة عميل جديد
                             </Link>
@@ -84,7 +84,7 @@ export default function DashboardPage() {
                     <div className="text-center lg:text-right order-1 lg:order-2 space-y-2">
                         <div className="flex items-center justify-center lg:justify-end gap-4 mb-2">
                             <h1 className="text-4xl font-black text-[#1e1b4b] tracking-tighter">لوحة التحكم المركزية</h1>
-                            <LayoutGrid className="text-indigo-600 h-10 w-10" strokeWidth={2.5} />
+                            <LayoutGrid className="text-primary h-10 w-10" strokeWidth={2.5} />
                         </div>
                         <p className="text-lg font-bold text-slate-500 leading-relaxed max-w-xl">
                             مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
@@ -99,7 +99,7 @@ export default function DashboardPage() {
                 <Card className="h-full border-white/40 bg-white/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8">
                         <CardTitle className="text-xl font-black flex items-center gap-2">
-                            <Sparkles className="text-purple-500 h-5 w-5" /> تنبيهات الأولويات (WBS)
+                            <Sparkles className="text-primary h-5 w-5 animate-pulse" /> تنبيهات الأولويات (WBS)
                         </CardTitle>
                         <CardDescription>المهام الميدانية التي تجاوزت جدولها الزمني المخطط.</CardDescription>
                     </CardHeader>
@@ -124,7 +124,7 @@ export default function DashboardPage() {
                     value={loading ? 0 : stats?.totalRevenue || 0} 
                     icon={<Wallet className="h-5 w-5" />} 
                     subText="بناءً على القيود المرحلة"
-                    colorClass="bg-purple-50 text-purple-600"
+                    colorClass="bg-orange-100 text-primary"
                     loading={loading}
                 />
                 
@@ -133,7 +133,7 @@ export default function DashboardPage() {
                         <p className="font-black text-sm">كشف يوميات المواقع</p>
                         <p className="text-[10px] text-slate-400 font-bold leading-tight">تابع إنجاز الفرق الميدانية.</p>
                     </div>
-                    <Button asChild className="rounded-xl h-9 px-6 bg-[#7209B7] text-white font-black text-[10px]">
+                    <Button asChild className="rounded-xl h-9 px-6 bg-primary text-white font-black text-[10px]">
                         <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
                     </Button>
                 </Card>
@@ -143,7 +143,7 @@ export default function DashboardPage() {
                     value={loading ? 0 : stats?.totalClientsCount || 0} 
                     icon={<Users className="h-5 w-5" />} 
                     subText="إجمالي الملفات المسجلة"
-                    colorClass="bg-indigo-50 text-indigo-600"
+                    colorClass="bg-orange-50 text-primary"
                     loading={loading}
                 />
             </div>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
                 <Card className="h-full border-white/40 bg-white/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8 border-b border-white/10">
                         <CardTitle className="text-xl font-black flex items-center gap-2">
-                            <History className="text-indigo-600 h-5 w-5" /> آخر النشاطات
+                            <History className="text-primary h-5 w-5" /> آخر النشاطات
                         </CardTitle>
                         <CardDescription>متابعة حية للإجراءات المتخذة في النظام.</CardDescription>
                     </CardHeader>

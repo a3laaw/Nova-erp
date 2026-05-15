@@ -40,7 +40,7 @@ const defaultBranding: BrandingSettings = {
     id: 'default',
     companyName: 'Nova ERP',
     activityType: 'general',
-    headerColor: '#7209B7'
+    headerColor: '#F5820D' /* 🧡 المعتمد الجديد */
 };
 
 const BrandingContext = createContext<BrandingContextType>({
@@ -55,7 +55,6 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 🛡️ التزامن السيادي: التحقق من وجود جلسة تقمص أو دخول منشأة
     const tenantId = user?.currentCompanyId || null;
     
     if (!firestore || !tenantId) {
@@ -71,7 +70,6 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
         if (snapshot.exists()) {
             setBranding({ id: snapshot.id, ...snapshot.data() } as BrandingSettings);
         } else {
-            // If no custom branding, ensure we at least have the company name from the user claim if available
             setBranding({
                 ...defaultBranding,
                 companyName: user?.companyName || defaultBranding.companyName
@@ -98,10 +96,6 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-/**
- * حاقن التنسيقات السيادي: 
- * يقوم بتحديث المتغيرات اللونية في CSS بناءً على إعدادات المنشأة الحالية.
- */
 function CardStylesInjector({ children, branding }: { children: React.ReactNode, branding: BrandingSettings | null }) {
     useEffect(() => {
         if (branding?.headerColor) {
@@ -112,9 +106,6 @@ function CardStylesInjector({ children, branding }: { children: React.ReactNode,
     return <>{children}</>;
 }
 
-/**
- * مساعد تحويل الألوان: من HEX إلى HSL المتوافق مع Tailwind.
- */
 function hexToHsl(hex: string): string {
     let r = 0, g = 0, b = 0;
     if (hex.length === 4) {

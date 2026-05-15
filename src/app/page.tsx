@@ -13,16 +13,13 @@ import {
     AlertCircle, 
     Send,
     ArrowRight,
-    PlusCircle,
-    Key
+    PlusCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -47,7 +44,7 @@ export default function LoginPage() {
       const val = e.target.value;
       setIdentifier(val);
       if (val === '') {
-          setPassword('');
+          setPassword(''); // 🛡️ الارتباط الذكي للحذف
       }
   };
 
