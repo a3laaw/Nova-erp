@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useFirebase } from '@/firebase';
 import { useSubscription } from './use-subscription';
+import { useAuth } from '@/context/auth-context';
 import type { 
     JournalEntry, 
     Client, 
@@ -20,24 +21,26 @@ const EMPTY_CONSTRAINTS: any[] = [];
 
 /**
  * محرك البيانات التحليلية اللحظي المطور:
- * تم تحصينه بـ "حواجز الحماية" لضمان عدم توقف النظام عند نقص البيانات أو فشل جلب إحدى المجموعات.
+ * تم تحصينه بـ "حواجز الحماية" لمنع طلب البيانات قبل استقرار هوية المنشأة.
  */
 export function useAnalyticalData() {
   const { firestore } = useFirebase();
+  const { user, loading: authLoading } = useAuth();
 
-  // جلب كافة المجموعات الأساسية مع دعم القيم الافتراضية الفارغة لتجنب الانهيار
-  const { data: journalEntries = [], loading: jesLoading } = useSubscription<JournalEntry>(firestore, 'journalEntries');
-  const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, 'clients');
-  const { data: rawTransactions = [], loading: txsLoading } = useSubscription<ClientTransaction>(firestore, 'transactions', EMPTY_CONSTRAINTS, true);
-  const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees');
-  const { data: departments = [], loading: deptsLoading } = useSubscription<Department>(firestore, 'departments');
-  const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, 'chartOfAccounts');
-  const { data: appointments = [], loading: apptsLoading } = useSubscription<Appointment>(firestore, 'appointments');
-  const { data: projects = [], loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, 'projects');
-  const { data: rfqs = [], loading: rfqsLoading } = useSubscription<RequestForQuotation>(firestore, 'rfqs');
-  const { data: purchaseOrders = [], loading: posLoading } = useSubscription<PurchaseOrder>(firestore, 'purchaseOrders');
+  // 🛡️ صمام أمان: إذا لم تكتمل المصادقة، لا تبدأ جلب البيانات
+  const canFetch = !!firestore && !!user?.currentCompanyId;
 
-  // معالجة البيانات لضمان عدم وجود قيم undefined تكسر الشاشات أثناء الرندرة
+  const { data: journalEntries = [], loading: jesLoading } = useSubscription<JournalEntry>(firestore, canFetch ? 'journalEntries' : null);
+  const { data: clients = [], loading: clientsLoading } = useSubscription<Client>(firestore, canFetch ? 'clients' : null);
+  const { data: rawTransactions = [], loading: txsLoading } = useSubscription<ClientTransaction>(firestore, canFetch ? 'transactions' : null, EMPTY_CONSTRAINTS, true);
+  const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, canFetch ? 'employees' : null);
+  const { data: departments = [], loading: deptsLoading } = useSubscription<Department>(firestore, canFetch ? 'departments' : null);
+  const { data: accounts = [], loading: accountsLoading } = useSubscription<Account>(firestore, canFetch ? 'chartOfAccounts' : null);
+  const { data: appointments = [], loading: apptsLoading } = useSubscription<Appointment>(firestore, canFetch ? 'appointments' : null);
+  const { data: projects = [], loading: projectsLoading } = useSubscription<ConstructionProject>(firestore, canFetch ? 'projects' : null);
+  const { data: rfqs = [], loading: rfqsLoading } = useSubscription<RequestForQuotation>(firestore, canFetch ? 'rfqs' : null);
+  const { data: purchaseOrders = [], loading: posLoading } = useSubscription<PurchaseOrder>(firestore, canFetch ? 'purchaseOrders' : null);
+
   const processedTransactions = useMemo(() => {
     if (!rawTransactions) return [];
     return rawTransactions.map(tx => ({ 
@@ -47,6 +50,7 @@ export function useAnalyticalData() {
   }, [rawTransactions]);
 
   const loading = 
+    authLoading || !canFetch ||
     jesLoading || clientsLoading || txsLoading || 
     employeesLoading || deptsLoading || accountsLoading || 
     apptsLoading || projectsLoading || rfqsLoading || posLoading;
