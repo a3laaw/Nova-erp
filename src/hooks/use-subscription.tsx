@@ -15,7 +15,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف اشتراك لحظي مطور (Sovereign Real-time Hook):
- * تم تحصينه لمنع التحميل اللانهائي وتكرار الاتصالات غير الضرورية مع دعم كامل للـ Multi-tenancy.
+ * تم تحصينه لفرض فلترة معرف الشركة في الاستعلامات المجمعة لمنع أخطاء الـ Permissions.
  */
 export function useSubscription<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -36,10 +36,8 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        // 🛡️ صمام أمان: لا تبدأ الاشتراك إذا لم يكن المحرك أو المسار جاهزاً أو إذا كان الـ Auth قيد التحميل
         if (!firestore || !collectionPath || authLoading) {
             setLoading(!firestore || !collectionPath ? false : true);
-            setData([]);
             return;
         }
 
@@ -47,7 +45,7 @@ export function useSubscription<T extends { id?: string }>(
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ منع جلب أي بيانات غير "ماستر" إلا بعد استقرار هوية المنشأة (Tenant ID) في الجلسة
+        // 🛡️ صمام أمان سيادي: منع الطلب إذا كانت الهوية غير مستقرة للمسارات المعزولة
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;
@@ -59,7 +57,8 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        // في استعلامات الـ Group Queries، يجب فرض فلتر الـ companyId لضمان عزل البيانات برمجياً وسحابياً
+        // 🚨 تصحيح مسار استعلام المجموعات (Force Tenant Filtering)
+        // جوجل ترفض CollectionGroup دون فلتر دقيق في نظام الـ Multi-tenancy
         if (isGroup && tenantId) {
             const collectionName = collectionPath.split('/').pop() || collectionPath;
             finalPath = collectionName;
@@ -90,7 +89,6 @@ export function useSubscription<T extends { id?: string }>(
                     setError(null);
                 },
                 (err: any) => {
-                    // في حال خطأ الصلاحيات، لا تقتل الواجهة، بل سجل الخطأ وحاول الحفاظ على الحالة
                     console.error(`Sovereign Subscription Denied [${finalPath}]:`, err.message);
                     setError(err);
                     setLoading(false);
@@ -102,7 +100,6 @@ export function useSubscription<T extends { id?: string }>(
             console.error("Critical hook execution error:", err);
             setError(err);
             setLoading(false);
-            setData([]);
         }
     }, [firestore, collectionPath, isGroup, user?.currentCompanyId, authLoading, constraintsHash]);
 

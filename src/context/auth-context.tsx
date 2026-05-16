@@ -35,9 +35,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshToken = useCallback(async () => {
     if (masterAuth?.currentUser) {
       try {
-          // 🛡️ فرض تجديد التوكن لجلب كافة الـ Claims السيادية فوراً
           await getIdToken(masterAuth.currentUser, true);
-          console.log("Sovereign Identity Refreshed & Synced.");
+          console.log("Sovereign Identity Refreshed.");
       } catch (e) {
           console.error("Token refresh failed:", e);
       }
@@ -84,6 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
+        // 1. جلب الفهرس العالمي أولاً لمعرفة الانتماء
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
@@ -93,9 +93,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const { companyId } = globalSnap.data();
         
-        // ⚡ تجديد التوكن فوراً لضمان وجود ادعاءات الـ Multi-tenancy قبل بدء القراءة
+        // 2. تجديد التوكن فوراً لضمان وجود ادعاءات الـ Multi-tenancy
         await getIdToken(firebaseUser, true);
 
+        // 3. جلب ملفات المنشأة والمستخدم
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))

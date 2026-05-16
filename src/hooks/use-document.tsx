@@ -10,7 +10,7 @@ import { getTenantPath } from '@/lib/utils';
 
 /**
  * خطاف استماع لوثيقة واحدة:
- * يدعم التبديل السيادي وتوجيه المسار آلياً لمسار الشركة المختارة وحل مشكلة الـ Deadlock.
+ * يدعم التبديل السيادي وتوجيه المسار آلياً لمسار الشركة المختارة.
  */
 export function useDocument<T extends { id?: string }>(
   firestore: Firestore | null,
@@ -19,11 +19,11 @@ export function useDocument<T extends { id?: string }>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!firestore || !docPath) {
-      setLoading(false);
+    if (!firestore || !docPath || authLoading) {
+      setLoading(!firestore || !docPath ? false : true);
       setData(null);
       return;
     }
@@ -64,7 +64,7 @@ export function useDocument<T extends { id?: string }>(
         setLoading(false);
         setError(err);
     }
-  }, [firestore, docPath, user?.currentCompanyId]);
+  }, [firestore, docPath, user?.currentCompanyId, authLoading]);
 
   return { data, loading, error };
 }

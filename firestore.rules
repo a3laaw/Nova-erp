@@ -5,7 +5,7 @@ service cloud.firestore {
     
     // 🛡️ مصفوفة الصلاحيات السيادية (Sovereign Authority Logic)
     
-    // 1. المطور: صاحب السيادة المطلقة في كامل النظام
+    // 1. المطور: صاحب السيادة المطلقة
     function isDeveloper() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
@@ -19,12 +19,6 @@ service cloud.firestore {
               request.auth.token.currentCompanyId == companyId);
     }
 
-    // 3. المدير: صمام أمان يعتمد على البريد المسجل في وثيقة الشركة (Fallback)
-    function isCompanyAdmin(companyId) {
-       return request.auth != null && 
-              get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower();
-    }
-
     // 🚨 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
     match /{document=**} {
       allow read, write: if isDeveloper();
@@ -32,13 +26,13 @@ service cloud.firestore {
 
     // 🏢 قواعد عزل المنشآت (SaaS Isolation)
     match /companies/{companyId} {
-      // السماح بقراءة وثيقة الشركة للتحقق من هوية المدير
+      // السماح بقراءة وثيقة الشركة للتحقق من الحالة
       allow read: if request.auth != null;
-      allow write: if isDeveloper() || isCompanyAdmin(companyId);
+      allow write: if isDeveloper();
       
       // السماح بكافة المجموعات والبيانات داخل الشركة بناءً على الانتماء
       match /{allSubcollections=**} {
-        allow read, write: if isDeveloper() || isTenantMember(companyId) || isCompanyAdmin(companyId);
+        allow read, write: if isDeveloper() || isTenantMember(companyId);
       }
     }
 
@@ -53,13 +47,19 @@ service cloud.firestore {
       allow read, write: if isDeveloper();
     }
 
-    // 📊 دعم استعلامات المجموعات (Collection Group Queries) لضمان عدم فشل التقارير
+    // 📊 🛡️ تحصين استعلامات المجموعات (Collection Group Rules)
+    // ضروري جداً لنجاح الداش بورد والتقارير
+    
     match /{path=**}/transactions/{id} {
-        allow read: if isDeveloper() || isTenantMember(resource.data.companyId) || isCompanyAdmin(resource.data.companyId);
+        allow read: if request.auth != null && (isDeveloper() || isTenantMember(resource.data.companyId));
     }
     
     match /{path=**}/timelineEvents/{id} {
-        allow read: if isDeveloper() || isTenantMember(resource.data.companyId) || isCompanyAdmin(resource.data.companyId);
+        allow read: if request.auth != null && (isDeveloper() || isTenantMember(resource.data.companyId));
+    }
+
+    match /{path=**}/userProductivity/{id} {
+        allow read, write: if request.auth != null && (isDeveloper() || request.auth.uid == resource.data.userId);
     }
   }
 }
