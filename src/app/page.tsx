@@ -22,7 +22,7 @@ import Link from 'next/link';
 
 /**
  * صفحة الدخول السيادية (Access Gateway V93.0):
- * تم إرجاعها للحالة المستقرة واللحظية التي كانت عليها.
+ * تم ترميمها لتصبح لحظية تماماً، وتعتمد على حالة الـ User في السياق العالمي.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading } = useAuth();
@@ -56,7 +56,7 @@ export default function LoginPage() {
 
     try {
         await login(identifier.trim().toLowerCase(), password);
-        // التوجيه سيتم آلياً عبر الـ useEffect أعلاه فور اكتمال جلب الملف
+        // التوجيه سيتم آلياً عبر الـ useEffect أعلاه فور اكتمال جلب الملف من Firestore
     } catch (error: any) {
         setLocalLoading(false);
         setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');
@@ -75,6 +75,15 @@ export default function LoginPage() {
           setErrorMsg(error.message);
       } finally { setLocalLoading(false); }
   };
+
+  // إذا كان المستخدم مسجلاً دخوله بالفعل، لا نظهر شاشة الدخول
+  if (user) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">

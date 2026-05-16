@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * ⚡ محرك جلب الهوية المستقر (Stable Identity Core V93.0):
-   * تم إرجاع المنطق الأصلي مع دعم البحث المزدوج (UID + Email) لضمان دخول الجميع.
+   * تم تحصينه بالكامل لضمان الدخول الفوري للحسابات القديمة والجديدة.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!tenantUserSnap.empty) {
                 userData = tenantUserSnap.docs[0].data();
             } else if (globalData?.role === 'Admin') {
-                // 🔄 ترميم تلقائي للمديرين الجدد (Auto-Healing)
+                // 🔄 ترميم تلقائي للمديرين (Auto-Healing) لضمان دخول المنشآت الجديدة فوراً
                 userData = {
                     id: firebaseUser.uid,
                     uid: firebaseUser.uid,
@@ -179,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         isInitialLoad.current = false;
       } catch (err) { 
+        console.error("Auth Loop Break:", err);
         setLoading(false);
       }
     });
