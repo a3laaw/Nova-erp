@@ -1,23 +1,45 @@
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { Loader, AlertCircle, RefreshCcw, LogOut, Wallet, ShieldAlert, Phone } from 'lucide-react';
+import { 
+    Loader, 
+    AlertCircle, 
+    RefreshCcw, 
+    LogOut, 
+    Wallet, 
+    ShieldAlert, 
+    AlertTriangle,
+    CheckCircle2,
+    CalendarClock,
+    Zap
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
-import { isPast } from 'date-fns';
+import { isPast, differenceInDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
+import { cn, formatCurrency } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 /**
- * غلاف لوحة التحكم (Sovereign Shield Implementation V75.0):
- * يتضمن درع الحماية المالي؛ حيث يقوم بفحص تاريخ اشتراك المنشأة وحالة السداد.
+ * غلاف لوحة التحكم (Sovereign Shield Implementation V77.0):
+ * يتضمن:
+ * 1. درع الحظر المالي (Hard Block if expired).
+ * 2. نظام الإنذار المبكر (Soft Block warning 7 days before).
  */
 export default function DashboardLayout({
   children,
@@ -30,6 +52,7 @@ export default function DashboardLayout({
   
   const [mounted, setMounted] = useState(false);
   const [showEmergencyExit, setShowEmergencyExit] = useState(false);
+  const [hasAcknowledgedWarning, setHasAcknowledgedWarning] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -43,6 +66,28 @@ export default function DashboardLayout({
     logout();
     router.replace('/');
   };
+
+  // 🛡️ حسابات الحالة المالية للشركة
+  const { isExpired, isExpiringSoon, daysLeft, expiryDateFormatted } = useMemo(() => {
+    if (!company?.subscriptionExpiryDate) return { isExpired: false, isExpiringSoon: false, daysLeft: 999 };
+    
+    const expiry = toFirestoreDate(company.subscriptionExpiryDate);
+    if (!expiry) return { isExpired: false, isExpiringSoon: false, daysLeft: 999 };
+
+    const today = new Date();
+    const expired = isPast(expiry);
+    const diff = differenceInDays(expiry, today);
+    
+    return {
+      isExpired: expired,
+      isExpiringSoon: !expired && diff <= 7,
+      daysLeft: diff,
+      expiryDateFormatted: expiry.toLocaleDateString('en-GB')
+    };
+  }, [company]);
+
+  // المطور السيادي لا يخضع للحظر أو الإنذار لتمكينه من الصيانة
+  const isDev = user?.role === 'Developer';
 
   // 1. معالجة حالة التحميل
   if (loading || !mounted) {
@@ -91,14 +136,8 @@ export default function DashboardLayout({
     );
   }
 
-  // 🛡️ درع الحظر المالي (Financial Shield Check)
-  // المطور السيادي (المالك الأصلي) لا يخضع للحظر لتمكينه من الصيانة
-  const isDev = user.role === 'Developer';
-  const expiryDate = company?.subscriptionExpiryDate ? toFirestoreDate(company.subscriptionExpiryDate) : null;
-  const isExpired = expiryDate && isPast(expiryDate);
-  const isSuspended = company?.isActive === false;
-
-  if (!isDev && (isExpired || isSuspended)) {
+  // 🛡️ درع الحظر المالي (Financial Shield Check - Hard Block)
+  if (!isDev && (isExpired || company?.isActive === false)) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" dir="rtl">
           <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
@@ -111,7 +150,7 @@ export default function DashboardLayout({
               <p className="text-slate-300 font-bold mb-8 leading-relaxed">
                   نأسف لإبلاغكم بأن جلسة العمل لمنشأة <span className="text-red-400">"{company?.name}"</span> قد تم تجميدها آلياً.
                   <br/><br/>
-                  {isExpired ? "لقد انتهت فترة الاشتراك المعتمدة (تاريخ الاستحقاق: " + format(expiryDate!, 'dd/MM/yyyy') + "). " : "تم إيقاف الحساب بقرار إداري. "}
+                  {isExpired ? "لقد انتهت فترة الاشتراك المعتمدة (تاريخ الاستحقاق: " + expiryDateFormatted + "). " : "تم إيقاف الحساب بقرار إداري. "}
                   يرجى تسوية المستحقات المالية أو التواصل مع إدارة المنظومة لتفعيل الخدمة.
               </p>
               
@@ -151,6 +190,63 @@ export default function DashboardLayout({
             <SystemExpertChatWidget />
           </SidebarInset>
       </SidebarProvider>
+
+      {/* 🛡️ نافذة الإنذار المبكر (Early Warning Gatekeeper - Soft Block) */}
+      {!isDev && isExpiringSoon && !hasAcknowledgedWarning && (
+        <Dialog open={true} onOpenChange={() => {}}>
+            <DialogContent className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white" dir="rtl">
+                <div className="p-8 bg-amber-500 text-white text-right relative overflow-hidden">
+                    <div className="absolute top-0 left-0 opacity-10">
+                        <CalendarClock className="h-40 w-40 -translate-x-10 translate-y-10" />
+                    </div>
+                    <div className="relative z-10 flex items-center gap-4">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md border border-white/30">
+                            <AlertTriangle className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-2xl font-black text-white">تنبيه: اقتراب انتهاء الاشتراك</DialogTitle>
+                            <DialogDescription className="text-amber-100 font-bold">إشعار إداري هام بخصوص حساب المنشأة</DialogDescription>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-10 space-y-8">
+                    <div className="space-y-4">
+                        <p className="text-slate-700 font-bold leading-relaxed text-lg text-center">
+                            نود إحاطتكم علماً بأن اشتراك منشأة <span className="text-amber-600">"{company?.name}"</span> 
+                            سوف ينتهي خلال أقل من <span className="underline decoration-2 underline-offset-4">{daysLeft} أيام</span>.
+                        </p>
+                        
+                        <div className="flex justify-between items-center p-6 bg-slate-50 rounded-[2rem] border-2 border-dashed border-amber-200 shadow-inner">
+                            <div className="text-right">
+                                <Label className="text-[10px] font-black uppercase text-slate-400">تاريخ الانتهاء المحدد</Label>
+                                <p className="text-2xl font-black text-slate-900 font-mono">{expiryDateFormatted}</p>
+                            </div>
+                            <div className="bg-amber-100 p-3 rounded-2xl text-amber-600">
+                                <Zap className="h-6 w-6" />
+                            </div>
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground font-medium text-center">
+                            يرجى التواصل مع الإدارة المالية أو المطور لتجديد الاشتراك لضمان استمرار الخدمة دون انقطاع.
+                        </p>
+                    </div>
+
+                    <Button 
+                        onClick={() => setHasAcknowledgedWarning(true)}
+                        className="w-full h-14 rounded-2xl font-black text-xl bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-100 gap-3"
+                    >
+                        <CheckCircle2 className="h-6 w-6" />
+                        أقرأ وأفهم، دخول للنظام
+                    </Button>
+                </div>
+                
+                <div className="p-4 bg-muted/30 text-center border-t">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP - Subscription Guard v1.0</p>
+                </div>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
