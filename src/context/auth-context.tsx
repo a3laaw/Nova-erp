@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
@@ -38,8 +37,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V6.0):
-   * تم تحصينه بكافة الاستدعاءات المفقودة ودعم كامل للبحث المتعدد لضمان استقرار الحسابات القديمة.
+   * ⚡ محرك جلب الهوية الذكي (Self-Healing Identity Engine V8.0):
+   * تم تحصينه لترميم ملفات المستخدمين المفقودة آلياً عند تسجيل الدخول.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
@@ -63,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let companyId = null;
         let globalData = null;
         
-        // محاولة 1: الوصول المباشر بالـ UID (سريع جداً)
+        // 1. استرجاع بيانات الفهرس العالمي
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
@@ -71,39 +70,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             globalData = globalSnap.data();
             companyId = globalData.companyId;
         } else {
-            // محاولة 2: البحث بالايميل (لدعم الحسابات القديمة)
             const oldQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
             const oldSnap = await getDocs(oldQuery);
             if (!oldSnap.empty) {
                 globalData = oldSnap.docs[0].data();
                 companyId = globalData.companyId;
-                
-                // 🔄 إجراء "الترميم الذاتي": تحديث الفهرس العالمي ليعتمد الـ UID كمفتاح مستقبلي
-                await setDoc(doc(firestore, 'global_users', firebaseUser.uid), {
-                    ...globalData,
-                    uid: firebaseUser.uid,
-                    updatedAt: serverTimestamp()
-                }, { merge: true });
+                await setDoc(doc(firestore, 'global_users', firebaseUser.uid), { ...globalData, uid: firebaseUser.uid, updatedAt: serverTimestamp() }, { merge: true });
             }
         }
         
         if (!companyId) return { user: null, company: null };
 
-        // جلب بيانات الشركة
+        // 2. جلب بيانات الشركة
         const companyDoc = await getDoc(doc(firestore, 'companies', companyId));
         const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
-        // محاولة جلب ملف المستخدم من داخل المنشأة (بالـ UID أولاً ثم بالايميل)
-        let tenantUserDocSnap = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
+        // 3. جلب ملف المستخدم (مع محرك الترميم التلقائي)
+        const tenantUserPath = `companies/${companyId}/users/${firebaseUser.uid}`;
+        const tenantUserDocSnap = await getDoc(doc(firestore, tenantUserPath));
+        
         let userData: any = null;
 
         if (tenantUserDocSnap.exists()) {
             userData = tenantUserDocSnap.data();
         } else {
+            // محاولة ثانية بالايميل
             const tenantUserQuery = query(collection(firestore, `companies/${companyId}/users`), where('email', '==', sanitizedEmail), limit(1));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             if (!tenantUserSnap.empty) {
                 userData = tenantUserSnap.docs[0].data();
+            } else if (globalData?.role === 'Admin') {
+                // 🔄 إجراء الترميم السيادي: إذا كان مديراً في الفهرس العالمي وغير موجود في مجلد الشركة، نقوم بإنشائه فوراً
+                userData = {
+                    id: firebaseUser.uid,
+                    uid: firebaseUser.uid,
+                    email: sanitizedEmail,
+                    fullName: firebaseUser.displayName || companyData?.name || 'Admin',
+                    role: 'Admin',
+                    isActive: true,
+                    companyId: companyId,
+                    createdAt: serverTimestamp()
+                };
+                await setDoc(doc(firestore, tenantUserPath), cleanFirestoreData(userData));
             }
         }
 
@@ -150,19 +158,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        // محاولة استعادة سريعة من الكاش (Optimistic Identity)
-        if (isInitialLoad.current) {
-            const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
-            if (cached) {
-                try {
-                    const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
-                    setUser(cachedUser);
-                    setCompany(cachedCompany);
-                    if (cachedCompany) setCurrentCompany(cachedCompany);
-                } catch (e) {}
-            }
-        }
-
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
@@ -172,7 +167,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setLoading(false);
         } else {
-          // فقط إذا لم يكن تحميل أولياً، نقوم بتسجيل الخروج إذا فشل التحقق
           if (!isInitialLoad.current) {
             await signOut(masterAuth);
             setUser(null);

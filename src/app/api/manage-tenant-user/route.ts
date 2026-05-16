@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد (V73.0):
- * تم تحديثه لدعم الفهرس العالمي السريع عبر استخدام الـ UID كمفتاح للمستند.
+ * محرك إدارة المنشآت الموحد (V74.0):
+ * تم تحصينه لضمان إنشاء ملف المستخدم داخل المنشأة (Tenant Profile) فور التأسيس.
  */
 
 function getAdminApp() {
@@ -69,26 +69,37 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // حقن صلاحيات الشركة فوراً
         if (companyId) {
             await auth.setCustomUserClaims(userRecord.uid, {
                 companyId: companyId,
                 role: 'Admin'
             });
 
-            // ⚡ تحديث الفهرس العالمي بالـ UID للوصول المباشر السريع
+            // ⚡ تحديث الفهرس العالمي
             await db.collection('global_users').doc(userRecord.uid).set({
                 email: sanitizedEmail,
                 companyId: companyId,
                 role: 'Admin',
                 createdAt: FieldValue.serverTimestamp()
             });
+
+            // 🛡️ إنشاء ملف المستخدم داخل المنشأة لضمان استقرار الدخول
+            await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
+                id: userRecord.uid,
+                uid: userRecord.uid,
+                email: sanitizedEmail,
+                fullName: displayName || contactName || 'Admin',
+                role: 'Admin',
+                isActive: true,
+                companyId: companyId,
+                createdAt: FieldValue.serverTimestamp()
+            }, { merge: true });
         }
 
         return NextResponse.json({ success: true, uid: userRecord.uid });
     }
 
-    // 2. إجراء التحديث الكامل (Update Identity)
+    // 2. إجراء التحديث الكامل
     if (action === 'update_full') {
         if (!uid) throw new Error("UID_REQUIRED");
         
@@ -106,10 +117,17 @@ export async function POST(request: NextRequest) {
                 role: 'Admin'
             });
 
-            // تحديث الفهرس العالمي
             await db.collection('global_users').doc(uid).set({
                 email: sanitizedEmail,
                 companyId: companyId,
+                role: 'Admin',
+                updatedAt: FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            // تحديث ملف المنشأة
+            await db.collection('companies').doc(companyId).collection('users').doc(uid).set({
+                email: sanitizedEmail,
+                fullName: displayName,
                 role: 'Admin',
                 updatedAt: FieldValue.serverTimestamp()
             }, { merge: true });
@@ -118,7 +136,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, uid });
     }
 
-    // 3. الإجراء القديم (Instant Setup) للحفاظ على التوافق
+    // 3. الإجراء الفوري (Instant Setup)
     if (action === 'instant_setup') {
         const generatedCompanyId = companyId || `comp-${Math.random().toString(36).substring(2, 9)}`;
         
@@ -140,7 +158,7 @@ export async function POST(request: NextRequest) {
             role: 'Admin'
         });
 
-        // ⚡ تحديث الفهرس العالمي للسرعة السيادية
+        // 1. الفهرس العالمي
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             companyId: generatedCompanyId,
@@ -148,6 +166,7 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
+        // 2. سجل الشركة
         await db.collection('companies').doc(generatedCompanyId).set({
             id: generatedCompanyId,
             name: companyName || 'منشأة جديدة',
@@ -158,7 +177,20 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             maxUsersLimit: 5,
-            subscriptionType: 'trial'
+            subscriptionType: 'trial',
+            subscriptionExpiryDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+        });
+
+        // 3. 🛡️ ملف المستخدم داخل المنشأة (الحلقة المفقودة)
+        await db.collection('companies').doc(generatedCompanyId).collection('users').doc(userRecord.uid).set({
+            id: userRecord.uid,
+            uid: userRecord.uid,
+            email: sanitizedEmail,
+            fullName: contactName || 'Admin',
+            role: 'Admin',
+            isActive: true,
+            companyId: generatedCompanyId,
+            createdAt: FieldValue.serverTimestamp()
         });
 
         if (requestId) {
@@ -177,7 +209,7 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND", receivedAction: action });
+    return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND" });
 
   } catch (error: any) {
     console.error("IAM PERMISSION ERROR:", error);
