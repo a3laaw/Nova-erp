@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -20,7 +21,9 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
-    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User, Settings2, Pencil, Sparkles, Cloud, Key
+    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User, Settings2, Pencil, Sparkles, Cloud, Key,
+    Wallet,
+    AlertTriangle
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,10 +56,11 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toFirestoreDate } from '@/services/date-converter';
 
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -189,7 +193,7 @@ export default function DeveloperDashboard() {
                         </div>
                         <div className="text-right text-white">
                             <CardTitle className="text-4xl font-black tracking-tighter">غرفة التحكم الرئيسية</CardTitle>
-                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت وتفعيل الحسابات الجديدة.</CardDescription>
+                            <CardDescription className="text-indigo-200 font-bold text-lg opacity-80 mt-1">إدارة المنشآت وتفعيل الحسابات والتحصيل المالي.</CardDescription>
                         </div>
                     </div>
                     <Button onClick={() => { setCompanyToEdit(null); setIsEditFormOpen(true); }} className="h-12 px-8 rounded-2xl font-black gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-900/40">
@@ -279,51 +283,72 @@ export default function DeveloperDashboard() {
                                 <TableRow className="border-none">
                                     <TableHead className="px-12 font-black text-white text-right">المنظمة والبريد الإداري</TableHead>
                                     <TableHead className="font-black text-indigo-100 text-center">نوع الاشتراك</TableHead>
-                                    <TableHead className="font-black text-indigo-100 text-center">تاريخ التأسيس</TableHead>
+                                    <TableHead className="font-black text-indigo-100 text-center">الاستحقاق المالي</TableHead>
                                     <TableHead className="text-left px-12 font-black text-indigo-100">تحكم</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {companiesLoading ? <TableRow><TableCell colSpan={4} className="text-center p-20"><Loader2 className="animate-spin h-12 w-12 mx-auto text-primary" /></TableCell></TableRow> :
                                 filteredCompanies.length === 0 ? <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد منشآت نشطة حالياً.</TableCell></TableRow> :
-                                filteredCompanies.map(company => (
-                                    <TableRow key={company.id} className="h-24 border-slate-100 group transition-all border-b">
-                                        <TableCell className="px-12">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 shadow-sm"><Building2 className="h-6 w-6" /></div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-black text-xl text-slate-900">{company.name}</span>
-                                                    <span className="font-mono text-xs text-primary font-black">{company.adminEmail}</span>
+                                filteredCompanies.map(company => {
+                                    const expiryDate = company.subscriptionExpiryDate ? toFirestoreDate(company.subscriptionExpiryDate) : null;
+                                    const isExpired = expiryDate && isPast(expiryDate);
+                                    
+                                    return (
+                                        <TableRow key={company.id} className={cn("h-24 border-slate-100 group transition-all border-b", isExpired && "bg-red-50/30")}>
+                                            <TableCell className="px-12">
+                                                <div className="flex items-center gap-4">
+                                                    <div className={cn("p-3 rounded-2xl shadow-sm", isExpired ? "bg-red-100 text-red-600" : "bg-indigo-50 text-indigo-600")}>
+                                                        <Building2 className="h-6 w-6" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="font-black text-xl text-slate-900">{company.name}</span>
+                                                        <span className="font-mono text-xs text-primary font-black">{company.adminEmail}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[9px] uppercase", company.subscriptionType === 'premium' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200')}>
-                                                {company.subscriptionType === 'premium' ? 'Premium Plan' : 'Trial Mode'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-center font-bold text-xs text-slate-500">
-                                            {company.createdAt ? format(company.createdAt.toDate(), 'dd/MM/yyyy', { locale: ar }) : '-'}
-                                        </TableCell>
-                                        <TableCell className="text-left px-12">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm group-hover:bg-white transition-all"><MoreHorizontal className="h-5 w-5" /></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none">
-                                                    <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إدارة المنشأة</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleEditCompany(company)} className="rounded-xl py-3 font-bold gap-3">
-                                                        <Pencil className="h-4 w-4 text-indigo-600" /> تعديل إعدادات المنشأة
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50">
-                                                        <Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                <Badge variant="outline" className={cn("px-4 py-1 rounded-full font-black text-[9px] uppercase", company.subscriptionType === 'premium' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-orange-50 text-orange-700 border-orange-200')}>
+                                                    {company.subscriptionType === 'premium' ? 'Premium Plan' : 'Trial Mode'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-center">
+                                                {expiryDate ? (
+                                                    <div className="flex flex-col items-center gap-1">
+                                                        <span className={cn("font-mono text-xs font-black", isExpired ? "text-red-600" : "text-slate-600")}>
+                                                            {format(expiryDate, 'dd/MM/yyyy')}
+                                                        </span>
+                                                        {isExpired ? (
+                                                            <Badge variant="destructive" className="h-4 text-[8px] font-black uppercase animate-pulse">محظور مالياً</Badge>
+                                                        ) : (
+                                                            <span className="text-[9px] font-bold text-slate-400">نشط</span>
+                                                        )}
+                                                    </div>
+                                                ) : <span className="text-slate-300 font-bold italic text-xs">غير محدد</span>}
+                                            </TableCell>
+                                            <TableCell className="text-left px-12">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-slate-50 border shadow-sm group-hover:bg-white transition-all"><MoreHorizontal className="h-5 w-5" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" dir="rtl" className="w-64 rounded-2xl p-2 shadow-2xl border-none">
+                                                        <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">إدارة المنشأة</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleEditCompany(company)} className="rounded-xl py-3 font-bold gap-3">
+                                                            <Pencil className="h-4 w-4 text-indigo-600" /> تعديل إعدادات المنشأة
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleEditCompany(company)} className="rounded-xl py-3 font-bold gap-3 text-primary">
+                                                            <Wallet className="h-4 w-4" /> تمديد الاشتراك / سداد
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem onClick={() => setCompanyToDelete(company)} className="text-red-600 rounded-xl py-3 font-bold gap-3 focus:bg-red-50">
+                                                            <Trash2 className="h-4 w-4" /> حذف المنشأة نهائياً
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </CardContent>
@@ -396,7 +421,7 @@ export default function DeveloperDashboard() {
                                             size="sm"
                                             className="rounded-lg font-black text-[10px] gap-2 border-indigo-200 text-indigo-700 bg-indigo-50"
                                         >
-                                            <Sparkles className="h-3 w-3" /> تعبئة ببيانات الماستر
+                                            <Sparkles className="h-4 w-4" /> تعبئة ببيانات الماستر
                                         </Button>
                                     </div>
                                     

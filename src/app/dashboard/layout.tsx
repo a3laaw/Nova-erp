@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -5,18 +6,25 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { Loader, AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
+import { Loader, AlertCircle, RefreshCcw, LogOut, Wallet, ShieldAlert, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
+import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
+import { isPast } from 'date-fns';
+import { toFirestoreDate } from '@/services/date-converter';
 
+/**
+ * غلاف لوحة التحكم (Sovereign Shield Implementation V75.0):
+ * يتضمن درع الحماية المالي؛ حيث يقوم بفحص تاريخ اشتراك المنشأة وحالة السداد.
+ */
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading, logout } = useAuth();
+  const { user, company, loading, logout } = useAuth();
   const router = useRouter();
   const { language } = useLanguage();
   
@@ -36,15 +44,16 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
+  // 1. معالجة حالة التحميل
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#0F172A] relative overflow-hidden">
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#1e1b4b] relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-6">
             <div className="relative">
-                <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-primary animate-spin shadow-[0_0_30px_rgba(255,122,0,0.1)]" />
-                <Loader className="h-10 w-10 text-primary absolute inset-0 m-auto animate-pulse" />
+                <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-white animate-spin shadow-[0_0_30px_rgba(255,255,255,0.1)]" />
+                <Loader className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
             </div>
             <div className="text-center space-y-4">
                 <p className="text-white font-black text-2xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
@@ -68,15 +77,58 @@ export default function DashboardLayout({
     );
   }
 
+  // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#0F172A]">
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e1b4b]">
         <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-400 animate-bounce" />
         </div>
         <h2 className="text-3xl font-black text-white tracking-tighter">انتهت جلسة العمل</h2>
         <p className="text-white/60 max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك المعزولة.</p>
-        <Button onClick={handleSafeExit} className="bg-primary text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-orange-600 active:scale-95 transition-all">بوابة الدخول</Button>
+        <Button onClick={handleSafeExit} className="bg-white text-indigo-950 font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:bg-slate-100 active:scale-95 transition-all">بوابة الدخول</Button>
+      </div>
+    );
+  }
+
+  // 🛡️ درع الحظر المالي (Financial Shield Check)
+  // المطور السيادي (المالك الأصلي) لا يخضع للحظر لتمكينه من الصيانة
+  const isDev = user.role === 'Developer';
+  const expiryDate = company?.subscriptionExpiryDate ? toFirestoreDate(company.subscriptionExpiryDate) : null;
+  const isExpired = expiryDate && isPast(expiryDate);
+  const isSuspended = company?.isActive === false;
+
+  if (!isDev && (isExpired || isSuspended)) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" dir="rtl">
+          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+          
+          <Card className="max-w-lg rounded-[3rem] border-red-500/20 bg-red-500/5 shadow-2xl p-12 relative z-10 animate-in zoom-in-95 duration-500">
+              <div className="bg-red-600 p-6 rounded-full w-fit mx-auto mb-8 shadow-xl shadow-red-900/40">
+                  <Wallet className="h-12 w-12 text-white" />
+              </div>
+              <h2 className="text-3xl font-black mb-4 tracking-tighter">تنبيه: توقف الخدمة مؤقتاً</h2>
+              <p className="text-slate-300 font-bold mb-8 leading-relaxed">
+                  نأسف لإبلاغكم بأن جلسة العمل لمنشأة <span className="text-red-400">"{company?.name}"</span> قد تم تجميدها آلياً.
+                  <br/><br/>
+                  {isExpired ? "لقد انتهت فترة الاشتراك المعتمدة (تاريخ الاستحقاق: " + format(expiryDate!, 'dd/MM/yyyy') + "). " : "تم إيقاف الحساب بقرار إداري. "}
+                  يرجى تسوية المستحقات المالية أو التواصل مع إدارة المنظومة لتفعيل الخدمة.
+              </p>
+              
+              <div className="grid gap-4">
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                          <ShieldAlert className="h-5 w-5 text-red-400" />
+                          <span className="text-xs font-black">الدعم الفني</span>
+                      </div>
+                      <span className="font-mono text-sm">965-XXXX-XXXX+</span>
+                  </div>
+                  <Button onClick={handleSafeExit} variant="outline" className="h-12 rounded-xl font-black text-white border-white/20 hover:bg-white/10">
+                      العودة لصفحة الدخول
+                  </Button>
+              </div>
+          </Card>
+          <div className="mt-8 opacity-20 text-[10px] font-black uppercase tracking-[0.5em]">Nova ERP Financial Shield System</div>
       </div>
     );
   }
@@ -92,10 +144,11 @@ export default function DashboardLayout({
           </Sidebar>
           <SidebarInset className="flex flex-col h-screen min-w-0 w-full bg-transparent">
             <Header currentUser={user} onLogout={handleSafeExit} className="no-print bg-transparent border-none" />
-            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-w-0 scrollbar-none">
+            <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-w-0">
               {children}
             </main>
             <OfflineIndicator />
+            <SystemExpertChatWidget />
           </SidebarInset>
       </SidebarProvider>
     </div>

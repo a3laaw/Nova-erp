@@ -50,9 +50,10 @@ export interface Company extends BaseEntity {
   activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
   employeeCountRange?: string;
   status?: 'pending' | 'active' | 'suspended';
-  // --- Licensing & Subscription ---
+  // --- Licensing & Financial Shield ---
   subscriptionType: 'trial' | 'premium';
   trialEndDate?: Timestamp | any;
+  subscriptionExpiryDate?: Timestamp | any; // 📅 تاريخ انتهاء الاشتراك المعتمد
   maxUsersLimit: number;
   currentUsersCount?: number;
 }
@@ -62,8 +63,8 @@ export interface CompanyRequest extends BaseEntity {
     activity: string;
     employeeCountRange: string;
     contactName: string;
-    email: string; // 📧 البريد الحقيقي للتفعيل
-    username: string; // 🔑 اسم المستخدم المختار كمعرف للدخول
+    email: string; 
+    username: string; 
     phone: string;
     status: 'pending' | 'activated' | 'rejected';
     activatedAt?: Timestamp | any;
@@ -202,7 +203,7 @@ export interface PaymentApplication extends BaseEntity {
   subsidizedMaterialsValue?: number;
   netDueAmount?: number;
   status: 'draft' | 'submitted' | 'approved' | 'paid' | 'cancelled';
-  journalEntryId?: string;
+  journalEntryId: string;
 }
 
 export interface Employee extends BaseEntity {

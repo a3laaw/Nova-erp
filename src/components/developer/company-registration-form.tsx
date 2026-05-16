@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -30,11 +31,14 @@ import {
   CreditCard,
   Users,
   Calendar,
-  Zap
+  Zap,
+  Lock,
+  RefreshCw,
+  Wallet
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
 import type { Company } from '@/lib/types';
-import { addDays } from 'date-fns';
+import { addDays, addMonths, addYears } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '../ui/date-input';
@@ -72,6 +76,8 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     subscriptionType: 'trial' as 'trial' | 'premium',
     maxUsersLimit: 5,
     trialEndDate: undefined as Date | undefined,
+    subscriptionExpiryDate: undefined as Date | undefined,
+    isActive: true,
   });
 
   useEffect(() => {
@@ -106,9 +112,12 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 subscriptionType: company.subscriptionType || 'trial',
                 maxUsersLimit: company.maxUsersLimit || 5,
                 trialEndDate: company.trialEndDate ? (company.trialEndDate.toDate ? company.trialEndDate.toDate() : new Date(company.trialEndDate.seconds * 1000)) : undefined,
+                subscriptionExpiryDate: company.subscriptionExpiryDate ? (company.subscriptionExpiryDate.toDate ? company.subscriptionExpiryDate.toDate() : new Date(company.subscriptionExpiryDate.seconds * 1000)) : undefined,
+                isActive: company.isActive ?? true,
             });
         } else {
             const defaultTrialEnd = addDays(new Date(), 7);
+            const defaultExpiry = addMonths(new Date(), 1);
             setFormData({
                 name: '', nameEn: '', activityType: 'consulting', adminEmail: '', adminPassword: '',
                 apiKey: '', authDomain: '', projectId: '', storageBucket: '',
@@ -116,10 +125,21 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                 subscriptionType: 'trial',
                 maxUsersLimit: 5,
                 trialEndDate: defaultTrialEnd,
+                subscriptionExpiryDate: defaultExpiry,
+                isActive: true,
             });
         }
     }
   }, [isOpen, company]);
+
+  const generateStrongPassword = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setFormData(prev => ({ ...prev, adminPassword: password }));
+  };
 
   const handleFillMasterConfig = () => {
       setFormData(prev => ({
@@ -133,6 +153,12 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           measurementId: ""
       }));
       toast({ title: '✅ تم جلب بيانات الماستر' });
+  };
+
+  const handleQuickAddDate = (type: 'month' | 'year') => {
+      const current = formData.subscriptionExpiryDate || new Date();
+      const next = type === 'month' ? addMonths(current, 1) : addYears(current, 1);
+      setFormData(prev => ({ ...prev, subscriptionExpiryDate: next }));
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -186,10 +212,11 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           adminPassword: formData.adminPassword,
           firebaseProjectId: formData.projectId,
           firebaseConfig,
-          isActive: true,
+          isActive: formData.isActive,
           subscriptionType: formData.subscriptionType,
           maxUsersLimit: Number(formData.maxUsersLimit) || 5,
           trialEndDate: formData.trialEndDate ? Timestamp.fromDate(formData.trialEndDate) : null,
+          subscriptionExpiryDate: formData.subscriptionExpiryDate ? Timestamp.fromDate(formData.subscriptionExpiryDate) : null,
           updatedAt: serverTimestamp(),
           ...(!isEditing && { createdAt: serverTimestamp() })
       }), { merge: true });
@@ -239,7 +266,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     </div>
                     <div className="text-right">
                         <DialogTitle className="text-2xl font-black">{isEditing ? 'تعديل بيانات المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
-                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص.</DialogDescription>
+                        <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص والفوترة.</DialogDescription>
                     </div>
                 </div>
           </DialogHeader>
@@ -265,51 +292,87 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     id="adminPassword" 
                                     type={showPassword ? "text" : "password"} 
                                     value={formData.adminPassword} 
-                                    onChange={handleChange} 
+                                    onChange={e => setFormData(prev => ({ ...prev, adminPassword: e.target.value }))} 
                                     required 
-                                    className="h-12 rounded-xl border-2 pl-12" 
+                                    className="h-12 rounded-xl border-2 pl-12 pr-10" 
                                 />
+                                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                 <Button type="button" variant="ghost" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)}>
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
                             </div>
                         </div>
+                        <div className="flex items-center gap-3 pt-6">
+                            <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-11 rounded-xl gap-2 font-bold text-xs">
+                                <RefreshCw className="h-3 w-3" /> توليد كلمة مرور قوية
+                            </Button>
+                        </div>
                     </div>
                 </section>
 
-                {/* 2. نظام التراخيص (الجديد) */}
+                {/* 2. نظام التراخيص والاشتراك */}
                 <section className="space-y-6">
                     <h3 className="font-black text-xl text-purple-700 border-r-8 border-purple-600 pr-4 flex items-center gap-3">
-                        <CreditCard className="h-6 w-6 text-purple-600" /> نظام التراخيص والاشتراك
+                        <CreditCard className="h-6 w-6 text-purple-600" /> نظام التراخيص والتحصيل المالي
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-8 rounded-[2.5rem] bg-purple-50/30 border-2 border-purple-100 shadow-inner">
-                        <div className="grid gap-2">
-                            <Label className="font-black text-xs pr-1">نوع الخطة (Plan)</Label>
-                            <Select value={formData.subscriptionType} onValueChange={(v: any) => setFormData(p => ({...p, subscriptionType: v}))}>
-                                <SelectTrigger className="h-12 rounded-xl border-2 bg-white font-bold"><SelectValue /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="trial">نسخة تجريبية (Demo)</SelectItem>
-                                    <SelectItem value="premium">نسخة أساسية (Premium)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label className="font-black text-xs pr-1 flex items-center gap-1"><Users className="h-3 w-3"/> حد المستخدمين (Quota)</Label>
-                            <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} className="h-12 rounded-xl border-2 bg-white font-black text-center text-xl text-purple-700" />
-                        </div>
-                        {formData.subscriptionType === 'trial' && (
-                            <div className="grid gap-2 animate-in slide-in-from-top-2">
-                                <Label className="font-black text-xs pr-1 flex items-center gap-1"><Calendar className="h-3 w-3"/> تاريخ انتهاء الديمو</Label>
-                                <DateInput value={formData.trialEndDate} onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))} className="bg-white rounded-xl border-2" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-purple-50/30 border-2 border-purple-100 shadow-inner">
+                        <div className="space-y-6">
+                            <div className="grid gap-2">
+                                <Label className="font-black text-xs pr-1">نوع الخطة (Subscription Plan)</Label>
+                                <Select value={formData.subscriptionType} onValueChange={(v: any) => setFormData(p => ({...p, subscriptionType: v}))}>
+                                    <SelectTrigger className="h-12 rounded-xl border-2 bg-white font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                        <SelectItem value="trial">نسخة تجريبية (Demo)</SelectItem>
+                                        <SelectItem value="premium">نسخة أساسية (Premium)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
-                        )}
-                        {formData.subscriptionType === 'premium' && (
-                            <div className="flex items-center justify-center pt-6 animate-in zoom-in-95">
-                                <Badge className="bg-green-600 text-white font-black px-6 py-2 rounded-xl border-none shadow-lg gap-2">
-                                    <ShieldCheck className="h-4 w-4"/> اشتراك أساسي مفعل
-                                </Badge>
+
+                            <div className="grid gap-2">
+                                <Label className="font-black text-xs pr-1 flex items-center gap-1"><Users className="h-3 w-3"/> حد المستخدمين (Quota Limit)</Label>
+                                <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} className="h-12 rounded-xl border-2 bg-white font-black text-center text-xl text-purple-700" />
                             </div>
-                        )}
+
+                            <div className="flex items-center justify-between p-4 bg-white rounded-2xl border shadow-sm">
+                                <div className="space-y-0.5">
+                                    <Label className="font-black text-sm">تنشيط الخدمة للعميل</Label>
+                                    <p className="text-[10px] text-muted-foreground font-bold">إلغاء التنشيط يحظر دخول كافة الموظفين فوراً.</p>
+                                </div>
+                                <Switch checked={formData.isActive} onCheckedChange={v => setFormData(p => ({...p, isActive: v}))} />
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="p-6 bg-white rounded-[2rem] border-2 border-dashed border-purple-200">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Wallet className="h-5 w-5 text-purple-600" />
+                                    <Label className="font-black text-purple-900">إدارة تاريخ الاستحقاق والسداد</Label>
+                                </div>
+                                
+                                <div className="grid gap-4">
+                                    <div className="grid gap-1.5">
+                                        <Label className="text-[10px] font-black uppercase text-slate-500 mr-1">تاريخ انتهاء الاشتراك القادم *</Label>
+                                        <DateInput value={formData.subscriptionExpiryDate} onChange={d => setFormData(p => ({...p, subscriptionExpiryDate: d}))} className="bg-background border-2" />
+                                    </div>
+                                    
+                                    <div className="flex gap-2">
+                                        <Button type="button" variant="outline" size="sm" onClick={() => handleQuickAddDate('month')} className="flex-1 h-9 rounded-lg font-bold text-[10px] gap-1">
+                                            + شهر إضافي
+                                        </Button>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => handleQuickAddDate('year')} className="flex-1 h-9 rounded-lg font-bold text-[10px] gap-1 text-primary border-primary/20">
+                                            + سنة كاملة
+                                        </Button>
+                                    </div>
+                                    
+                                    <Alert className="mt-2 bg-purple-50/50 border-none p-3 rounded-xl">
+                                        <Zap className="h-3 w-3 text-purple-600" />
+                                        <AlertDescription className="text-[9px] font-bold text-purple-800 leading-tight">
+                                            عند تجاوز هذا التاريخ، ستظهر للمستخدم شاشة "درع الحظر المالي" ولن يتمكن من الوصول للبيانات حتى يتم تمديد التاريخ من قبلك.
+                                        </AlertDescription>
+                                    </Alert>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -355,7 +418,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-2xl font-black h-14 px-10 border-2">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px]">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Zap className="h-6 w-6 text-yellow-400" />}
-                حفظ ومزامنة الهوية
+                {isEditing ? 'حفظ التغييرات السيادية' : 'حفظ ومزامنة الهوية'}
             </Button>
           </DialogFooter>
         </form>
@@ -363,3 +426,5 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     </Dialog>
   );
 }
+
+import { Switch } from '../ui/switch';
