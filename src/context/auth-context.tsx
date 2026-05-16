@@ -44,7 +44,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
     // 🛡️ المسار البرقي للمطور (Sovereign Lightning Path)
-    if (sanitizedEmail === 'alaawaaheeb@gmail.com' || sanitizedEmail === 'alaaeng045@gmail.com') {
+    // تم حذف البريد الإضافي لضمان دخوله كمستخدم منشأة عادي
+    if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
             id: firebaseUser.uid,
@@ -120,12 +121,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (isInitialLoad.current) {
             const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
             if (cached) {
-                const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
-                setUser(cachedUser);
-                setCompany(cachedCompany);
-                if (cachedCompany) setCurrentCompany(cachedCompany);
-                setLoading(false);
-                isInitialLoad.current = false;
+                try {
+                  const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
+                  setUser(cachedUser);
+                  setCompany(cachedCompany);
+                  if (cachedCompany) setCurrentCompany(cachedCompany);
+                  setLoading(false);
+                  isInitialLoad.current = false;
+                } catch (e) {
+                  localStorage.removeItem(`${CACHE_KEY}_${firebaseUser.uid}`);
+                }
             }
         }
 
@@ -154,7 +159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext]); // 🛡️ تم إزالة 'user' من التبعيات لكسر الحلقة
+  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext]);
 
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error('بوابة الدخول غير متصلة.');
