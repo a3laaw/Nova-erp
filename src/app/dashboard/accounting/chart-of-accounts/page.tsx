@@ -139,7 +139,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         onSave({ ...formData, level, type: parentAccount ? parentAccount.type : getTypeFromCode(code), statement: (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) ? 'Balance Sheet' : 'Income Statement', balanceType: (code.startsWith('1') || code.startsWith('5')) ? 'Debit' : 'Credit', parentCode: parentAccount?.code || null });
     };
 
-    const showEmployeeLink = parentAccount?.code === '110103' || account?.parentCode === '110103';
+    const showEmployeeLink = parentAccount?.code === '110103' || account?.parentCode === '110103' || parentAccount?.code?.startsWith('110103');
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -273,7 +273,7 @@ export default function ChartOfAccountsPage() {
         try {
             const batch = writeBatch(firestore);
             const coaPath = getTenantPath('chartOfAccounts', user.currentCompanyId);
-            const existingAccountsSnap = await getDocs(query(collection(firestore, coaPath)));
+            const existingSnap = await getDocs(query(collection(firestore, coaPath)));
             existingSnap.forEach(doc => batch.delete(doc.ref));
 
             defaultChartOfAccounts.forEach(account => {

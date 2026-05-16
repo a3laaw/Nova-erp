@@ -42,10 +42,11 @@ export function useSubscription<T extends { id?: string }>(
             return;
         }
 
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
+        // 🛡️ منع جلب أي بيانات غير "ماستر" إلا بعد استقرار هوية المنشأة
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;
@@ -57,6 +58,7 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
+        // في استعلامات الـ Group Queries، يجب فرض فلتر الـ companyId لضمان العزل
         if (isGroup && tenantId) {
             finalPath = collectionPath.split('/').pop() || collectionPath;
             finalConstraints.push(where('companyId', '==', tenantId));

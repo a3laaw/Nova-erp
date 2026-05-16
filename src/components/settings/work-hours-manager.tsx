@@ -125,6 +125,8 @@ export function WorkHoursManager() {
         } finally { setIsSaving(false); }
     };
 
+    if (loading) return <div className="space-y-6"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-[500px] w-full rounded-2xl"/></div>;
+
     return (
         <div className="space-y-6" dir="rtl">
             <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-orange-50 dark:from-slate-900/60 dark:to-orange-950/20">
@@ -235,4 +237,3 @@ export function WorkHoursManager() {
         </div>
     );
 }
-
