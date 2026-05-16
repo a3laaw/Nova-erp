@@ -32,15 +32,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Appointment, Client, Employee, WorkStage } from '@/lib/types';
+import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
-import { useAuth } from '@/context/auth-context'; // CORRECT: Import from context to get the user object
-import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 
@@ -77,9 +76,12 @@ function getVisitColor(visit: { visitCount?: number, contractSigned?: boolean })
   return "#9ca3af"; 
 }
 
-async function reconcileClientAppointments(firestore: any, identifier: { clientId?: string | null; clientMobile?: string | null }) {
+async function reconcileClientAppointments(firestore: any, tenantId: string | undefined, identifier: { clientId?: string | null; clientMobile?: string | null }) {
     if (!identifier.clientId && !identifier.clientMobile) return;
     try {
+        const apptsPath = getTenantPath('appointments', tenantId);
+        const clientsPath = getTenantPath('clients', tenantId);
+
         const apptsQueryConstraints = [where('type', '==', 'architectural')];
         if (identifier.clientId) {
             apptsQueryConstraints.push(where('clientId', '==', identifier.clientId));
@@ -87,7 +89,7 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
             apptsQueryConstraints.push(where('clientMobile', '==', identifier.clientMobile));
         } else { return; }
 
-        const clientApptsSnap = await getDocs(query(collection(firestore, 'appointments'), ...apptsQueryConstraints));
+        const clientApptsSnap = await getDocs(query(collection(firestore, apptsPath), ...apptsQueryConstraints));
         const appointments = clientApptsSnap.docs
             .map(d => ({ id: d.id, ...d.data() } as Appointment))
             .filter(appt => appt.status !== 'cancelled')
@@ -95,7 +97,7 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
 
         let contractSigned = false;
         if (identifier.clientId) {
-            const clientSnap = await getDoc(doc(firestore, 'clients', identifier.clientId));
+            const clientSnap = await getDoc(doc(firestore, clientsPath, identifier.clientId));
             contractSigned = clientSnap.exists() && ['contracted', 'reContracted'].includes(clientSnap.data().status);
         }
         
@@ -105,7 +107,7 @@ async function reconcileClientAppointments(firestore: any, identifier: { clientI
             const visitCount = index + 1;
             const newColor = getVisitColor({ visitCount, contractSigned });
             if (appt.visitCount !== visitCount || appt.color !== newColor) {
-                batch.update(doc(firestore, 'appointments', appt.id!), { visitCount, color: newColor });
+                batch.update(doc(firestore, apptsPath, appt.id!), { visitCount, color: newColor });
                 hasUpdates = true;
             }
         });
@@ -141,6 +143,8 @@ export default function ArchitecturalAppointmentsView() {
     const [isDeleting, setIsDeleting] = useState(false);
     
     useEffect(() => { if (!date) setDate(new Date()); }, [date]);
+
+    const tenantId = currentUser?.currentCompanyId;
 
     const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
         if (!date) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
@@ -192,25 +196,29 @@ export default function ArchitecturalAppointmentsView() {
     }, [branding, date]);
 
     useEffect(() => {
-        if (!firestore) return;
-        getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))).then(snap => {
+        if (!firestore || !tenantId) return;
+        const employeesPath = getTenantPath('employees', tenantId);
+        const clientsPath = getTenantPath('clients', tenantId);
+
+        getDocs(query(collection(firestore, employeesPath), where('status', '==', 'active'))).then(snap => {
             const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
         });
-        getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))).then(snap => {
+        getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))).then(snap => {
             const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
             setClients(clientsList);
         });
-    }, [firestore]);
+    }, [firestore, tenantId]);
     
     const fetchAppointments = useCallback(async (d: Date) => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         setLoading(true);
         try {
-            const apptSnap = await getDocs(query(collection(firestore, 'appointments'), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
+            const apptsPath = getTenantPath('appointments', tenantId);
+            const apptSnap = await getDocs(query(collection(firestore, apptsPath), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
             setRawAppointments(apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment)).filter(appt => appt.type === 'architectural'));
         } finally { setLoading(false); }
-    }, [firestore]);
+    }, [firestore, tenantId]);
 
     useEffect(() => { if (date) fetchAppointments(date); }, [date, fetchAppointments]);
 
@@ -237,11 +245,12 @@ export default function ArchitecturalAppointmentsView() {
     }, [appointments, engineers, morningSlots, eveningSlots]);
 
     const handleCancelBooking = async () => {
-        if (!appointmentToDelete || !firestore) return;
+        if (!appointmentToDelete || !firestore || !tenantId) return;
         setIsDeleting(true);
         try {
-            await updateDoc(doc(firestore, 'appointments', appointmentToDelete.id!), { status: 'cancelled' });
-            await reconcileClientAppointments(firestore, { clientId: appointmentToDelete.clientId, clientMobile: appointmentToDelete.clientMobile });
+            const apptsPath = getTenantPath('appointments', tenantId);
+            await updateDoc(doc(firestore, apptsPath, appointmentToDelete.id!), { status: 'cancelled' });
+            await reconcileClientAppointments(firestore, tenantId, { clientId: appointmentToDelete.clientId, clientMobile: appointmentToDelete.clientMobile });
             toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث الجدول.' });
             if(date) fetchAppointments(date);
         } finally { setIsDeleting(false); setAppointmentToDelete(null); }
@@ -361,10 +370,14 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
     const [newClientName, setNewClientName] = useState('');
     const [newClientMobile, setNewClientMobile] = useState('');
 
+    const tenantId = currentUser?.currentCompanyId;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!tenantId) return;
         setIsSaving(true);
         try {
+            const apptsPath = getTenantPath('appointments', tenantId);
             const appointmentDateTime = dialogData.appointmentDate;
             
             if (isPast(appointmentDateTime) && currentUser?.role !== 'Admin') {
@@ -373,17 +386,17 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
             }
 
             if (isNewClient) {
-                const newAppt = { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false };
-                await addDoc(collection(firestore, 'appointments'), newAppt);
+                const newAppt = { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId };
+                await addDoc(collection(firestore, apptsPath), newAppt);
             } else {
                 const client = clients.find((c: any) => c.id === selectedClientId);
                 const batch = writeBatch(firestore);
-                const clientApptsQuery = query(collection(firestore, 'appointments'), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled'));
+                const clientApptsQuery = query(collection(firestore, apptsPath), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled'));
                 const snap = await getDocs(clientApptsQuery);
                 const existing = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 const visitCount = existing.length + 1;
-                const newApptRef = doc(collection(firestore, 'appointments'));
-                batch.set(newApptRef, { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false });
+                const newApptRef = doc(collection(firestore, apptsPath));
+                batch.set(newApptRef, { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
                 await batch.commit();
             }
             toast({ title: 'نجاح', description: 'تم حفظ الموعد.' });

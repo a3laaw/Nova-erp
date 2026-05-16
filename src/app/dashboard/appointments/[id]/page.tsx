@@ -18,7 +18,7 @@ import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getTenantPath } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Separator } from '@/components/ui/separator';
@@ -37,10 +37,16 @@ export default function AppointmentDetailsPage() {
     const { toast } = useToast();
     const id = Array.isArray(params.id) ? params.id[0] : params.id;
 
+    const tenantId = currentUser?.currentCompanyId;
+
     // --- جلب البيانات الأساسية ---
     const { data: appointment, loading: apptLoading } = useDocument<Appointment>(firestore, id ? `appointments/${id}` : null);
-    const { data: client } = useDocument<Client>(firestore, appointment?.clientId ? `clients/${appointment.clientId}` : null);
-    const { data: transaction } = useDocument<ClientTransaction>(firestore, (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null);
+    
+    const clientPath = useMemo(() => appointment?.clientId ? `clients/${appointment.clientId}` : null, [appointment?.clientId]);
+    const { data: client } = useDocument<Client>(firestore, clientPath);
+    
+    const transactionPath = useMemo(() => (appointment?.clientId && appointment?.transactionId) ? `clients/${appointment.clientId}/transactions/${appointment.transactionId}` : null, [appointment]);
+    const { data: transaction } = useDocument<ClientTransaction>(firestore, transactionPath);
 
     const [workStages, setWorkStages] = useState<WorkStage[]>([]);
     const [selectedStageId, setSelectedStageId] = useState('');
@@ -49,26 +55,30 @@ export default function AppointmentDetailsPage() {
 
     // جلب مراحل العمل المعتمدة للقسم المعماري
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const fetchStages = async () => {
-            const deptSnap = await getDocs(query(collection(firestore, 'departments'), where('name', '==', 'القسم المعماري'), limit(1)));
+            const deptsPath = getTenantPath('departments', tenantId);
+            const deptSnap = await getDocs(query(collection(firestore, deptsPath), where('name', '==', 'القسم المعماري'), limit(1)));
             if (!deptSnap.empty) {
-                const stagesSnap = await getDocs(query(collection(firestore, `departments/${deptSnap.docs[0].id}/workStages`), orderBy('order')));
+                const stagesSnap = await getDocs(query(collection(firestore, `${deptsPath}/${deptSnap.docs[0].id}/workStages`), orderBy('order')));
                 setWorkStages(stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage)));
             }
         };
         fetchStages();
-    }, [firestore]);
+    }, [firestore, tenantId]);
 
     // معالجة تحديث مرحلة العمل والربط المالي
     const handleUpdateStage = async () => {
-        if (!firestore || !currentUser || !appointment || !selectedStageId) return;
+        if (!firestore || !currentUser || !tenantId || !appointment || !selectedStageId) return;
         setIsSaving(true);
         const stageTemplate = workStages.find(s => s.id === selectedStageId);
         
         try {
             const batch = writeBatch(firestore);
-            const txRef = doc(firestore, `clients/${appointment.clientId}/transactions/${appointment.transactionId}`);
+            const txPath = getTenantPath(`clients/${appointment.clientId}/transactions/${appointment.transactionId}`, tenantId);
+            const apptsPath = getTenantPath(`appointments/${appointment.id}`, tenantId);
+            
+            const txRef = doc(firestore, txPath);
             const txSnap = await getDoc(txRef);
             
             if (txSnap.exists()) {
@@ -89,7 +99,7 @@ export default function AppointmentDetailsPage() {
                 // 2. الربط المالي: البحث عن دفعة في العقد مرتبطة بهذه المرحلة
                 let commentContent = `تم إكمال مرحلة: **${stageTemplate?.name}** ميدانياً.`;
                 if (txData.contract?.clauses) {
-                    const updatedClauses = txData.contract.clauses.map(clause => {
+                    const updatedClauses = txData.contract.clauses.map((clause: any) => {
                         if (clause.condition === stageTemplate?.name && clause.status === 'غير مستحقة') {
                             commentContent += `\n\n**[إشعار مالي]** استحقاق دفعة بقيمة **${formatCurrency(clause.amount)}**.`;
                             return { ...clause, status: 'مستحقة' };
@@ -109,12 +119,13 @@ export default function AppointmentDetailsPage() {
                     content: commentContent, 
                     userId: currentUser.id, 
                     userName: currentUser.fullName, 
-                    createdAt: serverTimestamp()
+                    createdAt: serverTimestamp(),
+                    companyId: tenantId
                 });
             }
 
             // 3. إغلاق الزيارة وتوثيق الملاحظات
-            batch.update(doc(firestore, 'appointments', appointment.id!), { workStageUpdated: true, notes });
+            batch.update(doc(firestore, apptsPath), { workStageUpdated: true, notes });
             await batch.commit();
             
             toast({ title: 'نجاح', description: 'تم تحديث سير العمل والبيانات المالية بنجاح.' });

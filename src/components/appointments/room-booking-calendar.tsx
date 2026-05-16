@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
@@ -97,6 +97,7 @@ const weekDays = [
 
 export default function RoomBookingCalendar() {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const { branding, loading: brandingLoading } = useBranding();
 
@@ -113,6 +114,8 @@ export default function RoomBookingCalendar() {
 
     const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const tenantId = currentUser?.currentCompanyId;
 
     const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
         if (!date) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
@@ -169,12 +172,15 @@ export default function RoomBookingCalendar() {
     useEffect(() => { if (!date) setDate(new Date()); }, [date]);
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
+        const employeesPath = getTenantPath('employees', tenantId);
+        const clientsPath = getTenantPath('clients', tenantId);
+
         const fetchStaticData = async () => {
             try {
                 const [clientSnap, engSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'clients'), where('isActive', '==', true))),
-                    getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))),
+                    getDocs(query(collection(firestore, employeesPath), where('status', '==', 'active'))),
                 ]);
                 const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
                 setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
@@ -183,16 +189,17 @@ export default function RoomBookingCalendar() {
             } catch (error) { console.error(error); }
         };
         fetchStaticData();
-    }, [firestore]);
+    }, [firestore, tenantId]);
     
     const fetchAppointments = useCallback(async (d: Date) => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         setLoading(true);
         try {
-            const apptSnap = await getDocs(query(collection(firestore, 'appointments'), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
+            const apptsPath = getTenantPath('appointments', tenantId);
+            const apptSnap = await getDocs(query(collection(firestore, apptsPath), where('appointmentDate', '>=', startOfDay(d)), where('appointmentDate', '<=', endOfDay(d))));
             setRawAppointments(apptSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment)).filter(appt => appt.type === 'room'));
         } finally { setLoading(false); }
-    }, [firestore]);
+    }, [firestore, tenantId]);
 
     useEffect(() => { if(date) fetchAppointments(date); }, [date, fetchAppointments]);
 
@@ -237,10 +244,11 @@ export default function RoomBookingCalendar() {
     };
 
     const handleDeleteBooking = async () => {
-        if (!appointmentToDelete || !firestore) return;
+        if (!appointmentToDelete || !firestore || !tenantId) return;
         setIsDeleting(true);
         try {
-            await deleteDoc(doc(firestore, 'appointments', appointmentToDelete.id!));
+            const apptsPath = getTenantPath('appointments', tenantId);
+            await deleteDoc(doc(firestore, apptsPath, appointmentToDelete.id!));
             toast({ title: 'تم الحذف', description: 'تم إلغاء الموعد بنجاح.' });
             setRawAppointments(prev => prev.filter(appt => appt.id !== appointmentToDelete.id!));
         } finally { setIsDeleting(false); setAppointmentToDelete(null); }
@@ -318,7 +326,7 @@ export default function RoomBookingCalendar() {
                 ))}
             </div>
 
-            {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} />}
+            {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} />}
             
             <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl">
@@ -330,7 +338,7 @@ export default function RoomBookingCalendar() {
     );
 }
 
-function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore, currentUser }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -339,6 +347,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
     const [department, setDepartment] = useState('');
     const [notes, setNotes] = useState('');
 
+    const tenantId = currentUser?.currentCompanyId;
     const isEditing = !!dialogData?.id;
 
     useEffect(() => {
@@ -356,11 +365,13 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!tenantId) return;
         setIsSaving(true);
         try {
-            const dataToSave = { clientId: selectedClientId, engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const };
-            if (isEditing) await updateDoc(doc(firestore, 'appointments', dialogData.id), dataToSave);
-            else await addDoc(collection(firestore, 'appointments'), { ...dataToSave, createdAt: serverTimestamp() });
+            const apptsPath = getTenantPath('appointments', tenantId);
+            const dataToSave = { clientId: selectedClientId, engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
+            if (isEditing) await updateDoc(doc(firestore, apptsPath, dialogData.id), dataToSave);
+            else await addDoc(collection(firestore, apptsPath), { ...dataToSave, createdAt: serverTimestamp() });
             toast({ title: 'نجاح', description: 'تم حفظ الحجز بنجاح.' });
             onSaveSuccess(); onClose();
         } finally { setIsSaving(false); }

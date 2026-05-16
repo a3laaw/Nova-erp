@@ -29,6 +29,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DateInput } from '@/components/ui/date-input';
+import { getTenantPath } from '@/lib/utils';
 
 export default function NewArchitecturalAppointmentPage() {
     const router = useRouter();
@@ -56,6 +57,8 @@ export default function NewArchitecturalAppointmentPage() {
     const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' }[]>([]);
     const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
     
+    const tenantId = currentUser?.currentCompanyId;
+
     // Pre-fill from URL
     useEffect(() => {
         const nameFromUrl = searchParams.get('nameAr');
@@ -79,12 +82,15 @@ export default function NewArchitecturalAppointmentPage() {
 
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const fetchData = async () => {
             setLoading(true);
             try {
-                const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
-                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
+                const clientPath = getTenantPath('clients', tenantId);
+                const empPath = getTenantPath('employees', tenantId);
+
+                const clientQuery = query(collection(firestore, clientPath), where('isActive', '==', true));
+                const engQuery = query(collection(firestore, empPath), where('status', '==', 'active'));
 
                 const [clientSnap, engSnap] = await Promise.all([
                     getDocs(clientQuery),
@@ -112,7 +118,7 @@ export default function NewArchitecturalAppointmentPage() {
             }
         };
         fetchData();
-    }, [firestore, toast]);
+    }, [firestore, tenantId, toast]);
     
     const filteredClients = useMemo(() => {
         if (!engineerId) {
@@ -133,7 +139,7 @@ export default function NewArchitecturalAppointmentPage() {
     useEffect(() => {
         const fetchSchedule = async () => {
             const checkClientId = isNewClient ? null : clientId;
-            if (!date || (!checkClientId && !engineerId) || !firestore) {
+            if (!date || (!checkClientId && !engineerId) || !firestore || !tenantId) {
                 setDailySchedule([]);
                 return;
             }
@@ -141,6 +147,7 @@ export default function NewArchitecturalAppointmentPage() {
             setIsLoadingSchedule(true);
             
             try {
+                const apptsPath = getTenantPath('appointments', tenantId);
                 const appointmentDate = date;
 
                 const dayStart = new Date(appointmentDate);
@@ -148,7 +155,7 @@ export default function NewArchitecturalAppointmentPage() {
                 const dayEnd = new Date(appointmentDate);
                 dayEnd.setHours(23, 59, 59, 999);
 
-                const appointmentsRef = collection(firestore, 'appointments');
+                const appointmentsRef = collection(firestore, apptsPath);
                 const q = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
                 const querySnapshot = await getDocs(q);
 
@@ -194,12 +201,12 @@ export default function NewArchitecturalAppointmentPage() {
         };
 
         fetchSchedule();
-    }, [date, clientId, engineerId, isNewClient, firestore]);
+    }, [date, clientId, engineerId, isNewClient, firestore, tenantId]);
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!firestore || !currentUser || !engineerId || !title || !date || !time) {
+        if (!firestore || !currentUser || !tenantId || !engineerId || !title || !date || !time) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
             return;
         }
@@ -216,6 +223,7 @@ export default function NewArchitecturalAppointmentPage() {
 
         setIsSaving(true);
         try {
+            const apptsPath = getTenantPath('appointments', tenantId);
             const [hours, minutes] = time.split(':').map(Number);
             const appointmentDateTime = new Date(date);
             appointmentDateTime.setHours(hours, minutes, 0, 0);
@@ -225,7 +233,7 @@ export default function NewArchitecturalAppointmentPage() {
                     throw new Error('الرجاء إدخال اسم وجوال العميل الجديد.');
                 }
                  // Check if prospective client already exists
-                const prospectiveApptsRef = collection(firestore, 'appointments');
+                const prospectiveApptsRef = collection(firestore, apptsPath);
                 const prospectiveQuery = query(prospectiveApptsRef, where('clientMobile', '==', newClientMobile), where('status', '==', 'scheduled'), limit(1));
                 const prospectiveSnapshot = await getDocs(prospectiveQuery);
                 
@@ -241,7 +249,7 @@ export default function NewArchitecturalAppointmentPage() {
             }
             
             // --- Conflict Validation ---
-            const appointmentsRef = collection(firestore, 'appointments');
+            const appointmentsRef = collection(firestore, apptsPath);
             const dayStart = new Date(appointmentDateTime); dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(appointmentDateTime); dayEnd.setHours(23, 59, 59, 999);
             const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
@@ -265,6 +273,7 @@ export default function NewArchitecturalAppointmentPage() {
                 createdAt: serverTimestamp(),
                 type: 'architectural',
                 status: 'scheduled',
+                companyId: tenantId
             };
             
             if(isNewClient) {
@@ -274,15 +283,16 @@ export default function NewArchitecturalAppointmentPage() {
                 newAppointmentData.clientId = clientId;
             }
 
-            const newApptRef = await addDoc(collection(firestore, 'appointments'), newAppointmentData);
+            const newApptRef = await addDoc(collection(firestore, apptsPath), newAppointmentData);
             
             const fromAppointmentId = searchParams.get('fromAppointmentId');
             if (fromAppointmentId && !isNewClient) {
-                const appointmentRef = doc(firestore, 'appointments', fromAppointmentId);
+                const appointmentRef = doc(firestore, apptsPath, fromAppointmentId);
                 await updateDoc(appointmentRef, { clientId: clientId, clientName: deleteField(), clientMobile: deleteField() });
             }
 
             if (!isNewClient && clientId) {
+                const historyPath = getTenantPath(`clients/${clientId}/history`, tenantId);
                 const logContent = `قام ${currentUser.fullName} بحجز موعد جديد بعنوان "${title}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}`;
                 const logData = {
                     type: 'log' as const,
@@ -291,8 +301,9 @@ export default function NewArchitecturalAppointmentPage() {
                     userName: currentUser.fullName,
                     userAvatar: currentUser.avatarUrl,
                     createdAt: serverTimestamp(),
+                    companyId: tenantId
                 };
-                await addDoc(collection(firestore, `clients/${clientId}/history`), logData);
+                await addDoc(collection(firestore, historyPath), logData);
             }
 
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });

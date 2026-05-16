@@ -35,6 +35,7 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DateInput } from '@/components/ui/date-input';
+import { getTenantPath } from '@/lib/utils';
 
 const meetingRooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -62,14 +63,20 @@ export default function NewOtherAppointmentPage() {
     const [dailySchedule, setDailySchedule] = useState<{ time: string; title: string; type: 'client' | 'engineer' | 'room' }[]>([]);
     const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
 
+    const tenantId = currentUser?.currentCompanyId;
+
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const fetchData = async () => {
             setLoading(true);
             try {
-                const clientQuery = query(collection(firestore, 'clients'), where('isActive', '==', true));
-                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const deptQuery = query(collection(firestore, 'departments'));
+                const clientPath = getTenantPath('clients', tenantId);
+                const empPath = getTenantPath('employees', tenantId);
+                const deptPath = getTenantPath('departments', tenantId);
+
+                const clientQuery = query(collection(firestore, clientPath), where('isActive', '==', true));
+                const engQuery = query(collection(firestore, empPath), where('status', '==', 'active'));
+                const deptQuery = query(collection(firestore, deptPath));
 
                 const [clientSnap, engSnap, deptSnap] = await Promise.all([
                     getDocs(clientQuery),
@@ -103,7 +110,7 @@ export default function NewOtherAppointmentPage() {
             }
         };
         fetchData();
-    }, [firestore, toast]);
+    }, [firestore, tenantId, toast]);
     
     const filteredEngineers = useMemo(() => {
         if (!selectedDepartment) return [];
@@ -124,7 +131,7 @@ export default function NewOtherAppointmentPage() {
     
     useEffect(() => {
         const fetchSchedule = async () => {
-            if (!date || (!clientId && !engineerId && !meetingRoom) || !firestore) {
+            if (!date || (!clientId && !engineerId && !meetingRoom) || !firestore || !tenantId) {
                 setDailySchedule([]);
                 return;
             }
@@ -132,6 +139,7 @@ export default function NewOtherAppointmentPage() {
             setIsLoadingSchedule(true);
 
             try {
+                const apptsPath = getTenantPath('appointments', tenantId);
                 const appointmentDate = date;
                 if (!appointmentDate) {
                     setIsLoadingSchedule(false);
@@ -143,7 +151,7 @@ export default function NewOtherAppointmentPage() {
                 const dayEnd = new Date(appointmentDate);
                 dayEnd.setHours(23, 59, 59, 999);
 
-                const appointmentsRef = collection(firestore, 'appointments');
+                const appointmentsRef = collection(firestore, apptsPath);
                 const q = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
                 const querySnapshot = await getDocs(q);
 
@@ -203,17 +211,18 @@ export default function NewOtherAppointmentPage() {
         };
 
         fetchSchedule();
-    }, [date, clientId, engineerId, meetingRoom, firestore]);
+    }, [date, clientId, engineerId, meetingRoom, firestore, tenantId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !currentUser || !clientId || !meetingRoom || !selectedDepartment || !engineerId || !title || !date || !time) {
+        if (!firestore || !currentUser || !tenantId || !clientId || !meetingRoom || !selectedDepartment || !engineerId || !title || !date || !time) {
             toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء تعبئة جميع الحقول الإلزامية.' });
             return;
         }
 
         setIsSaving(true);
         try {
+            const apptsPath = getTenantPath('appointments', tenantId);
             const [hours, minutes] = time.split(':').map(Number);
             const appointmentDateTime = new Date(date);
             appointmentDateTime.setHours(hours, minutes, 0, 0);
@@ -223,7 +232,7 @@ export default function NewOtherAppointmentPage() {
             dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(appointmentDateTime);
             dayEnd.setHours(23, 59, 59, 999);
-            const appointmentsRef = collection(firestore, 'appointments');
+            const appointmentsRef = collection(firestore, apptsPath);
             const dayAppointmentsQuery = query(appointmentsRef, where('appointmentDate', '>=', dayStart), where('appointmentDate', '<=', dayEnd));
             const dayAppointmentsSnap = await getDocs(dayAppointmentsQuery);
             const dayAppointments = dayAppointmentsSnap.docs.map(d => d.data());
@@ -276,10 +285,12 @@ export default function NewOtherAppointmentPage() {
                 createdAt: serverTimestamp(),
                 type: 'room' as const,
                 department: departments.find(d => d.id === selectedDepartment)?.name,
+                companyId: tenantId
             };
             
-            const newApptRef = await addDoc(collection(firestore, 'appointments'), newAppointment);
+            const newApptRef = await addDoc(collection(firestore, apptsPath), newAppointment);
 
+            const historyPath = getTenantPath(`clients/${clientId}/history`, tenantId);
             const logContent = `قام ${currentUser.fullName} بحجز "${meetingRoom}" لموعد بعنوان "${title}" بتاريخ ${format(appointmentDateTime, "PPp", { locale: ar })}`;
             const logData = {
                 type: 'log' as const,
@@ -288,8 +299,9 @@ export default function NewOtherAppointmentPage() {
                 userName: currentUser.fullName,
                 userAvatar: currentUser.avatarUrl,
                 createdAt: serverTimestamp(),
+                companyId: tenantId
             };
-            await addDoc(collection(firestore, `clients/${clientId}/history`), logData);
+            await addDoc(collection(firestore, historyPath), logData);
 
             toast({ title: 'نجاح', description: 'تم إنشاء الموعد بنجاح.' });
             
