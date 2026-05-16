@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -32,8 +32,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * 🛡️ محرك جلب الهوية السيادي المباشر (Direct Flow V96.0)
-   * تم إلغاء كافة عمليات "الترميم" لضمان السرعة والوضوح الرقابي.
+   * 🛡️ محرك جلب الهوية السيادي المباشر (V96.0)
+   * مسارين صريحين: مطور (Master) أو مستخدم منشأة (SaaS).
    */
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
-      // 1. المسار السيادي للمطور (Master Path)
+      // 1. مسار المطور السيادي (Master Path)
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -76,33 +76,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // 2. مسار مستخدمي المنشآت (SaaS Multi-tenant Path)
+      // 2. مسار مستخدمي المنشآت (SaaS Path) - جلب مباشر بالـ ID
       try {
-        // أ. جلب الفهرس العالمي (لمعرفة الشركة)
+        // أ. معرفة الشركة من الفهرس العالمي (مباشرة بالـ UID)
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
         if (!globalSnap.exists()) {
-          throw new Error("عذراً، هذا الحساب غير مرتبط بأي منشأة مسجلة.");
+          throw new Error("عذراً، هذا الحساب غير مربوط بأي منشأة مسجلة.");
         }
 
         const { companyId } = globalSnap.data();
 
-        // ب. جلب بيانات المنشأة والبروفايل داخلها (بالتوازي)
+        // ب. جلب بيانات المنشأة والبروفايل الداخلي
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
         ]);
 
         if (!userDoc.exists()) {
-            throw new Error("تم التعرف على الحساب، لكن ملفك الشخصي داخل المنشأة مفقود. يرجى مراجعة المطور.");
+            throw new Error("لم يتم العثور على ملفك الشخصي داخل المنشأة. يرجى مراجعة المدير.");
         }
 
         const userData = userDoc.data();
         const companyData = compDoc.exists() ? { id: compDoc.id, ...compDoc.data() } as Company : null;
 
         if (!userData.isActive) {
-          throw new Error("هذا الحساب معطل حالياً من قبل مدير النظام.");
+          throw new Error("هذا الحساب معطل حالياً.");
         }
 
         const finalUser = {
@@ -110,7 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
           currentCompanyId: companyId,
-          companyName: companyData?.name || 'منشأة غير مسمى'
+          companyName: companyData?.name || 'منشأة غير مسماة'
         } as AuthenticatedUser;
 
         setUser(finalUser);

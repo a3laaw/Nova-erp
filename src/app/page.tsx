@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية الموحدة (Gateway V96.0)
- * تم تصفير كافة الحقول وإعادة بناء منطق العبور ليكون خطياً ومباشراً.
+ * بوابة الدخول السيادية الموحدة (Zero-Base Design V96.0)
+ * تم تطهير الحقول وإزالة كافة القيم الافتراضية.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // التوجيه الفوري عند التعرف على الهوية
+  // التوجيه التلقائي بمجرد نجاح المصادقة
   useEffect(() => {
     if (user) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -50,7 +50,6 @@ export default function LoginPage() {
     try {
         await login(identifier, password);
     } catch (error: any) {
-        // الخطأ سيظهر آلياً عبر سياق المصادقة
         setIsSubmitting(false);
     }
   };
@@ -67,7 +66,6 @@ export default function LoginPage() {
       } finally { setIsSubmitting(false); }
   };
 
-  // حالة التحميل الكلية (أثناء جلب بيانات المنشأة)
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#1e1b4b]" dir="rtl">
@@ -88,7 +86,7 @@ export default function LoginPage() {
                 {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-white" /> : <Send className="h-10 w-10 text-white" />}
             </div>
             <CardTitle className="text-4xl font-black text-slate-900 tracking-tighter">Nova ERP</CardTitle>
-            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">Corporate Suite</CardDescription>
+            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">SaaS Gateway</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8 bg-white/20">
