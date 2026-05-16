@@ -21,11 +21,11 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V86.0):
- * تم إصلاح منطق التوجيه لضمان العبور الفوري ومنع "فخ حالة التحميل".
+ * صفحة الدخول السيادية (Access Gateway V87.0):
+ * تم تحصينها ببروتوكول الترميم لدعم الحسابات القديمة وفك تجميد الشاشة.
  */
 export default function LoginPage() {
-  const { login, resetPassword, user, loading } = useAuth();
+  const { login, resetPassword, user, loading: globalLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -35,13 +35,22 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ⚡ محرك التوجيه الفوري - يعمل بمجرد استقرار الهوية في السياق
+  // ⚡ محرك التوجيه الفوري
   useEffect(() => {
     if (user) {
+        setLocalLoading(false);
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
   }, [user, router]);
+
+  // 🛡️ فك تجميد الشاشة في حال فشل جلب الملف الشخصي
+  useEffect(() => {
+      if (!globalLoading && !user && localLoading) {
+          setLocalLoading(false);
+          setErrorMsg('تعذر جلب ملف المستخدم. تأكد من أن حسابك مسجل في منشأة نشطة.');
+      }
+  }, [globalLoading, user, localLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

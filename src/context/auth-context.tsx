@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, type Firestore } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, type Firestore, setDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
@@ -37,13 +37,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية المطور (Flash Identity Engine V2.7):
-   * تم تحصينه بالكامل لمنع أي تأخير أو تجميد في واجهة المستخدم.
+   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V3.0):
+   * يدعم البيانات القديمة (البحث بالايميل) والبيانات الجديدة (البحث بالـ UID)
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ المسار البرقي للمطور السيادي
+    // 🛡️ المسار السيادي للمطور
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -59,12 +59,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+        let companyId = null;
+        
+        // محاولة 1: الوصول المباشر بالـ UID (الجديد والسريع)
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
-        if (!globalSnap.exists()) return { user: null, company: null };
+        if (globalSnap.exists()) {
+            companyId = globalSnap.data().companyId;
+        } else {
+            // محاولة 2: البحث بالايميل (لدعم البيانات القديمة)
+            const oldQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail));
+            const oldSnap = await getDocs(oldQuery);
+            if (!oldSnap.empty) {
+                const data = oldSnap.docs[0].data();
+                companyId = data.companyId;
+                
+                // 🔄 إجراء "الترميم الذاتي": تحديث الفهرس العالمي ليصبح الوصول مباشراً بالـ UID
+                await setDoc(doc(firestore, 'global_users', firebaseUser.uid), {
+                    ...data,
+                    uid: firebaseUser.uid,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+            }
+        }
         
-        const companyId = globalSnap.data().companyId;
         if (!companyId) return { user: null, company: null };
 
         const [companyDoc, tenantDoc] = await Promise.all([
@@ -116,7 +135,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        // 🚀 استعادة فورية من الكاش لتجنب تجميد الواجهة
         if (isInitialLoad.current) {
             const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
             if (cached) {
@@ -136,20 +154,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
-          // 🛡️ تحديث الحالة فقط عند الضرورة لكسر حلقات التكرار
-          setUser(prev => {
-              if (prev?.uid === resolvedUser.uid && prev?.role === resolvedUser.role) return prev;
-              return resolvedUser;
-          });
+          setUser(resolvedUser);
           setCompany(resolvedCompany);
           if (resolvedCompany) setCurrentCompany(resolvedCompany);
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setLoading(false);
-        } else if (!isInitialLoad.current) {
-          await signOut(masterAuth);
-          setUser(null);
-          clearSessionIndicators();
-          if (resolvedUser && !resolvedUser.isActive) setError("هذا الحساب معطل حالياً.");
+        } else {
+          if (!isInitialLoad.current) {
+            await signOut(masterAuth);
+            setUser(null);
+            clearSessionIndicators();
+            if (resolvedUser && !resolvedUser.isActive) setError("هذا الحساب معطل حالياً.");
+          }
           setLoading(false);
         }
       } catch (err) { 
