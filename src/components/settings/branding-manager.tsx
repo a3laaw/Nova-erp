@@ -136,56 +136,48 @@ export function BrandingManager() {
     const handleSave = async () => {
         const tenantId = currentUser?.currentCompanyId;
         if (!firestore || !tenantId) {
-            toast({ variant: 'destructive', title: 'خطأ في الهوية', description: 'لم نتمكن من تحديد المنشأة. يرجى إعادة تسجيل الدخول.' });
-            return;
-        }
-        
-        if (!formData.company_name) {
-            toast({ variant: 'destructive', title: 'بيان ناقص', description: 'اسم المنشأة حقل إلزامي.'});
+            toast({ variant: 'destructive', title: 'خطأ في الهوية', description: 'لم نتمكن من تحديد المنشأة.' });
             return;
         }
 
         setIsSaving(true);
         try {
-            // 1. ⚡ محاولة تجديد التوكن لضمان الصلاحيات قبل الحفظ
+            // ⚡ تجديد التوكن لضمان الصلاحيات بناءً على البريد الإلكتروني أو الـ ID
             await refreshToken();
 
             const dataToSave = { ...formData };
-            delete (dataToSave as any).id;
+            delete (dataToSave as any).id; // تطهير البيانات من المعرفات المؤقتة
 
-            // 2. معالجة الصور بالتوازي
+            // رفع الصور بالتوازي لسرعة الاستجابة
             if (storage) {
-                const uploadPromises = Object.entries(filesToUpload).map(async ([key, file]) => {
+                const uploadTasks = Object.entries(filesToUpload).map(async ([key, file]) => {
                     if (!file) return null;
                     const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}`);
                     const uploadResult = await uploadBytes(storageRef, file);
-                    const downloadURL = await getDownloadURL(uploadResult.ref);
-                    return { key, url: downloadURL };
+                    const url = await getDownloadURL(uploadResult.ref);
+                    return { key, url };
                 });
 
-                const results = await Promise.all(uploadPromises);
+                const results = await Promise.all(uploadTasks);
                 results.forEach(res => {
                     if (res) (dataToSave as any)[res.key] = res.url;
                 });
             }
             
-            // 3. الحفظ المباشر في المسار السيادي المعزول
             const settingsPath = getTenantPath('settings/branding', tenantId);
             const settingsRef = doc(firestore, settingsPath);
             
             await setDoc(settingsRef, cleanFirestoreData(dataToSave), { merge: true });
             
-            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية والمزامنة السحابية.' });
+            toast({ title: '✅ تم ترحيل البيانات بنجاح', description: 'تم تحديث الهوية البصرية لكافة المنشآت.' });
             setFilesToUpload({});
 
         } catch (error: any) {
             console.error("Branding save error:", error);
             toast({ 
                 variant: 'destructive', 
-                title: 'فشل ترحيل البيانات', 
-                description: error.code === 'permission-denied' 
-                    ? 'تم رفض الوصول. يرجى محاولة تحديث الصفحة أو إعادة تسجيل الدخول.' 
-                    : error.message 
+                title: 'فشل الترحيل المالي', 
+                description: 'يرجى مراجعة الصلاحيات أو إعادة محاولة الدخول.' 
             });
         } finally {
             setIsSaving(false);
@@ -205,7 +197,7 @@ export function BrandingManager() {
                             </div>
                             <div>
                                 <CardTitle className="text-2xl font-black">إعدادات الهوية البصرية</CardTitle>
-                                <CardDescription className="text-base font-medium">تخصيص شعار الشركة، المطبوعات الرسمية، وبيانات العقود.</CardDescription>
+                                <CardDescription className="text-base font-medium">تخصيص شعار الشركة، المطبوعات الرسمية، وبيانات العقود لجميع المنشآت.</CardDescription>
                             </div>
                         </div>
                         <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2">

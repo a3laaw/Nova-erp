@@ -13,6 +13,7 @@ service cloud.firestore {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
               request.auth.token.currentCompanyId == companyId ||
+              // 🛡️ صمام الأمان السيادي: السماح بناءً على البريد المسجل في وثيقة الشركة
               get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower());
     }
     
@@ -25,7 +26,6 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
-      // 🛡️ السماح الصريح بالكتابة إذا كان المستخدم هو المدير (بناءً على البريد أو التوكن)
       allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
       match /{allSubcollections=**} {

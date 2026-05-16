@@ -32,10 +32,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🛡️ دالة تجديد التوكن السيادي لضمان استلام الصلاحيات فوراً
   const refreshToken = useCallback(async () => {
     if (masterAuth?.currentUser) {
-      await getIdToken(masterAuth.currentUser, true);
+      try {
+          await getIdToken(masterAuth.currentUser, true);
+          console.log("Sovereign Identity Refreshed.");
+      } catch (e) {
+          console.error("Token refresh failed:", e);
+      }
     }
   }, [masterAuth]);
 
@@ -60,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
-      // مسار المطور
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -88,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const { companyId } = globalSnap.data();
         
-        // ⚡ 🛡️ تجديد التوكن فوراً لضمان وجود ادعاءات الـ Multi-tenancy
+        // ⚡ تجديد التوكن فوراً لضمان وجود ادعاءات الـ Multi-tenancy
         await getIdToken(firebaseUser, true);
 
         const [compDoc, userDoc] = await Promise.all([
