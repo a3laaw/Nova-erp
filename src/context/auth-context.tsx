@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, getDocs, collection, query, where, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
@@ -37,8 +37,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V4.0):
-   * تم تحصينه لدعم الحسابات القديمة والجديدة مع ميزة التصحيح الذاتي.
+   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V5.0):
+   * تم تحصينه بـ limit المفقودة ودعم كامل للبحث المتعدد لضمان استقرار الحسابات القديمة.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let companyId = null;
         let globalData = null;
         
-        // محاولة 1: الوصول المباشر بالـ UID (سريع)
+        // محاولة 1: الوصول المباشر بالـ UID (سريع جداً)
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             companyId = globalData.companyId;
         } else {
             // محاولة 2: البحث بالايميل (لدعم الحسابات القديمة)
-            const oldQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail));
+            const oldQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
             const oldSnap = await getDocs(oldQuery);
             if (!oldSnap.empty) {
                 globalData = oldSnap.docs[0].data();
@@ -93,30 +93,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
         // محاولة جلب ملف المستخدم من داخل المنشأة (بالـ UID أولاً ثم بالايميل)
-        let tenantUserDoc = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
-        
-        if (!tenantUserDoc.exists()) {
+        let tenantUserDocSnap = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
+        let userData: any = null;
+
+        if (tenantUserDocSnap.exists()) {
+            userData = tenantUserDocSnap.data();
+        } else {
             const tenantUserQuery = query(collection(firestore, `companies/${companyId}/users`), where('email', '==', sanitizedEmail), limit(1));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             if (!tenantUserSnap.empty) {
-                tenantUserDoc = tenantUserSnap.docs[0];
+                userData = tenantUserSnap.docs[0].data();
             }
         }
 
-        if (tenantUserDoc.exists()) {
-            const userData = { 
-                ...tenantUserDoc.data(), 
+        if (userData) {
+            const finalUser = { 
+                ...userData, 
                 uid: firebaseUser.uid, 
-                id: tenantUserDoc.id, 
+                id: firebaseUser.uid, // استخدام UID كموحد
                 currentCompanyId: companyId, 
                 companyName: companyData?.name || 'منشأة غير معروفة'
             } as AuthenticatedUser;
 
             if (typeof window !== 'undefined') {
-                localStorage.setItem(`${CACHE_KEY}_${firebaseUser.uid}`, JSON.stringify({ user: userData, company: companyData }));
+                localStorage.setItem(`${CACHE_KEY}_${firebaseUser.uid}`, JSON.stringify({ user: finalUser, company: companyData }));
             }
 
-            return { user: userData, company: companyData };
+            return { user: finalUser, company: companyData };
         }
     } catch (e) { 
         console.error("Critical Identity Error:", e); 
@@ -146,7 +149,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        // استخدام الكاش فوراً لتحسين الاستجابة
         const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
         if (cached && isInitialLoad.current) {
             try {
@@ -170,7 +172,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setLoading(false);
         } else {
-          // فقط في حال كان هذا هو التحميل الأول وفشل جلب البيانات الحقيقية
           if (!isInitialLoad.current) {
             await signOut(masterAuth);
             setUser(null);
