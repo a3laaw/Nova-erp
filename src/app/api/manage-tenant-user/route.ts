@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد (V37.0):
- * تم تحديثه لاستقبال وحفظ مصفوفة الربط السحابي (Firebase Config) لضمان عزل الـ SaaS.
+ * محرك إدارة المنشآت الموحد (V73.0):
+ * تم تحديثه لدعم عمليات الـ Identity Sync للهوية السيادية المعزولة.
  */
 
 function getAdminApp() {
@@ -44,25 +44,68 @@ function getAdminApp() {
 }
 
 export async function POST(request: NextRequest) {
-  let serviceAccountEmail = "Unknown";
   try {
     const body = await request.json();
-    const { action, email, companyName, contactName, activity, password, requestId, firebaseConfig } = body;
+    const { action, email, password, displayName, companyId, uid, companyName, contactName, activity, requestId, firebaseConfig } = body;
 
     const app = getAdminApp();
-    
-    const saPath = path.join(process.cwd(), 'service-account.json');
-    const saData = JSON.parse(fs.readFileSync(saPath, 'utf8'));
-    serviceAccountEmail = saData.client_email;
-
-    const db = getFirestore(app);
     const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    if (action === 'instant_setup') {
-        const companyId = `comp-${Math.random().toString(36).substring(2, 9)}`;
-        const sanitizedEmail = email?.toLowerCase().trim();
+    const sanitizedEmail = email?.toLowerCase().trim();
+
+    // 1. إجراء التأسيس الجديد (Create Identity)
+    if (action === 'create') {
+        let userRecord;
+        try {
+            userRecord = await auth.createUser({
+                email: sanitizedEmail,
+                password: password,
+                displayName: displayName,
+            });
+        } catch (e: any) {
+            if (e.code === 'auth/email-already-exists') {
+                userRecord = await auth.getUserByEmail(sanitizedEmail);
+            } else { throw e; }
+        }
+
+        // حقن صلاحيات الشركة فوراً
+        if (companyId) {
+            await auth.setCustomUserClaims(userRecord.uid, {
+                companyId: companyId,
+                role: 'Admin'
+            });
+        }
+
+        return NextResponse.json({ success: true, uid: userRecord.uid });
+    }
+
+    // 2. إجراء التحديث الكامل (Update Identity)
+    if (action === 'update_full') {
+        if (!uid) throw new Error("UID_REQUIRED");
         
-        // 1. إنشاء حساب المالك في Firebase Auth
+        const updateParams: any = {
+            email: sanitizedEmail,
+            displayName: displayName
+        };
+        if (password) updateParams.password = password;
+
+        await auth.updateUser(uid, updateParams);
+
+        if (companyId) {
+            await auth.setCustomUserClaims(uid, {
+                companyId: companyId,
+                role: 'Admin'
+            });
+        }
+
+        return NextResponse.json({ success: true, uid });
+    }
+
+    // 3. الإجراء القديم (Instant Setup) للحفاظ على التوافق
+    if (action === 'instant_setup') {
+        const generatedCompanyId = companyId || `comp-${Math.random().toString(36).substring(2, 9)}`;
+        
         let userRecord;
         try {
             userRecord = await auth.createUser({
@@ -76,19 +119,17 @@ export async function POST(request: NextRequest) {
             } else { throw e; }
         }
 
-        // 2. حقن الصلاحيات (Claims)
         await auth.setCustomUserClaims(userRecord.uid, {
-            companyId: companyId,
+            companyId: generatedCompanyId,
             role: 'Admin'
         });
 
-        // 3. تأسيس سجل المنشأة مع مصفوفة الربط
-        await db.collection('companies').doc(companyId).set({
-            id: companyId,
+        await db.collection('companies').doc(generatedCompanyId).set({
+            id: generatedCompanyId,
             name: companyName || 'منشأة جديدة',
             activity: activity || 'consulting',
             adminEmail: sanitizedEmail,
-            firebaseConfig: firebaseConfig || {}, // 🛡️ حفظ مصفوفة الربط
+            firebaseConfig: firebaseConfig || {},
             isActive: true,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
@@ -96,61 +137,30 @@ export async function POST(request: NextRequest) {
             subscriptionType: 'trial'
         });
 
-        // 4. إنشاء ملف المستخدم الداخلي للشركة
-        await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
-            uid: userRecord.uid,
-            email: sanitizedEmail,
-            fullName: contactName || 'المالك',
-            username: sanitizedEmail.split('@')[0],
-            role: 'Admin',
-            isActive: true,
-            companyId: companyId,
-            createdAt: FieldValue.serverTimestamp()
-        });
-
-        // 5. تحديث الفهرس العالمي (Global Index)
-        await db.collection('global_users').doc(userRecord.uid).set({
-            email: sanitizedEmail,
-            username: sanitizedEmail.split('@')[0],
-            companyId: companyId,
-            uid: userRecord.uid,
-            role: 'Admin',
-            createdAt: FieldValue.serverTimestamp()
-        });
-
-        // 6. تحديث حالة الطلب
         if (requestId) {
-            const reqRef = db.collection('company_requests').doc(requestId);
-            await reqRef.update({
+            await db.collection('company_requests').doc(requestId).update({
                 status: 'activated',
                 activatedAt: FieldValue.serverTimestamp(),
-                companyId: companyId
+                companyId: generatedCompanyId
             });
         }
 
         return NextResponse.json({ 
             success: true, 
-            message: "تم تفعيل المنشأة بنجاح.",
-            companyId: companyId,
+            message: "تم التأسيس الفوري بنجاح.",
+            companyId: generatedCompanyId,
             uid: userRecord.uid
         });
     }
 
-    return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND" });
+    return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND", receivedAction: action });
 
   } catch (error: any) {
     console.error("IAM PERMISSION ERROR:", error);
-    
-    let userMessage = error.message;
-    if (error.message?.includes('insufficient permission') || error.code === 7 || error.status === 403) {
-        userMessage = `⚠️ خطأ في صلاحيات Google IAM: يرجى الذهاب لـ Google Cloud Console وإعطاء صلاحية (Firebase Admin) لهذا البريد حصراً: [ ${serviceAccountEmail} ]`;
-    }
-
     return NextResponse.json({ 
         success: false, 
-        error: "IAM_AUTH_FAILED",
-        message: userMessage,
-        targetEmail: serviceAccountEmail
-    }, { status: 200 }); 
+        error: "INTERNAL_ERROR",
+        message: error.message
+    }, { status: 500 });
   }
 }

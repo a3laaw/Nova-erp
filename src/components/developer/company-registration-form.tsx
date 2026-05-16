@@ -19,28 +19,18 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
   Save, 
-  Building2, 
-  Mail, 
-  Lock, 
   DatabaseZap, 
   X, 
   Key, 
-  Activity,
-  CalendarClock,
-  Users,
-  CreditCard,
   Eye,
   EyeOff,
-  Copy,
   Sparkles,
   Cloud
 } from 'lucide-react';
-import { cleanFirestoreData, cn } from '@/lib/utils';
+import { cleanFirestoreData } from '@/lib/utils';
 import type { Company } from '@/lib/types';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDays } from 'date-fns';
-import { DateInput } from '../ui/date-input';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Props {
   isOpen: boolean;
@@ -149,18 +139,23 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     savingRef.current = true;
     setIsSaving(true);
     try {
+      const companyId = isEditing ? company!.id! : `comp-${Math.random().toString(36).substring(2, 9)}`;
+
       const authResponse = await fetch('/api/manage-tenant-user', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
               email: formData.adminEmail,
               password: formData.adminPassword,
               displayName: formData.name,
               uid: adminUidRef.current,
+              companyId: companyId, // نرسل الـ ID ليتم حقنه في التوكن
               action: isEditing ? 'update_full' : 'create'
           })
       });
+      
       const authResult = await authResponse.json();
-      if (!authResult.success) throw new Error(authResult.error);
+      if (!authResult.success) throw new Error(authResult.message || authResult.error);
 
       const firebaseConfig = {
         apiKey: formData.apiKey?.trim() || '',
@@ -173,7 +168,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
       };
 
       const batch = writeBatch(masterFirestore);
-      const companyId = isEditing ? company!.id! : `comp-${Math.random().toString(36).substring(2, 9)}`;
       const companyRef = doc(masterFirestore, 'companies', companyId);
 
       batch.set(companyRef, cleanFirestoreData({
@@ -198,6 +192,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           username: formData.adminEmail.split('@')[0],
           companyId: companyId,
           uid: authResult.uid,
+          role: 'Admin',
           createdAt: serverTimestamp(),
       });
 
@@ -215,10 +210,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
       }, { merge: true });
 
       await batch.commit();
-      toast({ title: '✅ تم الحفظ والمزامنة' });
+      toast({ title: '✅ تم الحفظ والمزامنة السحابية' });
       onClose();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'خطأ', description: error.message });
+      toast({ variant: 'destructive', title: 'خطأ سيادي', description: error.message });
     } finally {
       setIsSaving(false);
       savingRef.current = false;
