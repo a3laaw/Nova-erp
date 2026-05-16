@@ -80,7 +80,7 @@ function ImageUploadField({
                     <Label className="text-[10px] font-black text-muted-foreground">رفع ملف من الجهاز</Label>
                     <Input
                         type="file"
-                        id={id + '-file'}
+                        id={id}
                         ref={fileInputRef}
                         onChange={handleFileSelect}
                         accept="image/*"
@@ -120,7 +120,6 @@ export function BrandingManager() {
 
     useEffect(() => {
         if (branding) {
-            // 🛡️ التطهير من المعرفات الافتراضية لمنع التضارب
             const { id, ...cleanData } = branding;
             setFormData(cleanData);
         }
@@ -148,27 +147,26 @@ export function BrandingManager() {
 
         setIsSaving(true);
         try {
-            // 1. ⚡ محاولة تجديد التوكن لضمان الصلاحيات
+            // 1. ⚡ محاولة تجديد التوكن لضمان الصلاحيات قبل الحفظ
             await refreshToken();
 
             const dataToSave = { ...formData };
             delete (dataToSave as any).id;
 
-            // 2. معالجة الصور
+            // 2. معالجة الصور بالتوازي
             if (storage) {
-                for (const key in filesToUpload) {
-                    const file = filesToUpload[key];
-                    if (file) {
-                        try {
-                            const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}`);
-                            const uploadResult = await uploadBytes(storageRef, file);
-                            const downloadURL = await getDownloadURL(uploadResult.ref);
-                            (dataToSave as any)[key] = downloadURL;
-                        } catch (stErr) {
-                            console.error(`Storage error for ${key}:`, stErr);
-                        }
-                    }
-                }
+                const uploadPromises = Object.entries(filesToUpload).map(async ([key, file]) => {
+                    if (!file) return null;
+                    const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}`);
+                    const uploadResult = await uploadBytes(storageRef, file);
+                    const downloadURL = await getDownloadURL(uploadResult.ref);
+                    return { key, url: downloadURL };
+                });
+
+                const results = await Promise.all(uploadPromises);
+                results.forEach(res => {
+                    if (res) (dataToSave as any)[res.key] = res.url;
+                });
             }
             
             // 3. الحفظ المباشر في المسار السيادي المعزول
@@ -186,7 +184,7 @@ export function BrandingManager() {
                 variant: 'destructive', 
                 title: 'فشل ترحيل البيانات', 
                 description: error.code === 'permission-denied' 
-                    ? 'تم رفض الوصول من خادم الحماية. يرجى تجربة إعادة تسجيل الدخول لتفعيل الصلاحيات الجديدة.' 
+                    ? 'تم رفض الوصول. يرجى محاولة تحديث الصفحة أو إعادة تسجيل الدخول.' 
                     : error.message 
             });
         } finally {

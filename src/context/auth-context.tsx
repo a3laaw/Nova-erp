@@ -60,6 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
+      // مسار المطور
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -87,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const { companyId } = globalSnap.data();
         
-        // ⚡ تجديد التوكن لضمان وجود ادعاءات الـ Multi-tenancy
+        // ⚡ 🛡️ تجديد التوكن فوراً لضمان وجود ادعاءات الـ Multi-tenancy
         await getIdToken(firebaseUser, true);
 
         const [compDoc, userDoc] = await Promise.all([
@@ -120,6 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSessionIndicators(firebaseUser.uid, finalUser.role);
 
       } catch (err: any) {
+        console.error("Auth context error:", err);
         setError(err.message);
         setUser(null);
         clearSessionIndicators();

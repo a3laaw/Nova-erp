@@ -13,7 +13,7 @@ service cloud.firestore {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
               request.auth.token.currentCompanyId == companyId ||
-              get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail == request.auth.token.email);
+              get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower());
     }
     
     function isOwner(userId) {
@@ -25,12 +25,9 @@ service cloud.firestore {
     }
 
     match /companies/{companyId} {
+      // 🛡️ السماح الصريح بالكتابة إذا كان المستخدم هو المدير (بناءً على البريد أو التوكن)
       allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
-      match /userProductivity/{itemId} {
-        allow read, write: if belongsToCompany(companyId) && (isOwner(resource.data.userId) || request.resource.data.userId == request.auth.uid);
-      }
-
       match /{allSubcollections=**} {
         allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       }
