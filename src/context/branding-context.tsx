@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
@@ -41,12 +42,15 @@ const BrandingContext = createContext<BrandingContextType>({
 
 export const BrandingProvider = ({ children }: { children: ReactNode }) => {
   const { firestore } = useFirebase();
-  const { user } = useAuth();
-  const [branding, setBranding] = useState<BrandingSettings | null>(defaultBranding);
+  const { user, loading: authLoading } = useAuth();
+  const [branding, setBranding] = useState<BrandingSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const tenantId = user?.currentCompanyId || null;
+    // 🛡️ انتظار تحميل المستخدم تماماً قبل البدء
+    if (authLoading) return;
+
+    const tenantId = user?.currentCompanyId;
     
     if (!firestore || !tenantId) {
       setBranding(defaultBranding);
@@ -55,7 +59,7 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setLoading(true);
-    // 🛡️ توحيد المسار السيادي المعتمد
+    // 🏰 المسار المرجعي السيادي المعتمد
     const brandingRef = doc(firestore, `companies/${tenantId}/settings/branding`);
     
     const unsubscribe = onSnapshot(brandingRef, (snapshot) => {
@@ -70,11 +74,13 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
     }, (error) => {
         console.error("Critical: Branding sync failed:", error);
+        // في حال فشل القواعد، نعتمد الافتراضي لضمان استقرار التطبيق
+        setBranding(defaultBranding);
         setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.currentCompanyId, user?.companyName]);
+  }, [firestore, user?.currentCompanyId, user?.companyName, authLoading]);
   
 
   const value = useMemo(() => ({ branding, loading }), [branding, loading]);

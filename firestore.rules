@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -5,14 +6,12 @@ service cloud.firestore {
     
     // 🛡️ مصفوفة الصلاحيات السيادية (Sovereign Authority Logic)
     
-    // 1. المطور: صاحب السيادة المطلقة
     function isDeveloper() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
               request.auth.token.role == 'Developer');
     }
 
-    // 2. الموظف: ينتمي للمنشأة عبر توكن الأمان (Custom Claims) أو البريد الإداري
     function isTenantMember(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
@@ -21,18 +20,16 @@ service cloud.firestore {
                get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower()));
     }
 
-    // 🚨 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
+    // 🏰 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
 
     // 🏢 قواعد عزل المنشآت (SaaS Isolation)
     match /companies/{companyId} {
-      // السماح بقراءة وثيقة الشركة للتحقق من الحالة
       allow read: if request.auth != null;
-      allow write: if isDeveloper();
+      allow write: if isDeveloper() || isTenantMember(companyId);
       
-      // السماح بكافة المجموعات والبيانات داخل الشركة بناءً على الانتماء
       match /{allSubcollections=**} {
         allow read, write: if isDeveloper() || isTenantMember(companyId);
       }
@@ -41,7 +38,7 @@ service cloud.firestore {
     // 🌍 قواعد الفهرس العالمي والطلبات
     match /global_users/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isDeveloper());
-      allow write: if isDeveloper();
+      allow write: if isDeveloper() || (request.auth != null && request.auth.uid == uid);
     }
     
     match /company_requests/{id} {
@@ -49,7 +46,7 @@ service cloud.firestore {
       allow read, write: if isDeveloper();
     }
 
-    // 📊 🛡️ تحصين استعلامات المجموعات (Collection Group Rules)
+    // 📊 تحصين استعلامات المجموعات (Collection Group Rules)
     match /{path=**}/transactions/{id} {
         allow read: if request.auth != null && (isDeveloper() || isTenantMember(resource.data.companyId));
     }
