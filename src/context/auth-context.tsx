@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
@@ -37,8 +38,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V5.0):
-   * تم تحصينه بـ limit المفقودة ودعم كامل للبحث المتعدد لضمان استقرار الحسابات القديمة.
+   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V6.0):
+   * تم تحصينه بكافة الاستدعاءات المفقودة ودعم كامل للبحث المتعدد لضمان استقرار الحسابات القديمة.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
@@ -110,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const finalUser = { 
                 ...userData, 
                 uid: firebaseUser.uid, 
-                id: firebaseUser.uid, // استخدام UID كموحد
+                id: firebaseUser.uid, 
                 currentCompanyId: companyId, 
                 companyName: companyData?.name || 'منشأة غير معروفة'
             } as AuthenticatedUser;
@@ -149,17 +150,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
-        if (cached && isInitialLoad.current) {
-            try {
-              const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
-              setUser(cachedUser);
-              setCompany(cachedCompany);
-              if (cachedCompany) setCurrentCompany(cachedCompany);
-              setLoading(false);
-              isInitialLoad.current = false;
-            } catch (e) {
-              localStorage.removeItem(`${CACHE_KEY}_${firebaseUser.uid}`);
+        // محاولة استعادة سريعة من الكاش (Optimistic Identity)
+        if (isInitialLoad.current) {
+            const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
+            if (cached) {
+                try {
+                    const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
+                    setUser(cachedUser);
+                    setCompany(cachedCompany);
+                    if (cachedCompany) setCurrentCompany(cachedCompany);
+                } catch (e) {}
             }
         }
 
@@ -172,6 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setLoading(false);
         } else {
+          // فقط إذا لم يكن تحميل أولياً، نقوم بتسجيل الخروج إذا فشل التحقق
           if (!isInitialLoad.current) {
             await signOut(masterAuth);
             setUser(null);
