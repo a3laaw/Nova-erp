@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V94.0):
- * تم تحصينها بمؤقت أمان (Safety Timeout) لمنع التعليق في حال بطء المزامنة.
+ * صفحة الدخول السيادية (Access Gateway V95.0):
+ * تم إعادة بنائها لتكون بوابة بسيطة وسريعة بدون تعقيدات المزامنة.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -32,28 +32,11 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
-  const [localLoading, setLocalLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectAttempted = useRef(false);
-
-  // 🛡️ فك تجميد الشاشة التلقائي في حال التأخير الزائد
+  // التوجيه الفوري عند استقرار الحالة
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (localLoading) {
-        timer = setTimeout(() => {
-            setLocalLoading(false);
-            setErrorMsg('تأخر النظام في التعرف على هويتك. يرجى المحاولة مرة أخرى أو تحديث الصفحة.');
-        }, 15000); // 10 ثوانٍ كحد أقصى للانتظار
-    }
-    return () => clearTimeout(timer);
-  }, [localLoading]);
-
-  // ⚡ التوجيه اللحظي الفوري فور استقرار حالة المستخدم
-  useEffect(() => {
-    if (user && !redirectAttempted.current) {
-        redirectAttempted.current = true;
-        setLocalLoading(false);
+    if (user) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
@@ -61,38 +44,40 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (localLoading) return;
+    if (isSubmitting) return;
     
-    setLocalLoading(true);
-    setErrorMsg(null);
-
+    setIsSubmitting(true);
     try {
-        await login(identifier.trim().toLowerCase(), password);
-        // التوجيه سيتم آلياً عبر الـ useEffect أعلاه فور اكتمال جلب الملف من Firestore
+        await login(identifier, password);
     } catch (error: any) {
-        setLocalLoading(false);
-        setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');
+        toast({ variant: 'destructive', title: 'خطأ في الدخول', description: 'بيانات الدخول غير صحيحة.' });
+        setIsSubmitting(false);
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (localLoading || !identifier) return;
-      setLocalLoading(true);
+      setIsSubmitting(true);
       try {
-          await resetPassword(identifier.trim().toLowerCase());
+          await resetPassword(identifier);
           toast({ title: 'تم الإرسال', description: 'راجع بريدك لإعادة تعيين كلمة المرور.' });
           setMode('login');
       } catch (error: any) {
-          setErrorMsg(error.message);
-      } finally { setLocalLoading(false); }
+          toast({ variant: 'destructive', title: 'خطأ', description: 'تأكد من البريد الإلكتروني.' });
+      } finally { setIsSubmitting(false); }
   };
 
-  if (user) {
+  const showLoading = globalLoading || (user && !isSubmitting);
+
+  if (showLoading) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#1e1b4b]" dir="rtl">
+          <div className="relative">
+              <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-white animate-spin" />
+              <ShieldCheck className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
+          </div>
+          <p className="text-white font-black text-xl tracking-tighter">جاري فتح الأبواب السيادية...</p>
+      </div>
     );
   }
 
@@ -108,26 +93,24 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="p-10 space-y-8 bg-white/20">
-            {(errorMsg || authError) && (
-                <Alert variant="destructive" className="rounded-2xl border-2 animate-in slide-in-from-top-2">
+            {authError && (
+                <Alert variant="destructive" className="rounded-2xl border-2">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle className="text-[11px] font-black">تنبيه العبور</AlertTitle>
-                    <AlertDescription className="text-[10px] font-bold">{errorMsg || authError}</AlertDescription>
+                    <AlertDescription className="text-[10px] font-bold">{authError}</AlertDescription>
                 </Alert>
             )}
 
             {mode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
+                <form onSubmit={handleLogin} className="space-y-8">
                     <div className="grid gap-3">
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد</Label>
                         <Input 
                             value={identifier} 
                             onChange={(e) => setIdentifier(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all shadow-inner border-orange-50" 
+                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white" 
                             required 
-                            placeholder="Username / Email"
-                            autoComplete="off"
-                            disabled={localLoading}
+                            placeholder="Email"
                         />
                     </div>
 
@@ -137,24 +120,22 @@ export default function LoginPage() {
                             type="password" 
                             value={password} 
                             onChange={e => setPassword(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white transition-all shadow-inner border-orange-50" 
+                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white" 
                             required 
                             placeholder="••••••••"
-                            autoComplete="new-password"
-                            disabled={localLoading}
                         />
                         <div className="flex justify-center mt-1">
-                             <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-bold text-primary hover:underline opacity-60 hover:opacity-100 transition-opacity">نسيت كلمة المرور؟</button>
+                             <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-bold text-primary hover:underline opacity-60">نسيت كلمة المرور؟</button>
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={localLoading} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all border-none">
-                        {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
-                        {localLoading ? 'جاري العبور...' : 'دخول للنظام'}
+                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white border-none">
+                        {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
+                        دخول للنظام
                     </Button>
 
                     <div className="pt-8 border-t border-orange-100 flex flex-col items-center">
-                        <Button asChild variant="ghost" className="text-slate-500 font-bold gap-2 hover:bg-primary/5 rounded-xl h-10 px-6 transition-all group">
+                        <Button asChild variant="ghost" className="text-slate-500 font-bold gap-2 rounded-xl h-10 px-6 group">
                             <Link href="/register">
                                 <PlusCircle className="h-4 w-4 group-hover:rotate-90 transition-transform" />
                                 اطلب انضمام منشأتك الآن
@@ -163,16 +144,16 @@ export default function LoginPage() {
                     </div>
                 </form>
             ) : (
-                <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
+                <form onSubmit={handleResetPassword} className="space-y-6">
                     <div className="grid gap-3">
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني المسجل</Label>
-                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg border-orange-50 bg-white/60" required placeholder="your@email.com" autoComplete="off" />
+                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg" required placeholder="your@email.com" />
                     </div>
-                    <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
-                        {localLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
-                        إإرسال رابط التعيين
+                    <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
+                        {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
+                        إرسال رابط التعيين
                     </Button>
-                    <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-black opacity-50 flex items-center justify-center gap-2 hover:opacity-100">
+                    <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-black opacity-50 flex items-center justify-center gap-2">
                         <ArrowRight className="h-4 w-4 rotate-180" /> العودة للدخول
                     </button>
                 </form>
