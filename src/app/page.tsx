@@ -21,11 +21,11 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V93.0):
- * تم ترميمها لتصبح لحظية تماماً، وتعتمد على حالة الـ User في السياق العالمي.
+ * صفحة الدخول السيادية (Access Gateway V94.0):
+ * تم تحصينها بمؤقت أمان (Safety Timeout) لمنع التعليق في حال بطء المزامنة.
  */
 export default function LoginPage() {
-  const { login, resetPassword, user, loading: globalLoading } = useAuth();
+  const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -36,6 +36,18 @@ export default function LoginPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const redirectAttempted = useRef(false);
+
+  // 🛡️ فك تجميد الشاشة التلقائي في حال التأخير الزائد
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (localLoading) {
+        timer = setTimeout(() => {
+            setLocalLoading(false);
+            setErrorMsg('تأخر النظام في التعرف على هويتك. يرجى المحاولة مرة أخرى أو تحديث الصفحة.');
+        }, 15000); // 10 ثوانٍ كحد أقصى للانتظار
+    }
+    return () => clearTimeout(timer);
+  }, [localLoading]);
 
   // ⚡ التوجيه اللحظي الفوري فور استقرار حالة المستخدم
   useEffect(() => {
@@ -76,7 +88,6 @@ export default function LoginPage() {
       } finally { setLocalLoading(false); }
   };
 
-  // إذا كان المستخدم مسجلاً دخوله بالفعل، لا نظهر شاشة الدخول
   if (user) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -97,11 +108,11 @@ export default function LoginPage() {
         </CardHeader>
         
         <CardContent className="p-10 space-y-8 bg-white/20">
-            {errorMsg && (
+            {(errorMsg || authError) && (
                 <Alert variant="destructive" className="rounded-2xl border-2 animate-in slide-in-from-top-2">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">خطأ في التحقق</AlertTitle>
-                    <AlertDescription className="text-[10px] font-bold">{errorMsg}</AlertDescription>
+                    <AlertTitle className="text-[11px] font-black">تنبيه العبور</AlertTitle>
+                    <AlertDescription className="text-[10px] font-bold">{errorMsg || authError}</AlertDescription>
                 </Alert>
             )}
 
@@ -159,7 +170,7 @@ export default function LoginPage() {
                     </div>
                     <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
                         {localLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
-                        إرسال رابط التعيين
+                        إإرسال رابط التعيين
                     </Button>
                     <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-black opacity-50 flex items-center justify-center gap-2 hover:opacity-100">
                         <ArrowRight className="h-4 w-4 rotate-180" /> العودة للدخول
