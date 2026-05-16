@@ -15,9 +15,10 @@ import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity } from 'lucide-
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
 import Image from 'next/image';
-import { cleanFirestoreData, cn } from '@/lib/utils';
+import { cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/context/auth-context';
 
 function ImageUploadField({
   id,
@@ -105,6 +106,7 @@ function ImageUploadField({
 
 export function BrandingManager() {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const storage = useStorage();
     const { branding, loading } = useBranding();
     const { toast } = useToast();
@@ -129,7 +131,7 @@ export function BrandingManager() {
     };
 
     const handleSave = async () => {
-        if (!firestore || !storage) return;
+        if (!firestore || !storage || !currentUser?.currentCompanyId) return;
         if (!formData.company_name) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يجب إدخال اسم الشركة.'});
             return;
@@ -137,22 +139,28 @@ export function BrandingManager() {
 
         setIsSaving(true);
         try {
+            const tenantId = currentUser.currentCompanyId;
             const dataToSave = { ...formData };
+            
             for (const key in filesToUpload) {
                 const file = filesToUpload[key as keyof typeof filesToUpload];
                 if (file) {
-                    const storageRef = ref(storage, `branding/${key}_${Date.now()}_${file.name}`);
+                    const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}_${file.name}`);
                     const uploadResult = await uploadBytes(storageRef, file);
                     const downloadURL = await getDownloadURL(uploadResult.ref);
                     dataToSave[key as keyof BrandingSettings] = downloadURL;
                 }
             }
-            const settingsRef = doc(firestore, 'company_settings', 'main');
+            
+            const settingsPath = getTenantPath('settings/branding', tenantId);
+            const settingsRef = doc(firestore, settingsPath);
             await setDoc(settingsRef, cleanFirestoreData(dataToSave), { merge: true });
+            
             setFilesToUpload({}); 
             toast({ title: 'نجاح التحديث', description: 'تم حفظ الهوية البصرية بنجاح.' });
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+            console.error("Branding save error:", error);
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message });
         } finally {
             setIsSaving(false);
         }
@@ -162,7 +170,7 @@ export function BrandingManager() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-purple-50">
+            <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-purple-50 dark:from-slate-900/60 dark:to-purple-950/20">
                 <CardHeader className="pb-8 px-8 border-b">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         <div className="flex items-center gap-4">
@@ -170,29 +178,29 @@ export function BrandingManager() {
                                 <Palette className="h-8 w-8" />
                             </div>
                             <div>
-                                <CardTitle className="text-2xl font-black text-purple-900">إعدادات العلامة التجارية والنشاط</CardTitle>
-                                <CardDescription className="text-base font-medium">تخصيص هوية النظام وتحديد نشاط الشركة لتفعيل الحقول المرتبطة.</CardDescription>
+                                <CardTitle className="text-2xl font-black text-foreground">إعدادات العلامة التجارية والنشاط</CardTitle>
+                                <CardDescription className="text-base font-medium text-muted-foreground">تخصيص هوية النظام وتحديد نشاط الشركة لتفعيل الحقول المرتبطة.</CardDescription>
                             </div>
                         </div>
-                        <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2 text-purple-700 hover:bg-purple-50">
+                        <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2 text-foreground hover:bg-white/10 no-print">
                             <ArrowRight className="h-4 w-4" /> العودة
                         </Button>
                     </div>
                 </CardHeader>
             </Card>
 
-            <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white">
+            <Card className="border-none shadow-xl rounded-[3rem] overflow-hidden bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl">
                 <CardContent className="pt-10 space-y-12 px-10">
                     
                     <div className="space-y-8">
-                        <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4">النشاط التجاري الرئيسي</h3>
-                        <div className="p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/20">
+                        <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4 flex items-center gap-3">النشاط التجاري الرئيسي</h3>
+                        <div className="p-6 bg-primary/5 rounded-[2rem] border-2 border-dashed border-primary/20 shadow-inner">
                             <div className="grid gap-3 max-w-md">
                                 <Label className="font-black text-primary flex items-center gap-2">
                                     <Activity className="h-4 w-4" /> تصنيف نشاط الشركة
                                 </Label>
                                 <Select value={formData.activityType} onValueChange={(v: any) => handleFieldChange('activityType', v)}>
-                                    <SelectTrigger className="h-12 rounded-2xl border-2 bg-white shadow-sm font-bold">
+                                    <SelectTrigger className="h-12 rounded-2xl border-2 bg-background shadow-sm font-bold">
                                         <SelectValue placeholder="اختر النشاط..." />
                                     </SelectTrigger>
                                     <SelectContent dir="rtl">
@@ -207,7 +215,7 @@ export function BrandingManager() {
                         </div>
                     </div>
 
-                    <Separator className="my-10" />
+                    <Separator className="my-10 opacity-20" />
 
                     <div className="space-y-8">
                         <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4">الهوية البصرية</h3>
@@ -226,36 +234,36 @@ export function BrandingManager() {
                         <ImageUploadField id="watermark_image_url" label="العلامة المائية للوثائق (Watermark)" currentUrl={formData.watermark_image_url} onUrlChange={(url) => handleFieldChange('watermark_image_url', url)} onFileChange={(file) => handleFileChange('watermark_image_url', file)} />
                     </div>
                     
-                    <Separator className="my-10" />
+                    <Separator className="my-10 opacity-20" />
                     
                     <div className="space-y-8 pb-10">
                         <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4">البيانات القانونية والعناوين</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="grid gap-3">
-                                <Label className="font-black text-gray-700 px-1">اسم المنشأة الرسمي *</Label>
-                                <Input value={formData.company_name || ''} onChange={(e) => handleFieldChange('company_name', e.target.value)} required className="h-12 rounded-2xl text-lg font-bold shadow-inner" />
+                                <Label className="font-black text-foreground px-1 uppercase text-[10px]">اسم المنشأة الرسمي *</Label>
+                                <Input value={formData.company_name || ''} onChange={(e) => handleFieldChange('company_name', e.target.value)} required className="h-12 rounded-2xl text-lg font-bold shadow-inner bg-background" />
                             </div>
                             <div className="grid gap-3">
-                                <Label className="font-black text-gray-700 px-1">رقم السجل التجاري / الضريبي</Label>
-                                <Input value={formData.tax_number || ''} onChange={(e) => handleFieldChange('tax_number', e.target.value)} className="h-12 rounded-2xl font-mono shadow-inner" />
+                                <Label className="font-black text-foreground px-1 uppercase text-[10px]">رقم السجل التجاري / الضريبي</Label>
+                                <Input value={formData.tax_number || ''} onChange={(e) => handleFieldChange('tax_number', e.target.value)} className="h-12 rounded-2xl font-mono shadow-inner bg-background" />
                             </div>
                             <div className="grid gap-3">
-                                <Label className="font-black text-gray-700 px-1">رقم الهاتف الرسمي</Label>
-                                <Input value={formData.phone || ''} onChange={(e) => handleFieldChange('phone', e.target.value)} dir="ltr" className="h-12 rounded-2xl font-mono shadow-inner" />
+                                <Label className="font-black text-foreground px-1 uppercase text-[10px]">رقم الهاتف الرسمي</Label>
+                                <Input value={formData.phone || ''} onChange={(e) => handleFieldChange('phone', e.target.value)} dir="ltr" className="h-12 rounded-2xl font-mono shadow-inner bg-background" />
                             </div>
                             <div className="grid gap-3">
-                                <Label className="font-black text-gray-700 px-1">البريد الإلكتروني للشركة</Label>
-                                <Input value={formData.email || ''} onChange={(e) => handleFieldChange('email', e.target.value)} dir="ltr" className="h-12 rounded-2xl font-mono shadow-inner" />
+                                <Label className="font-black text-foreground px-1 uppercase text-[10px]">البريد الإلكتروني للشركة</Label>
+                                <Input value={formData.email || ''} onChange={(e) => handleFieldChange('email', e.target.value)} dir="ltr" className="h-12 rounded-2xl font-mono shadow-inner bg-background" />
                             </div>
                         </div>
                         <div className="grid gap-3">
-                            <Label className="font-black text-gray-700 px-1">العنوان التفصيلي المعتمد في العقود</Label>
-                            <Textarea value={formData.address || ''} onChange={(e) => handleFieldChange('address', e.target.value)} rows={3} className="rounded-[2rem] p-6 text-base font-medium shadow-inner border-2" />
+                            <Label className="font-black text-foreground px-1 uppercase text-[10px]">العنوان التفصيلي المعتمد في العقود</Label>
+                            <Textarea value={formData.address || ''} onChange={(e) => handleFieldChange('address', e.target.value)} rows={3} className="rounded-[2rem] p-6 text-base font-medium shadow-inner border-2 bg-background" />
                         </div>
                     </div>
                 </CardContent>
                 <CardFooter className="p-10 border-t bg-muted/10 flex justify-end">
-                    <Button onClick={handleSave} disabled={isSaving} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 min-w-[280px] gap-3">
+                    <Button onClick={handleSave} disabled={isSaving} className="h-14 px-16 rounded-[2.5rem] font-black text-xl shadow-xl shadow-primary/30 min-w-[280px] gap-3 transition-all active:translate-y-1">
                         {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6" />}
                         اعتماد وحفظ التغييرات
                     </Button>
@@ -264,3 +272,4 @@ export function BrandingManager() {
         </div>
     );
 }
+
