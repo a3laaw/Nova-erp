@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية الموحدة (User Interface Restoration V97.0)
- * - تم تصفير كافة الحقول لتمكين العميل من إدخال بياناته.
+ * بوابة الدخول السيادية الموحدة (User Interface Restoration V98.0)
+ * - تم تصفير كافة الحقول ومنع التعبئة التلقائية للمتصفح (Anti-Autofill).
  * - تبسيط لغة "جاري الدخول" لتكون سهلة وودودة.
  */
 export default function LoginPage() {
@@ -100,7 +100,7 @@ export default function LoginPage() {
             )}
 
             {mode === 'login' ? (
-                <form onSubmit={handleLogin} className="space-y-8">
+                <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                     <div className="grid gap-3">
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-500">البريد الإلكتروني أو اسم المستخدم</Label>
                         <Input 
@@ -109,6 +109,7 @@ export default function LoginPage() {
                             className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all shadow-inner" 
                             required 
                             placeholder="Email / User ID"
+                            autoComplete="off"
                         />
                     </div>
 
@@ -121,6 +122,7 @@ export default function LoginPage() {
                             className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white transition-all shadow-inner" 
                             required 
                             placeholder="••••••••"
+                            autoComplete="new-password"
                         />
                         <div className="flex justify-center mt-1">
                              <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-bold text-primary hover:underline opacity-60">نسيت كلمة المرور؟</button>
@@ -142,10 +144,10 @@ export default function LoginPage() {
                     </div>
                 </form>
             ) : (
-                <form onSubmit={handleResetPassword} className="space-y-6">
+                <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
                     <div className="grid gap-3">
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-500">البريد الإلكتروني المسجل</Label>
-                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-white/60" required placeholder="your@email.com" />
+                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-white/60" required placeholder="your@email.com" autoComplete="off" />
                     </div>
                     <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
                         {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}

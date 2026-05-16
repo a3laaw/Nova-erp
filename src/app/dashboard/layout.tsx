@@ -13,8 +13,8 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
 /**
- * غلاف لوحة التحكم (User-Friendly UI Implementation):
- * - تم تبسيط شاشة التحميل لتطابق ألوان النظام.
+ * غلاف لوحة التحكم (User-Friendly UI Implementation V98.0):
+ * - تم تفريغ شاشة التحميل لتظهر خلفية النظام الملونة (Transparent Background).
  * - إزالة المسميات التقنية المعقدة لتسهيل التجربة.
  */
 export default function DashboardLayout({
@@ -37,11 +37,11 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 1. معالجة حالة التحميل (بألوان النظام المحدثة)
+  // 1. معالجة حالة التحميل (بألوان النظام المنسابة)
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-background relative overflow-hidden">
-        {/* توهج خلفية النظام */}
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-transparent relative overflow-hidden">
+        {/* توهج خلفية النظام سيظهر هنا لأن الـ Background شفاف */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-6">
@@ -60,7 +60,7 @@ export default function DashboardLayout({
   // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-background">
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-transparent">
         <h2 className="text-3xl font-black text-foreground tracking-tighter">انتهت جلسة العمل</h2>
         <p className="text-muted-foreground max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى بياناتك.</p>
         <Button onClick={handleSafeExit} className="px-16 h-14 rounded-2xl mt-8 shadow-2xl transition-all">بوابة الدخول</Button>
