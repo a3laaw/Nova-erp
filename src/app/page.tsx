@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V87.0):
- * تم تحصينها ببروتوكول الترميم لدعم الحسابات القديمة وفك تجميد الشاشة.
+ * صفحة الدخول السيادية (Access Gateway V88.0):
+ * تم تحصينها بالكامل لإلغاء أي تجميد أثناء الكتابة وتأمين العبور السريع.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading } = useAuth();
@@ -35,20 +35,27 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ⚡ محرك التوجيه الفوري
+  const redirectAttempted = useRef(false);
+
+  // ⚡ محرك التوجيه الفوري المستقر
   useEffect(() => {
-    if (user) {
+    if (user && !redirectAttempted.current) {
+        redirectAttempted.current = true;
         setLocalLoading(false);
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
   }, [user, router]);
 
-  // 🛡️ فك تجميد الشاشة في حال فشل جلب الملف الشخصي
+  // 🛡️ فك تجميد الشاشة في حال فشل جلب الملف الشخصي بعد تسجيل الدخول بنجاح
   useEffect(() => {
       if (!globalLoading && !user && localLoading) {
-          setLocalLoading(false);
-          setErrorMsg('تعذر جلب ملف المستخدم. تأكد من أن حسابك مسجل في منشأة نشطة.');
+          // إذا انتهى التحميل العالمي ولم نجد مستخدماً رغم أننا في حالة "جاري العبور"
+          const timer = setTimeout(() => {
+              setLocalLoading(false);
+              setErrorMsg('تعذر جلب ملف المستخدم. تأكد من أن حسابك مسجل في منشأة نشطة.');
+          }, 2000);
+          return () => clearTimeout(timer);
       }
   }, [globalLoading, user, localLoading]);
 
@@ -61,7 +68,7 @@ export default function LoginPage() {
 
     try {
         await login(identifier.trim().toLowerCase(), password);
-        // في حال النجاح، سيقوم الـ useEffect أعلاه بالتوجيه
+        // في حال النجاح، سيقوم الـ useEffect أعلاه بالتوجيه بمجرد ظهور الـ user في السياق
     } catch (error: any) {
         setLocalLoading(false);
         setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');

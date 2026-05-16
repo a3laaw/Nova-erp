@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, getDocs, collection, query, where, type Firestore, setDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
@@ -37,13 +37,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V3.0):
-   * يدعم البيانات القديمة (البحث بالايميل) والبيانات الجديدة (البحث بالـ UID)
+   * ⚡ محرك جلب الهوية الهجين (Hybrid Identity Engine V4.0):
+   * تم تحصينه لدعم الحسابات القديمة والجديدة مع ميزة التصحيح الذاتي.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ المسار السيادي للمطور
+    // 🛡️ المسار السيادي للمطور الأساسي
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -60,24 +60,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         let companyId = null;
+        let globalData = null;
         
-        // محاولة 1: الوصول المباشر بالـ UID (الجديد والسريع)
+        // محاولة 1: الوصول المباشر بالـ UID (سريع)
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
         if (globalSnap.exists()) {
-            companyId = globalSnap.data().companyId;
+            globalData = globalSnap.data();
+            companyId = globalData.companyId;
         } else {
-            // محاولة 2: البحث بالايميل (لدعم البيانات القديمة)
+            // محاولة 2: البحث بالايميل (لدعم الحسابات القديمة)
             const oldQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail));
             const oldSnap = await getDocs(oldQuery);
             if (!oldSnap.empty) {
-                const data = oldSnap.docs[0].data();
-                companyId = data.companyId;
+                globalData = oldSnap.docs[0].data();
+                companyId = globalData.companyId;
                 
-                // 🔄 إجراء "الترميم الذاتي": تحديث الفهرس العالمي ليصبح الوصول مباشراً بالـ UID
+                // 🔄 إجراء "الترميم الذاتي": تحديث الفهرس العالمي ليعتمد الـ UID كمفتاح مستقبلي
                 await setDoc(doc(firestore, 'global_users', firebaseUser.uid), {
-                    ...data,
+                    ...globalData,
                     uid: firebaseUser.uid,
                     updatedAt: serverTimestamp()
                 }, { merge: true });
@@ -86,19 +88,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (!companyId) return { user: null, company: null };
 
-        const [companyDoc, tenantDoc] = await Promise.all([
-            getDoc(doc(firestore, 'companies', companyId)),
-            getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`))
-        ]);
+        // جلب بيانات الشركة
+        const companyDoc = await getDoc(doc(firestore, 'companies', companyId));
+        const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
-        if (tenantDoc.exists()) {
-            const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+        // محاولة جلب ملف المستخدم من داخل المنشأة (بالـ UID أولاً ثم بالايميل)
+        let tenantUserDoc = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
+        
+        if (!tenantUserDoc.exists()) {
+            const tenantUserQuery = query(collection(firestore, `companies/${companyId}/users`), where('email', '==', sanitizedEmail), limit(1));
+            const tenantUserSnap = await getDocs(tenantUserQuery);
+            if (!tenantUserSnap.empty) {
+                tenantUserDoc = tenantUserSnap.docs[0];
+            }
+        }
+
+        if (tenantUserDoc.exists()) {
             const userData = { 
-                ...tenantDoc.data(), 
+                ...tenantUserDoc.data(), 
                 uid: firebaseUser.uid, 
-                id: tenantDoc.id, 
+                id: tenantUserDoc.id, 
                 currentCompanyId: companyId, 
-                companyName: companyData?.name 
+                companyName: companyData?.name || 'منشأة غير معروفة'
             } as AuthenticatedUser;
 
             if (typeof window !== 'undefined') {
@@ -135,19 +146,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        if (isInitialLoad.current) {
-            const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
-            if (cached) {
-                try {
-                  const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
-                  setUser(cachedUser);
-                  setCompany(cachedCompany);
-                  if (cachedCompany) setCurrentCompany(cachedCompany);
-                  setLoading(false);
-                  isInitialLoad.current = false;
-                } catch (e) {
-                  localStorage.removeItem(`${CACHE_KEY}_${firebaseUser.uid}`);
-                }
+        // استخدام الكاش فوراً لتحسين الاستجابة
+        const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
+        if (cached && isInitialLoad.current) {
+            try {
+              const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
+              setUser(cachedUser);
+              setCompany(cachedCompany);
+              if (cachedCompany) setCurrentCompany(cachedCompany);
+              setLoading(false);
+              isInitialLoad.current = false;
+            } catch (e) {
+              localStorage.removeItem(`${CACHE_KEY}_${firebaseUser.uid}`);
             }
         }
 
@@ -160,6 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setLoading(false);
         } else {
+          // فقط في حال كان هذا هو التحميل الأول وفشل جلب البيانات الحقيقية
           if (!isInitialLoad.current) {
             await signOut(masterAuth);
             setUser(null);
@@ -168,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           setLoading(false);
         }
+        isInitialLoad.current = false;
       } catch (err) { 
         setLoading(false);
       }
