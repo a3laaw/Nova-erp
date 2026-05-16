@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -51,6 +52,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useAuth } from '@/context/auth-context';
 import { useAppTheme } from '@/context/theme-context';
+import { useRouter } from 'next/navigation';
 
 const dayNameToIndex: Record<string, number> = {
   'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3,
@@ -112,6 +114,7 @@ export function AttendanceUploader() {
   const { branding } = useBranding();
   const { user: currentUser } = useAuth();
   const { theme } = useAppTheme();
+  const router = useRouter();
   const isGlass = theme === 'glass';
 
   const [year, setYear] = useState(new Date().getFullYear().toString());
@@ -293,12 +296,14 @@ export function AttendanceUploader() {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const json: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
                 await processAttendanceLogic(json);
-                toast({ title: 'نجاح المعالجة', description: 'تم دمج البصمات مع الإجازات والاستئذانات آلياً.' });
-                setFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
+                toast({ title: 'نجاح المعالجة', description: 'تم دمج البصمات. سيتم توجيهك لمركز الرواتب الآن.' });
+                
+                setTimeout(() => {
+                  router.push('/dashboard/hr/payroll');
+                }, 1000);
+
             } catch (err: any) {
                 toast({ variant: 'destructive', title: 'خطأ', description: err.message });
-            } finally {
                 setIsProcessing(false);
             }
         };
@@ -306,10 +311,12 @@ export function AttendanceUploader() {
     } else {
         try {
             await processAttendanceLogic([]);
-            toast({ title: 'نجاح المزامنة', description: 'تم تحديث سجلات الإجازات والاستئذانات المعتمدة آلياً.' });
+            toast({ title: 'نجاح المزامنة', description: 'تم التحديث. سيتم توجيهك لمركز الرواتب.' });
+            setTimeout(() => {
+              router.push('/dashboard/hr/payroll');
+            }, 1000);
         } catch (err: any) {
             toast({ variant: 'destructive', title: 'خطأ', description: err.message });
-        } finally {
             setIsProcessing(false);
         }
     }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -104,7 +105,6 @@ export function WorkHoursManager() {
         setIsSaving(true);
         try {
             const tenantId = currentUser.currentCompanyId;
-            // 🛡️ توجيه المسار إلى المجلد المعزول للمنشأة
             const settingsPath = getTenantPath('settings/branding', tenantId);
             const settingsRef = doc(firestore, settingsPath);
 
@@ -118,11 +118,18 @@ export function WorkHoursManager() {
                 }
             };
             await setDoc(settingsRef, cleanFirestoreData(data), { merge: true });
-            toast({ title: 'نجاح الحفظ', description: 'تم تحديث قواعد الدوام والمواعيد بنجاح.' });
+            toast({ title: 'نجاح الحفظ', description: 'تم تحديث قواعد الدوام بنجاح. سيتم توجيهك الآن للإعدادات.' });
+            
+            // التوجيه التلقائي لصفحة الإعدادات العامة بعد الحفظ
+            setTimeout(() => {
+                router.push('/dashboard/settings');
+            }, 1000);
+            
         } catch (e: any) {
             console.error("Save failed:", e);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: e.message || 'يرجى مراجعة الصلاحيات.' });
-        } finally { setIsSaving(false); }
+            setIsSaving(false);
+        }
     };
 
     if (loading) return <div className="space-y-6"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-[500px] w-full rounded-2xl"/></div>;

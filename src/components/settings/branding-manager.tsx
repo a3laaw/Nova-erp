@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -157,11 +158,15 @@ export function BrandingManager() {
             await setDoc(settingsRef, cleanFirestoreData(dataToSave), { merge: true });
             
             setFilesToUpload({}); 
-            toast({ title: 'نجاح التحديث', description: 'تم حفظ الهوية البصرية بنجاح.' });
+            toast({ title: 'نجاح التحديث', description: 'تم حفظ الهوية البصرية. سيتم توجيهك الآن للرئيسية.' });
+            
+            setTimeout(() => {
+                router.push('/dashboard/settings');
+            }, 1000);
+
         } catch (error: any) {
             console.error("Branding save error:", error);
             toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: error.message });
-        } finally {
             setIsSaving(false);
         }
     };
