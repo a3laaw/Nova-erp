@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V92.0):
- * تم تحصينها بتوقيتات عبور مرنة لضمان اكتمال "الترميم الذاتي" للحسابات الجديدة.
+ * صفحة الدخول السيادية (Access Gateway V93.0):
+ * تم إرجاعها للحالة المستقرة واللحظية التي كانت عليها.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading } = useAuth();
@@ -37,7 +37,7 @@ export default function LoginPage() {
 
   const redirectAttempted = useRef(false);
 
-  // ⚡ محرك التوجيه الفوري المستقر
+  // ⚡ التوجيه اللحظي الفوري فور استقرار حالة المستخدم
   useEffect(() => {
     if (user && !redirectAttempted.current) {
         redirectAttempted.current = true;
@@ -46,18 +46,6 @@ export default function LoginPage() {
         router.replace(target);
     }
   }, [user, router]);
-
-  // 🛡️ فك تجميد الشاشة مع إعطاء مهلة كافية لترميم هويات الـ SaaS
-  useEffect(() => {
-      if (!globalLoading && !user && localLoading) {
-          // رفع المهلة لـ 5 ثوانٍ لضمان اكتمال عمليات الـ SetDoc في الخلفية للمنشآت الجديدة
-          const timer = setTimeout(() => {
-              setLocalLoading(false);
-              setErrorMsg('تعذر جلب ملف المستخدم. تأكد من أن حسابك مسجل في منشأة نشطة، أو حاول الدخول مرة أخرى ليقوم النظام بترميم حسابك آلياً.');
-          }, 5000);
-          return () => clearTimeout(timer);
-      }
-  }, [globalLoading, user, localLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +56,7 @@ export default function LoginPage() {
 
     try {
         await login(identifier.trim().toLowerCase(), password);
+        // التوجيه سيتم آلياً عبر الـ useEffect أعلاه فور اكتمال جلب الملف
     } catch (error: any) {
         setLocalLoading(false);
         setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');

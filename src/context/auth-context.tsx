@@ -8,7 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
 import { setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
-import { cleanFirestoreData } from '@/lib/utils'; // 🛡️ CRITICAL IMPORT ADDED
+import { cleanFirestoreData } from '@/lib/utils';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -38,13 +38,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية الذكي (Self-Healing Identity Engine V8.0):
-   * تم تحصينه لترميم ملفات المستخدمين المفقودة آلياً عند تسجيل الدخول.
+   * ⚡ محرك جلب الهوية المستقر (Stable Identity Core V93.0):
+   * تم إرجاع المنطق الأصلي مع دعم البحث المزدوج (UID + Email) لضمان دخول الجميع.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ المسار السيادي للمطور الأساسي
+    // 🛡️ المسار السيادي للمطور
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let companyId = null;
         let globalData: any = null;
         
-        // 1. استرجاع بيانات الفهرس العالمي
+        // 1. البحث في الفهرس العالمي (UID أولاً ثم البريد)
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
@@ -76,18 +76,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!oldSnap.empty) {
                 globalData = oldSnap.docs[0].data();
                 companyId = globalData.companyId;
-                // Update to the new UID-keyed format for next time
+                // تحديث الفهرس ليعتمد الـ UID مستقبلاً (Auto-Repair)
                 await setDoc(doc(firestore, 'global_users', firebaseUser.uid), { ...globalData, uid: firebaseUser.uid, updatedAt: serverTimestamp() }, { merge: true });
             }
         }
         
         if (!companyId) return { user: null, company: null };
 
-        // 2. جلب بيانات الشركة
+        // 2. جلب بيانات المنشأة
         const companyDoc = await getDoc(doc(firestore, 'companies', companyId));
         const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
 
-        // 3. جلب ملف المستخدم (مع محرك الترميم التلقائي)
+        // 3. جلب ملف المستخدم المعزول
         const tenantUserPath = `companies/${companyId}/users/${firebaseUser.uid}`;
         const tenantUserDocSnap = await getDoc(doc(firestore, tenantUserPath));
         
@@ -96,13 +96,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (tenantUserDocSnap.exists()) {
             userData = tenantUserDocSnap.data();
         } else {
-            // محاولة ثانية بالايميل داخل الشركة
+            // محاولة ثانية بالبريد داخل الشركة
             const tenantUserQuery = query(collection(firestore, `companies/${companyId}/users`), where('email', '==', sanitizedEmail), limit(1));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             if (!tenantUserSnap.empty) {
                 userData = tenantUserSnap.docs[0].data();
             } else if (globalData?.role === 'Admin') {
-                // 🔄 إجراء الترميم السيادي: إذا كان مديراً في الفهرس العالمي وغير موجود في مجلد الشركة، نقوم بإنشائه فوراً
+                // 🔄 ترميم تلقائي للمديرين الجدد (Auto-Healing)
                 userData = {
                     id: firebaseUser.uid,
                     uid: firebaseUser.uid,
@@ -113,7 +113,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     companyId: companyId,
                     createdAt: serverTimestamp()
                 };
-                // 🛡️ استخدام cleanFirestoreData المستورد الآن بشكل صحيح
                 await setDoc(doc(firestore, tenantUserPath), cleanFirestoreData(userData));
             }
         }
