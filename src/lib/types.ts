@@ -21,10 +21,48 @@ export interface UserProfile extends BaseEntity {
   avatarUrl?: string;
   passwordHash?: string;
   activatedAt?: Timestamp | any;
-  // Claims
   isSuperAdmin?: boolean;
   currentCompanyId?: string;
   companyName?: string;
+}
+
+// --- 🚀 نظام الإنتاجية الشخصية (V1.0) ---
+export type ProductivityAction = 'review' | 'decision' | 'design' | 'redesign' | 'meeting' | 'general';
+export type ProductivityStatus = 'pending' | 'in-progress' | 'completed' | 'cancelled';
+
+export interface UserProductivityItem extends BaseEntity {
+    userId: string;             // صاحب المهمة (الموظف)
+    entryType: 'task' | 'bookmark';
+    title: string;
+    description?: string;
+    customIcon?: string;
+    customColor?: string;
+    
+    // الربط بالمصدر (Polymorphic Link)
+    sourceModule: string;       // e.g., 'projects', 'clients', 'invoices', 'boqs'
+    sourceId: string;           // المعرف الرئيسي (الوثيقة)
+    sourceSubId?: string;       // المعرف الفريد للبند الداخلي (BOQ Item ID, Clause ID)
+    sourceUrl: string;          // رابط العودة السريع
+    
+    // تفاصيل المهام (Tasks Only)
+    actionType?: ProductivityAction;
+    status?: ProductivityStatus;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    startDate?: Timestamp | any;
+    dueDate?: Timestamp | any;
+    completedAt?: Timestamp | any;
+    isRecurring?: boolean;
+    frequency?: 'daily' | 'weekly' | 'monthly';
+    
+    // تفاصيل المفضلات (Bookmarks Only)
+    folderName?: string;
+    tags?: string[];
+    personalNotes?: string;
+    
+    // مقاييس الاستخدام
+    viewCounter: number;
+    lastViewedAt?: Timestamp | any;
+    showInSidebar?: boolean;
 }
 
 export interface Company extends BaseEntity {
@@ -50,10 +88,9 @@ export interface Company extends BaseEntity {
   activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
   employeeCountRange?: string;
   status?: 'pending' | 'active' | 'suspended';
-  // --- Licensing & Financial Shield ---
   subscriptionType: 'trial' | 'premium';
   trialEndDate?: Timestamp | any;
-  subscriptionExpiryDate?: Timestamp | any; // 📅 تاريخ انتهاء الاشتراك المعتمد
+  subscriptionExpiryDate?: Timestamp | any; 
   maxUsersLimit: number;
   currentUsersCount?: number;
 }
@@ -70,19 +107,6 @@ export interface CompanyRequest extends BaseEntity {
     activatedAt?: Timestamp | any;
     companyId?: string;
 }
-
-export interface GlobalUserIndex {
-    email: string;
-    username: string;
-    companyId: string;
-    role: string;
-}
-
-export interface AuthenticatedUser extends UserProfile {
-    id: string;
-}
-
-export type ClientStatus = 'prospective' | 'registered' | 'active' | 'completed' | 'archived' | 'contracted' | 'reContracted';
 
 export interface Client extends BaseEntity {
   fileId: string;
@@ -101,7 +125,7 @@ export interface Client extends BaseEntity {
       street?: string;
       houseNumber?: string;
   };
-  status: ClientStatus;
+  status: 'prospective' | 'registered' | 'active' | 'completed' | 'archived' | 'contracted' | 'reContracted';
   assignedEngineer?: string;
   assignedEngineerName?: string;
   notes?: string;

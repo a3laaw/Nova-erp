@@ -1,9 +1,8 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- 🛡️ بروتوكول المعماري السيادي (V70.0) ---
     
     function isSovereignArchitect() {
       return request.auth != null && 
@@ -11,55 +10,29 @@ service cloud.firestore {
               request.auth.token.role == 'Developer');
     }
 
-    // التحقق من الانتماء للمنشأة عبر التوكن أو البيانات المباشرة
     function belongsToCompany(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
-              request.auth.token.currentCompanyId == companyId ||
-              request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
+              request.auth.token.currentCompanyId == companyId);
+    }
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // السماح للمطور بالدخول المطلق لتأسيس المنظومة
-    match /developers/{uid} {
-      allow read, write: if isSovereignArchitect();
-    }
-
-    // المنشآت: المطور يرى الكل، والمستخدم يرى منشأته فقط
     match /companies/{companyId} {
       allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
+      // 🛡️ درع الخصوصية للإنتاجية الشخصية
+      match /userProductivity/{itemId} {
+        allow read, write: if belongsToCompany(companyId) && (isOwner(resource.data.userId) || request.resource.data.userId == request.auth.uid);
+      }
+
       match /{allSubcollections=**} {
         allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       }
     }
 
-    // الفهرس العالمي للمستخدمين
-    match /global_users/{docId} {
-      allow read: if request.auth != null;
-      allow write: if isSovereignArchitect();
-    }
-    
-    // طلبات الانضمام
-    match /company_requests/{requestId} {
-      allow create: if true;
-      allow read, write: if isSovereignArchitect();
-    }
-
-    // دعم استعلامات الـ Collection Group المعزولة
-    // 🛡️ السماح بالقراءة إذا كان الفلتر يطابق هوية المنشأة
-    match /{path=**}/transactions/{transactionId} {
-      allow read: if isSovereignArchitect() || belongsToCompany(resource.data.companyId);
-    }
-    
-    match /{path=**}/timelineEvents/{eventId} {
-      allow read: if isSovereignArchitect() || belongsToCompany(resource.data.companyId);
-    }
-    
-    match /{path=**}/workStages/{stageId} {
-      allow read: if request.auth != null;
-    }
-
-    // القاعدة الذهبية: المعماري السيادي يملك الحق في كل شيء في أي مكان
     match /{document=**} {
       allow read, write: if isSovereignArchitect();
     }

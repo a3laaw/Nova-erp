@@ -1,41 +1,47 @@
+
 {
   "entities": {
-    "CustodyReconciliation": {
-      "title": "Custody Reconciliation",
-      "description": "Represents an employee's report of expenses spent from their cash custody.",
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Represents a user's login account within a tenant.",
       "type": "object",
       "properties": {
-        "reconciliationNumber": { "type": "string" },
-        "employeeId": { "type": "string" },
-        "employeeName": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "description": { "type": "string" },
-              "amount": { "type": "number" },
-              "projectId": { "type": "string" },
-              "projectName": { "type": "string" },
-              "clientId": { "type": "string" },
-              "clientName": { "type": "string" },
-              "category": { "type": "string", "description": "Expense account ID (Filled by accountant)" },
-              "categoryName": { "type": "string" },
-              "attachmentUrl": { "type": "string", "format": "uri" }
-            }
-          }
-        },
-        "totalAmount": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Engineer", "Accountant", "HR", "Secretary"] },
+        "isActive": { "type": "boolean" }
+      }
+    },
+    "UserProductivityItem": {
+      "title": "User Productivity Item",
+      "description": "Represents a Task or a Bookmark created by a user from an ERP entity.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "entryType": { "type": "string", "enum": ["task", "bookmark"] },
+        "title": { "type": "string" },
+        "actionType": { "type": "string", "enum": ["review", "decision", "design", "redesign", "meeting", "general"] },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed", "cancelled"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "sourceModule": { "type": "string" },
+        "sourceId": { "type": "string" },
+        "sourceSubId": { "type": "string" }
       },
-      "required": ["employeeId", "date", "items", "totalAmount"]
+      "required": ["userId", "entryType", "title", "sourceModule", "sourceId"]
     }
   },
+  "auth": {
+    "providers": ["password"]
+  },
   "firestore": {
-    "/custody_reconciliations/{id}": {
-      "schema": { "$ref": "#/entities/CustodyReconciliation" },
-      "description": "Stores employee custody reconciliation requests."
+    "/companies/{companyId}/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Tenant-specific user records."
+    },
+    "/companies/{companyId}/userProductivity/{itemId}": {
+      "schema": { "$ref": "#/entities/UserProductivityItem" },
+      "description": "Personal productivity items (Tasks/Bookmarks) for users."
     }
   }
 }
