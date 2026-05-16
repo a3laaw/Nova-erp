@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -22,6 +22,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const CACHE_KEY = 'nova_identity_cache';
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { auth: masterAuth, firestore: masterFirestore } = useFirebase();
@@ -31,11 +33,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 🛡️ استخدام المرجع لمنع الحلقات اللانهائية في التحديث
+  const isInitialLoad = useRef(true);
 
+  /**
+   * محرك جلب الهوية المطور (Lightning Fetch V2.0):
+   * يستخدم المعالجة المتوازية لتقليص زمن الاستجابة.
+   */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ المطور السيادي (Root)
+    // 1. المطور السيادي (Root) - أولوية قصوى
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -47,36 +56,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             currentCompanyId: null,
             companyName: 'Master Console'
         };
-        await setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
         return { user: devProfile, company: null };
     }
 
     try {
-        let companyId: string | null = null;
+        // 2. البحث عن معرّف الشركة (Tenant ID) من الفهرس العالمي
         const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
         
-        if (!globalSnap.empty) {
-            companyId = globalSnap.docs[0].data().companyId;
-        }
+        if (globalSnap.empty) return { user: null, company: null };
         
-        if (companyId) {
-            // جلب بيانات الشركة أولاً لمعرفة مصفوفة الربط
-            const companyDoc = await getDoc(doc(firestore, 'companies', companyId));
-            const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+        const companyId = globalSnap.docs[0].data().companyId;
+        if (!companyId) return { user: null, company: null };
 
-            // جلب ملف المستخدم من المجلد المعزول
-            const tenantDoc = await getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`));
-            
-            if (tenantDoc.exists()) {
-                return {
-                  user: { ...tenantDoc.data(), uid: firebaseUser.uid, id: tenantDoc.id, currentCompanyId: companyId, companyName: companyData?.name } as AuthenticatedUser,
-                  company: companyData
-                };
-            }
+        // ⚡ ميزة البرق: جلب بيانات الشركة وملف المستخدم في آنٍ واحد (Parallel Request)
+        const [companyDoc, tenantDoc] = await Promise.all([
+            getDoc(doc(firestore, 'companies', companyId)),
+            getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`))
+        ]);
+
+        if (tenantDoc.exists()) {
+            const companyData = companyDoc.exists() ? { id: companyDoc.id, ...companyDoc.data() } as Company : null;
+            const userData = { 
+                ...tenantDoc.data(), 
+                uid: firebaseUser.uid, 
+                id: tenantDoc.id, 
+                currentCompanyId: companyId, 
+                companyName: companyData?.name 
+            } as AuthenticatedUser;
+
+            // 💾 تحديث الذاكرة اللحظية للزيارة القادمة
+            localStorage.setItem(`${CACHE_KEY}_${firebaseUser.uid}`, JSON.stringify({ user: userData, company: companyData }));
+
+            return { user: userData, company: companyData };
         }
     } catch (e) { 
-        console.warn("Identity lookup failed:", e); 
+        console.error("Identity lookup failed:", e); 
     }
     return { user: null, company: null };
   }, []);
@@ -103,20 +118,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
+        // 🚀 محاولة استعادة الهوية من الكاش (Instant Access)
+        const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
+        if (cached && isInitialLoad.current) {
+            const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
+            setUser(cachedUser);
+            setCompany(cachedCompany);
+            if (cachedCompany) setCurrentCompany(cachedCompany);
+            setLoading(false); // فك الحظر عن الواجهة فوراً
+            isInitialLoad.current = false;
+        }
+
+        // 🛡️ التحقق الحقيقي في الخلفية لضمان سلامة الصلاحيات
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
-          // 🛡️ درع مزامنة التوكن: التأكد من وجود صلاحيات الشركة في التوكن
-          const tokenResult = await firebaseUser.getIdTokenResult();
-          if (!tokenResult.claims.companyId && resolvedUser.currentCompanyId) {
-              await firebaseUser.getIdToken(true);
-          }
+          // مزامنة التوكن إذا لزم الأمر دون حظر الواجهة
+          firebaseUser.getIdTokenResult().then(tokenResult => {
+            if (!tokenResult.claims.companyId && resolvedUser.currentCompanyId) {
+                firebaseUser.getIdToken(true);
+            }
+          });
 
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setUser(resolvedUser);
           setCompany(resolvedCompany);
           if (resolvedCompany) setCurrentCompany(resolvedCompany);
-        } else {
+        } else if (!cached) {
+          // لم نجد كاش ولم ينجح التحقق -> خروج
           setUser(null);
           clearSessionIndicators();
           if (resolvedUser && !resolvedUser.isActive) setError("هذا الحساب معطل حالياً.");
@@ -139,6 +168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(async () => {
     if (!masterAuth) return;
+    const uid = masterAuth.currentUser?.uid;
+    if (uid) localStorage.removeItem(`${CACHE_KEY}_${uid}`);
     await signOut(masterAuth);
     setUser(null); setCompany(null);
     clearSessionIndicators();

@@ -18,12 +18,14 @@ import {
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
 import Link from 'next/link';
 
+/**
+ * صفحة الدخول السيادية (Unified Access Gateway):
+ * تم تحسينها بنظام التوجيه المتفائل (Optimistic Redirect) لتقليل وقت الانتظار.
+ */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
-  const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -33,32 +35,27 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // رادار التوجيه اللحظي
   useEffect(() => {
-    if (user && !loading) {
+    if (user) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
-  }, [user, loading, router]);
-
-  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setIdentifier(val);
-      if (val === '') {
-          setPassword('');
-      }
-  };
+  }, [user, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (localLoading) return;
+    
     setLocalLoading(true);
     setErrorMsg(null);
 
     try {
+        // بمجرد نجاح هذه الخطوة، سيتولى الـ AuthContext التوجيه عبر الـ Identity Cache
         await login(identifier.trim().toLowerCase(), password);
     } catch (error: any) {
         setLocalLoading(false);
-        setErrorMsg('بيانات الدخول غير صحيحة.');
+        setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');
     }
   };
 
@@ -101,7 +98,7 @@ export default function LoginPage() {
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد</Label>
                         <Input 
                             value={identifier} 
-                            onChange={handleIdentifierChange} 
+                            onChange={(e) => setIdentifier(e.target.value)} 
                             className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all shadow-inner border-orange-50" 
                             required 
                             placeholder="Username / Email"
@@ -143,7 +140,7 @@ export default function LoginPage() {
                 <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
                     <div className="grid gap-3">
                         <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني المسجل</Label>
-                        <Input value={identifier} onChange={handleIdentifierChange} className="h-14 rounded-2xl border-2 text-center font-bold text-lg border-orange-50 bg-white/60" required placeholder="your@email.com" autoComplete="off" />
+                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg border-orange-50 bg-white/60" required placeholder="your@email.com" autoComplete="off" />
                     </div>
                     <Button type="submit" disabled={localLoading} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
                         {localLoading ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
