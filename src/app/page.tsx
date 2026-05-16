@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Lightning Access Gateway):
- * تم تحصينها بالكامل ضد التجمد اللانهائي عبر عزل المدخلات عن المزامنة الثقيلة.
+ * صفحة الدخول السيادية (Access Gateway V86.0):
+ * تم إصلاح منطق التوجيه لضمان العبور الفوري ومنع "فخ حالة التحميل".
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -35,13 +35,13 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ⚡ محرك التوجيه الفوري - يعمل فقط عند استقرار الهوية
+  // ⚡ محرك التوجيه الفوري - يعمل بمجرد استقرار الهوية في السياق
   useEffect(() => {
-    if (user && !localLoading) {
+    if (user) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
-  }, [user, router, localLoading]);
+  }, [user, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +52,7 @@ export default function LoginPage() {
 
     try {
         await login(identifier.trim().toLowerCase(), password);
+        // في حال النجاح، سيقوم الـ useEffect أعلاه بالتوجيه
     } catch (error: any) {
         setLocalLoading(false);
         setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');

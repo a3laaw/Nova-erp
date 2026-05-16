@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, type Firestore } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
@@ -37,14 +37,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية المطور (Flash Identity Engine V2.6):
-   * تم تحصينه لمنع حلقات التكرار اللانهائية.
+   * ⚡ محرك جلب الهوية المطور (Flash Identity Engine V2.7):
+   * تم تحصينه بالكامل لمنع أي تأخير أو تجميد في واجهة المستخدم.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ المسار البرقي للمطور (Sovereign Lightning Path)
-    // تم حذف البريد الإضافي لضمان دخوله كمستخدم منشأة عادي
+    // 🛡️ المسار البرقي للمطور السيادي
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -137,9 +136,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
-          // 🛡️ فحص التغيير الحقيقي قبل التحديث لمنع الـ Loop
+          // 🛡️ تحديث الحالة فقط عند الضرورة لكسر حلقات التكرار
           setUser(prev => {
-              if (JSON.stringify(prev) === JSON.stringify(resolvedUser)) return prev;
+              if (prev?.uid === resolvedUser.uid && prev?.role === resolvedUser.role) return prev;
               return resolvedUser;
           });
           setCompany(resolvedCompany);
@@ -176,14 +175,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.replace('/');
   }, [masterAuth, router]);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
       if (!masterAuth) return;
       await sendPasswordResetEmail(masterAuth, email.toLowerCase().trim());
-  };
+  }, [masterAuth]);
 
   const value = useMemo(() => ({ 
     user, company, loading, error, login, logout, resetPassword, refreshUserData
-  }), [user, company, loading, error, login, logout, refreshUserData]);
+  }), [user, company, loading, error, login, logout, resetPassword, refreshUserData]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

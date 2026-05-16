@@ -16,30 +16,39 @@ interface CompanyContextType {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
+/**
+ * مزود سياق الشركة (Sovereign Company Provider):
+ * تم تحصينه بـ Refs لضمان استقرار دالة الـ Setter ومنع حلقات التكرار اللانهائية.
+ */
 export const CompanyProvider = ({ children }: { children: ReactNode }) => {
   const [currentCompany, setCompany] = useState<Company | null>(null);
   const [instances, setInstances] = useState<CompanyFirebaseInstances | null>(null);
   const [isLoadingCompany, setIsLoadingCompany] = useState(false);
-  const isMounted = useRef(false);
+  
+  // 🛡️ استخدام Ref لتعقب المعرف الحالي دون التسبب في إعادة إنشاء الدالة
+  const currentIdRef = useRef<string | null>(null);
 
   const setCurrentCompany = useCallback((company: Company | null) => {
     if (!company) {
       setCompany(null);
       setInstances(null);
+      currentIdRef.current = null;
       try {
         if (typeof window !== 'undefined') localStorage.removeItem('nova_current_company');
       } catch (e) {}
       return;
     }
 
-    // منع إعادة التأسيس إذا كانت نفس الشركة لضمان استقرار التحميل
-    if (currentCompany?.id === company.id) return;
+    // 🛡️ منع إعادة التأسيس إذا كانت نفس الشركة لضمان استقرار التحميل
+    if (currentIdRef.current === company.id) return;
 
     setIsLoadingCompany(true);
     try {
       const firebaseInstances = getCompanyFirebase(company.firebaseConfig, company.id!);
       setCompany(company);
+      currentIdRef.current = company.id!;
       setInstances(firebaseInstances);
+      
       if (typeof window !== 'undefined') {
         localStorage.setItem('nova_current_company', JSON.stringify(company));
       }
@@ -48,20 +57,17 @@ export const CompanyProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsLoadingCompany(false);
     }
-  }, [currentCompany?.id]);
+  }, []); // ⚡ دالة مستقرة تماماً لا تعتمد على الحالة
 
   useEffect(() => {
-    if (!isMounted.current) {
-        isMounted.current = true;
-        try {
-            const saved = localStorage.getItem('nova_current_company');
-            if (saved) {
-                const company = JSON.parse(saved);
-                setCurrentCompany(company);
-            }
-        } catch (e) {
-            if (typeof window !== 'undefined') localStorage.removeItem('nova_current_company');
+    try {
+        const saved = localStorage.getItem('nova_current_company');
+        if (saved) {
+            const company = JSON.parse(saved);
+            setCurrentCompany(company);
         }
+    } catch (e) {
+        if (typeof window !== 'undefined') localStorage.removeItem('nova_current_company');
     }
   }, [setCurrentCompany]);
 
