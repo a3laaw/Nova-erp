@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, getIdToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
@@ -17,6 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  refreshToken: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,10 +32,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * 🛡️ محرك جلب الهوية السيادي المباشر (V96.0)
-   * مسارين صريحين: مطور (Master) أو مستخدم منشأة (SaaS).
-   */
+  // 🛡️ دالة تجديد التوكن السيادي لضمان استلام الصلاحيات فوراً
+  const refreshToken = useCallback(async () => {
+    if (masterAuth?.currentUser) {
+      await getIdToken(masterAuth.currentUser, true);
+    }
+  }, [masterAuth]);
+
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
       setLoading(false);
@@ -56,7 +60,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const email = firebaseUser.email?.toLowerCase().trim() || '';
 
-      // 1. مسار المطور السيادي (Master Path)
       if (email === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
           uid: firebaseUser.uid,
@@ -69,16 +72,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           companyName: 'Nova Master Admin'
         };
         setUser(devProfile);
-        setCompany(null);
-        setCurrentCompany(null);
         setSessionIndicators(firebaseUser.uid, 'Developer');
         setLoading(false);
         return;
       }
 
-      // 2. مسار مستخدمي المنشآت (SaaS Path) - جلب مباشر بالـ ID
       try {
-        // أ. معرفة الشركة من الفهرس العالمي (مباشرة بالـ UID)
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
@@ -87,15 +86,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const { companyId } = globalSnap.data();
+        
+        // ⚡ تجديد التوكن لضمان وجود ادعاءات الـ Multi-tenancy
+        await getIdToken(firebaseUser, true);
 
-        // ب. جلب بيانات المنشأة والبروفايل الداخلي
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
         ]);
 
         if (!userDoc.exists()) {
-            throw new Error("لم يتم العثور على ملفك الشخصي داخل المنشأة. يرجى مراجعة المدير.");
+            throw new Error("لم يتم العثور على ملفك الشخصي داخل المنشأة.");
         }
 
         const userData = userDoc.data();
@@ -119,7 +120,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSessionIndicators(firebaseUser.uid, finalUser.role);
 
       } catch (err: any) {
-        console.error("Access Refused:", err.message);
         setError(err.message);
         setUser(null);
         clearSessionIndicators();
@@ -159,8 +159,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const value = useMemo(() => ({ 
-    user, company, loading, error, login, logout, resetPassword 
-  }), [user, company, loading, error]);
+    user, company, loading, error, login, logout, resetPassword, refreshToken 
+  }), [user, company, loading, error, refreshToken]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -9,9 +9,9 @@ import { Textarea } from '../ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, type FirebaseStorage } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity } from 'lucide-react';
+import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity, Sparkles } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
 import Image from 'next/image';
@@ -69,6 +69,7 @@ function ImageUploadField({
                         alt={label} 
                         fill
                         className="object-contain p-2" 
+                        unoptimized
                     />
                 ) : (
                     <ImageIcon className="h-10 w-10 text-muted-foreground opacity-20" />
@@ -108,7 +109,7 @@ function ImageUploadField({
 
 export function BrandingManager() {
     const { firestore, storage } = useFirebase();
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, refreshToken } = useAuth();
     const { branding, loading } = useBranding();
     const { toast } = useToast();
     const router = useRouter();
@@ -119,7 +120,9 @@ export function BrandingManager() {
 
     useEffect(() => {
         if (branding) {
-            setFormData(branding);
+            // 🛡️ التطهير من المعرفات الافتراضية لمنع التضارب
+            const { id, ...cleanData } = branding;
+            setFormData(cleanData);
         }
     }, [branding]);
 
@@ -134,22 +137,24 @@ export function BrandingManager() {
     const handleSave = async () => {
         const tenantId = currentUser?.currentCompanyId;
         if (!firestore || !tenantId) {
-            toast({ variant: 'destructive', title: 'خطأ سيادي', description: 'لم يتم التعرف على هوية المنشأة.' });
+            toast({ variant: 'destructive', title: 'خطأ في الهوية', description: 'لم نتمكن من تحديد المنشأة. يرجى إعادة تسجيل الدخول.' });
             return;
         }
         
         if (!formData.company_name) {
-            toast({ variant: 'destructive', title: 'حقل مطلوب', description: 'يرجى إدخال اسم المنشأة.'});
+            toast({ variant: 'destructive', title: 'بيان ناقص', description: 'اسم المنشأة حقل إلزامي.'});
             return;
         }
 
         setIsSaving(true);
         try {
+            // 1. ⚡ محاولة تجديد التوكن لضمان الصلاحيات
+            await refreshToken();
+
             const dataToSave = { ...formData };
-            // 🛡️ تطهير الحقول الملوثة
             delete (dataToSave as any).id;
 
-            // 1. معالجة الصور المرفوعة (إن وجدت)
+            // 2. معالجة الصور
             if (storage) {
                 for (const key in filesToUpload) {
                     const file = filesToUpload[key];
@@ -158,27 +163,32 @@ export function BrandingManager() {
                             const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}`);
                             const uploadResult = await uploadBytes(storageRef, file);
                             const downloadURL = await getDownloadURL(uploadResult.ref);
-                            dataToSave[key as keyof BrandingSettings] = downloadURL;
+                            (dataToSave as any)[key] = downloadURL;
                         } catch (stErr) {
                             console.error(`Storage error for ${key}:`, stErr);
-                            // استمرار الحفظ حتى لو فشل الرفع (للحفاظ على النصوص)
                         }
                     }
                 }
             }
             
-            // 2. الحفظ في Firestore بالمسار المعزول
+            // 3. الحفظ المباشر في المسار السيادي المعزول
             const settingsPath = getTenantPath('settings/branding', tenantId);
             const settingsRef = doc(firestore, settingsPath);
             
             await setDoc(settingsRef, cleanFirestoreData(dataToSave), { merge: true });
             
-            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية للمنظمة.' });
+            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية والمزامنة السحابية.' });
             setFilesToUpload({});
 
         } catch (error: any) {
             console.error("Branding save error:", error);
-            toast({ variant: 'destructive', title: 'فشل الحفظ', description: error.message || 'حدث خطأ في قواعد البيانات.' });
+            toast({ 
+                variant: 'destructive', 
+                title: 'فشل ترحيل البيانات', 
+                description: error.code === 'permission-denied' 
+                    ? 'تم رفض الوصول من خادم الحماية. يرجى تجربة إعادة تسجيل الدخول لتفعيل الصلاحيات الجديدة.' 
+                    : error.message 
+            });
         } finally {
             setIsSaving(false);
         }
@@ -197,7 +207,7 @@ export function BrandingManager() {
                             </div>
                             <div>
                                 <CardTitle className="text-2xl font-black">إعدادات الهوية البصرية</CardTitle>
-                                <CardDescription className="text-base font-medium">تخصيص شعار الشركة، المطبوعات الرسمية، والبيانات العامة.</CardDescription>
+                                <CardDescription className="text-base font-medium">تخصيص شعار الشركة، المطبوعات الرسمية، وبيانات العقود.</CardDescription>
                             </div>
                         </div>
                         <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2">
@@ -221,7 +231,7 @@ export function BrandingManager() {
                                 <Select value={formData.activity_type} onValueChange={(v: any) => handleFieldChange('activity_type', v)}>
                                     <SelectTrigger className="h-12 rounded-2xl border-2 font-bold"><SelectValue /></SelectTrigger>
                                     <SelectContent dir="rtl">
-                                        <SelectItem value="general">نشاط عام</SelectItem>
+                                        <SelectItem value="general">تجارة عامة</SelectItem>
                                         <SelectItem value="construction">مقاولات وبناء</SelectItem>
                                         <SelectItem value="consulting">استشارات هندسية</SelectItem>
                                     </SelectContent>
@@ -249,8 +259,17 @@ export function BrandingManager() {
                 </CardContent>
                 <CardFooter className="p-10 border-t bg-muted/10 flex justify-end">
                     <Button onClick={handleSave} disabled={isSaving} className="h-14 px-20 rounded-[2.5rem] font-black text-xl shadow-xl shadow-primary/30 min-w-[320px] gap-4">
-                        {isSaving ? <Loader2 className="animate-spin h-7 w-7"/> : <Save className="h-7 w-7" />}
-                        {isSaving ? 'جاري الحفظ...' : 'اعتماد وحفظ التغييرات'}
+                        {isSaving ? (
+                            <>
+                                <Loader2 className="animate-spin h-7 w-7" />
+                                <span>جاري ترحيل البيانات...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save className="h-7 w-7" />
+                                <span>اعتماد وحفظ التغييرات</span>
+                            </>
+                        )}
                     </Button>
                 </CardFooter>
             </Card>
