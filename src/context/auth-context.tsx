@@ -37,8 +37,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isInitialLoad = useRef(true);
 
   /**
-   * ⚡ محرك جلب الهوية المطور (Flash Identity Engine V2.5):
-   * تم الانتقال للبحث المباشر بالـ UID بدلاً من الاستعلام بالبريد لسرعة فائقة.
+   * ⚡ محرك جلب الهوية المطور (Flash Identity Engine V2.6):
+   * تم تحصينه لمنع حلقات التكرار اللانهائية.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
@@ -59,7 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-        // ⚡ البحث المباشر (Direct Get) - أسرع من الـ Query بـ 10 أضعاف
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
@@ -68,7 +67,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const companyId = globalSnap.data().companyId;
         if (!companyId) return { user: null, company: null };
 
-        // ⚡ جلب متوازي لبيانات الشركة والموظف
         const [companyDoc, tenantDoc] = await Promise.all([
             getDoc(doc(firestore, 'companies', companyId)),
             getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`))
@@ -84,7 +82,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 companyName: companyData?.name 
             } as AuthenticatedUser;
 
-            localStorage.setItem(`${CACHE_KEY}_${firebaseUser.uid}`, JSON.stringify({ user: userData, company: companyData }));
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(`${CACHE_KEY}_${firebaseUser.uid}`, JSON.stringify({ user: userData, company: companyData }));
+            }
 
             return { user: userData, company: companyData };
         }
@@ -116,7 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        // 🚀 محاولة استعادة الهوية فوراً من الكاش (Instant Dashboard Unlock)
+        // 🚀 استعادة فورية من الكاش لتجنب تجميد الواجهة
         if (isInitialLoad.current) {
             const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
             if (cached) {
@@ -124,22 +124,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 setUser(cachedUser);
                 setCompany(cachedCompany);
                 if (cachedCompany) setCurrentCompany(cachedCompany);
-                setLoading(false); // فك حظر الواجهة فوراً
+                setLoading(false);
                 isInitialLoad.current = false;
             }
         }
 
-        // 🛡️ المزامنة الحقيقية في الخلفية للتأكد من الحالة المالية للشركة
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
-          setUser(resolvedUser);
+          // 🛡️ فحص التغيير الحقيقي قبل التحديث لمنع الـ Loop
+          setUser(prev => {
+              if (JSON.stringify(prev) === JSON.stringify(resolvedUser)) return prev;
+              return resolvedUser;
+          });
           setCompany(resolvedCompany);
           if (resolvedCompany) setCurrentCompany(resolvedCompany);
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setLoading(false);
-        } else if (!user) {
-          // لم نجد كاش ولم ينجح التحقق -> خروج
+        } else if (!isInitialLoad.current) {
           await signOut(masterAuth);
           setUser(null);
           clearSessionIndicators();
@@ -152,11 +154,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext, user]);
+  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext]); // 🛡️ تم إزالة 'user' من التبعيات لكسر الحلقة
 
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error('بوابة الدخول غير متصلة.');
-    // ⚡ التوجيه المتفائل يبدأ هنا
     return signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
   }, [masterAuth]);
 

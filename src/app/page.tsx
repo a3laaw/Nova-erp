@@ -22,7 +22,7 @@ import Link from 'next/link';
 
 /**
  * صفحة الدخول السيادية (Lightning Access Gateway):
- * تم تحسينها لتدعم التوجيه الفوري (Zero-Wait Redirect) بمجرد التعرف على المستخدم.
+ * تم تحصينها بالكامل ضد التجمد اللانهائي عبر عزل المدخلات عن المزامنة الثقيلة.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -35,14 +35,13 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ⚡ محرك التوجيه الفوري
+  // ⚡ محرك التوجيه الفوري - يعمل فقط عند استقرار الهوية
   useEffect(() => {
-    if (user) {
-        setLocalLoading(false);
+    if (user && !localLoading) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
-  }, [user, router]);
+  }, [user, router, localLoading]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +51,6 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     try {
-        // بمجرد نجاح التحقق من كلمة المرور، سيتولى الـ Identity Cache التوجيه الفوري
         await login(identifier.trim().toLowerCase(), password);
     } catch (error: any) {
         setLocalLoading(false);
