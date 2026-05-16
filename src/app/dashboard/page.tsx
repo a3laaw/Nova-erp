@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -19,11 +19,22 @@ import {
     Users,
     Activity,
     ClipboardList,
-    History
+    History,
+    CheckCircle2,
+    Clock,
+    ArrowUpRight,
+    ListTodo
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
+import { useFirebase, useSubscription } from '@/firebase';
+import { useAuth } from '@/context/auth-context';
+import { where, orderBy, limit } from 'firebase/firestore';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toFirestoreDate } from '@/services/date-converter';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
+import type { UserProductivityItem } from '@/lib/types';
 
 const StatCard = ({ title, value, icon, description, colorClass, loading, subText }: any) => (
     <Card className="overflow-hidden border-white/30 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] hover-lift group">
@@ -45,12 +56,28 @@ const StatCard = ({ title, value, icon, description, colorClass, loading, subTex
 );
 
 export default function DashboardPage() {
-  const { journalEntries, projects, clients, loading } = useAnalyticalData();
+  const { journalEntries, projects, clients, loading: analyticalLoading } = useAnalyticalData();
+  const { firestore } = useFirebase();
+  const { user } = useAuth();
+
+  // جلب المهام الشخصية القادمة
+  const tasksQuery = useMemo(() => [
+      where('userId', '==', user?.id),
+      where('entryType', '==', 'task'),
+      where('status', '==', 'pending'),
+      orderBy('dueDate', 'asc'),
+      limit(5)
+  ], [user?.id]);
+
+  const { data: myTasks, loading: tasksLoading } = useSubscription<UserProductivityItem>(
+      firestore, 
+      user?.currentCompanyId ? `companies/${user.currentCompanyId}/userProductivity` : null, 
+      tasksQuery
+  );
 
   const stats = useMemo(() => {
-    if (loading || !journalEntries) return null;
+    if (analyticalLoading || !journalEntries) return null;
     
-    // حساب الإيرادات من واقع القيود المرحلة فقط لضمان الصحة المالية
     const totalRevenue = journalEntries
         .filter(e => e.status === 'posted')
         .flatMap(e => e.lines)
@@ -61,7 +88,9 @@ export default function DashboardPage() {
     const totalClientsCount = (clients || []).length;
 
     return { totalRevenue, activeProjectsCount, totalClientsCount };
-  }, [journalEntries, projects, clients, loading]);
+  }, [journalEntries, projects, clients, analyticalLoading]);
+
+  const loading = analyticalLoading;
 
   return (
     <div className="space-y-8 p-2 lg:p-4" dir="rtl">
@@ -87,7 +116,7 @@ export default function DashboardPage() {
                             <LayoutGrid className="text-primary h-10 w-10" strokeWidth={2.5} />
                         </div>
                         <p className="text-lg font-bold text-muted-foreground leading-relaxed max-w-xl">
-                            مرحباً بك مجدداً. إليك نظرة شاملة على أداء الشركة والمشاريع القائمة.
+                            مرحباً بك، <span className="text-primary">{user?.fullName}</span>. إليك ملخص المهام الميدانية والمالية.
                         </p>
                     </div>
                 </div>
@@ -95,17 +124,50 @@ export default function DashboardPage() {
         </Card>
 
         <div className="grid gap-8 lg:grid-cols-12">
+            {/* قـسم مهامي الشخصية (My Tasks) */}
             <div className="lg:col-span-4">
                 <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col">
-                    <CardHeader className="p-8">
-                        <CardTitle className="text-xl font-black flex items-center gap-2 text-foreground">
-                            <Sparkles className="text-primary h-5 w-5 animate-pulse" /> تنبيهات الأولويات (WBS)
-                        </CardTitle>
-                        <CardDescription>المهام الميدانية التي تجاوزت جدولها الزمني المخطط.</CardDescription>
+                    <CardHeader className="p-8 border-b border-white/10">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-xl font-black flex items-center gap-2 text-foreground">
+                                <ListTodo className="text-primary h-5 w-5" /> مهامي القادمة
+                            </CardTitle>
+                            <Link href="/dashboard/productivity?tab=tasks">
+                                <Button variant="ghost" size="sm" className="h-8 rounded-xl font-black text-[10px] text-primary bg-primary/5">عرض الكل</Button>
+                            </Link>
+                        </div>
+                        <CardDescription>المهام المستخلصة من المشاريع والعملاء.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex-1 flex flex-col items-center justify-center text-center p-10 opacity-40">
-                        <ClipboardList className="h-16 w-16 mb-4 text-muted-foreground" />
-                        <p className="font-bold text-muted-foreground">لا توجد مهام متأخرة حالياً.</p>
+                    <CardContent className="p-6 flex-1">
+                        {tasksLoading ? (
+                            <div className="space-y-4">
+                                <Skeleton className="h-16 w-full rounded-2xl" />
+                                <Skeleton className="h-16 w-full rounded-2xl" />
+                            </div>
+                        ) : myTasks.length === 0 ? (
+                            <div className="h-48 flex flex-col items-center justify-center text-center opacity-40">
+                                <CheckCircle2 className="h-12 w-12 mb-3 text-muted-foreground" />
+                                <p className="font-bold text-sm">لا توجد مهام معلقة.</p>
+                                <p className="text-[10px]">استخدم "محرك الإنتاجية" من أي صفحة لإضافة مهام.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {myTasks.map(task => (
+                                    <Link key={task.id} href={task.sourceUrl || '/dashboard/productivity'} className="block group">
+                                        <div className="p-3 bg-white/60 dark:bg-slate-900/60 border border-transparent group-hover:border-primary/30 rounded-2xl transition-all">
+                                            <div className="flex justify-between items-start">
+                                                <p className="font-black text-xs text-foreground group-hover:text-primary transition-colors line-clamp-1">{task.title}</p>
+                                                <Badge variant="outline" className="text-[8px] h-4 font-black">{task.sourceModule}</Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2 text-[9px] font-bold text-muted-foreground">
+                                                <Clock className="h-3 w-3" />
+                                                <span>تسليم: {toFirestoreDate(task.dueDate) ? format(toFirestoreDate(task.dueDate)!, 'dd MMMM', { locale: ar }) : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -130,8 +192,8 @@ export default function DashboardPage() {
                 
                 <Card className="col-span-1 border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] p-6 flex flex-col items-center justify-center text-center gap-4">
                     <div className="space-y-1">
-                        <p className="font-black text-sm text-foreground">كشف يوميات المواقع</p>
-                        <p className="text-[10px] text-muted-foreground font-bold leading-tight">تابع إنجاز الفرق الميدانية.</p>
+                        <p className="font-black text-sm text-foreground">يوميات المواقع</p>
+                        <p className="text-[10px] text-muted-foreground font-bold leading-tight">إنجاز الفرق الميدانية.</p>
                     </div>
                     <Button asChild className="rounded-xl h-9 px-6 bg-primary text-white font-black text-[10px]">
                         <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
@@ -152,12 +214,13 @@ export default function DashboardPage() {
                 <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8 border-b border-white/10">
                         <CardTitle className="text-xl font-black flex items-center gap-2 text-foreground">
-                            <History className="text-primary h-5 w-5" /> آخر النشاطات
+                            <History className="text-primary h-5 w-5" /> رادار الفعالية
                         </CardTitle>
                         <CardDescription>متابعة حية للإجراءات المتخذة في النظام.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-8 flex-1 flex items-center justify-center opacity-30">
-                        <p className="font-bold italic text-foreground">جاري جلب آخر التحديثات...</p>
+                    <CardContent className="p-8 flex-1 flex flex-col items-center justify-center opacity-30 text-center">
+                        <Activity className="h-12 w-12 mb-3 text-primary animate-pulse" />
+                        <p className="font-bold text-sm">جاري تحليل النبض العملياتي...</p>
                     </CardContent>
                 </Card>
             </div>

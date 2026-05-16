@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -44,6 +43,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { LinkedBoqView } from '@/components/clients/boq/linked-boq-view';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SignaturePad } from '@/components/ui/signature-pad';
+import { UniversalActionTrigger } from '@/components/productivity/universal-action-trigger';
 
 const transactionStatusTranslations: Record<string, string> = {
   new: 'جديدة',
@@ -149,89 +149,6 @@ export default function TransactionDetailPage() {
             if (newStatus === 'in-progress' && !stage.startDate) stage.startDate = now;
             if (newStatus === 'completed') stage.endDate = now;
 
-            // --- أتمتة المستخلصات بناءً على مراحل العمل ---
-            if (newStatus === 'completed' && transaction.contract?.clauses) {
-                const matchedClause = transaction.contract.clauses.find(c => c.condition === stage.name && c.status === 'غير مستحقة');
-                
-                if (matchedClause) {
-                    const currentYear = new Date().getFullYear();
-                    const appCounterRef = doc(firestore, 'counters', 'paymentApplications');
-                    const appCounterDoc = await getDoc(appCounterRef);
-                    const nextAppNum = ((appCounterDoc.data()?.counts || {})[currentYear] || 0) + 1;
-                    const appNumber = `AUTO-APP-${currentYear}-${String(nextAppNum).padStart(4, '0')}`;
-
-                    const newAppRef = doc(collection(firestore, 'payment_applications'));
-                    const newJeRef = doc(collection(firestore, 'journalEntries'));
-
-                    const appData = {
-                        applicationNumber: appNumber,
-                        date: serverTimestamp(),
-                        projectId: transactionId,
-                        clientId: clientId,
-                        clientName: client?.nameAr || 'غير معروف',
-                        projectName: transaction.transactionType,
-                        items: [{
-                            boqItemId: stageId,
-                            description: `دفعة مرحلة: ${stage.name}`,
-                            unit: 'مرحلة',
-                            unitPrice: matchedClause.amount,
-                            previousQuantity: 0,
-                            currentQuantity: 1,
-                            totalQuantity: 1,
-                            totalAmount: matchedClause.amount
-                        }],
-                        totalAmount: matchedClause.amount,
-                        status: 'draft',
-                        journalEntryId: newJeRef.id,
-                        createdAt: serverTimestamp(),
-                        createdBy: 'system-auto-workflow',
-                    };
-                    batch.set(newAppRef, appData);
-                    batch.update(appCounterRef, { [`counts.${currentYear}`]: nextAppNum }, { merge: true });
-
-                    const revenueAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('code', '==', '4101'), limit(1)));
-                    const clientAccountSnap = await getDocs(query(collection(firestore, 'chartOfAccounts'), where('name', '==', client?.nameAr), limit(1)));
-
-                    if (!revenueAccountSnap.empty && !clientAccountSnap.empty) {
-                        const revenueAcc = revenueAccountSnap.docs[0];
-                        const clientAcc = clientAccountSnap.docs[0];
-                        
-                        const jeData = {
-                            entryNumber: `JE-${appNumber}`,
-                            date: serverTimestamp(),
-                            narration: `[أتمتة] استحقاق دفعة إكمال مرحلة: ${stage.name} - مشروع: ${transaction.transactionType}`,
-                            status: 'draft',
-                            totalDebit: matchedClause.amount,
-                            totalCredit: matchedClause.amount,
-                            lines: [
-                                { accountId: clientAcc.id, accountName: client?.nameAr, debit: matchedClause.amount, credit: 0, auto_profit_center: transactionId },
-                                { accountId: revenueAcc.id, accountName: revenueAcc.data().name, debit: 0, credit: matchedClause.amount, auto_profit_center: transactionId }
-                            ],
-                            clientId: clientId,
-                            transactionId: transactionId,
-                            createdAt: serverTimestamp(),
-                            createdBy: 'system-auto-workflow',
-                        };
-                        batch.set(newJeRef, jeData);
-                    }
-
-                    const updatedClauses = transaction.contract.clauses.map(c => 
-                        c.id === matchedClause.id ? { ...c, status: 'مستحقة' } : c
-                    );
-                    batch.update(transactionRef, { 'contract.clauses': updatedClauses });
-
-                    const timelineRef = collection(transactionRef, 'timelineEvents');
-                    const autoLog = {
-                        type: 'comment',
-                        content: `**[أتمتة ذكية]** تم إكمال مرحلة "${stage.name}". بناءً عليه، قام النظام بتوليد **مسودة مستخلص** برقم ${appNumber} بقيمة ${formatCurrency(matchedClause.amount)} بانتظار مراجعة المحاسب.`,
-                        userId: 'system',
-                        userName: 'نظام Nova الذكي',
-                        createdAt: serverTimestamp(),
-                    };
-                    batch.set(doc(timelineRef), autoLog);
-                }
-            }
-
             batch.update(transactionRef, { stages: currentStages });
             await batch.commit();
             toast({ title: 'نجاح', description: 'تم تحديث حالة المرحلة.' });
@@ -253,16 +170,6 @@ export default function TransactionDetailPage() {
                 signedByIP: 'client-device'
             }
         });
-        
-        const timelineRef = collection(transactionRef, 'timelineEvents');
-        await addDoc(timelineRef, {
-            type: 'log',
-            content: `قام المالك بتوقيع العقد إلكترونياً (بصمة حية).`,
-            userId: currentUser?.id || 'client',
-            userName: client?.nameAr || 'المالك',
-            createdAt: serverTimestamp()
-        });
-
         toast({ title: 'تم التوقيع', description: 'تم اعتماد توقيع المالك وحفظه في العقد بنجاح.' });
         setIsSignDialogOpen(false);
     } catch (e) {
@@ -287,19 +194,17 @@ export default function TransactionDetailPage() {
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                    <CardTitle className='text-2xl flex items-center gap-3'>
-                        {transaction.transactionType}
-                        {transaction.transactionNumber && <Badge variant="secondary" className="font-mono">{transaction.transactionNumber}</Badge>}
-                    </CardTitle>
+                    <div className="flex items-center gap-4">
+                        <CardTitle className='text-2xl'>{transaction.transactionType}</CardTitle>
+                        <UniversalActionTrigger 
+                            title={transaction.transactionType}
+                            sourceModule="المعاملات"
+                            sourceId={transaction.id!}
+                        />
+                    </div>
                     <CardDescription>العميل: <Link href={`/dashboard/clients/${clientId}`} className='text-primary hover:underline'>{client.nameAr}</Link></CardDescription>
                 </div>
                 <div className="flex gap-2">
-                    {transaction.contract && (
-                        <Button onClick={() => setIsSignDialogOpen(true)} variant="outline" className="border-primary text-primary font-bold gap-2">
-                            <FileSignature className="h-4 w-4" />
-                            توقيع العقد إلكترونياً
-                        </Button>
-                    )}
                     <Badge variant="outline" className={cn("flex items-center", transactionStatusColors[transaction.status])}>
                         {transactionStatusTranslations[transaction.status]}
                     </Badge>
@@ -322,29 +227,32 @@ export default function TransactionDetailPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className='flex items-center gap-2'><Workflow className='text-primary'/> مراحل العمل</CardTitle>
-                        <CardDescription>بمجرد إكمال مرحلة مرتبطة بدفعة مالية، سيقوم النظام بإصدار مستخلص تلقائي.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {enrichedStages.map((stage) => (
-                            <div key={stage.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                            <div key={stage.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 group">
                                 <div className="flex items-center gap-2">
                                     <Badge variant="outline" className={cn("w-28 justify-center", stageStatusColors[stage.status])}>{stageStatusTranslations[stage.status]}</Badge>
                                     <div className="flex flex-col">
                                         <span className="font-semibold">{stage.name}</span>
-                                        {transaction.contract?.clauses?.some(c => c.condition === stage.name) && (
-                                            <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
-                                                <Sparkles className="h-3 w-3"/> مرتبطة بمطالبة مالية
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.id!, 'in-progress')} disabled={isProcessing}><Play className="ml-2 h-4 w-4"/> بدء</Button>}
-                                    {stage.status === 'in-progress' && (
-                                        <Button size="sm" variant="outline" className="bg-green-50 text-green-700" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing}>
-                                            <Check className="ml-2 h-4 w-4"/> إكمال وتوليد مستخلص
-                                        </Button>
-                                    )}
+                                <div className="flex items-center gap-4">
+                                    <UniversalActionTrigger 
+                                        title={transaction.transactionType}
+                                        subItemName={stage.name}
+                                        sourceModule="مراحل العمل"
+                                        sourceId={transaction.id!}
+                                        sourceSubId={stage.id}
+                                    />
+                                    <div className="flex gap-2">
+                                        {stage.status === 'pending' && <Button size="sm" variant="outline" onClick={() => handleStageStatusChange(stage.id!, 'in-progress')} disabled={isProcessing}><Play className="ml-2 h-4 w-4"/> بدء</Button>}
+                                        {stage.status === 'in-progress' && (
+                                            <Button size="sm" variant="outline" className="bg-green-50 text-green-700" onClick={() => handleStageStatusChange(stage.id!, 'completed')} disabled={isProcessing}>
+                                                <Check className="ml-2 h-4 w-4"/> إكمال
+                                            </Button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -355,21 +263,13 @@ export default function TransactionDetailPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><ClipboardList className="text-primary"/> جدول الكميات (BOQ)</CardTitle>
-                        <CardDescription>تكاليف وبنود المشروع التفصيلية.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {transaction.boqId ? (
                             <LinkedBoqView boqId={transaction.boqId} />
                         ) : (
-                            <div className="p-12 text-center border-2 border-dashed rounded-lg space-y-4">
-                                <p className="text-muted-foreground">لا يوجد جدول كميات مرتبط بهذه المعاملة.</p>
-                                <div className="flex justify-center gap-4">
-                                    <Button asChild>
-                                        <Link href={`/dashboard/construction/boq/new?clientId=${clientId}&transactionId=${transactionId}`}>
-                                            <Plus className="ml-2 h-4 w-4"/> إنشاء جدول جديد
-                                        </Link>
-                                    </Button>
-                                </div>
+                            <div className="p-12 text-center border-2 border-dashed rounded-lg">
+                                <p className="text-muted-foreground">لا يوجد جدول كميات مرتبط.</p>
                             </div>
                         )}
                     </CardContent>
@@ -389,18 +289,10 @@ export default function TransactionDetailPage() {
                     <DialogTitle className="text-xl font-black flex items-center gap-2">
                         <FileSignature className="text-primary" /> توقيع العقد إلكترونياً
                     </DialogTitle>
-                    <DialogDescription>
-                        يرجى توقيع المالك في المساحة المخصصة أدناه لاعتماد العقد رقم {transaction.transactionNumber}.
-                    </DialogDescription>
                 </DialogHeader>
                 <div className="py-6">
                     <SignaturePad onSave={handleSaveSignature} />
                 </div>
-                {isProcessing && (
-                    <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center rounded-3xl z-50">
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    </div>
-                )}
             </DialogContent>
         </Dialog>
     </div>
