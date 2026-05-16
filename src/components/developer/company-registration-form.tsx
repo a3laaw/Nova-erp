@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -43,6 +42,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DateInput } from '../ui/date-input';
 import { Badge } from '../ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Switch } from '../ui/switch';
 
 interface Props {
   isOpen: boolean;
@@ -398,15 +399,15 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                 <Label className="text-[10px] font-black uppercase text-black flex items-center gap-2 mr-1">
                                     <Key className="h-3 w-3" /> API KEY
                                 </Label>
-                                <Input value={formData.apiKey} onChange={e => setFormData(p => ({...p, apiKey: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
+                                <Input value={formData.apiKey} onChange={e => setActivationConfig(p => ({...p, apiKey: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" placeholder="AIzaSy..." />
                             </div>
                             <div className="grid gap-3">
                                 <Label className="text-[10px] font-black uppercase text-black mr-1">PROJECT ID</Label>
-                                <Input value={formData.projectId} onChange={e => setFormData(p => ({...p, projectId: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
+                                <Input value={formData.projectId} onChange={e => setActivationConfig(p => ({...p, projectId: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
                             </div>
                             <div className="grid gap-3">
                                 <Label className="text-[10px] font-black uppercase text-black mr-1">APP ID</Label>
-                                <Input value={formData.appId} onChange={e => setFormData(p => ({...p, appId: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
+                                <Input value={formData.appId} onChange={e => setActivationConfig(p => ({...p, appId: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
                             </div>
                         </div>
                     </div>
@@ -426,5 +427,3 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     </Dialog>
   );
 }
-
-import { Switch } from '../ui/switch';
