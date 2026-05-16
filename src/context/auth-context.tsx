@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser, getIdTokenResult } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
@@ -35,8 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 🛡️ بروتوكول المطور الأعلى (Master Architect)
-    // حساب واحد فقط يملك السيادة المطلقة على البنية التحتية
     if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
@@ -56,7 +54,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let companyId: string | null = null;
         let globalUserData: any = null;
 
-        // 1. البحث في الفهرس العالمي بالبريد
         const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
         
@@ -64,21 +61,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const globalDoc = globalSnap.docs[0];
             globalUserData = globalDoc.data();
             companyId = globalUserData.companyId;
-
-            // محرك الإصلاح الذاتي للـ UID (في حال المسح والإعادة)
-            if (globalUserData.uid !== firebaseUser.uid) {
-                console.log("Sovereign Repair: Updating UID linkage.");
-                const oldUid = globalUserData.uid;
-                await updateDoc(globalDoc.ref, { uid: firebaseUser.uid });
-                if (companyId) {
-                    const oldTenantRef = doc(firestore, `companies/${companyId}/users/${oldUid}`);
-                    const oldTenantSnap = await getDoc(oldTenantRef);
-                    if (oldTenantSnap.exists()) {
-                        const userData = oldTenantSnap.data();
-                        await setDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`), { ...userData, uid: firebaseUser.uid, id: firebaseUser.uid });
-                    }
-                }
-            }
         }
         
         if (companyId) {
@@ -125,6 +107,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
+          // 🛡️ درع مزامنة التوكن السيادي (Identity Shield):
+          // إذا لم تكن صلاحيات الشركة موجودة في التوكن الحالي، نجبره على التحديث
+          // لضمان عدم ظهور خطأ "Missing or insufficient permissions"
+          const idTokenResult = await firebaseUser.getIdTokenResult();
+          if (!idTokenResult.claims.companyId && resolvedUser.currentCompanyId) {
+              console.log("Sovereign Sync: Refreshing identity claims...");
+              await firebaseUser.getIdToken(true);
+          }
+
           setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setUser(resolvedUser);
           setCompany(resolvedCompany);
