@@ -7,27 +7,18 @@ import { useAuth } from './auth-context';
 
 export interface BrandingSettings {
   id: string;
-  companyName: string;
-  activityType?: 'general' | 'food_delivery' | 'construction' | 'consulting';
-  logoUrl?: string | null;
+  company_name: string;
+  activity_type?: 'general' | 'food_delivery' | 'construction' | 'consulting';
+  logo_url?: string | null;
   address?: string | null;
   phone?: string | null;
   email?: string | null;
-  taxNumber?: string | null;
-  headerImageUrl?: string | null;
-  footerImageUrl?: string | null;
-  watermarkImageUrl?: string | null;
-  headerColor?: string;
-  useCustomImage?: boolean;
-  footerData?: {
-      address?: string;
-      phones?: string[];
-      email?: string;
-      crNumber?: string;
-      taxNumber?: string;
-      extraText?: string;
-  };
-  work_hours?: any;
+  tax_number?: string | null;
+  header_image_url?: string | null;
+  footer_image_url?: string | null;
+  watermark_image_url?: string | null;
+  header_color?: string;
+  use_custom_image?: boolean;
   financial_statement_notes?: string;
 }
 
@@ -38,9 +29,9 @@ interface BrandingContextType {
 
 const defaultBranding: BrandingSettings = {
     id: 'default',
-    companyName: 'Nova ERP',
-    activityType: 'general',
-    headerColor: '#F5820D' /* 🧡 المعتمد الجديد */
+    company_name: 'Nova ERP',
+    activity_type: 'general',
+    header_color: '#F5820D'
 };
 
 const BrandingContext = createContext<BrandingContextType>({
@@ -64,6 +55,7 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
     }
 
     setLoading(true);
+    // 🛡️ توحيد المسار السيادي المعتمد
     const brandingRef = doc(firestore, `companies/${tenantId}/settings/branding`);
     
     const unsubscribe = onSnapshot(brandingRef, (snapshot) => {
@@ -72,7 +64,7 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
         } else {
             setBranding({
                 ...defaultBranding,
-                companyName: user?.companyName || defaultBranding.companyName
+                company_name: user?.companyName || defaultBranding.company_name
             }); 
         }
         setLoading(false);
@@ -82,7 +74,7 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [firestore, user?.currentCompanyId ?? null, user?.companyName ?? null]);
+  }, [firestore, user?.currentCompanyId, user?.companyName]);
   
 
   const value = useMemo(() => ({ branding, loading }), [branding, loading]);
@@ -98,10 +90,10 @@ export const BrandingProvider = ({ children }: { children: ReactNode }) => {
 
 function CardStylesInjector({ children, branding }: { children: React.ReactNode, branding: BrandingSettings | null }) {
     useEffect(() => {
-        if (branding?.headerColor) {
-            document.documentElement.style.setProperty('--primary', hexToHsl(branding.headerColor));
+        if (branding?.header_color) {
+            document.documentElement.style.setProperty('--primary', hexToHsl(branding.header_color));
         }
-    }, [branding?.headerColor]);
+    }, [branding?.header_color]);
 
     return <>{children}</>;
 }

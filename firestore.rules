@@ -19,12 +19,13 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // 🛡️ السماح للمستخدمين بقراءة سجلهم العالمي لمعرفة الشركة (حل مشكلة الصلاحيات عند الدخول)
+    // 🛡️ السماح للمستخدمين بقراءة سجلهم العالمي لمعرفة الشركة
     match /global_users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
     }
 
     match /companies/{companyId} {
+      // 🛡️ تصريح سيادي: السماح بالوصول الكامل لمجلد الشركة (بما في ذلك الإعدادات)
       allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       
       // درع الخصوصية للإنتاجية الشخصية
@@ -32,6 +33,7 @@ service cloud.firestore {
         allow read, write: if belongsToCompany(companyId) && (isOwner(resource.data.userId) || request.resource.data.userId == request.auth.uid);
       }
 
+      // 🛡️ ضمان وصول كافة الأقسام الفرعية (بما فيها settings/branding)
       match /{allSubcollections=**} {
         allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
       }
