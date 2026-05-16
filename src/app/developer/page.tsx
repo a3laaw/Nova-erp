@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
     PlusCircle, Building2, Search, Loader2, Terminal, 
     MoreHorizontal, Trash2, CheckCircle2,
-    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User, Settings2, Pencil
+    Activity, Rocket, UserPlus, Lock, Send, X, RefreshCw, User, Settings2, Pencil, Sparkles, Cloud, Key
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,6 +56,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { CompanyRegistrationForm } from '@/components/developer/company-registration-form';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function DeveloperDashboard() {
   const { firestore } = useFirebase();
@@ -64,9 +65,18 @@ export default function DeveloperDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
+  // --- Activation States ---
   const [requestToActivate, setRequestToActivate] = useState<CompanyRequest | null>(null);
   const [activationPassword, setActivationPassword] = useState('');
   const [activationResult, setActivationResult] = useState<{ email: string, pass: string } | null>(null);
+  const [activationConfig, setActivationConfig] = useState({
+    apiKey: '',
+    projectId: '',
+    appId: '',
+    authDomain: '',
+    storageBucket: '',
+    messagingSenderId: ''
+  });
   
   const [companyToEdit, setCompanyToEdit] = useState<Company | null>(null);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
@@ -91,6 +101,18 @@ export default function DeveloperDashboard() {
     setActivationPassword(password);
   };
 
+  const handleFillMasterConfig = () => {
+    setActivationConfig({
+        apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
+        projectId: "nov-erp-1-25549967-c24e5",
+        appId: "1:71297676078:web:b956ab00372e6ba237c0bf",
+        authDomain: "nov-erp-1-25549967-c24e5.firebaseapp.com",
+        storageBucket: "nov-erp-1-25549967-c24e5.firebasestorage.app",
+        messagingSenderId: "71297676078"
+    });
+    toast({ title: '✅ تم جلب بيانات الماستر' });
+  };
+
   const handleActivateRequest = async () => {
     if (!requestToActivate || !activationPassword || isProcessing) return;
     setIsProcessing(requestToActivate.id!);
@@ -106,7 +128,8 @@ export default function DeveloperDashboard() {
                 email: requestToActivate.email,
                 activity: requestToActivate.activity || 'consulting',
                 password: activationPassword,
-                requestId: requestToActivate.id
+                requestId: requestToActivate.id,
+                firebaseConfig: activationConfig
             })
         });
 
@@ -317,8 +340,8 @@ export default function DeveloperDashboard() {
         )}
 
         <Dialog open={!!requestToActivate} onOpenChange={() => !isProcessing && setRequestToActivate(null)}>
-            <DialogContent dir="rtl" className="max-w-2xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
-                <DialogHeader className="p-8 bg-slate-900 text-white text-right">
+            <DialogContent dir="rtl" className="max-w-3xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
+                <DialogHeader className="p-8 bg-slate-900 text-white text-right shrink-0">
                     <div className="flex items-center gap-4">
                         <div className="p-3 bg-green-600 rounded-2xl text-white shadow-xl"><CheckCircle2 className="h-8 w-8" /></div>
                         <div className="text-right">
@@ -328,68 +351,119 @@ export default function DeveloperDashboard() {
                     </div>
                 </DialogHeader>
 
-                <div className="p-10 space-y-8">
-                    {!activationResult ? (
-                        <>
-                            <div className="grid grid-cols-2 gap-8 bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100 shadow-inner">
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] font-black uppercase text-slate-400">المالك المسؤول</Label>
-                                    <p className="font-black text-xl text-slate-900">{requestToActivate?.contactName}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] font-black uppercase text-slate-400">البريد المعتمد</Label>
-                                    <p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-3">
-                                <Label className="font-black text-[#1e1b4b] pr-2">كلمة المرور التأسيسية للمالك *</Label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                        <Input 
-                                            value={activationPassword} 
-                                            onChange={(e) => setActivationPassword(e.target.value)}
-                                            className="h-12 rounded-xl pr-10 border-2 font-mono font-black text-lg text-primary"
-                                            placeholder="أدخل كلمة المرور..."
-                                        />
+                <ScrollArea className="max-h-[70vh]">
+                    <div className="p-10 space-y-12">
+                        {!activationResult ? (
+                            <>
+                                <div className="grid grid-cols-2 gap-8 bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100 shadow-inner">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-black uppercase text-slate-400">المالك المسؤول</Label>
+                                        <p className="font-black text-xl text-slate-900">{requestToActivate?.contactName}</p>
                                     </div>
-                                    <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-12 rounded-xl border-2 font-bold gap-2 text-primary hover:bg-primary/5">
-                                        <RefreshCw className="h-4 w-4" /> توليد تلقائي
-                                    </Button>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-black uppercase text-slate-400">البريد المعتمد</Label>
+                                        <p className="font-mono font-bold text-indigo-600">{requestToActivate?.email}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="space-y-8 animate-in zoom-in-95 duration-500">
-                            <div className="p-8 bg-green-50 rounded-[2rem] border-2 border-green-200 text-center space-y-2">
-                                <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-                                <h3 className="text-2xl font-black text-green-800">تم التفعيل بنجاح!</h3>
-                                <p className="text-sm font-bold text-green-700">تم تأسيس قاعدة البيانات وحساب المالك.</p>
-                            </div>
 
-                            <div className="p-8 bg-slate-900 rounded-[2rem] text-white shadow-2xl space-y-4">
-                                <div className="flex justify-between border-b border-white/10 pb-3">
-                                    <span className="text-xs font-bold text-slate-400">البريد الإلكتروني:</span>
-                                    <span className="font-mono font-black text-indigo-400">{activationResult.email}</span>
+                                <div className="grid gap-3">
+                                    <Label className="font-black text-[#1e1b4b] pr-2">كلمة المرور التأسيسية للمالك *</Label>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                            <Input 
+                                                value={activationPassword} 
+                                                onChange={(e) => setActivationPassword(e.target.value)}
+                                                className="h-12 rounded-xl pr-10 border-2 font-mono font-black text-lg text-primary"
+                                                placeholder="أدخل كلمة المرور..."
+                                            />
+                                        </div>
+                                        <Button type="button" variant="outline" onClick={generateStrongPassword} className="h-12 rounded-xl border-2 font-bold gap-2 text-primary hover:bg-primary/5">
+                                            <RefreshCw className="h-4 w-4" /> توليد تلقائي
+                                        </Button>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span className="text-xs font-bold text-slate-400">كلمة المرور:</span>
-                                    <span className="font-mono font-black text-green-400">{activationResult.pass}</span>
-                                </div>
-                            </div>
-                            <Button onClick={copyWelcomeMessage} className="w-full h-14 rounded-2xl font-black text-lg gap-3 shadow-xl bg-green-600 hover:bg-green-700 transition-all">
-                                <Send className="h-5 w-5" /> نسخ بيانات الدخول
-                            </Button>
-                        </div>
-                    )}
-                </div>
 
-                <DialogFooter className="p-8 bg-slate-50 border-t flex gap-4">
+                                <section className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="font-black text-lg text-indigo-600 flex items-center gap-2">
+                                            <Cloud className="h-5 w-5" /> مصفوفة الربط السحابي (Firebase)
+                                        </h3>
+                                        <Button 
+                                            type="button" 
+                                            onClick={handleFillMasterConfig}
+                                            variant="outline" 
+                                            size="sm"
+                                            className="rounded-lg font-black text-[10px] gap-2 border-indigo-200 text-indigo-700 bg-indigo-50"
+                                        >
+                                            <Sparkles className="h-3 w-3" /> تعبئة ببيانات الماستر
+                                        </Button>
+                                    </div>
+                                    
+                                    <div className="p-8 rounded-[2rem] border-2 border-dashed bg-slate-50 space-y-6">
+                                        <div className="grid gap-3">
+                                            <Label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
+                                                <Key className="h-3 w-3" /> API KEY
+                                            </Label>
+                                            <Input 
+                                                value={activationConfig.apiKey} 
+                                                onChange={e => setActivationConfig(p => ({...p, apiKey: e.target.value}))} 
+                                                dir="ltr" className="h-11 rounded-xl border-2 bg-white font-mono text-xs" 
+                                                placeholder="AIzaSy..." 
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="grid gap-3">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500">PROJECT ID</Label>
+                                                <Input 
+                                                    value={activationConfig.projectId} 
+                                                    onChange={e => setActivationConfig(p => ({...p, projectId: e.target.value}))} 
+                                                    dir="ltr" className="h-11 rounded-xl border-2 bg-white font-mono text-xs" 
+                                                />
+                                            </div>
+                                            <div className="grid gap-3">
+                                                <Label className="text-[10px] font-black uppercase text-slate-500">APP ID</Label>
+                                                <Input 
+                                                    value={activationConfig.appId} 
+                                                    onChange={e => setActivationConfig(p => ({...p, appId: e.target.value}))} 
+                                                    dir="ltr" className="h-11 rounded-xl border-2 bg-white font-mono text-xs" 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+                            </>
+                        ) : (
+                            <div className="space-y-8 animate-in zoom-in-95 duration-500">
+                                <div className="p-8 bg-green-50 rounded-[2rem] border-2 border-green-200 text-center space-y-2">
+                                    <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
+                                    <h3 className="text-2xl font-black text-green-800">تم التفعيل بنجاح!</h3>
+                                    <p className="text-sm font-bold text-green-700">تم تأسيس قاعدة البيانات وحساب المالك.</p>
+                                </div>
+
+                                <div className="p-8 bg-slate-900 rounded-[2rem] text-white shadow-2xl space-y-4">
+                                    <div className="flex justify-between border-b border-white/10 pb-3">
+                                        <span className="text-xs font-bold text-slate-400">البريد الإلكتروني:</span>
+                                        <span className="font-mono font-black text-indigo-400">{activationResult.email}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-xs font-bold text-slate-400">كلمة المرور:</span>
+                                        <span className="font-mono font-black text-green-400">{activationResult.pass}</span>
+                                    </div>
+                                </div>
+                                <Button onClick={copyWelcomeMessage} className="w-full h-14 rounded-2xl font-black text-lg gap-3 shadow-xl bg-green-600 hover:bg-green-700 transition-all">
+                                    <Send className="h-5 w-5" /> نسخ بيانات الدخول
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </ScrollArea>
+
+                <DialogFooter className="p-8 bg-slate-50 border-t flex gap-4 shrink-0">
                     {!activationResult ? (
                         <>
                             <Button variant="ghost" onClick={() => setRequestToActivate(null)} disabled={!!isProcessing} className="rounded-xl font-bold h-12 px-8 text-slate-500">إلغاء</Button>
-                            <Button onClick={handleActivateRequest} disabled={!!isProcessing || !activationPassword} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-xl bg-indigo-600 hover:bg-indigo-700 gap-3">
+                            <Button onClick={handleActivateRequest} disabled={!!isProcessing || !activationPassword || !activationConfig.apiKey} className="flex-1 h-14 rounded-2xl font-black text-xl shadow-xl bg-indigo-600 hover:bg-indigo-700 gap-3">
                                 {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <Rocket className="h-6 w-6" />} تفعيل المنشأة الآن
                             </Button>
                         </>

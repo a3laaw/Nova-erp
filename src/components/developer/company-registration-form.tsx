@@ -32,7 +32,7 @@ import {
   Eye,
   EyeOff,
   Copy,
-  AlertTriangle,
+  Sparkles,
   Cloud
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
@@ -123,6 +123,20 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     }
   }, [isOpen, company]);
 
+  const handleFillMasterConfig = () => {
+      setFormData(prev => ({
+          ...prev,
+          apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
+          authDomain: "nov-erp-1-25549967-c24e5.firebaseapp.com",
+          projectId: "nov-erp-1-25549967-c24e5",
+          storageBucket: "nov-erp-1-25549967-c24e5.firebasestorage.app",
+          messagingSenderId: "71297676078",
+          appId: "1:71297676078:web:b956ab00372e6ba237c0bf",
+          measurementId: ""
+      }));
+      toast({ title: '✅ تم جلب بيانات الماستر', description: 'تمت تعبئة مصفوفة الربط ببيانات المنظومة الرئيسية.' });
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: id === 'maxUsersLimit' ? parseInt(value) || 0 : value }));
@@ -141,7 +155,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
     savingRef.current = true;
     setIsSaving(true);
     try {
-      // 1. تحديث حساب Firebase Auth عبر الـ API الموحد
       const authResponse = await fetch('/api/manage-tenant-user', {
           method: 'POST',
           body: JSON.stringify({
@@ -175,7 +188,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
       const companyId = isEditing ? company!.id! : `comp-${Math.random().toString(36).substring(2, 9)}`;
       const companyRef = doc(masterFirestore, 'companies', companyId);
 
-      // 2. تحديث وثيقة الشركة
       batch.set(companyRef, cleanFirestoreData({
           name: formData.name,
           nameEn: formData.nameEn,
@@ -190,7 +202,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           ...(!isEditing && { createdAt: serverTimestamp() })
       }), { merge: true });
 
-      // 3. تحديث الفهرس العالمي (Global Index)
       const globalIndexQuery = query(collection(masterFirestore, 'global_users'), where('uid', '==', authResult.uid));
       const globalIndexSnap = await getDocs(globalIndexQuery);
       globalIndexSnap.forEach(d => batch.delete(d.ref));
@@ -204,7 +215,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           createdAt: serverTimestamp(),
       });
 
-      // 4. تحديث ملف المستخدم داخل الشركة (Tenant Profile)
       const tenantUserRef = doc(masterFirestore, `companies/${companyId}/users`, authResult.uid);
       batch.set(tenantUserRef, {
           id: authResult.uid,
@@ -364,6 +374,14 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                         <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
                             <Cloud className="h-6 w-6 text-indigo-600" /> مصفوفة الربط السحابي (Firebase Config)
                         </h3>
+                        <Button 
+                            type="button" 
+                            onClick={handleFillMasterConfig}
+                            variant="outline" 
+                            className="rounded-xl font-black text-xs gap-2 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 shadow-sm"
+                        >
+                            <Sparkles className="h-4 w-4" /> تعبئة تلقائية ببيانات الماستر
+                        </Button>
                     </div>
                     
                     <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30 shadow-inner">

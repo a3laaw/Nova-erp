@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد (V36.0):
- * تم تحصين كشف الأخطاء وإرشاد المستخدم لحلها في IAM بوضوح لؤلؤي.
+ * محرك إدارة المنشآت الموحد (V37.0):
+ * تم تحديثه لاستقبال وحفظ مصفوفة الربط السحابي (Firebase Config) لضمان عزل الـ SaaS.
  */
 
 function getAdminApp() {
@@ -26,7 +26,6 @@ function getAdminApp() {
             throw new Error("INVALID_SERVICE_ACCOUNT_JSON");
         }
 
-        // تنظيف المفتاح الخاص من أي تنسيق خاطئ
         serviceAccount.private_key = serviceAccount.private_key
             .replace(/\\n/g, '\n')
             .replace(/"/g, '')
@@ -48,11 +47,10 @@ export async function POST(request: NextRequest) {
   let serviceAccountEmail = "Unknown";
   try {
     const body = await request.json();
-    const { action, email, companyName, contactName, activity, password, requestId } = body;
+    const { action, email, companyName, contactName, activity, password, requestId, firebaseConfig } = body;
 
     const app = getAdminApp();
     
-    // جلب بريد حساب الخدمة للتشخيص
     const saPath = path.join(process.cwd(), 'service-account.json');
     const saData = JSON.parse(fs.readFileSync(saPath, 'utf8'));
     serviceAccountEmail = saData.client_email;
@@ -84,12 +82,13 @@ export async function POST(request: NextRequest) {
             role: 'Admin'
         });
 
-        // 3. تأسيس سجل المنشأة
+        // 3. تأسيس سجل المنشأة مع مصفوفة الربط
         await db.collection('companies').doc(companyId).set({
             id: companyId,
             name: companyName || 'منشأة جديدة',
             activity: activity || 'consulting',
             adminEmail: sanitizedEmail,
+            firebaseConfig: firebaseConfig || {}, // 🛡️ حفظ مصفوفة الربط
             isActive: true,
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
@@ -132,7 +131,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ 
             success: true, 
             message: "تم تفعيل المنشأة بنجاح.",
-            companyId: companyId
+            companyId: companyId,
+            uid: userRecord.uid
         });
     }
 
@@ -142,7 +142,6 @@ export async function POST(request: NextRequest) {
     console.error("IAM PERMISSION ERROR:", error);
     
     let userMessage = error.message;
-    // التحقق من خطأ الصلاحيات 7 (PERMISSION_DENIED)
     if (error.message?.includes('insufficient permission') || error.code === 7 || error.status === 403) {
         userMessage = `⚠️ خطأ في صلاحيات Google IAM: يرجى الذهاب لـ Google Cloud Console وإعطاء صلاحية (Firebase Admin) لهذا البريد حصراً: [ ${serviceAccountEmail} ]`;
     }
@@ -152,6 +151,6 @@ export async function POST(request: NextRequest) {
         error: "IAM_AUTH_FAILED",
         message: userMessage,
         targetEmail: serviceAccountEmail
-    }, { status: 200 }); // نرسل 200 لتظهر الرسالة للمستخدم في الـ Toast
+    }, { status: 200 }); 
   }
 }
