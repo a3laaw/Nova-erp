@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useFirebase, useSubscription } from '@/firebase';
 import { orderBy, where } from 'firebase/firestore';
 import type { Account, JournalEntry, ConstructionProject } from '@/lib/types';
-import { format, startOfYear, endOfYear, subMonths, eachMonthOfInterval } from 'date-fns';
+import { format, startOfYear, endOfYear, subMonths, eachMonthOfInterval, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Loader2, LineChart as ChartIcon, FileSearch, PieChart, TrendingUp, TrendingDown, Target, Activity } from 'lucide-react';
@@ -47,7 +47,7 @@ export default function IncomeStatementPage() {
     const { branding } = useBranding();
     
     const [isGenerating, setIsGenerating] = useState(false);
-    const [reportData, setReportData] = useState<IncomeStatementData | null>(null);
+    const [reportData, setReportData] = setReportData | null>(null);
     
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfYear(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfYear(new Date()));
@@ -75,7 +75,7 @@ export default function IncomeStatementPage() {
         
         setIsGenerating(true);
         setTimeout(() => {
-            const start = dateFrom;
+            const start = startOfDay(dateFrom);
             const end = endOfDay(dateTo);
             const trendStart = subMonths(new Date(), 11);
 

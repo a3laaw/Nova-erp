@@ -14,16 +14,16 @@ import { Label } from '@/components/ui/label';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, Timestamp } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
-import { format, endOfYear } from 'date-fns';
+import { format, endOfYear, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User, Building2, TrendingUp, Info } from 'lucide-react';
+import { formatCurrency, cn, getTenantPath } from '@/lib/utils';
+import { Loader2, Printer, Scale, AlertCircle, FileSearch, Landmark, ShieldCheck, User, Building2, TrendingUp } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DateInput } from '@/components/ui/date-input';
-import { toFirestoreDate } from '@/services/date-converter';
+import { useAuth } from '@/context/auth-context';
 
 interface BalanceSheetData {
     assets: {
@@ -59,6 +59,7 @@ const AccountRow = ({ name, balance, className }: { name: string, balance: numbe
 
 export default function BalanceSheetPage() {
     const { firestore } = useFirebase();
+    const { user } = useAuth();
     const { branding, loading: brandingLoading } = useBranding();
     
     const [isGenerating, setIsGenerating] = useState(false);
@@ -66,15 +67,20 @@ export default function BalanceSheetPage() {
     const [asOfDate, setAsOfDate] = useState<Date | undefined>(() => endOfYear(new Date()));
 
     const handleGenerate = async () => {
-        if (!firestore || !asOfDate) return;
-        setIsGenerating(true);
+        const tenantId = user?.currentCompanyId;
+        if (!firestore || !asOfDate || !tenantId) return;
         
+        setIsGenerating(true);
         try {
+            const endDate = endOfDay(asOfDate);
+            const coaPath = getTenantPath('chartOfAccounts', tenantId);
+            const jePath = getTenantPath('journalEntries', tenantId);
+
             const [accountsSnap, entriesSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'chartOfAccounts'))),
+                getDocs(query(collection(firestore, coaPath))),
                 getDocs(query(
-                    collection(firestore, 'journalEntries'), 
-                    where('date', '<=', Timestamp.fromDate(asOfDate)),
+                    collection(firestore, jePath), 
+                    where('date', '<=', Timestamp.fromDate(endDate)),
                     where('status', '==', 'posted')
                 ))
             ]);
@@ -127,7 +133,6 @@ export default function BalanceSheetPage() {
             data.liabilitiesAndEquity.total = totalLiabilities + data.liabilitiesAndEquity.totalEquity;
             data.isBalanced = Math.abs(data.assets.total - data.liabilitiesAndEquity.total) < 0.01;
 
-            // ✨ حساب مؤشرات الصحة المالية ✨
             data.ratios = {
                 currentRatio: data.liabilitiesAndEquity.totalCurrentLiabilities > 0 ? data.assets.totalCurrent / data.liabilitiesAndEquity.totalCurrentLiabilities : 0,
                 debtToEquity: data.liabilitiesAndEquity.totalEquity > 0 ? totalLiabilities / data.liabilitiesAndEquity.totalEquity : 0,
@@ -141,8 +146,6 @@ export default function BalanceSheetPage() {
             setIsGenerating(false);
         }
     };
-
-    const handlePrint = () => window.print();
 
     return (
         <div className="bg-gray-100 dark:bg-gray-900 p-4 sm:p-8 print:bg-white print:p-0" dir="rtl">
@@ -167,15 +170,13 @@ export default function BalanceSheetPage() {
 
             {reportData ? (
                  <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
-                    
-                    {/* ✨ لوحة مؤشرات الصحة المالية ✨ */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
                         <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
                             <div className="p-3 bg-blue-100 rounded-2xl text-blue-700"><TrendingUp className="h-6 w-6"/></div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">رأس المال العامل</p>
                                 <p className="text-2xl font-black font-mono">{formatCurrency(reportData.ratios.workingCapital)}</p>
-                                <p className="text-[9px] font-bold text-blue-600 mt-1">السيولة المتاحة لتشغيل اليوميات</p>
+                                <p className="text-[9px] font-bold text-blue-600 mt-1">السيولة المتاحة للتشغيل</p>
                             </div>
                         </Card>
                         <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
@@ -183,7 +184,7 @@ export default function BalanceSheetPage() {
                             <div>
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">نسبة التداول (Current Ratio)</p>
                                 <p className="text-2xl font-black font-mono">{reportData.ratios.currentRatio.toFixed(2)}</p>
-                                <p className="text-[9px] font-bold text-green-600 mt-1">المعيار الآمن هو أعلى من 1.5</p>
+                                <p className="text-[9px] font-bold text-green-600 mt-1">المعيار الآمن أعلى من 1.5</p>
                             </div>
                         </Card>
                         <Card className="rounded-3xl border-none shadow-md bg-white p-6 flex items-center gap-4">
@@ -191,7 +192,7 @@ export default function BalanceSheetPage() {
                             <div>
                                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">نسبة الدين (D/E Ratio)</p>
                                 <p className="text-2xl font-black font-mono">{reportData.ratios.debtToEquity.toFixed(2)}</p>
-                                <p className="text-[9px] font-bold text-orange-600 mt-1">مدى الاعتماد على الديون مقابل الملكية</p>
+                                <p className="text-[9px] font-bold text-orange-600 mt-1">مدى الاعتماد على الديون</p>
                             </div>
                         </Card>
                     </div>
@@ -217,7 +218,7 @@ export default function BalanceSheetPage() {
                                 <Alert variant="destructive" className="rounded-3xl border-2 py-6 bg-red-50 shadow-red-100">
                                     <AlertCircle className="h-6 w-6" />
                                     <AlertTitle className="text-lg font-black">الميزانية غير متوازنة!</AlertTitle>
-                                    <AlertDescription className="font-bold">يوجد فرق مادي بين إجمالي الأصول وإجمالي الالتزامات وحقوق الملكية. يرجى مراجعة كافة القيود المرحلة.</AlertDescription>
+                                    <AlertDescription className="font-bold">يوجد فرق مادي بين إجمالي الأصول وإجمالي الالتزامات. يرجى المراجعة.</AlertDescription>
                                 </Alert>
                             )}
 
@@ -270,32 +271,12 @@ export default function BalanceSheetPage() {
                                 </div>
                             </div>
                         </CardContent>
-
-                        <footer className="pt-32 grid grid-cols-2 gap-20 text-center text-[10px] font-black uppercase text-muted-foreground">
-                            <div className="space-y-16">
-                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">الإدارة المالية</p>
-                                <div className="pt-2 border-t border-dashed">التدقيق والاعتماد</div>
-                            </div>
-                            <div className="space-y-16">
-                                <p className="text-foreground border-b-2 border-foreground pb-2 text-sm">المدير العام</p>
-                                <div className="pt-2 border-t border-dashed">الختم والمصادقة</div>
-                            </div>
-                        </footer>
-                    </div>
-                    
-                    <div className="flex justify-end no-print pb-20">
-                        <Button onClick={handlePrint} className="h-14 px-12 rounded-2xl font-black text-xl gap-3 shadow-2xl shadow-primary/30">
-                            <Printer className="h-6 w-6" /> طباعة الميزانية العمومية
-                        </Button>
                     </div>
                  </div>
             ) : (
                 <div className="h-[60vh] flex flex-col items-center justify-center border-4 border-dashed rounded-[3.5rem] bg-muted/5 opacity-30 grayscale transition-all">
-                    <div className="p-10 bg-muted rounded-full mb-6">
-                        <Scale className="h-24 w-24 text-muted-foreground" />
-                    </div>
+                    <Scale className="h-24 w-24 text-muted-foreground mb-6" />
                     <h3 className="text-3xl font-black text-muted-foreground">بانتظار بناء المركز المالي</h3>
-                    <p className="text-lg font-bold mt-2">حدد التاريخ المستهدف واضغط على "توليد" لعرض الموقف المالي للمنشأة.</p>
                 </div>
             )}
         </div>
