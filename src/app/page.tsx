@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V88.0):
- * تم تحصينها بالكامل لإلغاء أي تجميد أثناء الكتابة وتأمين العبور السريع.
+ * صفحة الدخول السيادية (Access Gateway V92.0):
+ * تم تحصينها بتوقيتات عبور مرنة لضمان اكتمال "الترميم الذاتي" للحسابات الجديدة.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading } = useAuth();
@@ -47,14 +47,14 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
-  // 🛡️ فك تجميد الشاشة في حال فشل جلب الملف الشخصي بعد تسجيل الدخول بنجاح
+  // 🛡️ فك تجميد الشاشة مع إعطاء مهلة كافية لترميم هويات الـ SaaS
   useEffect(() => {
       if (!globalLoading && !user && localLoading) {
-          // إذا انتهى التحميل العالمي ولم نجد مستخدماً رغم أننا في حالة "جاري العبور"
+          // رفع المهلة لـ 5 ثوانٍ لضمان اكتمال عمليات الـ SetDoc في الخلفية للمنشآت الجديدة
           const timer = setTimeout(() => {
               setLocalLoading(false);
-              setErrorMsg('تعذر جلب ملف المستخدم. تأكد من أن حسابك مسجل في منشأة نشطة.');
-          }, 2000);
+              setErrorMsg('تعذر جلب ملف المستخدم. تأكد من أن حسابك مسجل في منشأة نشطة، أو حاول الدخول مرة أخرى ليقوم النظام بترميم حسابك آلياً.');
+          }, 5000);
           return () => clearTimeout(timer);
       }
   }, [globalLoading, user, localLoading]);
@@ -68,7 +68,6 @@ export default function LoginPage() {
 
     try {
         await login(identifier.trim().toLowerCase(), password);
-        // في حال النجاح، سيقوم الـ useEffect أعلاه بالتوجيه بمجرد ظهور الـ user في السياق
     } catch (error: any) {
         setLocalLoading(false);
         setErrorMsg('بيانات الدخول غير صحيحة، يرجى التأكد من اسم المستخدم وكلمة المرور.');

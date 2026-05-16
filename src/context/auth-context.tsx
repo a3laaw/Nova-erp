@@ -8,6 +8,7 @@ import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
 import { setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
+import { cleanFirestoreData } from '@/lib/utils'; // 🛡️ CRITICAL IMPORT ADDED
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -60,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         let companyId = null;
-        let globalData = null;
+        let globalData: any = null;
         
         // 1. استرجاع بيانات الفهرس العالمي
         const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
@@ -75,6 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!oldSnap.empty) {
                 globalData = oldSnap.docs[0].data();
                 companyId = globalData.companyId;
+                // Update to the new UID-keyed format for next time
                 await setDoc(doc(firestore, 'global_users', firebaseUser.uid), { ...globalData, uid: firebaseUser.uid, updatedAt: serverTimestamp() }, { merge: true });
             }
         }
@@ -94,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (tenantUserDocSnap.exists()) {
             userData = tenantUserDocSnap.data();
         } else {
-            // محاولة ثانية بالايميل
+            // محاولة ثانية بالايميل داخل الشركة
             const tenantUserQuery = query(collection(firestore, `companies/${companyId}/users`), where('email', '==', sanitizedEmail), limit(1));
             const tenantUserSnap = await getDocs(tenantUserQuery);
             if (!tenantUserSnap.empty) {
@@ -111,6 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     companyId: companyId,
                     createdAt: serverTimestamp()
                 };
+                // 🛡️ استخدام cleanFirestoreData المستورد الآن بشكل صحيح
                 await setDoc(doc(firestore, tenantUserPath), cleanFirestoreData(userData));
             }
         }
