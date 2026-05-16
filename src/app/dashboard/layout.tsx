@@ -15,7 +15,8 @@ import {
     AlertTriangle,
     CheckCircle2,
     CalendarClock,
-    Zap
+    Zap,
+    DatabaseZap
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
@@ -24,7 +25,7 @@ import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 import { isPast, differenceInDays } from 'date-fns';
 import { toFirestoreDate } from '@/services/date-converter';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -36,10 +37,8 @@ import {
 } from '@/components/ui/dialog';
 
 /**
- * غلاف لوحة التحكم (Sovereign Shield Implementation V77.0):
- * يتضمن:
- * 1. درع الحظر المالي (Hard Block if expired).
- * 2. نظام الإنذار المبكر (Soft Block warning 7 days before).
+ * غلاف لوحة التحكم (Sovereign Shield Implementation V78.0):
+ * تم تحديثه ليشمل تحذير مسح البيانات بعد شهر للنسخ الديمو والأساسية.
  */
 export default function DashboardLayout({
   children,
@@ -68,11 +67,11 @@ export default function DashboardLayout({
   };
 
   // 🛡️ حسابات الحالة المالية للشركة
-  const { isExpired, isExpiringSoon, daysLeft, expiryDateFormatted } = useMemo(() => {
-    if (!company?.subscriptionExpiryDate) return { isExpired: false, isExpiringSoon: false, daysLeft: 999 };
+  const { isExpired, isExpiringSoon, daysLeft, expiryDateFormatted, isTrial } = useMemo(() => {
+    if (!company?.subscriptionExpiryDate) return { isExpired: false, isExpiringSoon: false, daysLeft: 999, isTrial: false };
     
     const expiry = toFirestoreDate(company.subscriptionExpiryDate);
-    if (!expiry) return { isExpired: false, isExpiringSoon: false, daysLeft: 999 };
+    if (!expiry) return { isExpired: false, isExpiringSoon: false, daysLeft: 999, isTrial: false };
 
     const today = new Date();
     const expired = isPast(expiry);
@@ -82,11 +81,12 @@ export default function DashboardLayout({
       isExpired: expired,
       isExpiringSoon: !expired && diff <= 7,
       daysLeft: diff,
-      expiryDateFormatted: expiry.toLocaleDateString('en-GB')
+      expiryDateFormatted: expiry.toLocaleDateString('en-GB'),
+      isTrial: company.subscriptionType === 'trial'
     };
   }, [company]);
 
-  // المطور السيادي لا يخضع للحظر أو الإنذار لتمكينه من الصيانة
+  // المطور السيادي لا يخضع للحظر أو الإنذار
   const isDev = user?.role === 'Developer';
 
   // 1. معالجة حالة التحميل
@@ -136,7 +136,7 @@ export default function DashboardLayout({
     );
   }
 
-  // 🛡️ درع الحظر المالي (Financial Shield Check - Hard Block)
+  // 🛡️ درع الحظر المالي (Hard Block)
   if (!isDev && (isExpired || company?.isActive === false)) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center p-8 bg-slate-950 text-white text-center" dir="rtl">
@@ -148,26 +148,24 @@ export default function DashboardLayout({
               </div>
               <h2 className="text-3xl font-black mb-4 tracking-tighter">تنبيه: توقف الخدمة مؤقتاً</h2>
               <p className="text-slate-300 font-bold mb-8 leading-relaxed">
-                  نأسف لإبلاغكم بأن جلسة العمل لمنشأة <span className="text-red-400">"{company?.name}"</span> قد تم تجميدها آلياً.
+                  نأسف لإبلاغكم بأن جلسة العمل لمنشأة <span className="text-red-400">"{company?.name}"</span> قد تم تجميدها آلياً لتجاوز موعد السداد.
                   <br/><br/>
-                  {isExpired ? "لقد انتهت فترة الاشتراك المعتمدة (تاريخ الاستحقاق: " + expiryDateFormatted + "). " : "تم إيقاف الحساب بقرار إداري. "}
-                  يرجى تسوية المستحقات المالية أو التواصل مع إدارة المنظومة لتفعيل الخدمة.
+                  <span className="text-red-500 font-black">تنبيه حماية البيانات:</span> سيتم الاحتفاظ ببياناتكم مشفرة لمدة 30 يوماً فقط من تاريخ الانتهاء ({expiryDateFormatted})، وبعد ذلك سيتم مسحها نهائياً من خوادمنا. يرجى المبادرة بالتسوية لضمان عدم ضياع الأرشيف الفني.
               </p>
               
               <div className="grid gap-4">
                   <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                           <ShieldAlert className="h-5 w-5 text-red-400" />
-                          <span className="text-xs font-black">الدعم الفني</span>
+                          <span className="text-xs font-black">إدارة المنظومة</span>
                       </div>
-                      <span className="font-mono text-sm">965-XXXX-XXXX+</span>
+                      <span className="font-mono text-sm tracking-widest">Sovereign Support</span>
                   </div>
                   <Button onClick={handleSafeExit} variant="outline" className="h-12 rounded-xl font-black text-white border-white/20 hover:bg-white/10">
                       العودة لصفحة الدخول
                   </Button>
               </div>
           </Card>
-          <div className="mt-8 opacity-20 text-[10px] font-black uppercase tracking-[0.5em]">Nova ERP Financial Shield System</div>
       </div>
     );
   }
@@ -191,7 +189,7 @@ export default function DashboardLayout({
           </SidebarInset>
       </SidebarProvider>
 
-      {/* 🛡️ نافذة الإنذار المبكر (Early Warning Gatekeeper - Soft Block) */}
+      {/* 🛡️ نافذة الإنذار المبكر (Soft Block) - تشمل الديمو والأساسية */}
       {!isDev && isExpiringSoon && !hasAcknowledgedWarning && (
         <Dialog open={true} onOpenChange={() => {}}>
             <DialogContent className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white" dir="rtl">
@@ -204,14 +202,14 @@ export default function DashboardLayout({
                             <AlertTriangle className="h-8 w-8 text-white" />
                         </div>
                         <div>
-                            <DialogTitle className="text-2xl font-black text-white">تنبيه: اقتراب انتهاء الاشتراك</DialogTitle>
-                            <DialogDescription className="text-amber-100 font-bold">إشعار إداري هام بخصوص حساب المنشأة</DialogDescription>
+                            <DialogTitle className="text-2xl font-black text-white">تنبيه: اقتراب انتهاء المهلة</DialogTitle>
+                            <DialogDescription className="text-amber-100 font-bold">إشعار {isTrial ? 'النسخة التجريبية' : 'الاشتراك السنوي'}</DialogDescription>
                         </div>
                     </div>
                 </div>
 
                 <div className="p-10 space-y-8">
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         <p className="text-slate-700 font-bold leading-relaxed text-lg text-center">
                             نود إحاطتكم علماً بأن اشتراك منشأة <span className="text-amber-600">"{company?.name}"</span> 
                             سوف ينتهي خلال أقل من <span className="underline decoration-2 underline-offset-4">{daysLeft} أيام</span>.
@@ -226,10 +224,16 @@ export default function DashboardLayout({
                                 <Zap className="h-6 w-6" />
                             </div>
                         </div>
-                        
-                        <p className="text-xs text-muted-foreground font-medium text-center">
-                            يرجى التواصل مع الإدارة المالية أو المطور لتجديد الاشتراك لضمان استمرار الخدمة دون انقطاع.
-                        </p>
+
+                        <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex gap-3">
+                            <DatabaseZap className="h-5 w-5 text-red-600 shrink-0 mt-1" />
+                            <div className="space-y-1">
+                                <p className="text-xs font-black text-red-800">تحذير هام بخصوص بياناتكم:</p>
+                                <p className="text-[10px] font-bold text-red-700 leading-normal">
+                                    بمجرد انتهاء الاشتراك، ستظل بياناتكم محفوظة لدينا لمدة **شهر واحد فقط** كمهلة سداد، وبعدها سيتم مسح كافة الأرشيف الفني والمالي نهائياً من خوادم النظام لضمان خصوصية البيانات. يرجى التجديد أو تصدير بياناتكم الآن.
+                                </p>
+                            </div>
+                        </div>
                     </div>
 
                     <Button 
@@ -242,7 +246,7 @@ export default function DashboardLayout({
                 </div>
                 
                 <div className="p-4 bg-muted/30 text-center border-t">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP - Subscription Guard v1.0</p>
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">Nova ERP - Sovereign Subscription Shield</p>
                 </div>
             </DialogContent>
         </Dialog>
