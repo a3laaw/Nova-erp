@@ -3,18 +3,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- 🛡️ بروتوكول المعماري السيادي (V69.0) ---
+    // --- 🛡️ بروتوكول المعماري السيادي (V70.0) ---
+    
     function isSovereignArchitect() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
               request.auth.token.role == 'Developer');
     }
 
-    // التحقق من الانتماء للمنشأة عبر التوكن أو البيانات
+    // التحقق من الانتماء للمنشأة عبر التوكن أو البيانات المباشرة
     function belongsToCompany(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
-              request.auth.token.currentCompanyId == companyId);
+              request.auth.token.currentCompanyId == companyId ||
+              request.auth.token.email.lower() == 'alaawaaheeb@gmail.com');
     }
 
     // السماح للمطور بالدخول المطلق لتأسيس المنظومة
@@ -44,6 +46,7 @@ service cloud.firestore {
     }
 
     // دعم استعلامات الـ Collection Group المعزولة
+    // 🛡️ السماح بالقراءة إذا كان الفلتر يطابق هوية المنشأة
     match /{path=**}/transactions/{transactionId} {
       allow read: if isSovereignArchitect() || belongsToCompany(resource.data.companyId);
     }
@@ -52,10 +55,8 @@ service cloud.firestore {
       allow read: if isSovereignArchitect() || belongsToCompany(resource.data.companyId);
     }
     
-    // 🛡️ السماح بقراءة العدادات في المجلد العام (إذا وُجدت تاريخياً)
-    match /counters/{counterId} {
+    match /{path=**}/workStages/{stageId} {
       allow read: if request.auth != null;
-      allow write: if isSovereignArchitect();
     }
 
     // القاعدة الذهبية: المعماري السيادي يملك الحق في كل شيء في أي مكان

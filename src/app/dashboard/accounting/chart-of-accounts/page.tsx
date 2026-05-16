@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -58,7 +58,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry, Employee } from '@/lib/types';
-import { formatCurrency, cn, getTenantPath, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
 import { defaultChartOfAccounts } from '@/lib/default-coa';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
@@ -90,7 +90,6 @@ const getTypeFromCode = (code: string): Account['type'] => {
 
 function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts }: { isOpen: boolean, onClose: () => void, onSave: (data: Partial<Account>) => void, account: Account | null, parentAccount: Account | null, accounts: Account[] }) {
     const { firestore } = useFirebase();
-    const { user } = useAuth();
     const isEditing = !!account;
     const [formData, setFormData] = useState<Partial<Account>>({});
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -123,14 +122,13 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
     }, [account, parentAccount, isEditing, isOpen, accounts]);
 
     useEffect(() => {
-        if (isOpen && firestore && user?.currentCompanyId) {
+        if (isOpen && firestore) {
             setLoadingEmployees(true);
-            const empPath = getTenantPath('employees', user.currentCompanyId);
-            getDocs(query(collection(firestore, empPath), where('status', '==', 'active'))).then(snap => {
+            getDocs(query(collection(firestore, 'employees'), where('status', '==', 'active'))).then(snap => {
                 setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
             }).finally(() => setLoadingEmployees(false));
         }
-    }, [isOpen, firestore, user?.currentCompanyId]);
+    }, [isOpen, firestore]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -139,10 +137,10 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         onSave({ ...formData, level, type: parentAccount ? parentAccount.type : getTypeFromCode(code), statement: (code.startsWith('1') || code.startsWith('2') || code.startsWith('3')) ? 'Balance Sheet' : 'Income Statement', balanceType: (code.startsWith('1') || code.startsWith('5')) ? 'Debit' : 'Credit', parentCode: parentAccount?.code || null });
     };
 
-    const showEmployeeLink = parentAccount?.code === '110103' || account?.parentCode === '110103' || parentAccount?.code?.startsWith('110103');
+    const showEmployeeLink = parentAccount?.code === '110102' || account?.parentCode === '110102' || parentAccount?.code?.startsWith('110102');
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader><DialogTitle>{isEditing ? 'تعديل حساب' : parentAccount ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}</DialogTitle></DialogHeader>
@@ -205,7 +203,9 @@ export default function ChartOfAccountsPage() {
                 const acc = accounts.find(a => a.id === line.accountId);
                 if (!acc) return; 
                 const currentBalance = directBalances.get(line.accountId) || 0;
-                let balanceChange = acc.balanceType === 'Debit' ? (line.debit || 0) - (line.credit || 0) : (line.credit || 0) - (line.debit || 0);
+                let balanceChange = (acc.type === 'asset' || acc.type === 'expense')
+                    ? (line.debit || 0) - (line.credit || 0)
+                    : (line.credit || 0) - (line.debit || 0);
                 directBalances.set(line.accountId, currentBalance + balanceChange);
             });
         });
@@ -241,43 +241,40 @@ export default function ChartOfAccountsPage() {
     }, [accounts, openAccounts]);
 
     const handleSave = async (data: Partial<Account>) => {
-        if (!firestore || !user?.currentCompanyId || !data.code) return;
+        if (!firestore || !data.code) return;
         setIsSaving(true);
         try {
-            const coaPath = getTenantPath('chartOfAccounts', user.currentCompanyId);
             if (editingAccount?.id) {
-                await updateDoc(doc(firestore, coaPath, editingAccount.id), cleanFirestoreData(data));
+                await updateDoc(doc(firestore, 'chartOfAccounts', editingAccount.id), cleanFirestoreData(data));
                 toast({ title: 'نجاح التحديث' });
             } else {
-                await addDoc(collection(firestore, coaPath), cleanFirestoreData({ ...data, companyId: user.currentCompanyId }));
+                await addDoc(collection(firestore, 'chartOfAccounts'), cleanFirestoreData(data));
                 toast({ title: 'نجاح الإضافة' });
             }
-            setIsFormOpen(false);
+            closeDialog();
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); } finally { setIsSaving(false); }
     };
     
     const handleDeleteConfirm = async () => {
-        if (!firestore || !user?.currentCompanyId || !accountToDelete?.id) return;
+        if (!firestore || !accountToDelete?.id) return;
         setIsSaving(true);
         try {
-            const coaPath = getTenantPath('chartOfAccounts', user.currentCompanyId);
-            await deleteDoc(doc(firestore, coaPath, accountToDelete.id));
+            await deleteDoc(doc(firestore, 'chartOfAccounts', accountToDelete.id));
             toast({ title: 'تم الحذف' });
             setIsAlertOpen(false);
         } finally { setIsSaving(false); }
     };
 
     const handleSeedChartOfAccounts = async () => {
-        if (!firestore || !user?.currentCompanyId) return;
+        if (!firestore) return;
         setIsSeeding(true);
         try {
             const batch = writeBatch(firestore);
-            const coaPath = getTenantPath('chartOfAccounts', user.currentCompanyId);
-            const existingSnap = await getDocs(query(collection(firestore, coaPath)));
+            const existingSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
             existingSnap.forEach(doc => batch.delete(doc.ref));
 
             defaultChartOfAccounts.forEach(account => {
-                batch.set(doc(collection(firestore, coaPath)), { ...account, companyId: user.currentCompanyId });
+                batch.set(doc(collection(firestore, 'chartOfAccounts')), account);
             });
 
             await batch.commit();
@@ -326,7 +323,7 @@ export default function ChartOfAccountsPage() {
                                             <div className="flex items-center gap-3 group">
                                                 {hasChildren && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpenAccounts(prev => { const n = new Set(prev); if(n.has(account.code)) n.delete(account.code); else n.add(account.code); return n; })}>{isOpen ? <Minus className="h-3 w-3"/> : <Plus className="h-3 w-3"/>}</Button>}
                                                 <div className="flex flex-col">
-                                                    <span className="text-base text-gray-800">{account.name}</span>
+                                                    <span className="font-bold text-gray-800">{account.name}</span>
                                                     <span className="font-mono text-[9px] opacity-40">{account.code}</span>
                                                 </div>
                                                 {account.level < 4 && <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-all h-6 w-6 text-primary" onClick={() => { setParentAccount(account); setEditingAccount(null); setIsFormOpen(true); }}><PlusCircle className="h-4 w-4"/></Button>}
@@ -336,7 +333,7 @@ export default function ChartOfAccountsPage() {
                                         <TableCell className={cn("font-mono font-black text-lg", balance < 0 ? "text-red-600" : "text-primary")}>{formatCurrency(balance)}</TableCell>
                                         <TableCell className="text-center">
                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" dir="rtl" className="rounded-xl shadow-xl border-none p-2">
                                                     <DropdownMenuItem onClick={() => { setEditingAccount(account); setParentAccount(accounts.find(a => a.code === account.parentCode) || null); setIsFormOpen(true); }} className="gap-2 rounded-lg font-bold"><Pencil className="h-4 w-4 text-primary"/> تعديل</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
@@ -353,8 +350,37 @@ export default function ChartOfAccountsPage() {
             </Card>
             
             <AccountForm isOpen={isFormOpen} onClose={closeDialog} onSave={handleSave} account={editingAccount} parentAccount={parentAccount} accounts={accounts} />
-            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}><AlertDialogContent dir="rtl" className="rounded-3xl"><AlertDialogHeader><AlertDialogTitle>حذف الحساب المالي؟</AlertDialogTitle><AlertDialogDescription>سيتم مسح الحساب "{accountToDelete?.name}" وكافة حساباته الفرعية. لا يمكن الحذف إذا وجد قيد مالي مرتبط.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-8">{isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-            <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}><AlertDialogContent dir="rtl" className="rounded-3xl"><AlertDialogHeader><AlertDialogTitle>تأكيد تهيئة الشجرة؟</AlertDialogTitle><AlertDialogDescription>سيتم مسح الدليل الحالي واستبداله بالشجرة الافتراضية المعتمدة لـ Nova ERP. <br/><br/> <span className="font-black text-red-600">اكتب "مسح البيانات" للتأكيد:</span></AlertDialogDescription></AlertDialogHeader><Input value={confirmSeedText} onChange={e => setConfirmSeedText(e.target.value)} className="h-12 text-center font-black border-2" placeholder="كلمة التأكيد..." /><AlertDialogFooter className="mt-4 gap-2"><AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel><AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={confirmSeedText !== 'مسح البيانات' || isSeeding} className="bg-destructive rounded-xl font-black px-10">{isSeeding ? <Loader2 className="animate-spin h-4 w-4"/> : 'بدء التهيئة'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+            
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>حذف الحساب المالي؟</AlertDialogTitle>
+                        <AlertDialogDescription>سيتم مسح الحساب "{accountToDelete?.name}" وكافة حساباته الفرعية. لا يمكن الحذف إذا وجد قيد مالي مرتبط.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black px-8">
+                            {isSaving ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
+                <AlertDialogContent dir="rtl" className="rounded-3xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد تهيئة الشجرة؟</AlertDialogTitle>
+                        <AlertDialogDescription>سيتم مسح الدليل الحالي واستبداله بالشجرة الافتراضية المعتمدة لـ Nova ERP. <br/><br/> <span className="font-black text-red-600">اكتب "مسح البيانات" للتأكيد:</span></AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Input value={confirmSeedText} onChange={e => setConfirmSeedText(e.target.value)} className="h-12 text-center font-black border-2" placeholder="كلمة التأكيد..." />
+                    <AlertDialogFooter className="mt-4 gap-2">
+                        <AlertDialogCancel className="rounded-xl font-bold">إلغاء</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={confirmSeedText !== 'مسح البيانات' || isSeeding} className="bg-destructive rounded-xl font-black px-10">
+                            {isSeeding ? <Loader2 className="animate-spin h-4 w-4"/> : 'بدء التهيئة'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

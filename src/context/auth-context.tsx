@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser, getIdTokenResult } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, type Firestore, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
@@ -46,21 +46,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             currentCompanyId: null,
             companyName: 'Master Console'
         };
-        setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+        // Ensure developer is in the whitelist
+        await setDoc(doc(firestore, 'developers', firebaseUser.uid), { ...devProfile, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
         return { user: devProfile, company: null };
     }
 
     try {
         let companyId: string | null = null;
-        let globalUserData: any = null;
-
         const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
         const globalSnap = await getDocs(globalQuery);
         
         if (!globalSnap.empty) {
-            const globalDoc = globalSnap.docs[0];
-            globalUserData = globalDoc.data();
-            companyId = globalUserData.companyId;
+            companyId = globalSnap.docs[0].data().companyId;
         }
         
         if (companyId) {
@@ -77,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
     } catch (e) { 
-        console.warn("Identity context lookup failed:", e); 
+        console.warn("Identity lookup failed:", e); 
     }
     return { user: null, company: null };
   }, []);
@@ -107,12 +104,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
-          // 🛡️ درع مزامنة التوكن السيادي (Identity Shield):
-          // إذا لم تكن صلاحيات الشركة موجودة في التوكن الحالي، نجبره على التحديث
-          // لضمان عدم ظهور خطأ "Missing or insufficient permissions"
-          const idTokenResult = await firebaseUser.getIdTokenResult();
-          if (!idTokenResult.claims.companyId && resolvedUser.currentCompanyId) {
-              console.log("Sovereign Sync: Refreshing identity claims...");
+          // 🛡️ درع مزامنة التوكن السيادي: إجبار التحديث إذا كانت المطالبات مفقودة
+          const tokenResult = await firebaseUser.getIdTokenResult();
+          if (!tokenResult.claims.companyId && resolvedUser.currentCompanyId) {
               await firebaseUser.getIdToken(true);
           }
 
@@ -123,9 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setUser(null);
           clearSessionIndicators();
-          if (resolvedUser && !resolvedUser.isActive) {
-              setError("هذا الحساب معطل حالياً.");
-          }
+          if (resolvedUser && !resolvedUser.isActive) setError("هذا الحساب معطل حالياً.");
           await signOut(masterAuth);
         }
       } catch (err) { 
