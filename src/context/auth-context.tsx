@@ -2,12 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, signOut, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { useCompany } from './company-context';
 import type { AuthenticatedUser, Company } from '@/lib/types';
-import { setSessionIndicators, clearSessionIndicators } from '@/lib/auth/utils';
+import { setSessionIndicators, clearSessionIndicators, mapFirebaseAuthError } from '@/lib/auth/utils';
 
 interface AuthContextType {
   user: AuthenticatedUser | null;
@@ -31,8 +31,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🛡️ محرك جلب الهوية السيادي (Sovereign Identity Engine V95.0)
-  // تم بناؤه من الصفر ليكون "خطياً" ومباشراً بدون ترميمات
+  /**
+   * 🛡️ محرك جلب الهوية السيادي المباشر (Direct Flow V96.0)
+   * تم إلغاء كافة عمليات "الترميم" لضمان السرعة والوضوح الرقابي.
+   */
   useEffect(() => {
     if (!masterAuth || !masterFirestore) {
       setLoading(false);
@@ -64,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role: 'Developer',
           isActive: true,
           currentCompanyId: null,
-          companyName: 'Nova Master'
+          companyName: 'Nova Master Admin'
         };
         setUser(devProfile);
         setCompany(null);
@@ -74,33 +76,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
-      // 2. مسار مستخدمي المنشآت (SaaS Path)
+      // 2. مسار مستخدمي المنشآت (SaaS Multi-tenant Path)
       try {
-        // أ. معرفة الشركة من الفهرس العالمي
+        // أ. جلب الفهرس العالمي (لمعرفة الشركة)
         const globalRef = doc(masterFirestore, 'global_users', firebaseUser.uid);
         const globalSnap = await getDoc(globalRef);
         
         if (!globalSnap.exists()) {
-          throw new Error("عذراً، هذا الحساب غير مرتبط بأي منشأة نشطة.");
+          throw new Error("عذراً، هذا الحساب غير مرتبط بأي منشأة مسجلة.");
         }
 
         const { companyId } = globalSnap.data();
 
-        // ب. جلب بيانات المنشأة والبروفايل في طلب واحد متوازي لسرعة البرق
+        // ب. جلب بيانات المنشأة والبروفايل داخلها (بالتوازي)
         const [compDoc, userDoc] = await Promise.all([
           getDoc(doc(masterFirestore, 'companies', companyId)),
           getDoc(doc(masterFirestore, `companies/${companyId}/users`, firebaseUser.uid))
         ]);
 
         if (!userDoc.exists()) {
-          throw new Error("لم يتم العثور على ملفك الشخصي داخل المنشأة.");
+            throw new Error("تم التعرف على الحساب، لكن ملفك الشخصي داخل المنشأة مفقود. يرجى مراجعة المطور.");
         }
 
         const userData = userDoc.data();
         const companyData = compDoc.exists() ? { id: compDoc.id, ...compDoc.data() } as Company : null;
 
         if (!userData.isActive) {
-          throw new Error("هذا الحساب معطل حالياً.");
+          throw new Error("هذا الحساب معطل حالياً من قبل مدير النظام.");
         }
 
         const finalUser = {
@@ -108,7 +110,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
           currentCompanyId: companyId,
-          companyName: companyData?.name || 'منشأة غير معروفة'
+          companyName: companyData?.name || 'منشأة غير مسمى'
         } as AuthenticatedUser;
 
         setUser(finalUser);
@@ -129,14 +131,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [masterAuth, masterFirestore, setCurrentCompany]);
 
-  const login = (email: string, password: string) => {
+  const login = async (email: string, password: string) => {
     if (!masterAuth) throw new Error('بوابة الدخول غير متصلة.');
-    return signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
+    try {
+        setError(null);
+        await signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
+    } catch (e: any) {
+        const msg = mapFirebaseAuthError(e.code);
+        setError(msg);
+        throw new Error(msg);
+    }
   };
 
   const logout = async () => {
     if (!masterAuth) return;
     await signOut(masterAuth);
+    setUser(null);
+    setCompany(null);
+    setCurrentCompany(null);
+    clearSessionIndicators();
     router.replace('/');
   };
 

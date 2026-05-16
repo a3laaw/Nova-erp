@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Access Gateway V95.0):
- * تم إعادة بنائها لتكون بوابة بسيطة وسريعة بدون تعقيدات المزامنة.
+ * بوابة الدخول السيادية الموحدة (Gateway V96.0)
+ * تم تصفير كافة الحقول وإعادة بناء منطق العبور ليكون خطياً ومباشراً.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // التوجيه الفوري عند استقرار الحالة
+  // التوجيه الفوري عند التعرف على الهوية
   useEffect(() => {
     if (user) {
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
@@ -50,7 +50,7 @@ export default function LoginPage() {
     try {
         await login(identifier, password);
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'خطأ في الدخول', description: 'بيانات الدخول غير صحيحة.' });
+        // الخطأ سيظهر آلياً عبر سياق المصادقة
         setIsSubmitting(false);
     }
   };
@@ -67,23 +67,22 @@ export default function LoginPage() {
       } finally { setIsSubmitting(false); }
   };
 
-  const showLoading = globalLoading || (user && !isSubmitting);
-
-  if (showLoading) {
+  // حالة التحميل الكلية (أثناء جلب بيانات المنشأة)
+  if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#1e1b4b]" dir="rtl">
           <div className="relative">
               <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-white animate-spin" />
               <ShieldCheck className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
           </div>
-          <p className="text-white font-black text-xl tracking-tighter">جاري فتح الأبواب السيادية...</p>
+          <p className="text-white font-black text-xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-      <Card className="w-full max-w-md rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect animate-in zoom-in-95 duration-500 relative z-10">
+      <Card className="w-full max-w-md rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect relative z-10 animate-in zoom-in-95 duration-500">
         <CardHeader className="py-12 px-8 text-center border-b border-orange-100 bg-white/20">
             <div className="bg-primary p-5 rounded-[2rem] w-fit mx-auto mb-6 shadow-xl shadow-orange-200 border-4 border-white">
                 {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-white" /> : <Send className="h-10 w-10 text-white" />}
@@ -108,9 +107,9 @@ export default function LoginPage() {
                         <Input 
                             value={identifier} 
                             onChange={(e) => setIdentifier(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white" 
+                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all" 
                             required 
-                            placeholder="Email"
+                            placeholder="Email / User ID"
                         />
                     </div>
 
@@ -120,7 +119,7 @@ export default function LoginPage() {
                             type="password" 
                             value={password} 
                             onChange={e => setPassword(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white" 
+                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white transition-all" 
                             required 
                             placeholder="••••••••"
                         />
@@ -129,9 +128,9 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white border-none">
+                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white border-none transition-all active:scale-95">
                         {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
-                        دخول للنظام
+                        {isSubmitting ? "جاري العبور..." : "دخول للنظام"}
                     </Button>
 
                     <div className="pt-8 border-t border-orange-100 flex flex-col items-center">
