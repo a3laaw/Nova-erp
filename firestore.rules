@@ -1,10 +1,9 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات السيادية (Sovereign Authority Logic)
+    // 🛡️ مصفوفة الصلاحيات السيادية (Sovereign Authority Logic V115)
     
     function isDeveloper() {
       return request.auth != null && 
@@ -12,6 +11,7 @@ service cloud.firestore {
               request.auth.token.role == 'Developer');
     }
 
+    // 🏰 صمام أمان مزدوج: التحقق عبر التوكن أو عبر البريد المباشر في وثيقة الشركة
     function isTenantMember(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
@@ -20,7 +20,7 @@ service cloud.firestore {
                get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower()));
     }
 
-    // 🏰 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
+    // 🏯 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
@@ -28,6 +28,7 @@ service cloud.firestore {
     // 🏢 قواعد عزل المنشآت (SaaS Isolation)
     match /companies/{companyId} {
       allow read: if request.auth != null;
+      // السماح بالكتابة بناءً على الانتماء الموثق (التوكن أو البريد)
       allow write: if isDeveloper() || isTenantMember(companyId);
       
       match /{allSubcollections=**} {
