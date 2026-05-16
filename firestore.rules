@@ -3,38 +3,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    function isSovereignArchitect() {
+    // 🛡️ مصفوفة الصلاحيات السيادية (Sovereign Authority Logic)
+    
+    // 1. المطور: صاحب السيادة المطلقة في كامل النظام
+    function isDeveloper() {
       return request.auth != null && 
              (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
               request.auth.token.role == 'Developer');
     }
 
-    function belongsToCompany(companyId) {
+    // 2. الموظف: ينتمي للمنشأة عبر توكن الأمان (Custom Claims)
+    function isTenantMember(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
-              request.auth.token.currentCompanyId == companyId ||
-              // 🛡️ صمام الأمان السيادي: السماح بناءً على البريد المسجل في وثيقة الشركة
-              get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower());
-    }
-    
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+              request.auth.token.currentCompanyId == companyId);
     }
 
-    match /global_users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+    // 3. المدير: صمام أمان يعتمد على البريد المسجل في وثيقة الشركة (Fallback)
+    function isCompanyAdmin(companyId) {
+       return request.auth != null && 
+              get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower();
     }
 
+    // 🚨 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
+    match /{document=**} {
+      allow read, write: if isDeveloper();
+    }
+
+    // 🏢 قواعد عزل المنشآت (SaaS Isolation)
     match /companies/{companyId} {
-      allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
+      // السماح بقراءة وثيقة الشركة للتحقق من هوية المدير
+      allow read: if request.auth != null;
+      allow write: if isDeveloper() || isCompanyAdmin(companyId);
       
+      // السماح بكافة المجموعات والبيانات داخل الشركة بناءً على الانتماء
       match /{allSubcollections=**} {
-        allow read, write: if isSovereignArchitect() || belongsToCompany(companyId);
+        allow read, write: if isDeveloper() || isTenantMember(companyId) || isCompanyAdmin(companyId);
       }
     }
 
-    match /{document=**} {
-      allow read, write: if isSovereignArchitect();
+    // 🌍 قواعد الفهرس العالمي والطلبات
+    match /global_users/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isDeveloper());
+      allow write: if isDeveloper();
+    }
+    
+    match /company_requests/{id} {
+      allow create: if true; 
+      allow read, write: if isDeveloper();
+    }
+
+    // 📊 دعم استعلامات المجموعات (Collection Group Queries) لضمان عدم فشل التقارير
+    match /{path=**}/transactions/{id} {
+        allow read: if isDeveloper() || isTenantMember(resource.data.companyId) || isCompanyAdmin(resource.data.companyId);
+    }
+    
+    match /{path=**}/timelineEvents/{id} {
+        allow read: if isDeveloper() || isTenantMember(resource.data.companyId) || isCompanyAdmin(resource.data.companyId);
     }
   }
 }

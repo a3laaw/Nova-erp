@@ -26,7 +26,7 @@ export function useSubscription<T extends { id?: string }>(
     const [data, setData] = useState<T[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
 
     const constraintsHash = JSON.stringify(constraints.map(c => c.toString()));
     const constraintsRef = useRef(constraints);
@@ -36,17 +36,18 @@ export function useSubscription<T extends { id?: string }>(
     }, [constraintsHash]);
 
     useEffect(() => {
-        if (!firestore || !collectionPath) {
-            setLoading(false);
+        // 🛡️ صمام أمان: لا تبدأ الاشتراك إذا لم يكن المحرك أو المسار جاهزاً أو إذا كان الـ Auth قيد التحميل
+        if (!firestore || !collectionPath || authLoading) {
+            setLoading(!firestore || !collectionPath ? false : true);
             setData([]);
             return;
         }
 
-        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests'];
+        const masterCollections = ['companies', 'developers', 'global_users', 'company_requests', 'counters'];
         const isMasterCollection = masterCollections.some(mc => collectionPath.startsWith(mc));
         const tenantId = isMasterCollection ? null : (user?.currentCompanyId || null);
         
-        // 🛡️ منع جلب أي بيانات غير "ماستر" إلا بعد استقرار هوية المنشأة
+        // 🛡️ منع جلب أي بيانات غير "ماستر" إلا بعد استقرار هوية المنشأة (Tenant ID) في الجلسة
         if (!isMasterCollection && !tenantId) {
             setLoading(true); 
             return;
@@ -58,9 +59,10 @@ export function useSubscription<T extends { id?: string }>(
         let finalPath = getTenantPath(collectionPath, tenantId);
         let finalConstraints = [...constraintsRef.current];
         
-        // في استعلامات الـ Group Queries، يجب فرض فلتر الـ companyId لضمان العزل
+        // في استعلامات الـ Group Queries، يجب فرض فلتر الـ companyId لضمان عزل البيانات برمجياً وسحابياً
         if (isGroup && tenantId) {
-            finalPath = collectionPath.split('/').pop() || collectionPath;
+            const collectionName = collectionPath.split('/').pop() || collectionPath;
+            finalPath = collectionName;
             finalConstraints.push(where('companyId', '==', tenantId));
         }
 
@@ -85,12 +87,13 @@ export function useSubscription<T extends { id?: string }>(
                     });
                     setData(newData);
                     setLoading(false);
+                    setError(null);
                 },
-                (err) => {
-                    console.error(`Firestore Subscription Error [${finalPath}]:`, err);
+                (err: any) => {
+                    // في حال خطأ الصلاحيات، لا تقتل الواجهة، بل سجل الخطأ وحاول الحفاظ على الحالة
+                    console.error(`Sovereign Subscription Denied [${finalPath}]:`, err.message);
                     setError(err);
-                    setLoading(false); 
-                    setData([]);
+                    setLoading(false);
                 }
             );
 
@@ -101,7 +104,7 @@ export function useSubscription<T extends { id?: string }>(
             setLoading(false);
             setData([]);
         }
-    }, [firestore, collectionPath, isGroup, user?.currentCompanyId, constraintsHash]);
+    }, [firestore, collectionPath, isGroup, user?.currentCompanyId, authLoading, constraintsHash]);
 
     return { data, loading, error };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import {
   Card,
@@ -14,15 +14,12 @@ import {
     LayoutGrid,
     PlusCircle,
     BellRing,
-    Sparkles,
     Wallet,
     Users,
     Activity,
-    ClipboardList,
     History,
     CheckCircle2,
     Clock,
-    ArrowUpRight,
     ListTodo
 } from 'lucide-react';
 import { useAnalyticalData } from '@/hooks/use-analytical-data';
@@ -35,6 +32,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import type { UserProductivityItem } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
 
 const StatCard = ({ title, value, icon, description, colorClass, loading, subText }: any) => (
     <Card className="overflow-hidden border-white/30 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] hover-lift group">
@@ -44,8 +42,8 @@ const StatCard = ({ title, value, icon, description, colorClass, loading, subTex
                 <CardTitle className="text-xs font-black text-muted-foreground uppercase tracking-widest">{title}</CardTitle>
             </div>
         </CardHeader>
-        <CardContent className="pt-2">
-            {loading ? <Skeleton className="h-10 w-32" /> : (
+        <CardContent>
+            {loading ? <Skeleton className="h-10 w-32 mt-1" /> : (
                 <div className={cn("text-3xl font-black font-mono tracking-tighter text-foreground")}>
                     {typeof value === 'number' ? formatCurrency(value) : value}
                 </div>
@@ -61,13 +59,16 @@ export default function DashboardPage() {
   const { user } = useAuth();
 
   // جلب المهام الشخصية القادمة
-  const tasksQuery = useMemo(() => [
-      where('userId', '==', user?.id),
+  const tasksQuery = useMemo(() => {
+    if (!user?.id) return [];
+    return [
+      where('userId', '==', user.id),
       where('entryType', '==', 'task'),
       where('status', '==', 'pending'),
       orderBy('dueDate', 'asc'),
       limit(5)
-  ], [user?.id]);
+    ];
+  }, [user?.id]);
 
   const { data: myTasks, loading: tasksLoading } = useSubscription<UserProductivityItem>(
       firestore, 
@@ -136,7 +137,7 @@ export default function DashboardPage() {
                                 <Button variant="ghost" size="sm" className="h-8 rounded-xl font-black text-[10px] text-primary bg-primary/5">عرض الكل</Button>
                             </Link>
                         </div>
-                        <CardDescription>المهام المستخلصة من المشاريع والعملاء.</CardDescription>
+                        <CardDescription>المهام المستخلصـة من المشاريع والعملاء.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6 flex-1">
                         {tasksLoading ? (
