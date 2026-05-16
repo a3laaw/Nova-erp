@@ -14,7 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useFirebase } from '@/firebase';
-import { collection, doc, runTransaction, serverTimestamp, updateDoc, getDocs, query, where, Timestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Loader2, 
@@ -36,11 +36,11 @@ import {
   Cloud
 } from 'lucide-react';
 import { cleanFirestoreData, cn } from '@/lib/utils';
-import { Badge } from '../ui/badge';
 import type { Company } from '@/lib/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDays } from 'date-fns';
 import { DateInput } from '../ui/date-input';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface Props {
   isOpen: boolean;
@@ -134,18 +134,12 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           appId: "1:71297676078:web:b956ab00372e6ba237c0bf",
           measurementId: ""
       }));
-      toast({ title: '✅ تم جلب بيانات الماستر', description: 'تمت تعبئة مصفوفة الربط ببيانات المنظومة الرئيسية.' });
+      toast({ title: '✅ تم جلب بيانات الماستر' });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData(prev => ({ ...prev, [id]: id === 'maxUsersLimit' ? parseInt(value) || 0 : value }));
-  };
-
-  const copyCredentials = () => {
-    const text = `بيانات دخول منشأة ${formData.name}:\nالبريد: ${formData.adminEmail}\nكلمة المرور: ${formData.adminPassword}`;
-    navigator.clipboard.writeText(text);
-    toast({ title: 'تم النسخ', description: 'يمكنك الآن إرسال البيانات للعميل.' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,12 +172,6 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
         measurementId: formData.measurementId?.trim() || '',
       };
 
-      const licenseData = {
-          subscriptionType: formData.subscriptionType,
-          maxUsersLimit: Number(formData.maxUsersLimit) || 0,
-          trialEndDate: formData.trialEndDate ? Timestamp.fromDate(formData.trialEndDate) : null,
-      };
-
       const batch = writeBatch(masterFirestore);
       const companyId = isEditing ? company!.id! : `comp-${Math.random().toString(36).substring(2, 9)}`;
       const companyRef = doc(masterFirestore, 'companies', companyId);
@@ -197,16 +185,14 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           firebaseProjectId: formData.projectId,
           firebaseConfig,
           isActive: true,
-          ...licenseData,
+          subscriptionType: formData.subscriptionType,
+          maxUsersLimit: Number(formData.maxUsersLimit) || 5,
+          trialEndDate: formData.trialEndDate ? Timestamp.fromDate(formData.trialEndDate) : null,
           updatedAt: serverTimestamp(),
           ...(!isEditing && { createdAt: serverTimestamp() })
       }), { merge: true });
 
-      const globalIndexQuery = query(collection(masterFirestore, 'global_users'), where('uid', '==', authResult.uid));
-      const globalIndexSnap = await getDocs(globalIndexQuery);
-      globalIndexSnap.forEach(d => batch.delete(d.ref));
-
-      const globalIndexRef = doc(collection(masterFirestore, 'global_users'));
+      const globalIndexRef = doc(collection(masterFirestore, 'global_users'), authResult.uid);
       batch.set(globalIndexRef, {
           email: formData.adminEmail.toLowerCase().trim(),
           username: formData.adminEmail.split('@')[0],
@@ -244,66 +230,32 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
       <DialogContent className="max-w-4xl p-0 rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white" dir="rtl">
         <form onSubmit={handleSubmit} className="flex flex-col h-[90vh]">
           <DialogHeader className="p-8 bg-[#1e1b4b] text-white shrink-0 relative overflow-hidden text-right">
-            <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl border border-white/20">
                         <DatabaseZap className="h-8 w-8" />
                     </div>
                     <div className="text-right">
-                        <DialogTitle className="text-2xl font-black text-white tracking-tight">{isEditing ? 'تعديل بيانات المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
+                        <DialogTitle className="text-2xl font-black">{isEditing ? 'تعديل بيانات المنشأة' : 'تأسيس منشأة سحابية جديدة'}</DialogTitle>
                         <DialogDescription className="font-bold text-indigo-200 text-sm mt-1">إدارة الربط السحابي، بيانات الدخول، ونظام التراخيص.</DialogDescription>
                     </div>
                 </div>
-                <button type="button" onClick={onClose} className="text-white/60 hover:text-white rounded-full bg-white/10 h-10 w-10 flex items-center justify-center transition-all"><X className="h-5 w-5"/></button>
-            </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-10 space-y-12 bg-white scrollbar-none">
+          <ScrollArea className="flex-1">
+            <div className="p-10 space-y-12">
                 <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
-                            <Building2 className="h-6 w-6 text-indigo-600" /> هويـة المنشأة والحسـاب الإداري
-                        </h3>
-                        {isEditing && (
-                            <Button type="button" variant="outline" size="sm" onClick={copyCredentials} className="rounded-xl font-black text-[10px] gap-2 border-indigo-200 text-indigo-700 bg-indigo-50">
-                                <Copy className="h-3 w-3" /> نسخ بيانات الدخول المحدثة
-                            </Button>
-                        )}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100 shadow-inner">
+                    <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4">هوية المنشأة والحساب الإداري</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100">
                         <div className="grid gap-2">
-                            <Label htmlFor="name" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالعربية) *</Label>
-                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="أدخل اسم المنشأة..." />
+                            <Label className="font-black text-xs pr-1">اسم المنشأة *</Label>
+                            <Input id="name" value={formData.name} onChange={handleChange} required className="h-12 rounded-xl border-2" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="nameEn" className="font-black text-black text-xs pr-1 uppercase">اسم المنشأة (بالإنجليزية)</Label>
-                            <Input id="nameEn" value={formData.nameEn} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black text-lg shadow-sm" placeholder="English Name..." />
-                        </div>
-                        
-                        <div className="grid gap-2 md:col-span-2">
-                            <Label className="font-black text-black text-xs pr-1 uppercase flex items-center gap-2">
-                                <Activity className="h-3 w-3 text-indigo-600" /> نشاط المنشأة الرئيسي *
-                            </Label>
-                            <Select value={formData.activityType} onValueChange={(v: any) => setFormData(p => ({...p, activityType: v}))}>
-                                <SelectTrigger className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-black">
-                                    <SelectValue placeholder="اختر النشاط..." />
-                                </SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="general">نشاط عام (تجاري/مكتب)</SelectItem>
-                                    <SelectItem value="food_delivery">مطاعم وتوصيل أغذية</SelectItem>
-                                    <SelectItem value="construction">مقاولات وبناء</SelectItem>
-                                    <SelectItem value="consulting">استشارات هندسية</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="adminEmail" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Mail className="h-3 w-3 text-indigo-600"/> بريد المدير العام (Login) *</Label>
-                            <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold" placeholder="admin@company.nova" />
+                            <Label className="font-black text-xs pr-1">البريد الإداري (Login) *</Label>
+                            <Input id="adminEmail" type="email" value={formData.adminEmail} onChange={handleChange} required dir="ltr" className="h-12 rounded-xl border-2" />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="adminPassword" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Lock className="h-3 w-3 text-indigo-600"/> كلمة المرور *</Label>
+                            <Label className="font-black text-xs pr-1">كلمة المرور *</Label>
                             <div className="relative">
                                 <Input 
                                     id="adminPassword" 
@@ -311,63 +263,15 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                                     value={formData.adminPassword} 
                                     onChange={handleChange} 
                                     required 
-                                    className="h-12 rounded-xl border-2 border-slate-200 bg-white text-[#1e1b4b] font-bold pl-12" 
-                                    placeholder="********" 
+                                    className="h-12 rounded-xl border-2 pl-12" 
                                 />
-                                <Button 
-                                    type="button" 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="absolute left-2 top-1/2 -translate-y-1/2" 
-                                    onClick={() => setShowPassword(!showPassword)}
-                                >
+                                <Button type="button" variant="ghost" size="icon" className="absolute left-2 top-1/2 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)}>
                                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
                             </div>
                         </div>
                     </div>
                 </section>
-
-                <Separator className="bg-slate-100" />
-
-                <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-orange-600 pr-4 flex items-center gap-3">
-                            <CreditCard className="h-6 w-6 text-orange-600" /> نظام التراخيص والحصص المفتوحة
-                        </h3>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-orange-50/20 border-2 border-dashed border-orange-200 shadow-inner">
-                        <div className="grid gap-2">
-                            <Label className="font-black text-black text-xs pr-1 uppercase">نوع الاشتراك</Label>
-                            <Select value={formData.subscriptionType} onValueChange={(v: any) => setFormData(p => ({...p, subscriptionType: v}))}>
-                                <SelectTrigger className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent dir="rtl">
-                                    <SelectItem value="trial">فترة تجريبية (Demo Mode)</SelectItem>
-                                    <SelectItem value="premium">اشتراك مدفوع (Premium)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="maxUsersLimit" className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><Users className="h-3 w-3 text-orange-600"/> عدد المستخدمين المسموح به *</Label>
-                            <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} required className="h-12 rounded-xl border-2 border-orange-100 bg-white text-[#1e1b4b] font-black text-2xl text-center shadow-sm" />
-                        </div>
-                        {(formData.subscriptionType === 'trial' || formData.trialEndDate) && (
-                            <div className="grid gap-2 md:col-span-2 animate-in slide-in-from-top-2">
-                                <Label className="font-black text-black text-xs pr-1 flex items-center gap-2 uppercase tracking-widest"><CalendarClock className="h-3 w-3 text-orange-600"/> تاريخ انتهاء الفترة التجريبية</Label>
-                                <DateInput 
-                                    value={formData.trialEndDate} 
-                                    onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))}
-                                    className="h-12 rounded-xl"
-                                />
-                            </div>
-                        )}
-                    </div>
-                </section>
-
-                <Separator className="bg-slate-100" />
 
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
@@ -378,40 +282,37 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                             type="button" 
                             onClick={handleFillMasterConfig}
                             variant="outline" 
-                            className="rounded-xl font-black text-xs gap-2 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 shadow-sm"
+                            className="rounded-xl font-black text-xs gap-2 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
                         >
                             <Sparkles className="h-4 w-4" /> تعبئة تلقائية ببيانات الماستر
                         </Button>
                     </div>
                     
-                    <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30 shadow-inner">
+                    <div className="p-10 rounded-[3rem] border-2 border-dashed border-indigo-200 bg-indigo-50/30">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
                             <div className="grid gap-3 md:col-span-2">
-                                <Label htmlFor="apiKey" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
+                                <Label className="text-[10px] font-black uppercase text-black flex items-center gap-2 mr-1">
                                     <Key className="h-3 w-3" /> API KEY
                                 </Label>
-                                <Input id="apiKey" value={formData.apiKey} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="AIzaSy..." />
+                                <Input value={formData.apiKey} onChange={e => setFormData(p => ({...p, apiKey: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
                             </div>
                             <div className="grid gap-3">
-                                <Label htmlFor="projectId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Key className="h-3 w-3" /> PROJECT ID
-                                </Label>
-                                <Input id="projectId" value={formData.projectId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="company-prj-123" />
+                                <Label className="text-[10px] font-black uppercase text-black mr-1">PROJECT ID</Label>
+                                <Input value={formData.projectId} onChange={e => setFormData(p => ({...p, projectId: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
                             </div>
                             <div className="grid gap-3">
-                                <Label htmlFor="appId" className="text-[10px] font-black uppercase text-black tracking-[0.3em] flex items-center gap-2 mr-1">
-                                    <Activity className="h-3 w-3" /> APP ID
-                                </Label>
-                                <Input id="appId" value={formData.appId} onChange={handleChange} dir="ltr" className="h-12 rounded-xl border-2 border-indigo-100 bg-white text-[#1e1b4b] font-mono text-xs shadow-sm" placeholder="1:828494:web:..." />
+                                <Label className="text-[10px] font-black uppercase text-black mr-1">APP ID</Label>
+                                <Input value={formData.appId} onChange={e => setFormData(p => ({...p, appId: e.target.value}))} dir="ltr" className="h-12 rounded-xl border-2 bg-white font-mono text-xs" />
                             </div>
                         </div>
                     </div>
                 </section>
-          </div>
+            </div>
+          </ScrollArea>
 
           <DialogFooter className="p-8 border-t bg-slate-50 shrink-0 flex gap-4">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-2xl font-black h-14 px-10 text-slate-500 hover:bg-slate-200">إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px] transition-all">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-2xl font-black h-14 px-10">إلغاء</Button>
+            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px]">
                 {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
                 {isEditing ? 'حفظ ومزامنة الهوية' : 'تأسيس المنشأة وتفعيل التراخيص'}
             </Button>
