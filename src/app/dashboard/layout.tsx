@@ -55,6 +55,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
+    // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 5 ثوانٍ، نظهر خيارات الإصلاح
     const timer = setTimeout(() => {
       setShowEmergencyExit(true);
     }, 5000);
@@ -87,7 +88,7 @@ export default function DashboardLayout({
   }, [company]);
 
   // المطور السيادي لا يخضع للحظر أو الإنذار
-  const isDev = user?.role === 'Developer';
+  const isDev = user?.role === 'Developer' || user?.email === 'alaawaaheeb@gmail.com';
 
   // 1. معالجة حالة التحميل
   if (loading || !mounted) {
@@ -189,7 +190,7 @@ export default function DashboardLayout({
           </SidebarInset>
       </SidebarProvider>
 
-      {/* 🛡️ نافذة الإنذار المبكر (Soft Block) - تشمل الديمو والأساسية */}
+      {/* 🛡️ نافذة الإنذار المبكر (Soft Block) - تظهر قبل 7 أيام من الانتهاء */}
       {!isDev && isExpiringSoon && !hasAcknowledgedWarning && (
         <Dialog open={true} onOpenChange={() => {}}>
             <DialogContent className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white" dir="rtl">
@@ -230,7 +231,7 @@ export default function DashboardLayout({
                             <div className="space-y-1">
                                 <p className="text-xs font-black text-red-800">تحذير هام بخصوص بياناتكم:</p>
                                 <p className="text-[10px] font-bold text-red-700 leading-normal">
-                                    بمجرد انتهاء الاشتراك، ستظل بياناتكم محفوظة لدينا لمدة **شهر واحد فقط** كمهلة سداد، وبعدها سيتم مسح كافة الأرشيف الفني والمالي نهائياً من خوادم النظام لضمان خصوصية البيانات. يرجى التجديد أو تصدير بياناتكم الآن.
+                                    بمجرد انتهاء الاشتراك، ستظل بياناتكم محفوظة لدينا لمدة **شهر واحد فقط** كمهلة سداد، وبعدها سيتم مسح كافة الأرشيف الفني والمالي نهائياً من خوادم النظام لضمان خصوصية البيانات. يرجى المبادرة بالتسوية لضمان عدم ضياع الأرشيف الفني.
                                 </p>
                             </div>
                         </div>
