@@ -7,7 +7,7 @@ import path from 'path';
 
 /**
  * محرك إدارة المنشآت الموحد (V73.0):
- * تم تحديثه لدعم عمليات الـ Identity Sync للهوية السيادية المعزولة.
+ * تم تحديثه لدعم الفهرس العالمي السريع عبر استخدام الـ UID كمفتاح للمستند.
  */
 
 function getAdminApp() {
@@ -75,6 +75,14 @@ export async function POST(request: NextRequest) {
                 companyId: companyId,
                 role: 'Admin'
             });
+
+            // ⚡ تحديث الفهرس العالمي بالـ UID للوصول المباشر السريع
+            await db.collection('global_users').doc(userRecord.uid).set({
+                email: sanitizedEmail,
+                companyId: companyId,
+                role: 'Admin',
+                createdAt: FieldValue.serverTimestamp()
+            });
         }
 
         return NextResponse.json({ success: true, uid: userRecord.uid });
@@ -97,6 +105,14 @@ export async function POST(request: NextRequest) {
                 companyId: companyId,
                 role: 'Admin'
             });
+
+            // تحديث الفهرس العالمي
+            await db.collection('global_users').doc(uid).set({
+                email: sanitizedEmail,
+                companyId: companyId,
+                role: 'Admin',
+                updatedAt: FieldValue.serverTimestamp()
+            }, { merge: true });
         }
 
         return NextResponse.json({ success: true, uid });
@@ -122,6 +138,14 @@ export async function POST(request: NextRequest) {
         await auth.setCustomUserClaims(userRecord.uid, {
             companyId: generatedCompanyId,
             role: 'Admin'
+        });
+
+        // ⚡ تحديث الفهرس العالمي للسرعة السيادية
+        await db.collection('global_users').doc(userRecord.uid).set({
+            email: sanitizedEmail,
+            companyId: generatedCompanyId,
+            role: 'Admin',
+            createdAt: FieldValue.serverTimestamp()
         });
 
         await db.collection('companies').doc(generatedCompanyId).set({

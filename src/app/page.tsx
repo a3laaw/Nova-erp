@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * صفحة الدخول السيادية (Unified Access Gateway):
- * تم تحسينها بنظام التوجيه المتفائل (Optimistic Redirect) لتقليل وقت الانتظار.
+ * صفحة الدخول السيادية (Lightning Access Gateway):
+ * تم تحسينها لتدعم التوجيه الفوري (Zero-Wait Redirect) بمجرد التعرف على المستخدم.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading } = useAuth();
@@ -35,9 +35,10 @@ export default function LoginPage() {
   const [localLoading, setLocalLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // رادار التوجيه اللحظي
+  // ⚡ محرك التوجيه الفوري
   useEffect(() => {
     if (user) {
+        setLocalLoading(false);
         const target = user.role === 'Developer' ? '/developer' : '/dashboard';
         router.replace(target);
     }
@@ -51,7 +52,7 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     try {
-        // بمجرد نجاح هذه الخطوة، سيتولى الـ AuthContext التوجيه عبر الـ Identity Cache
+        // بمجرد نجاح التحقق من كلمة المرور، سيتولى الـ Identity Cache التوجيه الفوري
         await login(identifier.trim().toLowerCase(), password);
     } catch (error: any) {
         setLocalLoading(false);
@@ -103,6 +104,7 @@ export default function LoginPage() {
                             required 
                             placeholder="Username / Email"
                             autoComplete="off"
+                            disabled={localLoading}
                         />
                     </div>
 
@@ -116,6 +118,7 @@ export default function LoginPage() {
                             required 
                             placeholder="••••••••"
                             autoComplete="new-password"
+                            disabled={localLoading}
                         />
                         <div className="flex justify-center mt-1">
                              <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-bold text-primary hover:underline opacity-60 hover:opacity-100 transition-opacity">نسيت كلمة المرور؟</button>
@@ -124,7 +127,7 @@ export default function LoginPage() {
 
                     <Button type="submit" disabled={localLoading} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white hover:scale-[1.02] active:scale-95 transition-all border-none">
                         {localLoading ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
-                        دخول للنظام
+                        {localLoading ? 'جاري العبور...' : 'دخول للنظام'}
                     </Button>
 
                     <div className="pt-8 border-t border-orange-100 flex flex-col items-center">

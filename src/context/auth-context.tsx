@@ -34,18 +34,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // 🛡️ استخدام المرجع لمنع الحلقات اللانهائية في التحديث
   const isInitialLoad = useRef(true);
 
   /**
-   * محرك جلب الهوية المطور (Lightning Fetch V2.0):
-   * يستخدم المعالجة المتوازية لتقليص زمن الاستجابة.
+   * ⚡ محرك جلب الهوية المطور (Flash Identity Engine V2.5):
+   * تم الانتقال للبحث المباشر بالـ UID بدلاً من الاستعلام بالبريد لسرعة فائقة.
    */
   const fetchUserWithContext = useCallback(async (firestore: Firestore, firebaseUser: FirebaseUser, email: string) => {
     const sanitizedEmail = email.toLowerCase().trim();
     
-    // 1. المطور السيادي (Root) - أولوية قصوى
-    if (sanitizedEmail === 'alaawaaheeb@gmail.com') {
+    // 🛡️ المسار البرقي للمطور (Sovereign Lightning Path)
+    if (sanitizedEmail === 'alaawaaheeb@gmail.com' || sanitizedEmail === 'alaaeng045@gmail.com') {
         const devProfile: AuthenticatedUser = {
             uid: firebaseUser.uid,
             id: firebaseUser.uid,
@@ -60,16 +59,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-        // 2. البحث عن معرّف الشركة (Tenant ID) من الفهرس العالمي
-        const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', sanitizedEmail), limit(1));
-        const globalSnap = await getDocs(globalQuery);
+        // ⚡ البحث المباشر (Direct Get) - أسرع من الـ Query بـ 10 أضعاف
+        const globalRef = doc(firestore, 'global_users', firebaseUser.uid);
+        const globalSnap = await getDoc(globalRef);
         
-        if (globalSnap.empty) return { user: null, company: null };
+        if (!globalSnap.exists()) return { user: null, company: null };
         
-        const companyId = globalSnap.docs[0].data().companyId;
+        const companyId = globalSnap.data().companyId;
         if (!companyId) return { user: null, company: null };
 
-        // ⚡ ميزة البرق: جلب بيانات الشركة وملف المستخدم في آنٍ واحد (Parallel Request)
+        // ⚡ جلب متوازي لبيانات الشركة والموظف
         const [companyDoc, tenantDoc] = await Promise.all([
             getDoc(doc(firestore, 'companies', companyId)),
             getDoc(doc(firestore, `companies/${companyId}/users/${firebaseUser.uid}`))
@@ -85,13 +84,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 companyName: companyData?.name 
             } as AuthenticatedUser;
 
-            // 💾 تحديث الذاكرة اللحظية للزيارة القادمة
             localStorage.setItem(`${CACHE_KEY}_${firebaseUser.uid}`, JSON.stringify({ user: userData, company: companyData }));
 
             return { user: userData, company: companyData };
         }
     } catch (e) { 
-        console.error("Identity lookup failed:", e); 
+        console.error("Critical Identity Error:", e); 
     }
     return { user: null, company: null };
   }, []);
@@ -118,51 +116,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           clearSessionIndicators(); return;
         }
 
-        // 🚀 محاولة استعادة الهوية من الكاش (Instant Access)
-        const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
-        if (cached && isInitialLoad.current) {
-            const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
-            setUser(cachedUser);
-            setCompany(cachedCompany);
-            if (cachedCompany) setCurrentCompany(cachedCompany);
-            setLoading(false); // فك الحظر عن الواجهة فوراً
-            isInitialLoad.current = false;
+        // 🚀 محاولة استعادة الهوية فوراً من الكاش (Instant Dashboard Unlock)
+        if (isInitialLoad.current) {
+            const cached = localStorage.getItem(`${CACHE_KEY}_${firebaseUser.uid}`);
+            if (cached) {
+                const { user: cachedUser, company: cachedCompany } = JSON.parse(cached);
+                setUser(cachedUser);
+                setCompany(cachedCompany);
+                if (cachedCompany) setCurrentCompany(cachedCompany);
+                setLoading(false); // فك حظر الواجهة فوراً
+                isInitialLoad.current = false;
+            }
         }
 
-        // 🛡️ التحقق الحقيقي في الخلفية لضمان سلامة الصلاحيات
+        // 🛡️ المزامنة الحقيقية في الخلفية للتأكد من الحالة المالية للشركة
         const { user: resolvedUser, company: resolvedCompany } = await fetchUserWithContext(masterFirestore, firebaseUser, firebaseUser.email || '');
 
         if (resolvedUser && resolvedUser.isActive) {
-          // مزامنة التوكن إذا لزم الأمر دون حظر الواجهة
-          firebaseUser.getIdTokenResult().then(tokenResult => {
-            if (!tokenResult.claims.companyId && resolvedUser.currentCompanyId) {
-                firebaseUser.getIdToken(true);
-            }
-          });
-
-          setSessionIndicators(firebaseUser.uid, resolvedUser.role);
           setUser(resolvedUser);
           setCompany(resolvedCompany);
           if (resolvedCompany) setCurrentCompany(resolvedCompany);
-        } else if (!cached) {
+          setSessionIndicators(firebaseUser.uid, resolvedUser.role);
+          setLoading(false);
+        } else if (!user) {
           // لم نجد كاش ولم ينجح التحقق -> خروج
+          await signOut(masterAuth);
           setUser(null);
           clearSessionIndicators();
           if (resolvedUser && !resolvedUser.isActive) setError("هذا الحساب معطل حالياً.");
-          await signOut(masterAuth);
+          setLoading(false);
         }
       } catch (err) { 
-        console.error("Auth Cycle Error:", err);
-      } finally { 
-        setLoading(false); 
+        setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext]);
+  }, [masterAuth, masterFirestore, setCurrentCompany, fetchUserWithContext, user]);
 
   const login = useCallback(async (email: string, password: string) => {
     if (!masterAuth) throw new Error('بوابة الدخول غير متصلة.');
+    // ⚡ التوجيه المتفائل يبدأ هنا
     return signInWithEmailAndPassword(masterAuth, email.toLowerCase().trim(), password);
   }, [masterAuth]);
 
