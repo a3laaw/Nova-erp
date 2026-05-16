@@ -39,9 +39,8 @@ import {
 } from '@/components/ui/dialog';
 
 /**
- * غلاف لوحة التحكم (Sovereign Shield Implementation V79.0):
- * تم تحديثه ليشمل تحذير مسح البيانات بعد شهر للنسخ الديمو والأساسية.
- * تم إصلاح استدعاءات Label و Alert المفقودة.
+ * غلاف لوحة التحكم (Sovereign Shield Implementation V80.0):
+ * تم تحصينه بالكامل بكافة المكونات الرقابية لضمان استقرار "درع الحظر المالي".
  */
 export default function DashboardLayout({
   children,
@@ -91,7 +90,7 @@ export default function DashboardLayout({
   }, [company]);
 
   // المطور السيادي لا يخضع للحظر أو الإنذار
-  const isDev = user?.role === 'Developer' || user?.email === 'alaawaaheeb@gmail.com';
+  const isDev = user?.role === 'Developer' || user?.email?.toLowerCase() === 'alaawaaheeb@gmail.com';
 
   // 1. معالجة حالة التحميل
   if (loading || !mounted) {
@@ -154,7 +153,7 @@ export default function DashboardLayout({
               <p className="text-slate-300 font-bold mb-8 leading-relaxed">
                   نأسف لإبلاغكم بأن جلسة العمل لمنشأة <span className="text-red-400">"{company?.name}"</span> قد تم تجميدها آلياً لتجاوز موعد السداد.
                   <br/><br/>
-                  <span className="text-red-500 font-black">تنبيه حماية البيانات:</span> سيتم الاحتفاظ ببياناتكم مشفرة لمدة 30 يوماً فقط من تاريخ الانتهاء ({expiryDateFormatted})، وبعد ذلك سيتم مسحها نهائياً من خوادمنا. يرجى المبادرة بالتسوية لضمان عدم ضياع الأرشيف الفني.
+                  <span className="text-red-500 font-black">تنبيه حماية البيانات:</span> سيتم الاحتفاظ ببياناتكم مشفرة لمدة 30 يوماً فقط من تاريخ الانتهاء ({expiryDateFormatted})، وبعد ذلك سيتم مسحها نهائياً من خوادمنا لضمان خصوصية العمل. يرجى المبادرة بالتسوية لضمان عدم ضياع الأرشيف الفني.
               </p>
               
               <div className="grid gap-4">
@@ -163,7 +162,7 @@ export default function DashboardLayout({
                           <ShieldAlert className="h-5 w-5 text-red-400" />
                           <span className="text-xs font-black">إدارة المنظومة</span>
                       </div>
-                      <span className="font-mono text-sm tracking-widest">Sovereign Support</span>
+                      <span className="font-mono text-sm tracking-widest text-white/40">Sovereign Support</span>
                   </div>
                   <Button onClick={handleSafeExit} variant="outline" className="h-12 rounded-xl font-black text-white border-white/20 hover:bg-white/10">
                       العودة لصفحة الدخول
