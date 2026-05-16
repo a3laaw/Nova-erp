@@ -21,8 +21,9 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 /**
- * بوابة الدخول السيادية الموحدة (Zero-Base Design V96.0)
- * تم تطهير الحقول وإزالة كافة القيم الافتراضية.
+ * بوابة الدخول السيادية الموحدة (User Interface Restoration V97.0)
+ * - تم تصفير كافة الحقول لتمكين العميل من إدخال بياناته.
+ * - تبسيط لغة "جاري الدخول" لتكون سهلة وودودة.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -68,12 +69,12 @@ export default function LoginPage() {
 
   if (globalLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#1e1b4b]" dir="rtl">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background" dir="rtl">
           <div className="relative">
-              <div className="h-24 w-24 rounded-full border-4 border-white/10 border-t-white animate-spin" />
-              <ShieldCheck className="h-10 w-10 text-white absolute inset-0 m-auto animate-pulse" />
+              <div className="h-20 w-20 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
+              <ShieldCheck className="h-8 w-8 text-primary absolute inset-0 m-auto animate-pulse" />
           </div>
-          <p className="text-white font-black text-xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
+          <p className="text-foreground font-black text-xl tracking-tighter">جاري التحميل...</p>
       </div>
     );
   }
@@ -81,19 +82,19 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
       <Card className="w-full max-w-md rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect relative z-10 animate-in zoom-in-95 duration-500">
-        <CardHeader className="py-12 px-8 text-center border-b border-orange-100 bg-white/20">
-            <div className="bg-primary p-5 rounded-[2rem] w-fit mx-auto mb-6 shadow-xl shadow-orange-200 border-4 border-white">
-                {mode === 'login' ? <ShieldCheck className="h-10 w-10 text-white" /> : <Send className="h-10 w-10 text-white" />}
+        <CardHeader className="py-12 px-8 text-center border-b border-white/10 bg-white/20">
+            <div className="bg-primary p-5 rounded-[2rem] w-fit mx-auto mb-6 shadow-xl shadow-primary/20 border-4 border-white/40">
+                {mode === 'login' ? <LogIn className="h-10 w-10 text-white" /> : <Send className="h-10 w-10 text-white" />}
             </div>
             <CardTitle className="text-4xl font-black text-slate-900 tracking-tighter">Nova ERP</CardTitle>
-            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">SaaS Gateway</CardDescription>
+            <CardDescription className="text-primary font-black mt-2 uppercase tracking-widest text-[11px]">بوابة تسجيل الدخول</CardDescription>
         </CardHeader>
         
         <CardContent className="p-10 space-y-8 bg-white/20">
             {authError && (
-                <Alert variant="destructive" className="rounded-2xl border-2">
+                <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x duration-500">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle className="text-[11px] font-black">تنبيه العبور</AlertTitle>
+                    <AlertTitle className="text-[11px] font-black">تنبيه</AlertTitle>
                     <AlertDescription className="text-[10px] font-bold">{authError}</AlertDescription>
                 </Alert>
             )}
@@ -101,23 +102,23 @@ export default function LoginPage() {
             {mode === 'login' ? (
                 <form onSubmit={handleLogin} className="space-y-8">
                     <div className="grid gap-3">
-                        <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد</Label>
+                        <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-500">البريد الإلكتروني أو اسم المستخدم</Label>
                         <Input 
                             value={identifier} 
                             onChange={(e) => setIdentifier(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all" 
+                            className="h-14 rounded-2xl border-2 text-center font-black text-xl text-primary bg-white/60 focus:bg-white transition-all shadow-inner" 
                             required 
                             placeholder="Email / User ID"
                         />
                     </div>
 
                     <div className="grid gap-3">
-                        <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">كلمة المرور</Label>
+                        <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-500">كلمة المرور</Label>
                         <Input 
                             type="password" 
                             value={password} 
                             onChange={e => setPassword(e.target.value)} 
-                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white transition-all" 
+                            className="h-14 rounded-2xl border-2 font-mono text-center text-2xl bg-white/60 focus:bg-white transition-all shadow-inner" 
                             required 
                             placeholder="••••••••"
                         />
@@ -126,12 +127,12 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-orange-200 bg-primary text-white border-none transition-all active:scale-95">
+                    <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl shadow-primary/20 bg-primary text-white border-none transition-all active:scale-95">
                         {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : <LogIn className="h-6 w-6" />}
-                        {isSubmitting ? "جاري العبور..." : "دخول للنظام"}
+                        {isSubmitting ? "جاري الدخول..." : "دخول للنظام"}
                     </Button>
 
-                    <div className="pt-8 border-t border-orange-100 flex flex-col items-center">
+                    <div className="pt-8 border-t border-white/10 flex flex-col items-center">
                         <Button asChild variant="ghost" className="text-slate-500 font-bold gap-2 rounded-xl h-10 px-6 group">
                             <Link href="/register">
                                 <PlusCircle className="h-4 w-4 group-hover:rotate-90 transition-transform" />
@@ -143,8 +144,8 @@ export default function LoginPage() {
             ) : (
                 <form onSubmit={handleResetPassword} className="space-y-6">
                     <div className="grid gap-3">
-                        <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني المسجل</Label>
-                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg" required placeholder="your@email.com" />
+                        <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-500">البريد الإلكتروني المسجل</Label>
+                        <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-white/60" required placeholder="your@email.com" />
                     </div>
                     <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3">
                         {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
