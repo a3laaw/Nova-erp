@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, orderBy, Timestamp, where } from 'firebase/firestore';
+import { useState, useMemo } from 'react';
+import { useFirebase, useSubscription } from '@/firebase';
+import { orderBy, where } from 'firebase/firestore';
 import type { Account, JournalEntry } from '@/lib/types';
 import {
   Card,
@@ -10,7 +10,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
+  TableFooter,
 } from '@/components/ui/card';
 import {
   Table,
@@ -19,7 +19,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -27,14 +26,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatCurrency, cn } from '@/lib/utils';
-import { Loader2, Printer, Scale, Filter, AlertTriangle, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Printer, Scale, Filter, AlertTriangle } from 'lucide-react';
 import { useBranding } from '@/context/branding-context';
-import { Logo } from '@/components/layout/logo';
 import { DateInput } from '@/components/ui/date-input';
-import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toFirestoreDate } from '@/services/date-converter';
+import { useAuth } from '@/context/auth-context';
 
 interface TrialBalanceLine {
   accountId: string;
@@ -50,21 +48,11 @@ interface TrialBalanceLine {
   closingCredit: number;
 }
 
-/**
- * ميزان المراجعة المطور (v2.0):
- * - فلترة متقدمة حسب النوع والمستوى.
- * - إخفاء الأرصدة الصفرية.
- * - تنبيهات عدم التوازن.
- */
 export default function TrialBalancePage() {
     const { firestore } = useFirebase();
-    const { toast } = useToast();
-    const { branding, loading: brandingLoading } = useBranding();
+    const { user } = useAuth();
+    const { branding } = useBranding();
     
-    const [loading, setLoading] = useState(true);
-    const [accounts, setAccounts] = useState<Account[]>([]);
-    const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfMonth(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfMonth(new Date()));
     
@@ -72,24 +60,21 @@ export default function TrialBalancePage() {
     const [hideZeroBalances, setHideZeroBalances] = useState(true);
     const [typeFilter, setTypeFilter] = useState('all');
     const [levelFilter, setLevelFilter] = useState('all');
-    const [isGenerating, setIsGenerating] = useState(false);
 
-    const fetchData = async () => {
-        if (!firestore) return;
-        setLoading(true);
-        try {
-            const [accountsSnap, entriesSnap] = await Promise.all([
-                getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                getDocs(query(collection(firestore, 'journalEntries'), where('status', '==', 'posted')))
-            ]);
-            setAccounts(accountsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Account)));
-            setJournalEntries(entriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as JournalEntry)));
-        } finally { setLoading(false); }
-    };
+    // 🛡️ استخدام الخطافات السيادية الموحدة لضمان العبور الصحيح للمنشأة
+    const { data: accounts, loading: accountsLoading } = useSubscription<Account>(
+        firestore, 
+        user?.currentCompanyId ? 'chartOfAccounts' : null, 
+        [orderBy('code')]
+    );
+    
+    const { data: journalEntries, loading: entriesLoading } = useSubscription<JournalEntry>(
+        firestore, 
+        user?.currentCompanyId ? 'journalEntries' : null, 
+        [where('status', '==', 'posted')]
+    );
 
-    useEffect(() => {
-        fetchData();
-    }, [firestore]);
+    const loading = accountsLoading || entriesLoading;
 
     const trialBalanceData = useMemo(() => {
         if (loading || !dateFrom || !dateTo || accounts.length === 0) return { lines: [], totals: { openingDebit: 0, openingCredit: 0, periodDebit: 0, periodCredit: 0, closingDebit: 0, closingCredit: 0, isBalanced: true } };
@@ -142,14 +127,17 @@ export default function TrialBalancePage() {
              return true;
         });
         
+        const totalClosingDebit = lines.reduce((sum, l) => sum + l.closingDebit, 0);
+        const totalClosingCredit = lines.reduce((sum, l) => sum + l.closingCredit, 0);
+
         const totals = {
             openingDebit: lines.reduce((sum, l) => sum + l.openingDebit, 0),
             openingCredit: lines.reduce((sum, l) => sum + l.openingCredit, 0),
             periodDebit: lines.reduce((sum, l) => sum + l.periodDebit, 0),
             periodCredit: lines.reduce((sum, l) => sum + l.periodCredit, 0),
-            closingDebit: lines.reduce((sum, l) => sum + l.closingDebit, 0),
-            closingCredit: lines.reduce((sum, l) => sum + l.closingCredit, 0),
-            isBalanced: Math.abs(lines.reduce((sum, l) => sum + l.closingDebit, 0) - lines.reduce((sum, l) => sum + l.closingCredit, 0)) < 0.001
+            closingDebit: totalClosingDebit,
+            closingCredit: totalClosingCredit,
+            isBalanced: Math.abs(totalClosingDebit - totalClosingCredit) < 0.001
         };
 
         return { lines, totals };
@@ -192,7 +180,7 @@ export default function TrialBalancePage() {
                             <Label htmlFor="hide-zero" className="font-bold cursor-pointer">إخفاء الأرصدة الصفرية</Label>
                         </div>
                         <div className="flex gap-2">
-                            <Button onClick={fetchData} className="flex-1 rounded-xl h-11 font-black gap-2 shadow-lg shadow-blue-100">
+                            <Button className="flex-1 rounded-xl h-11 font-black gap-2 shadow-lg shadow-blue-100">
                                 <Filter className="h-4 w-4" /> تحديث النتائج
                             </Button>
                         </div>

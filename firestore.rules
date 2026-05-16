@@ -12,11 +12,13 @@ service cloud.firestore {
               request.auth.token.role == 'Developer');
     }
 
-    // 2. الموظف: ينتمي للمنشأة عبر توكن الأمان (Custom Claims)
+    // 2. الموظف: ينتمي للمنشأة عبر توكن الأمان (Custom Claims) أو البريد الإداري
     function isTenantMember(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
-              request.auth.token.currentCompanyId == companyId);
+              request.auth.token.currentCompanyId == companyId ||
+              (exists(/databases/$(database)/documents/companies/$(companyId)) && 
+               get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower()));
     }
 
     // 🚨 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
@@ -48,8 +50,6 @@ service cloud.firestore {
     }
 
     // 📊 🛡️ تحصين استعلامات المجموعات (Collection Group Rules)
-    // ضروري جداً لنجاح الداش بورد والتقارير
-    
     match /{path=**}/transactions/{id} {
         allow read: if request.auth != null && (isDeveloper() || isTenantMember(resource.data.companyId));
     }
