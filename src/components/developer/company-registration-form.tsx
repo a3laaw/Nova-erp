@@ -25,12 +25,20 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  Cloud
+  Cloud,
+  ShieldCheck,
+  CreditCard,
+  Users,
+  Calendar,
+  Zap
 } from 'lucide-react';
-import { cleanFirestoreData } from '@/lib/utils';
+import { cleanFirestoreData, cn } from '@/lib/utils';
 import type { Company } from '@/lib/types';
 import { addDays } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DateInput } from '../ui/date-input';
+import { Badge } from '../ui/badge';
 
 interface Props {
   isOpen: boolean;
@@ -149,7 +157,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
               password: formData.adminPassword,
               displayName: formData.name,
               uid: adminUidRef.current,
-              companyId: companyId, // نرسل الـ ID ليتم حقنه في التوكن
+              companyId: companyId,
               action: isEditing ? 'update_full' : 'create'
           })
       });
@@ -238,6 +246,7 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
 
           <ScrollArea className="flex-1">
             <div className="p-10 space-y-12">
+                {/* 1. الهوية والحساب */}
                 <section className="space-y-6">
                     <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4">هوية المنشأة والحساب الإداري</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 rounded-[2.5rem] bg-slate-50 border-2 border-slate-100">
@@ -268,10 +277,47 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
                     </div>
                 </section>
 
+                {/* 2. نظام التراخيص (الجديد) */}
+                <section className="space-y-6">
+                    <h3 className="font-black text-xl text-purple-700 border-r-8 border-purple-600 pr-4 flex items-center gap-3">
+                        <CreditCard className="h-6 w-6 text-purple-600" /> نظام التراخيص والاشتراك
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-8 rounded-[2.5rem] bg-purple-50/30 border-2 border-purple-100 shadow-inner">
+                        <div className="grid gap-2">
+                            <Label className="font-black text-xs pr-1">نوع الخطة (Plan)</Label>
+                            <Select value={formData.subscriptionType} onValueChange={(v: any) => setFormData(p => ({...p, subscriptionType: v}))}>
+                                <SelectTrigger className="h-12 rounded-xl border-2 bg-white font-bold"><SelectValue /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                    <SelectItem value="trial">نسخة تجريبية (Demo)</SelectItem>
+                                    <SelectItem value="premium">نسخة أساسية (Premium)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label className="font-black text-xs pr-1 flex items-center gap-1"><Users className="h-3 w-3"/> حد المستخدمين (Quota)</Label>
+                            <Input id="maxUsersLimit" type="number" value={formData.maxUsersLimit} onChange={handleChange} className="h-12 rounded-xl border-2 bg-white font-black text-center text-xl text-purple-700" />
+                        </div>
+                        {formData.subscriptionType === 'trial' && (
+                            <div className="grid gap-2 animate-in slide-in-from-top-2">
+                                <Label className="font-black text-xs pr-1 flex items-center gap-1"><Calendar className="h-3 w-3"/> تاريخ انتهاء الديمو</Label>
+                                <DateInput value={formData.trialEndDate} onChange={(d) => setFormData(p => ({...p, trialEndDate: d}))} className="bg-white rounded-xl border-2" />
+                            </div>
+                        )}
+                        {formData.subscriptionType === 'premium' && (
+                            <div className="flex items-center justify-center pt-6 animate-in zoom-in-95">
+                                <Badge className="bg-green-600 text-white font-black px-6 py-2 rounded-xl border-none shadow-lg gap-2">
+                                    <ShieldCheck className="h-4 w-4"/> اشتراك أساسي مفعل
+                                </Badge>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* 3. الربط السحابي */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
-                        <h3 className="font-black text-xl text-[#1e1b4b] border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
-                            <Cloud className="h-6 w-6 text-indigo-600" /> مصفوفة الربط السحابي (Firebase Config)
+                        <h3 className="font-black text-xl text-indigo-600 border-r-8 border-indigo-600 pr-4 flex items-center gap-3">
+                            <Cloud className="h-6 w-6 text-indigo-600" /> مصفوفة الربط السحابي (Firebase)
                         </h3>
                         <Button 
                             type="button" 
@@ -306,10 +352,10 @@ export function CompanyRegistrationForm({ isOpen, onClose, company = null }: Pro
           </ScrollArea>
 
           <DialogFooter className="p-8 border-t bg-slate-50 shrink-0 flex gap-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-2xl font-black h-14 px-10">إلغاء</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-2xl font-black h-14 px-10 border-2">إلغاء</Button>
             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-14 px-20 bg-[#1e1b4b] text-white hover:bg-black shadow-xl gap-4 text-xl min-w-[320px]">
-                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Save className="h-6 w-6" />}
-                {isEditing ? 'حفظ ومزامنة الهوية' : 'تأسيس المنشأة وتفعيل التراخيص'}
+                {isSaving ? <Loader2 className="animate-spin h-6 w-6" /> : <Zap className="h-6 w-6 text-yellow-400" />}
+                حفظ ومزامنة الهوية
             </Button>
           </DialogFooter>
         </form>
