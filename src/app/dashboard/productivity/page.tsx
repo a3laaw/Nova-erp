@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { orderBy, where } from 'firebase/firestore';
 import type { UserProductivityItem } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -28,7 +28,11 @@ import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { ProductivityService } from '@/services/productivity-service';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 
 /**
  * منصة الإنتاجية الشخصية (Personal Workspace):
@@ -37,7 +41,17 @@ import Link from 'next/link';
 export default function PersonalProductivityPage() {
     const { firestore } = useFirebase();
     const { user } = useAuth();
+    const searchParams = useSearchParams();
     
+    // محرك التبديل اللحظي بناءً على رادار الملاحة
+    const [activeTab, setActiveTab] = useState('tasks');
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'bookmarks') setActiveTab('bookmarks');
+        else if (tab === 'tasks') setActiveTab('tasks');
+    }, [searchParams]);
+
     // جلب المهام والمفضلات الخاصة بالمستخدم الحالي فقط (Privacy Protected)
     const productivityQuery = useMemo(() => [
         where('userId', '==', user?.id),
@@ -69,27 +83,43 @@ export default function PersonalProductivityPage() {
                 </CardHeader>
             </Card>
 
-            <Tabs defaultValue="tasks" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="bg-white/40 p-1 rounded-2xl border border-white/60 shadow-sm h-14 mb-8">
-                    <TabsTrigger value="tasks" className="rounded-xl px-12 font-black gap-2 data-[state=active]:bg-primary data-[state=active]:text-white h-full">
+                    <TabsTrigger value="tasks" className="rounded-xl px-12 font-black gap-2 data-[state=active]:bg-primary data-[state=active]:text-white h-full transition-all">
                         <ListChecks className="h-4 w-4" /> مهامي الشخصية
                     </TabsTrigger>
-                    <TabsTrigger value="bookmarks" className="rounded-xl px-12 font-black gap-2 data-[state=active]:bg-primary data-[state=active]:text-white h-full">
+                    <TabsTrigger value="bookmarks" className="rounded-xl px-12 font-black gap-2 data-[state=active]:bg-primary data-[state=active]:text-white h-full transition-all">
                         <Bookmark className="h-4 w-4" /> مركز المفضلات
                     </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="tasks" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {loading ? <Skeleton className="h-64 w-full rounded-3xl"/> : 
-                        tasks.length === 0 ? <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale"><ListChecks className="h-24 w-24 mb-4"/><p className="text-2xl font-black">لا توجد مهام حالياً</p></div> :
-                        tasks.map(task => <TaskCard key={task.id} task={task} />)}
+                        {loading ? (
+                            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-64 w-full rounded-3xl" />)
+                        ) : tasks.length === 0 ? (
+                            <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale">
+                                <ListChecks className="h-24 w-24 mb-4" />
+                                <p className="text-2xl font-black">لا توجد مهام حالياً</p>
+                            </div>
+                        ) : (
+                            tasks.map(task => <TaskCard key={task.id} task={task} />)
+                        )}
                     </div>
                 </TabsContent>
 
                 <TabsContent value="bookmarks" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {bookmarks.map(bm => <BookmarkCard key={bm.id} bookmark={bm} />)}
+                        {loading ? (
+                            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-3xl" />)
+                        ) : bookmarks.length === 0 ? (
+                            <div className="col-span-full h-96 flex flex-col items-center justify-center opacity-20 grayscale">
+                                <Bookmark className="h-24 w-24 mb-4" />
+                                <p className="text-2xl font-black">المفضلة فارغة</p>
+                            </div>
+                        ) : (
+                            bookmarks.map(bm => <BookmarkCard key={bm.id} bookmark={bm} />)
+                        )}
                     </div>
                 </TabsContent>
             </Tabs>
@@ -143,14 +173,14 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
                     </div>
                     <Separator orientation="vertical" className="h-6" />
                     <div className="space-y-0.5">
-                        <p className="text-[8px] font-black text-muted-foreground uppercase">الأيام المتبقية</p>
-                        <p className="font-black text-primary">3 أيام</p>
+                        <p className="text-[8px] font-black text-muted-foreground uppercase">الحالة</p>
+                        <p className="font-black text-primary">{task.status === 'completed' ? 'تم الإنجاز' : 'قيد المتابعة'}</p>
                     </div>
                 </div>
             </CardContent>
             <CardFooter className="p-6 bg-muted/10 gap-2">
                 <Button asChild variant="ghost" className="rounded-xl h-10 px-4 font-bold text-xs gap-2 group-hover:bg-white transition-all">
-                    <Link href={task.sourceUrl}><ArrowUpRight className="h-4 w-4"/> فتح المصدر</Link>
+                    <Link href={task.sourceUrl || '#'}><ArrowUpRight className="h-4 w-4"/> فتح المصدر</Link>
                 </Button>
                 {task.status !== 'completed' && (
                     <Button onClick={handleComplete} disabled={isUpdating} className="flex-1 h-10 rounded-xl bg-green-600 hover:bg-green-700 text-white font-black text-xs gap-2">
@@ -165,7 +195,7 @@ function TaskCard({ task }: { task: UserProductivityItem }) {
 
 function BookmarkCard({ bookmark }: { bookmark: UserProductivityItem }) {
     return (
-        <Link href={bookmark.sourceUrl} className="block group">
+        <Link href={bookmark.sourceUrl || '#'} className="block group">
             <Card className="rounded-[1.8rem] border-2 border-transparent bg-white shadow-sm hover:border-primary/40 hover:shadow-xl transition-all h-full flex flex-col items-center justify-center p-6 text-center">
                 <div className="p-3 bg-primary/5 rounded-2xl text-primary mb-3 group-hover:scale-110 transition-transform">
                     <Bookmark className="h-6 w-6" />

@@ -1,8 +1,21 @@
+
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Sparkles, User, Globe, Bell, CalendarDays, Home, Users, Moon, Sun } from 'lucide-react';
+import { 
+    Sparkles, 
+    User, 
+    Globe, 
+    Bell, 
+    CalendarDays, 
+    Home, 
+    Users, 
+    Moon, 
+    Sun,
+    ListTodo,
+    Bookmark
+} from 'lucide-react';
 import { useLanguage } from '@/context/language-context';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { cn } from '@/lib/utils';
@@ -34,8 +47,8 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
     return (
         <header className={cn("sticky top-0 z-30 flex h-20 items-center gap-4 bg-transparent px-8 sm:h-auto sm:border-0 no-print", className)}>
             <div className="flex items-center gap-6">
-                <div className="bg-white/60 dark:bg-slate-900/60 p-2.5 rounded-2xl border border-white/80 dark:border-white/10 backdrop-blur-xl shadow-lg transition-transform active:scale-95">
-                    <SidebarTrigger className="text-foreground size-5" />
+                <div className="bg-white/60 dark:bg-slate-900/60 p-2.5 rounded-2xl border border-white/80 dark:border-white/10 backdrop-blur-xl shadow-lg transition-transform active:scale-95 group">
+                    <SidebarTrigger className="text-foreground size-5 group-hover:text-primary transition-colors" />
                 </div>
                 <div className="hidden md:flex flex-col gap-1">
                     <Breadcrumbs />
@@ -48,7 +61,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                         variant="ghost" 
                         size="icon" 
                         onClick={toggleTheme} 
-                        className="rounded-full h-10 w-10 text-foreground hover:bg-white/40 dark:hover:bg-white/10 transition-all active:scale-90"
+                        className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
                         title="تبديل المظهر"
                     >
                         {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
@@ -56,9 +69,46 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     
                     <Separator orientation="vertical" className="h-6 bg-slate-200 dark:bg-white/10 mx-1" />
 
+                    {/* 🚀 محرك الإنتاجية الشخصية - الإضافة الجديدة */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 text-foreground hover:bg-white/40 dark:hover:bg-white/10 transition-all active:scale-90">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                            >
+                                <Sparkles className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="w-56 rounded-[1.5rem] p-2 shadow-2xl bg-white dark:bg-slate-900 backdrop-blur-xl border-white/20" dir="rtl">
+                            <DropdownMenuLabel className="font-black text-[10px] text-slate-400 uppercase tracking-widest px-3 py-2">محرك الإنجاز الشخصي</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                                <Link href="/dashboard/productivity?tab=tasks" className="flex items-center gap-3">
+                                    <div className="p-1.5 bg-green-50 rounded-lg text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                        <ListTodo className="h-4 w-4" />
+                                    </div>
+                                    <span className="dark:text-white">مهامي الشخصية</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild className="rounded-xl py-3 font-black cursor-pointer group">
+                                <Link href="/dashboard/productivity?tab=bookmarks" className="flex items-center gap-3">
+                                    <div className="p-1.5 bg-orange-50 rounded-lg text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                        <Bookmark className="h-4 w-4" />
+                                    </div>
+                                    <span className="dark:text-white">مركز المفضلات</span>
+                                </Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="rounded-full h-10 w-10 text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                            >
                                 <CalendarDays className="h-5 w-5" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -89,7 +139,7 @@ export function Header({ currentUser, onLogout, className }: HeaderProps) {
                     <Button 
                         variant="ghost" 
                         onClick={toggleLanguage} 
-                        className="h-10 px-4 rounded-full text-foreground hover:bg-primary/5 transition-all flex items-center gap-2 group relative overflow-hidden"
+                        className="h-10 px-4 rounded-full text-foreground hover:bg-primary/10 hover:text-primary transition-all flex items-center gap-2 group relative overflow-hidden"
                     >
                         <Globe className="h-4 w-4 opacity-70 group-hover:rotate-12 transition-transform" />
                         <span className="text-[10px] font-black uppercase tracking-tighter">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -49,7 +50,7 @@ export function Notifications() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full text-[#1e1b4b] hover:bg-white/40">
+        <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full text-foreground hover:bg-primary/10 hover:text-primary transition-all">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge className="absolute top-0.5 right-0.5 h-4 w-4 justify-center p-0 bg-red-600 text-white border-2 border-white text-[8px] font-black animate-pulse">
