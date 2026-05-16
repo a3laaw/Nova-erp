@@ -21,6 +21,8 @@ import {
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 import { isPast, differenceInDays } from 'date-fns';
@@ -37,8 +39,9 @@ import {
 } from '@/components/ui/dialog';
 
 /**
- * غلاف لوحة التحكم (Sovereign Shield Implementation V78.0):
+ * غلاف لوحة التحكم (Sovereign Shield Implementation V79.0):
  * تم تحديثه ليشمل تحذير مسح البيانات بعد شهر للنسخ الديمو والأساسية.
+ * تم إصلاح استدعاءات Label و Alert المفقودة.
  */
 export default function DashboardLayout({
   children,
