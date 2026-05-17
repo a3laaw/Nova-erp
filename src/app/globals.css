@@ -43,10 +43,10 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
   }
 
@@ -55,38 +55,37 @@
   }
 
   .sidebar-glass {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.15) !important;
     backdrop-filter: blur(15px) !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
   }
 
-  /* العنصر العادي: خلفية لؤلؤية وأيقونة برتقالية */
+  /* ⚪️ العنصر العادي (سكون): كبسولة بيضاء واضحة وأيقونة برتقالية حادة ⚪️ */
   .nav-capsule {
-    @apply bg-white/70 border border-white/90 text-[#1e1b4b] font-bold shadow-sm transition-all duration-300;
+    @apply bg-white/90 border border-white/100 text-[#1e1b4b] font-bold shadow-md transition-all duration-300;
   }
   
   .nav-capsule svg {
-    color: #FF7A00 !important;
+    color: #FF7A00 !important; /* البرتقالي الرسمي يظهر بوضوح فوق الأبيض */
     @apply transition-colors duration-300;
   }
   
-  /* العنصر النشط أو الهوفر: خلفية برتقالية وأيقونة بيضاء للتباين القصوى */
+  /* 🔥 العنصر النشط أو الهوفر: خلفية برتقالية وأيقونة بيضاء ناصعة للتباين 🔥 */
   .nav-capsule:hover, .nav-capsule-active {
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-white font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
+    @apply text-white font-black shadow-xl border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
   }
   
-  /* ⚪️ الأيقونة تتحول للأبيض الصريح فوراً فوق البرتقالي لضمان الوضوح ⚪️ */
   .nav-capsule:hover svg, 
   .nav-capsule-active svg,
-  [data-state="active"] svg,
-  .group\/btn:hover svg {
+  [data-state="active"] svg {
     color: #FFFFFF !important;
     stroke: #FFFFFF !important;
   }
 
+  /* العناصر الفرعية: أقل سطوعاً في السكون */
   .nav-capsule-sub {
-    @apply bg-white/40 border border-white/50 text-[#1e1b4b]/80 font-bold transition-all duration-300;
+    @apply bg-white/50 border border-white/60 text-[#1e1b4b]/80 font-bold transition-all duration-300;
   }
   
   .nav-capsule-sub svg {
