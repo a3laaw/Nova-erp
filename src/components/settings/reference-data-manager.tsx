@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -59,8 +58,9 @@ import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+import { useSubscription } from '@/hooks/use-subscription';
 
-// --- Drag & Drop Imports ---
+// --- 🛡️ التصحيح الجذري لمصفوفة السحب والإفلات (dnd-kit) ---
 import {
   DndContext,
   closestCenter,
@@ -69,8 +69,8 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent
-} from '@radix-ui/react-dnd'; // Note: Ensure the correct package name if different
-// Fallback for missing package in training data context, assuming standard dnd-kit usage
+} from '@dnd-kit/core';
+
 import {
   arrayMove,
   SortableContext,
@@ -78,6 +78,7 @@ import {
   verticalListSortingStrategy,
   useSortable
 } from '@dnd-kit/sortable';
+
 import { CSS } from '@dnd-kit/utilities';
 
 function SortableRefListItem({ id, children, isActive }: { id: string, children: React.ReactNode, isActive?: boolean }) {
@@ -195,14 +196,14 @@ export function ReferenceDataManager() {
         return '';
     }, [view, activeSubTab]);
 
-    const { data: rawPrimaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
+    const { data: rawPrimaryItems = [], loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
     
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
     }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
     
-    const { data: rawSecondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath);
+    const { data: rawSecondaryItems = [], loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath);
 
     const primaryItems = useMemo(() => {
         return [...rawPrimaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
@@ -555,9 +556,9 @@ export function ReferenceDataManager() {
                         <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-2">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمناطق الافتراضية المعتمدة للمكاتب الهندسية في الكويت آلياً لتوفير وقتك.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-8 gap-4">
-                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-8">تراجع</AlertDialogCancel>
+                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-2xl font-black h-12 px-12 bg-primary shadow-xl shadow-primary/20">
-                            {isImporting ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، ابدأ الاستيراد'}
+                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
