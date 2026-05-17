@@ -103,4 +103,39 @@
   pointer-events: auto !important;
 }
 
+/* 🎨 تحسين مظهر قوائم التقويم المنسدلة (Professional Date Picker UI) 🎨 */
+.rdp-dropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rdp-caption_dropdowns {
+  display: flex;
+  gap: 0.5rem;
+  background: #f8fafc;
+  padding: 0.25rem 0.5rem;
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.rdp-dropdown select {
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #1e1b4b;
+  background-color: transparent;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  outline: none;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.rdp-dropdown select:hover {
+  background-color: #ffffff;
+  color: #FF5C00;
+}
+
 .scrollbar-none::-webkit-scrollbar { display: none; }

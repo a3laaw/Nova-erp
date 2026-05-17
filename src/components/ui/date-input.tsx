@@ -112,7 +112,7 @@ export function DateInput({
           {...props}
         />
       </div>
-      <PopoverContent className="w-auto p-0 z-[999999] rounded-[2rem] border-none shadow-2xl" align="start">
+      <PopoverContent className="w-auto p-0 z-[999999] rounded-[2.5rem] border-none shadow-2xl overflow-hidden" align="start">
         <Calendar
           mode="single"
           selected={dateValue}
@@ -120,7 +120,7 @@ export function DateInput({
           initialFocus
           disabled={disabled}
           locale={ar}
-          // ✨ تفعيل اختيار السنة والشهر مباشرة ✨
+          // ✨ تفعيل اختيار السنة والشهر كقوائم منسدلة احترافية ✨
           captionLayout="dropdown-buttons"
           fromYear={1950}
           toYear={2050}
