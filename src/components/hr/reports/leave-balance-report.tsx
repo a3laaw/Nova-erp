@@ -1,8 +1,7 @@
-
 'use client';
 import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { where } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Printer, FileDown, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Printer, FileDown, AlertTriangle, Clock } from 'lucide-react';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
@@ -142,10 +141,10 @@ export function LeaveBalanceReport() {
                                         <TableCell className="px-4">
                                             <div className="space-y-1.5">
                                                 <div className="flex justify-between text-[10px] font-black uppercase">
-                                                    <span className={cn(emp.isCritical ? "text-red-600" : "text-green-600")}>{emp.leaveBalance} يوم متبقي</span>
+                                                    <span className={cn(emp.leaveBalance < 5 ? "text-red-600" : "text-green-600")}>{emp.leaveBalance} يوم متبقي</span>
                                                     <span className="text-muted-foreground">{emp.usageRate.toFixed(0)}% مستخدم</span>
                                                 </div>
-                                                <Progress value={100 - emp.usageRate} className={cn("h-2", emp.isCritical ? "bg-red-100" : "bg-green-100")} />
+                                                <Progress value={100 - emp.usageRate} className={cn("h-2", emp.leaveBalance < 5 ? "bg-red-100" : "bg-green-100")} />
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-center">
