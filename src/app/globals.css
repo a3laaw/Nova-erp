@@ -32,7 +32,9 @@
 @layer base {
   * { @apply border-border; }
   body {
-    background: #F8F9FB;
+    /* 🌅 خلفية لؤلؤية خفيفة جداً بتدرج ذهبي برتقالي 🌅 */
+    background: linear-gradient(135deg, #FFFDF0 0%, #FFFAF5 100%);
+    background-attachment: fixed;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -79,5 +81,26 @@
   }
 }
 
-[data-radix-popper-content-wrapper] { z-index: 999999 !important; pointer-events: auto !important; }
+/* 🛡️ الحل الجذري لمشكلة النقر بالماوس في القوائم المنسدلة 🛡️ */
+[data-radix-popper-content-wrapper] {
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+}
+
+[role="listbox"],
+[role="menu"],
+[role="dialog"],
+[data-state="open"][data-radix-select-content],
+[data-state="open"][data-radix-popover-content] {
+  pointer-events: auto !important;
+  z-index: 999999 !important;
+}
+
+[role="option"],
+[role="menuitem"],
+[cmdk-item] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
 .scrollbar-none::-webkit-scrollbar { display: none; }
