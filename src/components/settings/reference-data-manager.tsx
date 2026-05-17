@@ -78,7 +78,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable
-} from '@radix-ui/react-sortable';
+} from '@dnd-kit/sortable';
 
 import { CSS } from '@dnd-kit/utilities';
 
@@ -266,7 +266,6 @@ export function ReferenceDataManager() {
                 companyId: tenantId
             };
 
-            // 🛡️ إضافة معرّف الأب بشكل صريح للبنود الفرعية لسهولة الفلترة
             if (type === 'secondary' && selectedPrimaryId) {
                 payload.parentId = selectedPrimaryId;
             }
@@ -569,4 +568,3 @@ export function ReferenceDataManager() {
         </div>
     );
 }
-
