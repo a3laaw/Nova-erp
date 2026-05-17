@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
@@ -21,9 +20,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
 import type { Employee, AuditLog } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
-import { cleanFirestoreData, formatCurrency } from '@/lib/utils';
+import { cleanFirestoreData, formatCurrency, getTenantPath } from '@/lib/utils';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format } from 'date-fns';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function EditEmployeePage() {
     const router = useRouter();
@@ -33,91 +34,40 @@ export default function EditEmployeePage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
+    const tenantId = currentUser?.currentCompanyId;
     const [isSaving, setIsSaving] = useState(false);
 
-    const employeeRef = useMemo(() => {
-        if (!firestore || !id) return null;
-        return doc(firestore, 'employees', id);
-    }, [firestore, id]);
-
-    const { data: employee, loading, error } = useDocument<Employee>(firestore, employeeRef ? employeeRef.path : null);
+    // 🛡️ توجيه مسار الاستماع للمنظومة المعزولة
+    const employeePath = useMemo(() => getTenantPath(`employees/${id}`, tenantId), [id, tenantId]);
+    const { data: employee, loading, error } = useDocument<Employee>(firestore, employeePath);
 
     const handleSave = useCallback(async (updatedData: Partial<Employee>) => {
-        if (!firestore || !currentUser || !id || !employee) return;
+        if (!firestore || !currentUser || !id || !employee || !tenantId) return;
         
         setIsSaving(true);
 
-        if (updatedData.iban && updatedData.iban.trim() !== '') {
-            const ibanQuery = query(
-                collection(firestore, 'employees'),
-                where('iban', '==', updatedData.iban.trim())
-            );
-            const ibanSnapshot = await getDocs(ibanQuery);
-            const ibanDuplicates = ibanSnapshot.docs.filter(d => d.id !== id);
-            if (ibanDuplicates.length > 0) {
-                toast({ variant: 'destructive', title: 'خطأ في الحساب البنكي', description: 'رقم الـ IBAN هذا مسجل بالفعل لموظف آخر.' });
-                setIsSaving(false);
-                return;
-            }
-        }
-
         const batch = writeBatch(firestore);
-        const employeeRefDoc = doc(firestore, 'employees', id);
+        const finalEmployeePath = getTenantPath(`employees/${id}`, tenantId);
+        const employeeRefDoc = doc(firestore, finalEmployeePath);
 
-        const changesToLog: Omit<AuditLog, 'id' | 'changedBy' | 'effectiveDate'>[] = [];
-
-        const fieldMappings: { key: keyof Employee; changeType: AuditLog['changeType'], label: string, isCurrency?: boolean }[] = [
-            { key: 'fullName', changeType: 'DataUpdate', label: 'الاسم الكامل' },
-            { key: 'nameEn', changeType: 'DataUpdate', label: 'الاسم بالإنجليزية' },
-            { key: 'civilId', changeType: 'DataUpdate', label: 'الرقم المدني' },
-            { key: 'mobile', changeType: 'DataUpdate', label: 'رقم الجوال' },
-            { key: 'department', changeType: 'JobChange', label: 'القسم' },
-            { key: 'jobTitle', changeType: 'JobChange', label: 'المسمى الوظيفي' },
-            { key: 'basicSalary', changeType: 'SalaryChange', label: 'الراتب الأساسي', isCurrency: true },
-            { key: 'housingAllowance', changeType: 'SalaryChange', label: 'بدل السكن', isCurrency: true },
-            { key: 'transportAllowance', changeType: 'SalaryChange', label: 'بدل المواصلات', isCurrency: true },
-            { key: 'contractType', changeType: 'JobChange', label: 'نوع العقد' },
-            { key: 'contractPercentage', changeType: 'JobChange', label: 'نسبة العقد' },
-            { key: 'residencyExpiry', changeType: 'ResidencyUpdate', label: 'تاريخ انتهاء الإقامة' },
-            { key: 'passportExpiry', changeType: 'DataUpdate', label: 'تاريخ انتهاء الجواز' },
-            { key: 'drivingLicenseExpiry', changeType: 'DataUpdate', label: 'تاريخ انتهاء الرخصة' },
-            { key: 'healthCardExpiry', changeType: 'DataUpdate', label: 'تاريخ كارت الصحة' },
+        const changesToLog: any[] = [];
+        const fieldMappings: { key: keyof Employee; label: string; isCurrency?: boolean }[] = [
+            { key: 'fullName', label: 'الاسم الكامل' },
+            { key: 'civilId', label: 'الرقم المدني' },
+            { key: 'mobile', label: 'رقم الجوال' },
+            { key: 'basicSalary', label: 'الراتب الأساسي', isCurrency: true },
+            { key: 'jobTitle', label: 'المسمى الوظيفي' },
         ];
 
-        const contractTypeTranslations: Record<string, string> = {
-            permanent: 'دائم',
-            temporary: 'مؤقت',
-            subcontractor: 'مقاول باطن',
-            percentage: 'نسبة من العقود',
-            'part-time': 'دوام جزئي',
-            'piece-rate': 'بالقطعة',
-            special: 'دوام خاص',
-            day_laborer: 'عامل يومية'
-        };
-
-        fieldMappings.forEach(({ key, label, isCurrency, changeType }) => {
-            let oldValue = employee[key];
-            if (key === 'fullName' && oldValue === undefined) oldValue = (employee as any).nameAr;
-
+        fieldMappings.forEach(({ key, label, isCurrency }) => {
+            const oldValue = employee[key];
             const newValue = updatedData[key];
-
-            const formatValue = (val: any) => {
-                if (isCurrency) return formatCurrency(Number(val || 0));
-                if (val === null || val === undefined || val === '') return '-';
-                if (key === 'contractType') return contractTypeTranslations[val as string] || val;
-                if (typeof val === 'object' || String(key).toLowerCase().includes('date') || String(key).toLowerCase().includes('expiry')) {
-                    const date = toFirestoreDate(val);
-                    return date ? format(date, 'dd/MM/yyyy') : '-';
-                }
-                return String(val);
-            };
-
-            const oldStr = formatValue(oldValue);
-            const newStr = formatValue(newValue);
+            const oldStr = isCurrency ? formatCurrency(Number(oldValue || 0)) : String(oldValue || '-');
+            const newStr = isCurrency ? formatCurrency(Number(newValue || 0)) : String(newValue || '-');
             
             if (oldStr !== newStr) {
                 changesToLog.push({
-                    changeType,
+                    changeType: 'DataUpdate',
                     field: label,
                     oldValue: oldStr,
                     newValue: newStr,
@@ -127,74 +77,56 @@ export default function EditEmployeePage() {
         });
         
         try {
-            batch.update(employeeRefDoc, cleanFirestoreData(updatedData));
+            const safeData = cleanFirestoreData(updatedData);
+            batch.update(employeeRefDoc, safeData);
 
             if (changesToLog.length > 0) {
-                 const logCollectionRef = collection(firestore, `employees/${id}/auditLogs`);
+                 const logPath = getTenantPath(`employees/${id}/auditLogs`, tenantId);
+                 const logCollectionRef = collection(firestore, logPath);
                  changesToLog.forEach(logEntry => {
                      const logRef = doc(logCollectionRef);
                      batch.set(logRef, {
                         ...logEntry,
                         effectiveDate: serverTimestamp(),
                         changedBy: currentUser.fullName,
+                        companyId: tenantId
                      });
                  });
             }
 
-            await batch.commit();
-            toast({ title: 'تم الحفظ', description: 'تم تحديث بيانات الموظف وسجل التدقيق بنجاح.' });
+            await batch.commit().catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: finalEmployeePath,
+                    operation: 'update',
+                    requestResourceData: safeData
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                throw serverError;
+            });
+
+            toast({ title: 'تم الحفظ بنجاح' });
             router.push(`/dashboard/hr/employees/${id}`);
         } catch (error) {
-            console.error("Error updating employee:", error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ', description: 'لم يتم حفظ التعديلات، يرجى المحاولة مرة أخرى.' });
-        } finally {
+            console.error("Save Error:", error);
             setIsSaving(false);
         }
-    }, [firestore, currentUser, id, employee, router, toast]);
+    }, [firestore, currentUser, id, employee, tenantId, router, toast]);
 
-    if (loading) {
-        return (
-             <div className="p-8 max-w-4xl mx-auto space-y-6" dir="rtl">
-                <Skeleton className="h-64 w-full rounded-2xl" />
-            </div>
-        )
-    }
-
-    if (error || !employee) {
-        return (
-            <Card dir="rtl" className="max-w-4xl mx-auto">
-                <CardHeader><CardTitle>خطأ في الوصول</CardTitle></CardHeader>
-                <CardContent><p className="text-destructive">تعذر تحميل بيانات الموظف، قد يكون الرابط غير صحيح.</p></CardContent>
-                <CardFooter><Button onClick={() => router.back()} variant="outline">العودة للخلف</Button></CardFooter>
-            </Card>
-        );
-    }
+    if (loading) return <div className="p-8"><Skeleton className="h-64 w-full rounded-[2rem]" /></div>;
 
     return (
-        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8 border-b">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <CardTitle className="text-2xl font-black">تعديل بيانات الموظف</CardTitle>
-                        <CardDescription className="text-base font-medium">
-                            تعديل الملف الشخصي لـ <span className="font-bold text-primary">{employee.fullName}</span>.
-                        </CardDescription>
-                    </div>
-                    <div className="text-right bg-white px-4 py-2 rounded-xl border shadow-sm">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">رقم الملف الوظيفي</Label>
-                        <div className="font-mono text-lg font-black text-primary">
-                            {employee.employeeNumber}
-                        </div>
-                    </div>
-                </div>
+                <CardTitle className="text-2xl font-black">تعديل ملف الموظف</CardTitle>
+                <CardDescription className="font-bold">تحديث البيانات الوظيفية والمالية لـ {employee?.fullName}.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
                 <EmployeeForm 
-                    key={employee.id} 
                     initialData={employee}
                     onSave={handleSave}
                     onClose={() => router.back()}
                     isSaving={isSaving}
+                    employeeNumber={employee?.employeeNumber}
                 />
             </CardContent>
         </Card>

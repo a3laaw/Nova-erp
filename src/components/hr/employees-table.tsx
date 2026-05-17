@@ -43,7 +43,9 @@ import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
 import { DateInput } from '../ui/date-input';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
@@ -67,6 +69,8 @@ interface EmployeesTableProps {
 export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTableProps) {
     const { toast } = useToast();
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
+    const tenantId = currentUser?.currentCompanyId;
     
     const [statusFilter, setStatusFilter] = useState('active');
     const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -116,7 +120,6 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
             });
         }
         
-        // Sorting numerically by employeeNumber
         const sorted = [...filtered].sort((a, b) => {
             const numA = parseInt(a.employeeNumber) || 0;
             const numB = parseInt(b.employeeNumber) || 0;
@@ -132,27 +135,43 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
     };
 
     const handleTerminateConfirm = async () => {
-        if (!employeeToTerminate || !terminationReason || !firestore) return;
+        if (!employeeToTerminate || !terminationReason || !firestore || !tenantId) return;
         setIsTerminating(true);
+        const employeePath = getTenantPath(`employees/${employeeToTerminate.id}`, tenantId);
+        const employeeRef = doc(firestore, employeePath);
+        const updateData = { status: 'terminated', terminationDate: new Date(), terminationReason: terminationReason };
+
         try {
-            const employeeRef = doc(firestore, 'employees', employeeToTerminate.id!);
-            await updateDoc(employeeRef, { status: 'terminated', terminationDate: new Date(), terminationReason: terminationReason });
+            await updateDoc(employeeRef, updateData).catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: employeePath,
+                    operation: 'update',
+                    requestResourceData: updateData
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            });
             toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف.'});
         } finally { setIsTerminating(false); setEmployeeToTerminate(null); setTerminationReason(null); }
     };
 
     const handleReactivate = async (employee: Employee) => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
+        const employeePath = getTenantPath(`employees/${employee.id}`, tenantId);
+        const employeeRef = doc(firestore, employeePath);
+        const updateData = { status: 'active' as const, terminationReason: null, terminationDate: null };
+
         try {
-            const employeeRef = doc(firestore, 'employees', employee.id!);
-            await updateDoc(employeeRef, {
-                status: 'active',
-                terminationReason: null,
-                terminationDate: null,
+            await updateDoc(employeeRef, updateData).catch(async (serverError) => {
+                const permissionError = new FirestorePermissionError({
+                    path: employeePath,
+                    operation: 'update',
+                    requestResourceData: updateData
+                });
+                errorEmitter.emit('permission-error', permissionError);
             });
             toast({ title: 'نجاح', description: `تم إعادة ${employee.fullName} للخدمة بنجاح.` });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحديث حالة الموظف.' });
+            console.error(error);
         }
     };
 
