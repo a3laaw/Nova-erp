@@ -63,12 +63,22 @@
 
   /* العنصر الرئيسي - فاتح بوضوح */
   .nav-capsule {
-    @apply bg-white/60 border border-white/80 text-[#1e1b4b] font-bold shadow-sm transition-all duration-300 hover:bg-gradient-to-l hover:from-[#FF7A00] hover:to-[#FFB000] hover:text-white hover:border-none hover:shadow-lg;
+    @apply bg-white/60 border border-white/80 text-[#1e1b4b] font-bold shadow-sm transition-all duration-300;
+  }
+  
+  .nav-capsule:hover {
+    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
+    @apply text-white font-black shadow-lg border-none scale-[1.02];
   }
 
   /* العنصر الفرعي - فاتح أقل قليلاً */
   .nav-capsule-sub {
-    @apply bg-white/30 border border-white/40 text-[#1e1b4b]/80 font-bold transition-all duration-300 hover:bg-gradient-to-l hover:from-[#FF7A00] hover:to-[#FFB000] hover:text-white hover:border-none hover:shadow-md;
+    @apply bg-white/30 border border-white/40 text-[#1e1b4b]/80 font-bold transition-all duration-300;
+  }
+  
+  .nav-capsule-sub:hover {
+    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
+    @apply text-white font-black shadow-md border-none;
   }
 
   /* الحالة النشطة - التدرج البرتقالي الذهبي */
