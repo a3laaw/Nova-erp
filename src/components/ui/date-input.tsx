@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -93,11 +92,11 @@ export function DateInput({
         <PopoverTrigger asChild>
           <Button
             variant="ghost"
-            className="absolute left-0 top-0 h-full px-3 rtl:left-auto rtl:right-0 z-10"
+            className="absolute left-0 top-0 h-full px-3 rtl:left-auto rtl:right-0 z-10 hover:bg-transparent"
             disabled={disabled}
             type="button"
           >
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <CalendarIcon className="h-4 w-4 text-primary opacity-60" />
           </Button>
         </PopoverTrigger>
         <Input
@@ -109,11 +108,11 @@ export function DateInput({
           placeholder={placeholder || `مثال: ${formatDate(new Date(), 'dd/MM/yyyy')}`}
           disabled={disabled}
           required={required}
-          className="w-full pl-10 rtl:pr-10 h-11 rounded-xl"
+          className="w-full pl-10 rtl:pr-10 h-11 rounded-xl border-2 font-bold"
           {...props}
         />
       </div>
-      <PopoverContent className="w-auto p-0 z-[999999]" align="start">
+      <PopoverContent className="w-auto p-0 z-[999999] rounded-[2rem] border-none shadow-2xl" align="start">
         <Calendar
           mode="single"
           selected={dateValue}
@@ -121,6 +120,10 @@ export function DateInput({
           initialFocus
           disabled={disabled}
           locale={ar}
+          // ✨ تفعيل اختيار السنة والشهر مباشرة ✨
+          captionLayout="dropdown-buttons"
+          fromYear={1950}
+          toYear={2050}
         />
       </PopoverContent>
     </Popover>
