@@ -22,9 +22,8 @@ function Calendar({
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        // 💎 تعديل الرأس ليكون متناسقاً مع القوائم المنسدلة 💎
         caption: "flex justify-center pt-2 relative items-center gap-2 px-10",
-        caption_label: "hidden", // إخفاء النص العادي لإفساح المجال للقوائم
+        caption_label: "text-sm font-black", 
         caption_dropdowns: "flex justify-center gap-2 items-center z-20",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
@@ -49,7 +48,6 @@ function Calendar({
         day_disabled: "text-muted-foreground opacity-20",
         day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        // 🎨 تنسيق القوائم المنسدلة الاحترافية 🎨
         dropdown: "rdp-dropdown appearance-none bg-white border-2 border-slate-100 rounded-xl text-xs font-black p-2 px-3 focus:border-primary focus:ring-0 outline-none cursor-pointer hover:bg-slate-50 transition-colors shadow-sm",
         dropdown_month: "relative",
         dropdown_year: "relative",

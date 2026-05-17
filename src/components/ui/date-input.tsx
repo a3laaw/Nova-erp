@@ -120,7 +120,6 @@ export function DateInput({
           initialFocus
           disabled={disabled}
           locale={ar}
-          // ✨ تفعيل اختيار السنة والشهر كقوائم منسدلة احترافية ✨
           captionLayout="dropdown-buttons"
           fromYear={1950}
           toYear={2050}

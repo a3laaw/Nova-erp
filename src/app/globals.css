@@ -32,7 +32,6 @@
 @layer base {
   * { @apply border-border; }
   body {
-    /* 🌅 خلفية لؤلؤية خفيفة جداً بتدرج ذهبي برتقالي 🌅 */
     background: linear-gradient(135deg, #FFFDF0 0%, #FFFAF5 100%);
     background-attachment: fixed;
     color: #1e1b4b;
@@ -50,7 +49,6 @@
     box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
   }
 
-  /* 🟠 المربع المتدرج الذهبي-البرتقالي 🟠 */
   .nav-item-box {
     background: linear-gradient(135deg, #FFB000 0%, #FF7A00 100%) !important;
     @apply flex items-center gap-4 p-4 rounded-[1.5rem] text-white transition-all duration-300 border-none w-full shadow-md;
@@ -60,7 +58,6 @@
     @apply text-white size-6 shrink-0 transition-all duration-300;
   }
 
-  /* ⚪ حالة الهوفر والنشاط السيادية: خلفية بيضاء، أيقونة سوداء ⚪ */
   .nav-item-box:hover, 
   .nav-item-box-active {
     background: #FFFFFF !important;
@@ -75,13 +72,11 @@
     @apply scale-110 !important;
   }
 
-  /* 📏 منع الإزاحة للأقسام الفرعية لضمان خط عمودي واحد 📏 */
   .sidebar-no-offset {
     @apply pr-0 mr-0 ml-0 pl-0 border-none !important;
   }
 }
 
-/* 🛡️ الحل الجذري لمشكلة النقر بالماوس في القوائم المنسدلة 🛡️ */
 [data-radix-popper-content-wrapper] {
   z-index: 999999 !important;
   pointer-events: auto !important;
@@ -104,38 +99,48 @@
 }
 
 /* 🎨 تحسين مظهر قوائم التقويم المنسدلة (Professional Date Picker UI) 🎨 */
-.rdp-dropdown {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
+.rdp-caption {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+.rdp-caption_label {
+  display: none !important; /* Hide static text when dropdowns are active */
 }
 
 .rdp-caption_dropdowns {
-  display: flex;
-  gap: 0.5rem;
-  background: #f8fafc;
-  padding: 0.25rem 0.5rem;
-  border-radius: 1rem;
-  border: 1px solid #e2e8f0;
+  display: flex !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.rdp-dropdown {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
 
 .rdp-dropdown select {
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 800;
-  color: #1e1b4b;
-  background-color: transparent;
-  border: none;
-  padding: 0.25rem 0.5rem;
-  cursor: pointer;
-  outline: none;
-  border-radius: 0.5rem;
-  transition: all 0.2s;
+  appearance: none !important;
+  background-color: #f8fafc !important;
+  border: 2px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 4px 12px !important;
+  font-family: inherit !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  color: #1e1b4b !important;
+  cursor: pointer !important;
+  outline: none !important;
+  transition: all 0.2s !important;
 }
 
 .rdp-dropdown select:hover {
-  background-color: #ffffff;
-  color: #FF5C00;
+  background-color: #ffffff !important;
+  border-color: #FF5C00 !important;
+  color: #FF5C00 !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
