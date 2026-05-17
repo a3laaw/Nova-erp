@@ -1,19 +1,20 @@
+
 'use client';
 import { useState, useMemo } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Printer, FileDown, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { useToast } from '@/hooks/use-toast';
-import { Progress } from '../ui/progress';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
