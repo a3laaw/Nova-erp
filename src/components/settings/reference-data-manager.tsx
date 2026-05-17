@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { 
     collection, 
@@ -78,9 +78,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-/**
- * مكون العنصر القابل للسحب (Sortable Item):
- */
 function SortableRefListItem({ id, children, isActive }: { id: string, children: React.ReactNode, isActive?: boolean }) {
   const {
     attributes,
@@ -147,7 +144,6 @@ export function ReferenceDataManager() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
-    const router = useRouter();
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
     const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas'>('jobs');
@@ -194,20 +190,27 @@ export function ReferenceDataManager() {
         return '';
     }, [view, activeSubTab]);
 
-    const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null, [orderBy('order')]);
+    // 🛡️ التعديل الجذري: إزالة orderBy من السيرفر لضمان ظهور السجلات القديمة
+    const { data: rawPrimaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null);
     
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
     }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
     
-    const { data: secondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath, [orderBy('order')]);
+    const { data: rawSecondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath);
+
+    // ✨ الترتيب المحلي (Client-side Sorting) لضمان ظهور كافة البيانات
+    const primaryItems = useMemo(() => {
+        return [...rawPrimaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
+    }, [rawPrimaryItems]);
+
+    const secondaryItems = useMemo(() => {
+        return [...rawSecondaryItems].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
+    }, [rawSecondaryItems]);
 
     const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
 
-    /**
-     * محرك إعادة الترتيب السحابي (Reordering Engine):
-     */
     const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary') => {
         const { active, over } = event;
         if (!over || active.id === over.id || !firestore || !tenantId) return;
@@ -241,10 +244,7 @@ export function ReferenceDataManager() {
     };
 
     const handleSave = async (type: 'primary' | 'secondary') => {
-        if (!firestore || !itemName.trim() || !tenantId) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير مكتملة.' });
-            return;
-        }
+        if (!firestore || !itemName.trim() || !tenantId) return;
 
         const relativePath = type === 'primary' ? primaryCollectionName : secondaryRelativePath;
         if (!relativePath) return;
@@ -278,7 +278,6 @@ export function ReferenceDataManager() {
 
     const handleDelete = async () => {
         if (!firestore || !itemToDelete || !tenantId) return;
-        
         const relativePath = itemToDelete.target === 'primary' ? primaryCollectionName : secondaryRelativePath;
         if (!relativePath) return;
 
@@ -289,11 +288,7 @@ export function ReferenceDataManager() {
             toast({ title: 'تم الحذف بنجاح' });
             setIsDeleteDialogOpen(false); 
             setItemToDelete(null);
-        } catch (e) { 
-            toast({ variant: 'destructive', title: 'فشل الحذف' }); 
-        } finally { 
-            setIsSaving(false); 
-        }
+        } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
     };
 
     const handleImportDefaults = async () => {
@@ -317,11 +312,7 @@ export function ReferenceDataManager() {
             await batch.commit();
             toast({ title: 'نجاح الاستيراد' });
             setIsImportConfirmOpen(false);
-        } catch (e) { 
-            toast({ variant: 'destructive', title: 'خطأ في الاستيراد' }); 
-        } finally { 
-            setIsImporting(false); 
-        }
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الاستيراد' }); } finally { setIsImporting(false); }
     };
 
     if (view === 'main') {
@@ -340,33 +331,9 @@ export function ReferenceDataManager() {
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <StatCard 
-                        title="الأقسام والوظائف" 
-                        count={primaryItems?.length || 0} 
-                        icon={<Building2 className="h-6 w-6"/>} 
-                        onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
-                        colorClass="bg-blue-100 text-blue-600" 
-                        loading={loadingPrimary} 
-                        description="تحديد الهيكل الإداري والوظائف"
-                    />
-                    <StatCard 
-                        title="توزيع المواقع" 
-                        count={primaryItems?.length || 0} 
-                        icon={<Globe className="h-6 w-6"/>} 
-                        onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
-                        colorClass="bg-emerald-100 text-emerald-600" 
-                        loading={loadingPrimary} 
-                        description="إدارة المناطق الجغرافية للعمل"
-                    />
-                    <StatCard 
-                        title="أنواع الخدمات" 
-                        count={primaryItems?.length || 0} 
-                        icon={<Workflow className="h-6 w-6"/>} 
-                        onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} 
-                        colorClass="bg-purple-100 text-purple-600" 
-                        loading={loadingPrimary} 
-                        description="قائمة الخدمات الهندسية والطلبات"
-                    />
+                    <StatCard title="الأقسام والوظائف" count={primaryItems?.length || 0} icon={<Building2 className="h-6 w-6"/>} onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} colorClass="bg-blue-100 text-blue-600" loading={loadingPrimary} description="تحديد الهيكل الإداري والوظائف" />
+                    <StatCard title="توزيع المواقع" count={primaryItems?.length || 0} icon={<Globe className="h-6 w-6"/>} onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} colorClass="bg-emerald-100 text-emerald-600" loading={loadingPrimary} description="إدارة المناطق الجغرافية للعمل" />
+                    <StatCard title="أنواع الخدمات" count={primaryItems?.length || 0} icon={<Workflow className="h-6 w-6"/>} onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} colorClass="bg-purple-100 text-purple-600" loading={loadingPrimary} description="قائمة الخدمات الهندسية والطلبات" />
                 </div>
             </div>
         );
@@ -407,9 +374,7 @@ export function ReferenceDataManager() {
                     <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
                         <div className="md:col-span-4 border-l bg-slate-50/50 flex flex-col">
                             <div className="p-6 border-b flex justify-between items-center bg-muted/20">
-                                <Label className="font-black text-[#1e1b4b] text-base">
-                                    {view === 'departments' ? 'الأقسام' : view === 'locations' ? 'الموقع الرئيسي' : 'الخدمات'}
-                                </Label>
+                                <Label className="font-black text-[#1e1b4b] text-base">القائمة الرئيسية</Label>
                                 <Button size="icon" variant="ghost" onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-9 w-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"><Plus className="h-5 w-5" /></Button>
                             </div>
                             <ScrollArea className="flex-1 p-4">

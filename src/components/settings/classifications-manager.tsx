@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -90,8 +91,14 @@ export function ClassificationsManager() {
     const { toast } = useToast();
 
     const tenantId = currentUser?.currentCompanyId;
-    const { data: categories, loading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
+    
+    // 🛡️ التعديل الجذري: إزالة orderBy من السيرفر لضمان ظهور كافة السجلات
+    const { data: rawCategories, loading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
     const [openCategories, setOpenCategories] = useState(new Set<string>());
+
+    const categories = useMemo(() => {
+        return [...rawCategories].sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name, 'ar'));
+    }, [rawCategories]);
 
     const categoryTree = useMemo(() => {
         if (!categories) return [];
@@ -103,11 +110,6 @@ export function ClassificationsManager() {
                 map.get(cat.parentCategoryId)!.children.push(map.get(cat.id!)!);
             else roots.push(map.get(cat.id!)!);
         });
-        const sortRecursive = (nodes: any[]) => {
-            nodes.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, 'ar'));
-            nodes.forEach(node => { if (node.children.length > 0) sortRecursive(node.children); });
-        };
-        sortRecursive(roots);
         return roots;
     }, [categories]);
 
