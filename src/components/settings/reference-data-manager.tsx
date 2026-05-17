@@ -453,8 +453,8 @@ export function ReferenceDataManager() {
                                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة الهيكل الفرعي والمحتوى المخصص</p>
                                                 </div>
                                             </div>
-                                            <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
-                                                <PlusCircle className="h-6 w-6" /> إضافة {activeSubTab === 'jobs' ? 'وظيفة' : activeSubTab === 'stages' ? 'مرحلة' : activeSubTab === 'areas' ? 'منطقة' : 'خدمة داخلية'}
+                                            <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3 glass-3d-button">
+                                                <PlusCircle className="h-6 w-6" /> إضافة {activeSubTab === 'jobs' ? 'خدمة أو معاملة' : activeSubTab === 'stages' ? 'مرحلة' : activeSubTab === 'areas' ? 'منطقة' : 'بند داخلي'}
                                             </Button>
                                         </div>
                                         {view === 'departments' && (
@@ -532,7 +532,7 @@ export function ReferenceDataManager() {
                         </div>
                         <DialogFooter className="gap-4 pt-6 border-t">
                             <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
-                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px]">
+                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px] glass-3d-button">
                                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ السجل
                             </Button>
                         </DialogFooter>
@@ -574,4 +574,3 @@ export function ReferenceDataManager() {
         </div>
     );
 }
-

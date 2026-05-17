@@ -69,7 +69,13 @@
   }
 
   .nav-capsule {
-    @apply font-bold transition-all duration-300 hover:bg-white/60 hover:shadow-md border-transparent;
+    @apply font-bold transition-all duration-300 hover:bg-white/40 hover:shadow-md border-transparent;
+  }
+
+  .sidebar-glass {
+    background: rgba(255, 255, 255, 0.15) !important; /* Lighter sidebar background */
+    backdrop-filter: blur(15px) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
   }
 
   .soft-shadow-inner {

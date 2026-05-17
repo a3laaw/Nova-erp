@@ -340,7 +340,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
 
   return (
     <>
-      <SidebarHeader className="p-6 mb-4 group-data-[collapsible=icon]:p-3">
+      <SidebarHeader className="p-6 mb-4 group-data-[collapsible=icon]:p-3 bg-white/5 rounded-t-3xl">
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1E293B] tracking-tighter group-data-[collapsible=icon]:text-xl">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
@@ -362,7 +362,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2">
+      <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2 bg-white/5 rounded-b-3xl">
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/20 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
