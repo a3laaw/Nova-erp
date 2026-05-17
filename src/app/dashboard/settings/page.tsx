@@ -22,21 +22,21 @@ import { Badge } from '@/components/ui/badge';
 const settingsFeatures = [
     {
         title: 'إدارة المستخدمين',
-        description: 'إدارة حسابات دخول الموظفين وصلاحياتهم السيادية في النظام.',
+        description: 'إدارة حسابات دخول الموظفين وتوزيع الأدوار والصلاحيات.',
         href: '/dashboard/settings/users',
         icon: Users,
         color: 'bg-blue-500/10 text-blue-600 border-blue-500/20'
     },
     {
-        title: 'العلامة التجارية',
-        description: 'تخصيص هوية النظام وشعار الشركة والتقارير المطبوعة.',
+        title: 'الهوية والشعار',
+        description: 'تخصيص شعار الشركة والبيانات التي تظهر على المطبوعات.',
         href: '/dashboard/settings/branding',
         icon: Palette,
         color: 'bg-orange-500/10 text-orange-600 border-orange-500/20'
     },
     {
         title: 'إعدادات القوائم',
-        description: 'التحكم في الأقسام والوظائف ومراحل العمل وسحب وإفلات الترتيب.',
+        description: 'التحكم في الأقسام والوظائف ومراحل العمل المعتمدة.',
         href: '/dashboard/settings/reference-data',
         icon: Network,
         color: 'bg-green-500/10 text-green-600 border-green-500/20'
@@ -50,14 +50,14 @@ const settingsFeatures = [
     },
     {
         title: 'طرق الدفع',
-        description: 'إدارة عمولات بوابات الدفع والتحصيل المالي الآلي.',
+        description: 'إدارة عمولات البنوك وبوابات الدفع عند التحصيل المالي.',
         href: '/dashboard/settings/payment-methods',
         icon: CreditCard,
         color: 'bg-teal-500/10 text-teal-600 border-teal-500/20'
     },
     {
-        title: 'سلامة البيانات',
-        description: 'أدوات متقدمة لتطهير السجلات وفحص التوازن المالي.',
+        title: 'تحديث البيانات',
+        description: 'أدوات تنظيف السجلات وفحص سلامة البيانات المالية.',
         href: '/dashboard/settings/data-integrity',
         icon: ShieldCheck,
         color: 'bg-slate-500/10 text-slate-600 border-slate-500/20'
@@ -70,7 +70,7 @@ const settingsFeatures = [
         color: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
     },
     {
-        title: 'إدارة الفئات',
+        title: 'تصنيفات المواد',
         description: 'تنظيم وتصنيف الأصناف المخزنية والخدمات في دليل شجري.',
         href: '/dashboard/settings/classifications',
         icon: Tags,
@@ -84,7 +84,6 @@ export default function SettingsDashboardPage() {
 
   return (
     <div className="space-y-10 pb-20" dir="rtl">
-        {/* --- Header Frame --- */}
         <Card className={cn(
             "border-none rounded-[3rem] overflow-hidden relative",
             "bg-gradient-to-l from-white/60 to-orange-50/40 backdrop-blur-3xl border-white/60 shadow-2xl"
@@ -97,19 +96,14 @@ export default function SettingsDashboardPage() {
                             <Settings2 className="h-10 w-10" />
                         </div>
                         <div className="text-right">
-                            <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">إعدادات النظام المركزية</CardTitle>
-                            <CardDescription className="text-lg font-bold text-slate-500 mt-1">تخصيص القواعد، الهوية البصرية، والرقابة السيادية للمنظومة.</CardDescription>
+                            <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">إعدادات النظام</CardTitle>
+                            <CardDescription className="text-lg font-bold text-slate-500 mt-1">تخصيص قواعد العمل، الهوية البصرية، وإدارة صلاحيات الموظفين.</CardDescription>
                         </div>
                     </div>
-                    <Badge variant="outline" className="bg-white/60 text-primary border-primary/20 px-6 py-2 rounded-2xl font-black text-xs gap-2 shadow-sm">
-                        <Sparkles className="h-3 w-3 animate-pulse" />
-                        الوصول الإداري الكامل
-                    </Badge>
                 </div>
             </CardHeader>
         </Card>
 
-        {/* --- Features Grid --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 px-2">
             {settingsFeatures.map((feature, idx) => {
                 const Icon = feature.icon;
@@ -121,7 +115,6 @@ export default function SettingsDashboardPage() {
                             "hover:border-primary/30 hover:-translate-y-2 hover:shadow-[0_20px_50px_-20px_rgba(255,122,0,0.15)]",
                             "relative overflow-hidden group"
                         )}>
-                            {/* Decorative element inside card */}
                             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                             
                             <CardHeader className="pb-4 relative z-10">

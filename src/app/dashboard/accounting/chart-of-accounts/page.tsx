@@ -143,7 +143,7 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent dir="rtl">
                 <form onSubmit={handleSubmit}>
-                    <DialogHeader><DialogTitle>{isEditing ? 'تعديل حساب' : parentAccount ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{isEditing ? 'تعديل الحساب' : parentAccount ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}</DialogTitle></DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2"><Label htmlFor="code">رمز الحساب</Label><Input id="code" value={formData.code || ''} onChange={(e) => setFormData(p => ({ ...p, code: e.target.value }))} required dir="ltr" /></div>
                         <div className="grid gap-2"><Label htmlFor="name">اسم الحساب</Label><Input id="name" value={formData.name || ''} onChange={(e) => setFormData(p => ({...p, name: e.target.value}))} required /></div>
@@ -246,10 +246,10 @@ export default function ChartOfAccountsPage() {
         try {
             if (editingAccount?.id) {
                 await updateDoc(doc(firestore, 'chartOfAccounts', editingAccount.id), cleanFirestoreData(data));
-                toast({ title: 'نجاح التحديث' });
+                toast({ title: 'تم التحديث' });
             } else {
                 await addDoc(collection(firestore, 'chartOfAccounts'), cleanFirestoreData(data));
-                toast({ title: 'نجاح الإضافة' });
+                toast({ title: 'تمت الإضافة' });
             }
             closeDialog();
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); } finally { setIsSaving(false); }
@@ -278,7 +278,7 @@ export default function ChartOfAccountsPage() {
             });
 
             await batch.commit();
-            toast({ title: 'نجاح التنزيل' });
+            toast({ title: 'تم الاستيراد بنجاح' });
             setIsSeedAlertOpen(false);
         } finally { setIsSeeding(false); }
     };
@@ -289,8 +289,8 @@ export default function ChartOfAccountsPage() {
                 <CardHeader className="bg-primary/5 pb-8 border-b">
                     <div className="flex justify-between items-start">
                         <div className="space-y-1">
-                            <CardTitle className="text-2xl font-black">شجرة الحسابات السيادية</CardTitle>
-                            <CardDescription>إدارة الدليل المحاسبي ومراكز التكلفة لمنشأتك.</CardDescription>
+                            <CardTitle className="text-2xl font-black">شجرة الحسابات</CardTitle>
+                            <CardDescription>إدارة الدليل المحاسبي ومراكز التكلفة للمنشأة.</CardDescription>
                         </div>
                          <div className="flex gap-2">
                             <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" className="rounded-xl font-bold" disabled={isSeeding}>
@@ -370,7 +370,7 @@ export default function ChartOfAccountsPage() {
                 <AlertDialogContent dir="rtl" className="rounded-3xl">
                     <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد تهيئة الشجرة؟</AlertDialogTitle>
-                        <AlertDialogDescription>سيتم مسح الدليل الحالي واستبداله بالشجرة الافتراضية المعتمدة لـ Nova ERP. <br/><br/> <span className="font-black text-red-600">اكتب "مسح البيانات" للتأكيد:</span></AlertDialogDescription>
+                        <AlertDialogDescription>سيتم مسح الدليل الحالي واستبداله بالشجرة الافتراضية المعتمدة. <br/><br/> <span className="font-black text-red-600">اكتب "مسح البيانات" للتأكيد:</span></AlertDialogDescription>
                     </AlertDialogHeader>
                     <Input value={confirmSeedText} onChange={e => setConfirmSeedText(e.target.value)} className="h-12 text-center font-black border-2" placeholder="كلمة التأكيد..." />
                     <AlertDialogFooter className="mt-4 gap-2">

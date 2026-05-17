@@ -62,7 +62,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { useSubscription } from '@/hooks/use-subscription';
 
-// --- 🛡️ محرك السحب والإفلات السيادي (dnd-kit) ---
 import {
   DndContext,
   closestCenter,
@@ -141,7 +140,7 @@ function SummaryCard({ title, count, icon, onNavigate, colorClass, loading, desc
                 {loading ? <Skeleton className="h-10 w-16 mt-1" /> : <div className="text-6xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
                 <p className="text-xs font-black text-slate-500 mt-3">{description}</p>
                 <div className="flex items-center gap-1 text-[10px] text-primary font-black mt-6 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 uppercase tracking-[0.2em]">
-                    تخصيص الإعدادات <ArrowRight className="h-3 w-3"/>
+                    تعديل القوائم <ArrowRight className="h-3 w-3"/>
                 </div>
             </CardContent>
         </Card>
@@ -242,9 +241,9 @@ export function ReferenceDataManager() {
             });
 
             await batch.commit();
-            toast({ title: 'تم الترتيب بنجاح' });
+            toast({ title: 'تم حفظ الترتيب' });
         } catch (e) {
-            toast({ variant: 'destructive', title: 'فشل الترتيب' });
+            toast({ variant: 'destructive', title: 'فشل الحفظ' });
         } finally {
             setIsSaving(false);
         }
@@ -274,10 +273,10 @@ export function ReferenceDataManager() {
                 await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
             }
             
-            toast({ title: 'تم الحفظ والمزامنة' });
+            toast({ title: 'تم الحفظ بنجاح' });
             closeDialog();
         } catch (e: any) { 
-            toast({ variant: 'destructive', title: 'فشل ترحيل البيانات' }); 
+            toast({ variant: 'destructive', title: 'فشل الحفظ' }); 
         } finally { 
             setIsSaving(false); 
         }
@@ -292,7 +291,7 @@ export function ReferenceDataManager() {
         try {
             const finalPath = getTenantPath(relativePath, tenantId);
             await deleteDoc(doc(firestore, finalPath, itemToDelete.id));
-            toast({ title: 'تم الحذف النهائي' });
+            toast({ title: 'تم الحذف' });
             setIsDeleteDialogOpen(false); 
             setItemToDelete(null);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
@@ -317,9 +316,9 @@ export function ReferenceDataManager() {
                 });
             }
             await batch.commit();
-            toast({ title: 'نجاح الاستيراد المرجعي' });
+            toast({ title: 'تم الاستيراد بنجاح' });
             setIsImportConfirmOpen(false);
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الاستيراد' }); } finally { setIsImporting(false); }
+        } catch (e) { toast({ variant: 'destructive', title: 'فشل الاستيراد' }); } finally { setIsImporting(false); }
     };
 
     if (view === 'main') {
@@ -332,8 +331,8 @@ export function ReferenceDataManager() {
                                 <Settings2 className="h-12 w-12" />
                             </div>
                             <div className="space-y-1">
-                                <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">إعدادات القوائم السيادية</CardTitle>
-                                <CardDescription className="text-xl font-bold text-slate-500">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي للمكتب.</CardDescription>
+                                <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">إعدادات القوائم والبيانات</CardTitle>
+                                <CardDescription className="text-xl font-bold text-slate-500">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -341,31 +340,31 @@ export function ReferenceDataManager() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 px-2">
                     <SummaryCard 
-                        title="الهيكل التنظيمي" 
+                        title="الأقسام والوظائف" 
                         count={primaryItems?.length || 0} 
                         icon={<Building2 className="h-10 w-10"/>} 
                         onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
                         colorClass="bg-blue-600/10 text-blue-600" 
                         loading={loadingPrimary} 
-                        description="الأقسام والوظائف ومراحل العمل المعتمدة." 
+                        description="إدارة الهيكل التنظيمي والوظائف ومراحل العمل." 
                     />
                     <SummaryCard 
-                        title="رادار المواقع" 
+                        title="المناطق والمواقع" 
                         count={primaryItems?.length || 0} 
                         icon={<MapPin className="h-10 w-10"/>} 
                         onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
                         colorClass="bg-emerald-600/10 text-emerald-600" 
                         loading={loadingPrimary} 
-                        description="توزيع المحافظات والمناطق التابعة لها." 
+                        description="إدارة المحافظات والمناطق الجغرافية." 
                     />
                     <SummaryCard 
-                        title="دليل الخدمات" 
+                        title="أنواع الخدمات" 
                         count={primaryItems?.length || 0} 
                         icon={<Workflow className="h-10 w-10"/>} 
                         onNavigate={() => { setView('transactions'); setActiveSubTab('subServices'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
-                        description="قائمة الطلبات والخدمات الهندسية المتاحة." 
+                        description="قائمة المعاملات والخدمات المتاحة في النظام." 
                     />
                 </div>
             </div>
@@ -384,40 +383,38 @@ export function ReferenceDataManager() {
                             </div>
                             <div className="text-right">
                                 <CardTitle className="text-3xl font-black tracking-tighter text-white">
-                                    {view === 'departments' ? 'إدارة الأقسام والوظائف' : view === 'locations' ? 'تخصيص المواقع الجغرافية' : 'إدارة أنواع الخدمات'}
+                                    {view === 'departments' ? 'إدارة الأقسام والوظائف' : view === 'locations' ? 'إدارة المواقع الجغرافية' : 'إدارة أنواع الخدمات'}
                                 </CardTitle>
                                 <div className="flex items-center gap-2 mt-2">
                                     <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
-                                    <CardDescription className="text-white/90 font-black text-sm uppercase tracking-widest">قم بالسحب والإفلات لترتيب أولويات العرض في النظام.</CardDescription>
+                                    <CardDescription className="text-white/90 font-black text-sm uppercase tracking-widest">قم بسحب وإفلات العناصر لترتيبها.</CardDescription>
                                 </div>
                             </div>
                         </div>
                         <div className="flex gap-4">
                             {view !== 'transactions' && (
                                 <Button variant="secondary" onClick={() => setIsImportConfirmOpen(true)} className="bg-white/90 hover:bg-white text-primary rounded-2xl font-black h-12 px-8 gap-3 shadow-xl transition-all active:scale-95">
-                                    <DownloadCloud className="h-5 w-5"/> استيراد القوالب
+                                    <DownloadCloud className="h-5 w-5"/> استيراد افتراضي
                                 </Button>
                             )}
                             <Button onClick={() => setView('main')} variant="outline" className="text-white border-white/40 hover:bg-white/10 rounded-2xl font-black h-12 px-8 gap-2 backdrop-blur-md">
-                                <X className="h-5 w-5" /> إغلاق العرض
+                                <X className="h-5 w-5" /> إغلاق
                             </Button>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="grid grid-cols-1 md:grid-cols-12 min-h-[650px]">
-                        {/* القائمة اليمنى - التصنيفات الرئيسية */}
                         <div className="md:col-span-4 border-l-2 border-primary/5 bg-slate-50/20 flex flex-col">
                             <div className="p-10 border-b bg-primary/5 flex justify-between items-center">
                                 <div className="space-y-0.5">
                                     <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الرئيسية</Label>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sovereign Core Structure</p>
                                 </div>
                                 <Button onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-12 w-12 rounded-[1.5rem] shadow-xl shadow-primary/20"><Plus className="h-6 w-6" /></Button>
                             </div>
                             <ScrollArea className="flex-1 p-8">
                                 {loadingPrimary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> : 
-                                primaryItems.length === 0 ? <p className="text-center p-20 text-muted-foreground italic font-black opacity-20">لا توجد سجلات حالياً.</p> :
+                                primaryItems.length === 0 ? <p className="text-center p-20 text-muted-foreground italic font-black opacity-20">لا توجد سجلات.</p> :
                                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'primary')}>
                                     <SortableContext items={primaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
                                         <div className="space-y-3">
@@ -438,7 +435,6 @@ export function ReferenceDataManager() {
                             </ScrollArea>
                         </div>
 
-                        {/* القائمة اليسرى - التفاصيل */}
                         <div className="md:col-span-8 flex flex-col bg-white/40 backdrop-blur-md">
                             {selectedPrimaryId ? (
                                 <>
@@ -450,21 +446,18 @@ export function ReferenceDataManager() {
                                                 </div>
                                                 <div className="space-y-1">
                                                     <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedPrimary?.name}</h3>
-                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة الهيكل الفرعي والمحتوى المخصص</p>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة البنود الفرعية</p>
                                                 </div>
                                             </div>
                                             <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3 glass-3d-button">
-                                                <PlusCircle className="h-6 w-6" /> إضافة {activeSubTab === 'jobs' ? 'خدمة أو معاملة' : activeSubTab === 'stages' ? 'مرحلة' : activeSubTab === 'areas' ? 'منطقة' : 'بند داخلي'}
+                                                <PlusCircle className="h-6 w-6" /> إضافة بند جديد
                                             </Button>
                                         </div>
                                         {view === 'departments' && (
                                             <div className="flex bg-white/60 p-1.5 rounded-[1.5rem] border border-primary/10 w-fit shadow-inner">
                                                 <Button variant={activeSubTab === 'jobs' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('jobs')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">الوظائف والمهن</Button>
-                                                <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">مراحل سير العمل</Button>
+                                                <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">مراحل العمل</Button>
                                             </div>
-                                        )}
-                                        {view === 'transactions' && (
-                                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black px-6 py-2 rounded-2xl text-xs uppercase tracking-widest">مصفوفة الخدمات الداخلية</Badge>
                                         )}
                                     </div>
                                     <ScrollArea className="flex-1 p-10">
@@ -507,9 +500,8 @@ export function ReferenceDataManager() {
                                         </div>
                                     </div>
                                     <h3 className="text-4xl font-black text-[#1e1b4b] tracking-tighter max-w-md leading-tight">
-                                        {view === 'transactions' ? 'دليل الخدمات الهندسية' : 'اختر تصنيفاً من القائمة اليمنى للتحكم في محتواه'}
+                                        اختر تصنيفاً من القائمة لعرض وتعديل بياناته
                                     </h3>
-                                    <p className="text-slate-400 font-bold text-lg mt-6">واجهة تفاعلية ذكية مدعومة بالسحب والإفلات.</p>
                                 </div>
                             )}
                         </div>
@@ -517,23 +509,21 @@ export function ReferenceDataManager() {
                 </CardContent>
             </Card>
 
-            {/* الحوارات (Dialogs) */}
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent dir="rtl" className="max-w-md rounded-[3rem] p-10 shadow-[0_40px_100px_rgba(0,0,0,0.3)] border-none bg-white/95 backdrop-blur-2xl">
+                <DialogContent dir="rtl" className="max-w-md rounded-[3rem] p-10 shadow-2xl border-none bg-white/95 backdrop-blur-2xl">
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader>
                             <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
-                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل السجل' : 'إضافة سجل سيادي'}</DialogTitle>
-                            <DialogDescription className="font-bold text-slate-500 text-base">سيتم حفظ التغييرات وتحديث قواعد العمل للمنشأة فوراً.</DialogDescription>
+                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل السجل' : 'إضافة سجل جديد'}</DialogTitle>
                         </DialogHeader>
                         <div className="py-10">
-                            <Label className="font-black text-[#1e1b4b] pr-3 block mb-4 text-sm uppercase tracking-widest">الاسم الرسمي (بالعربية) *</Label>
+                            <Label className="font-black text-[#1e1b4b] pr-3 block mb-4 text-sm uppercase tracking-widest">الاسم المعتمد *</Label>
                             <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-16 rounded-[1.5rem] border-2 text-2xl font-black text-primary bg-slate-50/50 focus:bg-white shadow-inner transition-all" placeholder="اكتب هنا..." />
                         </div>
                         <DialogFooter className="gap-4 pt-6 border-t">
                             <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
                             <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px] glass-3d-button">
-                                {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ السجل
+                                {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ
                             </Button>
                         </DialogFooter>
                     </form>
@@ -544,13 +534,13 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12 glass-effect">
                     <AlertDialogHeader>
                         <div className="p-5 bg-red-100 text-red-600 rounded-[1.8rem] w-fit mb-6 shadow-inner"><Trash2 className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-red-700 tracking-tighter">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-xl font-bold text-slate-600 leading-relaxed mt-4">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> تماماً من المنظومة السيادية. <br/><br/> هل أنت متأكد من المتابعة؟</AlertDialogDescription>
+                        <AlertDialogTitle className="text-3xl font-black text-red-700 tracking-tighter">تأكيد الحذف؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xl font-bold text-slate-600 leading-relaxed mt-4">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> نهائياً من النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-10 gap-4">
                         <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-2xl font-black h-12 px-16 shadow-xl shadow-red-200">
-                            {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، تأكيد الحذف'}
+                            {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، تأكيد الحذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -560,8 +550,8 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12">
                     <AlertDialogHeader>
                         <div className="p-5 bg-primary/10 text-primary rounded-[1.8rem] w-fit mb-6 shadow-inner"><DownloadCloud className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب المرجعية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمدن الافتراضية المعتمدة آلياً لتوفير وقت التأسيس.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمدن الافتراضية آلياً.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-10 gap-4">
                         <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>

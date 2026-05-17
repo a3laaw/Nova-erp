@@ -58,7 +58,6 @@ export default function DashboardPage() {
   const { firestore } = useFirebase();
   const { user } = useAuth();
 
-  // جلب المهام الشخصية القادمة
   const tasksQuery = useMemo(() => {
     if (!user?.id) return [];
     return [
@@ -113,11 +112,11 @@ export default function DashboardPage() {
 
                     <div className="text-center lg:text-right order-1 lg:order-2 space-y-2">
                         <div className="flex items-center justify-center lg:justify-end gap-4 mb-2">
-                            <h1 className="text-4xl font-black text-foreground tracking-tighter">لوحة التحكم المركزية</h1>
+                            <h1 className="text-4xl font-black text-foreground tracking-tighter">لوحة التحكم الرئيسية</h1>
                             <LayoutGrid className="text-primary h-10 w-10" strokeWidth={2.5} />
                         </div>
                         <p className="text-lg font-bold text-muted-foreground leading-relaxed max-w-xl">
-                            مرحباً بك، <span className="text-primary">{user?.fullName}</span>. إليك ملخص المهام الميدانية والمالية.
+                            مرحباً بك، <span className="text-primary">{user?.fullName}</span>. إليك ملخص المهام وحالة العمل اليوم.
                         </p>
                     </div>
                 </div>
@@ -125,7 +124,6 @@ export default function DashboardPage() {
         </Card>
 
         <div className="grid gap-8 lg:grid-cols-12">
-            {/* قـسم مهامي الشخصية (My Tasks) */}
             <div className="lg:col-span-4">
                 <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8 border-b border-white/10">
@@ -137,7 +135,7 @@ export default function DashboardPage() {
                                 <Button variant="ghost" size="sm" className="h-8 rounded-xl font-black text-[10px] text-primary bg-primary/5">عرض الكل</Button>
                             </Link>
                         </div>
-                        <CardDescription>المهام المستخلصـة من المشاريع والعملاء.</CardDescription>
+                        <CardDescription>المهام المستخلصة من المشاريع والعملاء.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6 flex-1">
                         {tasksLoading ? (
@@ -149,7 +147,6 @@ export default function DashboardPage() {
                             <div className="h-48 flex flex-col items-center justify-center text-center opacity-40">
                                 <CheckCircle2 className="h-12 w-12 mb-3 text-muted-foreground" />
                                 <p className="font-bold text-sm">لا توجد مهام معلقة.</p>
-                                <p className="text-[10px]">استخدم "محرك الإنتاجية" من أي صفحة لإضافة مهام.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -162,7 +159,7 @@ export default function DashboardPage() {
                                             </div>
                                             <div className="flex items-center gap-2 mt-2 text-[9px] font-bold text-muted-foreground">
                                                 <Clock className="h-3 w-3" />
-                                                <span>تسليم: {toFirestoreDate(task.dueDate) ? format(toFirestoreDate(task.dueDate)!, 'dd MMMM', { locale: ar }) : '-'}</span>
+                                                <span>موعد التسليم: {toFirestoreDate(task.dueDate) ? format(toFirestoreDate(task.dueDate)!, 'dd MMMM', { locale: ar }) : '-'}</span>
                                             </div>
                                         </div>
                                     </Link>
@@ -175,10 +172,10 @@ export default function DashboardPage() {
 
             <div className="lg:col-span-4 grid grid-cols-2 gap-6">
                 <StatCard 
-                    title="المواقع النشطة" 
+                    title="المشاريع النشطة" 
                     value={loading ? 0 : stats?.activeProjectsCount || 0} 
                     icon={<Activity className="h-5 w-5" />} 
-                    subText="مواقع تخضع للإشراف حالياً"
+                    subText="مشاريع قيد التنفيذ حالياً"
                     colorClass="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400"
                     loading={loading}
                 />
@@ -186,7 +183,7 @@ export default function DashboardPage() {
                     title="إجمالي الإيرادات" 
                     value={loading ? 0 : stats?.totalRevenue || 0} 
                     icon={<Wallet className="h-5 w-5" />} 
-                    subText="بناءً على القيود المرحلة"
+                    subText="بناءً على السجلات المالية"
                     colorClass="bg-orange-100 dark:bg-primary/20 text-primary"
                     loading={loading}
                 />
@@ -194,10 +191,10 @@ export default function DashboardPage() {
                 <Card className="col-span-1 border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[2.5rem] p-6 flex flex-col items-center justify-center text-center gap-4">
                     <div className="space-y-1">
                         <p className="font-black text-sm text-foreground">يوميات المواقع</p>
-                        <p className="text-[10px] text-muted-foreground font-bold leading-tight">إنجاز الفرق الميدانية.</p>
+                        <p className="text-[10px] text-muted-foreground font-bold leading-tight">سجل إنجاز الفرق الميدانية.</p>
                     </div>
                     <Button asChild className="rounded-xl h-9 px-6 bg-primary text-white font-black text-[10px]">
-                        <Link href="/dashboard/construction/field-visits">فتح العرض الهندسي</Link>
+                        <Link href="/dashboard/construction/field-visits">فتح السجل الفني</Link>
                     </Button>
                 </Card>
 
@@ -215,13 +212,13 @@ export default function DashboardPage() {
                 <Card className="h-full border-white/40 bg-white/40 dark:bg-slate-900/40 rounded-[3rem] shadow-sm flex flex-col">
                     <CardHeader className="p-8 border-b border-white/10">
                         <CardTitle className="text-xl font-black flex items-center gap-2 text-foreground">
-                            <History className="text-primary h-5 w-5" /> رادار الفعالية
+                            <History className="text-primary h-5 w-5" /> آخر التحديثات
                         </CardTitle>
                         <CardDescription>متابعة حية للإجراءات المتخذة في النظام.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 flex-1 flex flex-col items-center justify-center opacity-30 text-center">
                         <Activity className="h-12 w-12 mb-3 text-primary animate-pulse" />
-                        <p className="font-bold text-sm">جاري تحليل النبض العملياتي...</p>
+                        <p className="font-bold text-sm">جاري تحديث السجل اللحظي...</p>
                     </CardContent>
                 </Card>
             </div>
