@@ -51,7 +51,9 @@ import {
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
     MapPin, X, Layers, Activity, GripVertical,
-    Sparkles
+    Sparkles,
+    Briefcase,
+    Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
@@ -103,9 +105,9 @@ function SortableRefListItem({ id, children, isActive }: { id: string, children:
         ref={setNodeRef} 
         style={style} 
         className={cn(
-            "group relative flex items-center justify-between p-5 rounded-[2rem] cursor-default transition-all border-2 mb-3",
+            "group relative flex items-center justify-between p-5 rounded-[2.2rem] cursor-default transition-all border-2 mb-3",
             isActive 
-              ? "bg-primary border-primary text-white shadow-2xl scale-[1.02] ring-8 ring-primary/5" 
+              ? "bg-primary border-primary text-white shadow-2xl scale-[1.02] ring-8 ring-orange-500/10" 
               : "bg-white/60 hover:bg-white hover:border-primary/20 border-transparent shadow-sm"
         )}
     >
@@ -152,7 +154,7 @@ export function ReferenceDataManager() {
     const { toast } = useToast();
 
     const [view, setView] = useState<'main' | 'departments' | 'locations' | 'transactions'>('main');
-    const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas'>('jobs');
+    const [activeSubTab, setActiveSubTab] = useState<'jobs' | 'stages' | 'areas' | 'subServices'>('jobs');
     
     const [selectedPrimaryId, setSelectedPrimaryId] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -193,6 +195,7 @@ export function ReferenceDataManager() {
     const secondaryCollectionName = useMemo(() => {
         if (view === 'departments') return activeSubTab === 'jobs' ? 'jobs' : 'workStages';
         if (view === 'locations') return 'areas';
+        if (view === 'transactions') return 'subServices';
         return '';
     }, [view, activeSubTab]);
 
@@ -359,7 +362,7 @@ export function ReferenceDataManager() {
                         title="دليل الخدمات" 
                         count={primaryItems?.length || 0} 
                         icon={<Workflow className="h-10 w-10"/>} 
-                        onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} 
+                        onNavigate={() => { setView('transactions'); setActiveSubTab('subServices'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
                         description="قائمة الطلبات والخدمات الهندسية المتاحة." 
@@ -437,19 +440,21 @@ export function ReferenceDataManager() {
 
                         {/* القائمة اليسرى - التفاصيل */}
                         <div className="md:col-span-8 flex flex-col bg-white/40 backdrop-blur-md">
-                            {selectedPrimaryId && view !== 'transactions' ? (
+                            {selectedPrimaryId ? (
                                 <>
                                     <div className="p-10 border-b bg-muted/5">
                                         <div className="flex justify-between items-center mb-8">
                                             <div className="flex items-center gap-5">
-                                                <div className="p-4 bg-white rounded-[1.5rem] shadow-xl border border-primary/10"><ListTree className="h-8 w-8 text-primary"/></div>
+                                                <div className="p-4 bg-white rounded-[1.5rem] shadow-xl border border-primary/10">
+                                                    {view === 'transactions' ? <Zap className="h-8 w-8 text-primary"/> : <ListTree className="h-8 w-8 text-primary"/>}
+                                                </div>
                                                 <div className="space-y-1">
                                                     <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedPrimary?.name}</h3>
                                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة الهيكل الفرعي والمحتوى المخصص</p>
                                                 </div>
                                             </div>
                                             <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
-                                                <PlusCircle className="h-6 w-6" /> إضافة {activeSubTab === 'jobs' ? 'وظيفة' : activeSubTab === 'stages' ? 'مرحلة' : 'منطقة'}
+                                                <PlusCircle className="h-6 w-6" /> إضافة {activeSubTab === 'jobs' ? 'وظيفة' : activeSubTab === 'stages' ? 'مرحلة' : activeSubTab === 'areas' ? 'منطقة' : 'خدمة داخلية'}
                                             </Button>
                                         </div>
                                         {view === 'departments' && (
@@ -457,6 +462,9 @@ export function ReferenceDataManager() {
                                                 <Button variant={activeSubTab === 'jobs' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('jobs')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">الوظائف والمهن</Button>
                                                 <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">مراحل سير العمل</Button>
                                             </div>
+                                        )}
+                                        {view === 'transactions' && (
+                                            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 font-black px-6 py-2 rounded-2xl text-xs uppercase tracking-widest">مصفوفة الخدمات الداخلية</Badge>
                                         )}
                                     </div>
                                     <ScrollArea className="flex-1 p-10">
@@ -495,7 +503,7 @@ export function ReferenceDataManager() {
                                     <div className="p-16 bg-gradient-to-b from-primary/10 to-transparent rounded-full mb-10 relative">
                                         <Layers className="h-40 w-40 text-primary/5 animate-pulse" />
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <ListTree className="h-16 w-16 text-primary opacity-30" />
+                                            {view === 'transactions' ? <Zap className="h-16 w-16 text-primary opacity-30" /> : <ListTree className="h-16 w-16 text-primary opacity-30" />}
                                         </div>
                                     </div>
                                     <h3 className="text-4xl font-black text-[#1e1b4b] tracking-tighter max-w-md leading-tight">
