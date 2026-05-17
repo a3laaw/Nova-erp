@@ -263,7 +263,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                             isActive ? "nav-capsule-active" : "nav-capsule"
                           )}
                         >
-                          {Icon && <Icon className={cn("size-6 transition-colors", isActive ? "text-black" : "text-primary group-hover/btn:text-black")} />}
+                          {Icon && <Icon className={cn("size-6 transition-colors", isActive ? "!text-black" : "text-primary group-hover/btn:!text-black")} />}
                         </BaseSidebarMenuButton>
                     </div>
                   </DropdownMenuTrigger>
@@ -283,7 +283,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         )}>
                             <Link href={child.href} className="flex items-center justify-between w-full">
                                 <span className={cn("font-black text-xs", isChildActive && "text-black")}>{child.label}</span>
-                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-black" : "text-primary")} />}
+                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "!text-black" : "text-primary")} />}
                             </Link>
                         </DropdownMenuItem>
                     );
@@ -308,7 +308,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 )}>
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-6 shrink-0 ml-3 transition-colors", isActive ? "text-black" : "text-primary group-hover/btn:text-black")} />}
+                {Icon && <Icon className={cn("size-6 shrink-0 ml-3 transition-colors", isActive ? "!text-black" : "text-primary group-hover/btn:!text-black")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -334,7 +334,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                             </span>
                             {child.icon && <child.icon className={cn(
                                 "h-4 w-4 ml-3 transition-colors", 
-                                isChildActive ? "text-black" : "text-primary group-hover/subbtn:text-black"
+                                isChildActive ? "!text-black" : "text-primary group-hover/subbtn:!text-black"
                             )} />}
                         </div>
                       </Link>
