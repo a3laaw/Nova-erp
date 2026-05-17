@@ -71,10 +71,11 @@ import {
   FileCheck,
   ArrowUpFromLine,
   ArrowLeftRight,
-  RotateCcw as ReturnIcon,
   Users,
   Trash2,
-  Zap
+  Zap,
+  ListChecks,
+  Bookmark
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
