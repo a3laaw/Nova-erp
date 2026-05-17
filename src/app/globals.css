@@ -12,7 +12,7 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100% / 0.95;
     --popover-foreground: 222 47% 11%;
-    --primary: 29 100% 50%; /* Tech Orange #FF7A00 */
+    --primary: 29 100% 50%; /* البرتقالي التقني #FF7A00 */
     --primary-foreground: 0 0% 100%;
     --secondary: 215 25% 27%;
     --secondary-foreground: 210 40% 98%;
@@ -54,39 +54,37 @@
     @apply relative overflow-hidden transition-all duration-300 active:scale-95 shadow-[0_8px_20px_-5px_rgba(255,122,0,0.3)] hover:shadow-[0_15px_30px_-5px_rgba(255,122,0,0.4)] hover:-translate-y-0.5 border-b-4 border-primary/40 rounded-2xl font-black;
   }
 
-  /* 🏛️ القائمة الجانبية - النمط الفاتح السيادي */
   .sidebar-glass {
-    background: rgba(255, 255, 255, 0.2) !important;
+    background: rgba(255, 255, 255, 0.1) !important;
     backdrop-filter: blur(15px) !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.2) !important;
   }
 
-  /* العنصر الرئيسي - فاتح (أيقونة برتقالية) */
+  /* العنصر العادي: خلفية لؤلؤية وأيقونة برتقالية */
   .nav-capsule {
-    @apply bg-white/60 border border-white/80 text-[#1e1b4b] font-bold shadow-sm transition-all duration-300;
+    @apply bg-white/70 border border-white/90 text-[#1e1b4b] font-bold shadow-sm transition-all duration-300;
   }
   
   .nav-capsule svg {
     @apply text-[#FF7A00] transition-colors duration-300;
   }
   
-  /* الهوفر والنشط - خلفية برتقالية (أيقونة كحلية للوضوح) */
+  /* العنصر النشط أو الهوفر: خلفية برتقالية وأيقونة كحلية للتباين القصوى */
   .nav-capsule:hover, .nav-capsule-active {
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
     @apply text-[#1e1b4b] font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
   }
   
   .nav-capsule:hover svg, .nav-capsule-active svg {
-    @apply text-[#1e1b4b] !important;
+    @apply text-[#1e1b4b] !important; /* ضمان ظهور الأيقونة بلون كحلي فوق البرتقالي */
   }
 
-  /* العنصر الفرعي */
   .nav-capsule-sub {
-    @apply bg-white/30 border border-white/40 text-[#1e1b4b]/80 font-bold transition-all duration-300;
+    @apply bg-white/40 border border-white/50 text-[#1e1b4b]/80 font-bold transition-all duration-300;
   }
   
   .nav-capsule-sub svg {
-    @apply text-[#FF7A00]/70 transition-colors duration-300;
+    @apply text-[#FF7A00]/70;
   }
 
   .nav-capsule-sub:hover {
@@ -97,12 +95,7 @@
   .nav-capsule-sub:hover svg {
     @apply text-[#1e1b4b] !important;
   }
-
-  .luminous-card {
-    @apply glass-effect rounded-[2.5rem] p-8 border-2 border-white/60;
-  }
 }
 
-/* 🛡️ Sovereign UI Restorations */
 [data-radix-popper-content-wrapper] { z-index: 999999 !important; pointer-events: auto !important; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
