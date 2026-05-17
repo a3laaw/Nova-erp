@@ -84,15 +84,19 @@
 [role="dialog"],
 .rdp-caption_dropdowns,
 .rdp-dropdown,
-.native-select-fix {
+.native-select-fix,
+.rdp-caption_dropdowns select {
   z-index: 999999 !important;
   pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 [role="option"],
 [role="menuitem"],
 [cmdk-item],
-.rdp-dropdown select {
+.rdp-dropdown select,
+.native-select-fix select {
   cursor: pointer !important;
   pointer-events: auto !important;
 }

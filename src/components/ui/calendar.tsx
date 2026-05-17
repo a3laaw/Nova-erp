@@ -19,23 +19,23 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3 bg-white rounded-[2rem] shadow-2xl border-none", className)}
-      // 🛡️ تفعيل القوائم المنسدلة بشكل دائم وسيادي
+      // 🛡️ تفعيل القوائم المنسدلة بشكل دائم وسيادي (Sovereign Dropdowns)
       captionLayout="dropdown-buttons"
-      fromYear={1950}
-      toYear={2050}
+      fromYear={1900}
+      toYear={2100}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
-        caption: "flex justify-center pt-2 relative items-center gap-2 px-10",
-        caption_label: "hidden", // إخفاء العنوان الثابت
-        caption_dropdowns: "flex justify-center gap-2 items-center z-20 relative pointer-events-auto",
+        caption: "flex justify-center pt-2 relative items-center gap-2",
+        caption_label: "hidden", // إخفاء العنوان الثابت لفسح المجال للقوائم
+        caption_dropdowns: "flex justify-center gap-2 items-center z-50 relative pointer-events-auto",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 rounded-lg border-2 transition-all"
         ),
-        nav_button_previous: "absolute right-2",
-        nav_button_next: "absolute left-2",
+        nav_button_previous: "absolute left-2",
+        nav_button_next: "absolute right-2",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell: "text-muted-foreground rounded-md w-9 font-black text-[0.7rem] uppercase text-center",
@@ -52,7 +52,7 @@ function Calendar({
         day_disabled: "text-muted-foreground opacity-20",
         day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        dropdown: "rdp-dropdown native-select-fix cursor-pointer", // كلاس مخصص للتحكم عبر الماوس
+        dropdown: "rdp-dropdown native-select-fix cursor-pointer", 
         dropdown_month: "relative",
         dropdown_year: "relative",
         ...classNames,
