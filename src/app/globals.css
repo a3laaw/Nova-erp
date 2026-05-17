@@ -70,6 +70,10 @@
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
     @apply text-white font-black shadow-lg border-none scale-[1.02];
   }
+  
+  .nav-capsule:hover svg {
+    @apply text-white !important;
+  }
 
   /* العنصر الفرعي - فاتح أقل قليلاً */
   .nav-capsule-sub {
@@ -80,14 +84,22 @@
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
     @apply text-white font-black shadow-md border-none;
   }
+  
+  .nav-capsule-sub:hover svg {
+    @apply text-white !important;
+  }
 
   /* الحالة النشطة - التدرج البرتقالي الذهبي */
   .nav-capsule-active {
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
     @apply text-white font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
   }
+  
+  .nav-capsule-active svg {
+    @apply text-white !important;
+  }
 
-  /* تخصيص أيقونات القائمة عند الإغلاق لضمان الظهور باللون الأبيض */
+  /* تخصيص أيقونات القائمة لضمان اللون الأبيض في الحالات النشطة */
   [data-state="collapsed"] .nav-capsule-active svg,
   [data-state="collapsed"] .nav-capsule:hover svg,
   [data-state="collapsed"] .nav-capsule-sub:hover svg {

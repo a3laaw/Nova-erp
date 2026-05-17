@@ -284,7 +284,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         )}>
                             <Link href={child.href} className="flex items-center justify-between w-full">
                                 <span className="font-black text-xs">{child.label}</span>
-                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-[#1E293B]" : "opacity-40")} />}
+                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-primary" : "opacity-40")} />}
                             </Link>
                         </DropdownMenuItem>
                     );
