@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -50,13 +51,76 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, X, Layers, Activity
+    MapPin, X, Layers, Activity, GripVertical
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
+
+// --- Drag & Drop Imports ---
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+/**
+ * مكون العنصر القابل للسحب (Sortable Item):
+ */
+function SortableRefListItem({ id, children, isActive }: { id: string, children: React.ReactNode, isActive?: boolean }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  return (
+    <div 
+        ref={setNodeRef} 
+        style={style} 
+        className={cn(
+            "group relative flex items-center justify-between p-4 rounded-[1.5rem] cursor-default transition-all border-2 mb-2",
+            isActive ? "bg-primary border-primary text-white shadow-lg" : "hover:bg-muted/50 bg-white border-transparent"
+        )}
+    >
+        <div className="flex items-center gap-3 flex-1">
+            <button 
+                {...attributes} 
+                {...listeners} 
+                className="cursor-grab active:cursor-grabbing p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                type="button"
+            >
+                <GripVertical className="h-4 w-4 opacity-30 group-hover:opacity-100" />
+            </button>
+            {children}
+        </div>
+    </div>
+  );
+}
 
 function StatCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
     return (
@@ -103,6 +167,13 @@ export function ReferenceDataManager() {
 
     const tenantId = currentUser?.currentCompanyId;
 
+    const sensors = useSensors(
+      useSensor(PointerSensor),
+      useSensor(KeyboardSensor, {
+        coordinateGetter: sortableKeyboardCoordinates,
+      })
+    );
+
     const closeDialog = useCallback(() => {
         setIsPrimaryDialogOpen(false);
         setIsSecondaryDialogOpen(false);
@@ -123,16 +194,51 @@ export function ReferenceDataManager() {
         return '';
     }, [view, activeSubTab]);
 
-    const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null, [orderBy('name')]);
+    const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null, [orderBy('order')]);
     
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
     }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
     
-    const { data: secondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath, [orderBy('name')]);
+    const { data: secondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath, [orderBy('order')]);
 
     const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
+
+    /**
+     * محرك إعادة الترتيب السحابي (Reordering Engine):
+     */
+    const handleDragEnd = async (event: DragEndEvent, type: 'primary' | 'secondary') => {
+        const { active, over } = event;
+        if (!over || active.id === over.id || !firestore || !tenantId) return;
+
+        const list = type === 'primary' ? primaryItems : secondaryItems;
+        const relativePath = type === 'primary' ? primaryCollectionName : secondaryRelativePath;
+        if (!relativePath) return;
+
+        const oldIndex = list.findIndex((item) => item.id === active.id);
+        const newIndex = list.findIndex((item) => item.id === over.id);
+
+        const newOrderedList = arrayMove(list, oldIndex, newIndex);
+        
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(firestore);
+            const finalPath = getTenantPath(relativePath, tenantId);
+
+            newOrderedList.forEach((item, idx) => {
+                const itemRef = doc(firestore, finalPath, item.id);
+                batch.update(itemRef, { order: idx });
+            });
+
+            await batch.commit();
+            toast({ title: 'تم تحديث الترتيب' });
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'فشل الترتيب' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleSave = async (type: 'primary' | 'secondary') => {
         if (!firestore || !itemName.trim() || !tenantId) {
@@ -146,7 +252,9 @@ export function ReferenceDataManager() {
         setIsSaving(true);
         try {
             const finalPath = getTenantPath(relativePath, tenantId);
-            const payload = { 
+            const currentList = type === 'primary' ? primaryItems : secondaryItems;
+            
+            const payload: any = { 
                 name: itemName, 
                 updatedAt: serverTimestamp(),
                 companyId: tenantId
@@ -155,6 +263,7 @@ export function ReferenceDataManager() {
             if (editingItem) {
                 await updateDoc(doc(firestore, finalPath, editingItem.id), cleanFirestoreData(payload));
             } else {
+                payload.order = currentList.length;
                 await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
             }
             
@@ -195,14 +304,14 @@ export function ReferenceDataManager() {
             const finalPrimaryPath = getTenantPath(primaryCollectionName, tenantId);
             
             if (view === 'departments') {
-                defaultDepartments.forEach(d => {
+                defaultDepartments.forEach((d, idx) => {
                     const newDocRef = doc(collection(firestore, finalPrimaryPath));
-                    batch.set(newDocRef, { ...d, companyId: tenantId, createdAt: serverTimestamp() });
+                    batch.set(newDocRef, { ...d, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
                 });
             } else if (view === 'locations') {
-                defaultGovernorates.forEach(g => {
+                defaultGovernorates.forEach((g, idx) => {
                     const newDocRef = doc(collection(firestore, finalPrimaryPath));
-                    batch.set(newDocRef, { ...g, companyId: tenantId, createdAt: serverTimestamp() });
+                    batch.set(newDocRef, { ...g, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
                 });
             }
             await batch.commit();
@@ -276,7 +385,7 @@ export function ReferenceDataManager() {
                                 <CardTitle className="text-2xl font-black">
                                     {view === 'departments' ? 'إدارة الأقسام' : view === 'locations' ? 'توزيع المواقع' : 'دليل الخدمات'}
                                 </CardTitle>
-                                <CardDescription className="text-white/60 font-black">إدارة الهيكل المرجعي الموحد للمكتب.</CardDescription>
+                                <CardDescription className="text-white/60 font-black">إدارة الهيكل المرجعي الموحد للمكتب (اسحب للترتيب).</CardDescription>
                             </div>
                         </div>
                         <div className="flex gap-2">
@@ -306,17 +415,23 @@ export function ReferenceDataManager() {
                             <ScrollArea className="flex-1 p-4">
                                 {loadingPrimary ? <div className="space-y-2 p-4"><Skeleton className="h-10 w-full rounded-xl"/><Skeleton className="h-10 w-full rounded-xl"/></div> : 
                                 primaryItems.length === 0 ? <p className="text-center p-10 text-muted-foreground italic text-xs font-black">لا توجد سجلات بعد.</p> :
-                                <div className="space-y-2">
-                                    {primaryItems.map(item => (
-                                        <div key={item.id} onClick={() => setSelectedPrimaryId(item.id)} className={cn("group flex items-center justify-between p-4 rounded-[1.5rem] cursor-pointer transition-all border-2", selectedPrimaryId === item.id ? "bg-primary border-primary text-white shadow-lg" : "hover:bg-muted/50 bg-white border-transparent")}>
-                                            <span className="font-black text-sm truncate">{item.name}</span>
-                                            <div className={cn("flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity", selectedPrimaryId === item.id && "opacity-100")}>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-white/20 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setIsPrimaryDialogOpen(true); }}><Pencil className="h-3.5 w-3.5"/></Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-red-100/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3.5 w-3.5"/></Button>
-                                            </div>
+                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'primary')}>
+                                    <SortableContext items={primaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                                        <div className="space-y-1">
+                                            {primaryItems.map(item => (
+                                                <SortableRefListItem key={item.id} id={item.id} isActive={selectedPrimaryId === item.id}>
+                                                    <div className="flex items-center justify-between flex-1" onClick={() => setSelectedPrimaryId(item.id)}>
+                                                        <span className="font-black text-sm truncate">{item.name}</span>
+                                                        <div className={cn("flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity", selectedPrimaryId === item.id && "opacity-100")}>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-white/20 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setIsPrimaryDialogOpen(true); }}><Pencil className="h-3.5 w-3.5"/></Button>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-red-100/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3.5 w-3.5"/></Button>
+                                                        </div>
+                                                    </div>
+                                                </SortableRefListItem>
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>}
+                                    </SortableContext>
+                                </DndContext>}
                             </ScrollArea>
                         </div>
 
@@ -343,20 +458,26 @@ export function ReferenceDataManager() {
                                     <ScrollArea className="flex-1 p-8">
                                         {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-2xl"/></div> :
                                         secondaryItems.length === 0 ? <div className="h-64 flex flex-col items-center justify-center grayscale opacity-20"><PlusCircle className="h-16 w-16 mb-4"/><p className="font-black text-xl">لا توجد سجلات فرعية.</p></div> :
-                                        <div className="grid gap-4">
-                                            {secondaryItems.map(item => (
-                                                <div key={item.id} className="flex items-center justify-between p-6 border-2 border-slate-100 bg-white rounded-[1.8rem] hover:border-primary/20 transition-all group shadow-sm">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="p-2 bg-muted rounded-xl"><Activity className="h-4 w-4 opacity-40"/></div>
-                                                        <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
-                                                    </div>
-                                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
-                                                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl text-red-600 border" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
-                                                    </div>
+                                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'secondary')}>
+                                            <SortableContext items={secondaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                                                <div className="grid gap-2">
+                                                    {secondaryItems.map(item => (
+                                                        <SortableRefListItem key={item.id} id={item.id}>
+                                                            <div className="flex items-center justify-between flex-1">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="p-2 bg-muted rounded-xl"><Activity className="h-4 w-4 opacity-40"/></div>
+                                                                    <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
+                                                                </div>
+                                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl border" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
+                                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-2xl text-red-600 border" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
+                                                                </div>
+                                                            </div>
+                                                        </SortableRefListItem>
+                                                    ))}
                                                 </div>
-                                            ))}
-                                        </div>}
+                                            </SortableContext>
+                                        </DndContext>}
                                     </ScrollArea>
                                 </>
                             ) : (

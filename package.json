@@ -1,3 +1,4 @@
+
 {
   "name": "nova-erp",
   "version": "1.0.0",
@@ -11,6 +12,9 @@
     "setup:developer": "tsx src/scripts/setup-developer.ts"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.1.0",
+    "@dnd-kit/sortable": "^8.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "^0.21.0",
     "@hookform/resolvers": "3.9.0",
     "@radix-ui/react-accordion": "1.2.0",
