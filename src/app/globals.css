@@ -87,6 +87,13 @@
     @apply text-white font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
   }
 
+  /* تخصيص أيقونات القائمة عند الإغلاق لضمان الظهور باللون الأبيض */
+  [data-state="collapsed"] .nav-capsule-active svg,
+  [data-state="collapsed"] .nav-capsule:hover svg,
+  [data-state="collapsed"] .nav-capsule-sub:hover svg {
+    @apply text-white !important;
+  }
+
   .luminous-card {
     @apply glass-effect rounded-[2.5rem] p-8 border-2 border-white/60;
   }

@@ -73,7 +73,8 @@ import {
   ArrowLeftRight,
   RotateCcw as ReturnIcon,
   Users,
-  Trash2
+  Trash2,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -232,7 +233,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     return (
       <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
-          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
+          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full">
             <span className={cn(
                 "flex-1 text-right truncate text-[13px] font-black group-data-[collapsible=icon]:hidden transition-colors",
                 isActive ? "text-white" : "text-[#1e1b4b] group-hover/btn:text-white"
@@ -255,15 +256,17 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               <Tooltip>
                 <TooltipTrigger asChild>
                   <DropdownMenuTrigger asChild>
-                    <BaseSidebarMenuButton 
-                      isActive={isActive} 
-                      className={cn(
-                        "my-2 size-14 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto shadow-sm border group/btn",
-                        isActive ? "nav-capsule-active" : "nav-capsule"
-                      )}
-                    >
-                      {Icon && <Icon className={cn("size-6 transition-colors group-hover/btn:text-white", isActive ? "text-white" : "text-primary")} />}
-                    </BaseSidebarMenuButton>
+                    <div className="group/collapsible-btn w-full flex justify-center">
+                        <BaseSidebarMenuButton 
+                          isActive={isActive} 
+                          className={cn(
+                            "my-2 size-14 rounded-xl flex items-center justify-center p-0 transition-all duration-300 group-data-[collapsible=icon]:mx-auto shadow-sm border group/btn",
+                            isActive ? "nav-capsule-active" : "nav-capsule"
+                          )}
+                        >
+                          {Icon && <Icon className={cn("size-6 transition-colors group-hover/btn:text-white", isActive ? "text-white" : "text-primary")} />}
+                        </BaseSidebarMenuButton>
+                    </div>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
                 <TooltipContent side="left" className="font-black bg-[#1E293B] text-white border-none rounded-lg">{item.label}</TooltipContent>
@@ -298,7 +301,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
         <SidebarMenuItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive}>
-              <div className="flex items-center justify-between w-full">
+              <div className="flex items-center justify-between w-full h-full">
                 <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20 group-hover/btn:text-white group-hover/btn:opacity-100", isActive && "text-white opacity-100")} />
                 <span className={cn(
                     "text-right truncate text-[13px] font-black flex-1 transition-colors",
@@ -323,7 +326,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                           : "nav-capsule-sub"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
-                        <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center justify-between w-full h-full">
                             <span className={cn(
                                 "text-[11px] font-black truncate flex-1 text-right transition-colors",
                                 isChildActive ? "text-white" : "text-[#1e1b4b]/80 group-hover/subbtn:text-white"
