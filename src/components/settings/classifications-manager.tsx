@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PlusCircle, Pencil, Trash2, Loader2, Save, Plus, Minus, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { defaultItemCategories } from '@/lib/default-reference-data';
+import { useAuth } from '@/context/auth-context';
 
 interface CategoryNode extends ItemCategory {
   children: CategoryNode[];
@@ -85,8 +86,10 @@ function CategoryItem({
 
 export function ClassificationsManager() {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
 
+    const tenantId = currentUser?.currentCompanyId;
     const { data: categories, loading } = useSubscription<ItemCategory>(firestore, 'itemCategories');
     const [openCategories, setOpenCategories] = useState(new Set<string>());
 
@@ -148,23 +151,25 @@ export function ClassificationsManager() {
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         const trimmedName = itemName.trim();
-        if (!firestore || !trimmedName) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'اسم الفئة مطلوب.' });
+        if (!firestore || !trimmedName || !tenantId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير مكتملة.' });
             return;
         }
         setIsSaving(true);
         try {
+            const finalPath = getTenantPath('itemCategories', tenantId);
             const dataToSave = {
                 name: trimmedName,
-                parentCategoryId: parentCategory?.id || null
+                parentCategoryId: parentCategory?.id || null,
+                companyId: tenantId
             };
             if (editingItem) {
-                await updateDoc(doc(firestore, 'itemCategories', editingItem.id!), dataToSave);
+                await updateDoc(doc(firestore, finalPath, editingItem.id!), dataToSave);
             } else {
                 const currentList = parentCategory
                     ? categories.filter(c => c.parentCategoryId === parentCategory.id)
                     : categories.filter(c => !c.parentCategoryId);
-                await addDoc(collection(firestore, 'itemCategories'), { ...dataToSave, order: currentList.length });
+                await addDoc(collection(firestore, finalPath), { ...dataToSave, order: currentList.length });
             }
             toast({ title: 'تم الحفظ بنجاح' });
             closeDialog();
@@ -176,10 +181,11 @@ export function ClassificationsManager() {
     };
 
     const handleDelete = async () => {
-        if (!firestore || !itemToDelete) return;
+        if (!firestore || !itemToDelete || !tenantId) return;
         setIsSaving(true);
         try {
-            await deleteDoc(doc(firestore, 'itemCategories', itemToDelete.id!));
+            const finalPath = getTenantPath('itemCategories', tenantId);
+            await deleteDoc(doc(firestore, finalPath, itemToDelete.id!));
             toast({ title: 'نجاح' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ' });
@@ -190,17 +196,19 @@ export function ClassificationsManager() {
     };
 
     const handleImportDefaults = async () => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
-            const existingSnap = await getDocs(query(collection(firestore, 'itemCategories')));
+            const finalPath = getTenantPath('itemCategories', tenantId);
+            const existingSnap = await getDocs(query(collection(firestore, finalPath)));
             existingSnap.forEach(d => batch.delete(d.ref));
             for (const category of defaultItemCategories) {
-                batch.set(doc(collection(firestore, 'itemCategories')), {
+                batch.set(doc(collection(firestore, finalPath)), {
                     name: category.name,
                     parentCategoryId: category.parentCategoryId,
-                    order: category.order
+                    order: category.order,
+                    companyId: tenantId
                 });
             }
             await batch.commit();
@@ -306,7 +314,7 @@ export function ClassificationsManager() {
                     <AlertDialogFooter>
                         <AlertDialogCancel>إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-destructive hover:bg-destructive/90">
-                            {isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'نعم، حذف'}
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'نعم، حذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

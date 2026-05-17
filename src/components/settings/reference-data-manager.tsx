@@ -14,7 +14,7 @@ import {
     getDocs, 
     serverTimestamp,
     collectionGroup
-} from 'firebase/firestore';
+} from 'firebase/firestore'; 
 import { 
     Card, 
     CardHeader, 
@@ -25,7 +25,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -51,12 +50,13 @@ import {
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
     DownloadCloud, Building2, Globe, Workflow, 
     ArrowRight, ListTree, Settings2,
-    MapPin, X, Layers, Activity, FileSignature, Clock
+    MapPin, X, Layers, Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn, cleanFirestoreData } from '@/lib/utils';
+import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/auth-context';
 
 function StatCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
     return (
@@ -81,6 +81,7 @@ function StatCard({ title, count, icon, onNavigate, colorClass, loading, descrip
 
 export function ReferenceDataManager() {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
 
@@ -100,6 +101,8 @@ export function ReferenceDataManager() {
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [itemName, setItemName] = useState('');
 
+    const tenantId = currentUser?.currentCompanyId;
+
     const closeDialog = useCallback(() => {
         setIsPrimaryDialogOpen(false);
         setIsSecondaryDialogOpen(false);
@@ -107,71 +110,117 @@ export function ReferenceDataManager() {
         setItemName('');
     }, []);
 
-    const primaryCollection = useMemo(() => {
+    const primaryCollectionName = useMemo(() => {
         if (view === 'departments') return 'departments';
         if (view === 'locations') return 'governorates';
         if (view === 'transactions') return 'transactionTypes';
         return '';
     }, [view]);
 
-    const secondaryCollection = useMemo(() => {
+    const secondaryCollectionName = useMemo(() => {
         if (view === 'departments') return activeSubTab === 'jobs' ? 'jobs' : 'workStages';
         if (view === 'locations') return 'areas';
         return '';
     }, [view, activeSubTab]);
 
-    const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollection || null, [orderBy('name')]);
+    // 🛡️ استخدام الخطاف السيادي للجلب اللحظي
+    const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null, [orderBy('name')]);
     
-    const secondaryPath = useMemo(() => {
-        if (!selectedPrimaryId || !primaryCollection || !secondaryCollection) return null;
-        return `${primaryCollection}/${selectedPrimaryId}/${secondaryCollection}`;
-    }, [selectedPrimaryId, primaryCollection, secondaryCollection]);
+    // 🛡️ جلب البيانات الفرعية (Jobs, Stages, Areas) عبر المسار السيادي المتداخل
+    const secondaryRelativePath = useMemo(() => {
+        if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
+        return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
+    }, [selectedPrimaryId, primaryCollectionName, secondaryCollectionName]);
     
-    const { data: secondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryPath, [orderBy('name')]);
+    const { data: secondaryItems, loading: loadingSecondary } = useSubscription<any>(firestore, secondaryRelativePath, [orderBy('name')]);
 
     const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
 
+    /**
+     * محرك الحفظ الموحد:
+     * يضمن استخدام getTenantPath لفك عائق الـ Permissions وضمان العزل.
+     */
     const handleSave = async (type: 'primary' | 'secondary') => {
-        if (!firestore || !itemName.trim()) return;
-        const path = type === 'primary' ? primaryCollection : secondaryPath;
-        if (!path) return;
+        if (!firestore || !itemName.trim() || !tenantId) {
+            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير مكتملة أو لم يتم تحديد المنشأة.' });
+            return;
+        }
+
+        const relativePath = type === 'primary' ? primaryCollectionName : secondaryRelativePath;
+        if (!relativePath) return;
 
         setIsSaving(true);
         try {
-            const payload = { name: itemName, updatedAt: serverTimestamp() };
-            if (editingItem) await updateDoc(doc(firestore, path, editingItem.id), cleanFirestoreData(payload));
-            else await addDoc(collection(firestore, path), { ...payload, createdAt: serverTimestamp() });
-            toast({ title: 'نجاح الحفظ' });
+            // 🏰 توجيه المسار للمجلد السيادي للشركة
+            const finalPath = getTenantPath(relativePath, tenantId);
+            const payload = { 
+                name: itemName, 
+                updatedAt: serverTimestamp(),
+                companyId: tenantId // 🛡️ التاج السيادي
+            };
+
+            if (editingItem) {
+                await updateDoc(doc(firestore, finalPath, editingItem.id), cleanFirestoreData(payload));
+            } else {
+                await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
+            }
+            
+            toast({ title: 'نجاح الحفظ', description: 'تم تحديث البيانات المرجعية للمنظمة.' });
             closeDialog();
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsSaving(false); }
+        } catch (e: any) { 
+            console.error("Save Error:", e);
+            toast({ variant: 'destructive', title: 'فشل ترحيل البيانات', description: 'تأكد من صلاحياتك كمدير منشأة.' }); 
+        } finally { 
+            setIsSaving(false); 
+        }
     };
 
     const handleDelete = async () => {
-        if (!firestore || !itemToDelete) return;
-        const path = itemToDelete.target === 'primary' ? primaryCollection : secondaryPath;
-        if (!path) return;
+        if (!firestore || !itemToDelete || !tenantId) return;
+        
+        const relativePath = itemToDelete.target === 'primary' ? primaryCollectionName : secondaryRelativePath;
+        if (!relativePath) return;
+
         setIsSaving(true);
         try {
-            await deleteDoc(doc(firestore, path, itemToDelete.id));
-            toast({ title: 'تم الحذف' });
-            setIsDeleteDialogOpen(false); setItemToDelete(null);
-        } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
+            const finalPath = getTenantPath(relativePath, tenantId);
+            await deleteDoc(doc(firestore, finalPath, itemToDelete.id));
+            toast({ title: 'تم الحذف بنجاح' });
+            setIsDeleteDialogOpen(false); 
+            setItemToDelete(null);
+        } catch (e) { 
+            toast({ variant: 'destructive', title: 'فشل الحذف' }); 
+        } finally { 
+            setIsSaving(false); 
+        }
     };
 
     const handleImportDefaults = async () => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         setIsImporting(true);
         try {
             const batch = writeBatch(firestore);
+            const finalPrimaryPath = getTenantPath(primaryCollectionName, tenantId);
+            
             if (view === 'departments') {
-                defaultDepartments.forEach(d => batch.set(doc(collection(firestore, 'departments')), { ...d, createdAt: serverTimestamp() }));
+                defaultDepartments.forEach(d => {
+                    const newDocRef = doc(collection(firestore, finalPrimaryPath));
+                    batch.set(newDocRef, { ...d, companyId: tenantId, createdAt: serverTimestamp() });
+                });
             } else if (view === 'locations') {
-                defaultGovernorates.forEach(g => batch.set(doc(collection(firestore, 'governorates')), { ...g, createdAt: serverTimestamp() }));
+                defaultGovernorates.forEach(g => {
+                    const newDocRef = doc(collection(firestore, finalPrimaryPath));
+                    batch.set(newDocRef, { ...g, companyId: tenantId, createdAt: serverTimestamp() });
+                });
             }
             await batch.commit();
-            toast({ title: 'نجاح الاستيراد' });
+            toast({ title: 'نجاح الاستيراد السيادي', description: 'تم استنساخ القوالب الافتراضية لمنشأتك.' });
             setIsImportConfirmOpen(false);
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ' }); } finally { setIsImporting(false); }
+        } catch (e) { 
+            toast({ variant: 'destructive', title: 'خطأ في الاستيراد' }); 
+        } finally { 
+            setIsImporting(false); 
+        }
     };
 
     if (view === 'main') {
@@ -183,7 +232,7 @@ export function ReferenceDataManager() {
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Settings2 className="h-8 w-8" /></div>
                             <div>
                                 <CardTitle className="text-3xl font-black text-[#1e1b4b]">مركز البيانات المرجعية السيادي</CardTitle>
-                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم، هيكل العمل الفني، وقواعد التنظيم الداخلي.</CardDescription>
+                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم، هيكل العمل الفني، وقواعد التنظيم الداخلي للمنظمة.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -364,7 +413,7 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
                         <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد البيانات القياسية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية القياسية آلياً.</AlertDialogDescription>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية القياسية آلياً لمجلد منشأتك.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-black">إلغاء</AlertDialogCancel>
