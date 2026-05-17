@@ -22,8 +22,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 /**
- * بوابة الدخول السيادية (Sovereign Gateway V105.0)
- * تم تحديثها بإطار ذهبي/برتقالي متدرج ونمط زجاجي لؤلؤي عائم.
+ * بوابة الدخول (Modern Simplified Gateway V106.0)
+ * تم تبسيط النصوص لتلائم سوق العمل مع الحفاظ على الإطار السيادي المتدرج.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -84,19 +84,18 @@ export default function LoginPage() {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/10 rounded-full blur-[100px] animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
 
-      {/* 🛡️ الإطار السيادي المتدرج (Sovereign Gradient Frame) */}
+      {/* 🛡️ الإطار المتدرج الذهبي والبرتقالي */}
       <div className="p-1.5 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-[0_25px_80px_-15px_rgba(255,122,0,0.25)] animate-in zoom-in-95 duration-1000 relative z-10">
         
         <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
             
             <CardHeader className="py-10 px-8 text-center bg-transparent">
-                {/* الأيقونة البرتقالية المتوهجة */}
                 <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-[0_15px_35px_rgba(255,122,0,0.4)] border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />
                 </div>
                 
                 <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</CardTitle>
-                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em]">Sovereign Entrance</CardDescription>
+                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em]">نظام الإدارة المتكامل</CardDescription>
             </CardHeader>
             
             <CardContent className="px-10 pb-12 space-y-8">
@@ -110,19 +109,19 @@ export default function LoginPage() {
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني أو المعرّف</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني</Label>
                             <Input 
                                 value={identifier} 
                                 onChange={(e) => setIdentifier(e.target.value)} 
                                 className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner" 
                                 required 
-                                placeholder="Username / Email"
+                                placeholder="Email address"
                                 autoComplete="off"
                             />
                         </div>
 
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">كلمة المرور السيادية</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">كلمة المرور</Label>
                             <Input 
                                 type="password" 
                                 value={password} 
@@ -133,13 +132,13 @@ export default function LoginPage() {
                                 autoComplete="new-password"
                             />
                             <div className="flex justify-center">
-                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-primary/70 hover:text-primary transition-colors">هل نسيت كلمة المرور؟</button>
+                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-primary/70 hover:text-primary transition-colors">نسيت كلمة المرور؟</button>
                             </div>
                         </div>
 
                         <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-[0_15px_35px_rgba(255,122,0,0.3)] bg-gradient-to-r from-[#FF7A00] to-[#FFB000] hover:scale-[1.02] text-white border-none transition-all active:scale-95 group">
-                            {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول آمن"}
-                            {!isSubmitting && <LogIn className="h-6 w-6 group-hover:translate-x-1 transition-transform" />}
+                            {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول"}
+                            {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                         </Button>
 
                         <div className="pt-6 flex flex-col items-center">
