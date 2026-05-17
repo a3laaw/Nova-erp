@@ -78,7 +78,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable
-} from '@dnd-kit/sortable';
+} from '@radix-ui/react-sortable';
 
 import { CSS } from '@dnd-kit/utilities';
 
@@ -266,6 +266,11 @@ export function ReferenceDataManager() {
                 companyId: tenantId
             };
 
+            // 🛡️ إضافة معرّف الأب بشكل صريح للبنود الفرعية لسهولة الفلترة
+            if (type === 'secondary' && selectedPrimaryId) {
+                payload.parentId = selectedPrimaryId;
+            }
+
             if (editingItem) {
                 await updateDoc(doc(firestore, finalPath, editingItem.id), cleanFirestoreData(payload));
             } else {
@@ -374,7 +379,7 @@ export function ReferenceDataManager() {
     return (
         <div className="space-y-6" dir="rtl">
             <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect border-white/60">
-                <CardHeader className="p-10 orange-gold-gradient text-white relative">
+                <CardHeader className="p-10 bg-primary text-white relative">
                     <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32" />
                     <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative z-10">
                         <div className="flex items-center gap-6">
@@ -564,3 +569,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+

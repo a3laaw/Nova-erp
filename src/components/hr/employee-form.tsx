@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -7,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, X, Loader2, User, Phone, Briefcase, Banknote, Sparkles, Camera, ShieldCheck, Globe, Landmark, FileCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { orderBy, where } from 'firebase/firestore';
+import { orderBy, where, collection, getDocs, query } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import type { Employee, Department, Job } from '@/lib/types';
@@ -19,7 +18,8 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { Checkbox } from '../ui/checkbox';
 import { useBranding } from '@/context/branding-context';
 import { analyzeEmployeeDocument } from '@/ai/flows/analyze-employee-doc';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
 
 interface EmployeeFormProps {
     onSave: (data: Partial<Employee>) => Promise<void>;
@@ -40,13 +40,20 @@ const nationalityOptions = commonNationalities.map(n => ({ value: n, label: n })
 
 export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = false, employeeNumber = null }: EmployeeFormProps) {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const { branding } = useBranding();
     const aiFileInputRef = useRef<HTMLInputElement>(null);
     
+    const tenantId = currentUser?.currentCompanyId;
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const { data: departments } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
-    const { data: jobs } = useSubscription<Job>(firestore, 'jobs', [], true);
+    
+    // 🏢 جلب الأقسام
+    const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
+    
+    // 👔 إدارة الوظائف المفلترة محلياً لضمان الظهور الفوري
+    const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
+    const [loadingJobs, setLoadingJobs] = useState(false);
 
     const [formData, setFormData] = useState<Partial<Employee>>({
         fullName: '', nameEn: '', civilId: '', mobile: '',
@@ -74,6 +81,41 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showHousingAllowance, setShowHousingAllowance] = useState(false);
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
+
+    // ✨ محرك جلب الوظائف عند اختيار القسم (Direct Path Fetching)
+    useEffect(() => {
+        if (!formData.department || !firestore || !tenantId) {
+            setFilteredJobs([]);
+            return;
+        }
+
+        const fetchJobs = async () => {
+            const dept = departments.find(d => d.name === formData.department);
+            if (!dept?.id) return;
+
+            setLoadingJobs(true);
+            try {
+                // 🛡️ التوجه للمسار المباشر للوظائف التابعة للقسم في هذه المنشأة
+                const jobsPath = `departments/${dept.id}/jobs`;
+                const finalPath = getTenantPath(jobsPath, tenantId);
+                
+                const snap = await getDocs(query(collection(firestore, finalPath), orderBy('order')));
+                const fetchedJobs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+                setFilteredJobs(fetchedJobs);
+
+                // إذا كانت بيانات أولية، نتأكد من بقاء المسمى المختار
+                if (initialData?.jobTitle && !formData.jobTitle) {
+                    setFormData(prev => ({ ...prev, jobTitle: initialData.jobTitle }));
+                }
+            } catch (err) {
+                console.error("Error fetching filtered jobs:", err);
+            } finally {
+                setLoadingJobs(false);
+            }
+        };
+
+        fetchJobs();
+    }, [formData.department, departments, firestore, tenantId, initialData?.jobTitle]);
 
     useEffect(() => {
         if (initialData) {
@@ -144,13 +186,7 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     };
 
     const departmentOptions = useMemo(() => departments.map(d => ({ value: d.name, label: d.name })), [departments]);
-    
-    const filteredJobOptions = useMemo(() => {
-        if (!formData.department) return [];
-        const selectedDept = departments.find(d => d.name === formData.department);
-        if (!selectedDept) return [];
-        return jobs.filter(j => (j as any).parentId === selectedDept.id).map(j => ({ value: j.name, label: j.name }));
-    }, [departments, jobs, formData.department]);
+    const jobOptions = useMemo(() => filteredJobs.map(j => ({ value: j.name, label: j.name })), [filteredJobs]);
 
     const handleSubmitInternal = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -161,7 +197,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         await onSave(formData);
     };
 
-    const isFoodOrDelivery = branding?.activityType === 'food_delivery';
     const showResidencyExpiry = formData.nationality && formData.nationality.trim() !== 'كويتي';
 
     return (
@@ -239,39 +274,6 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     </div>
                 </section>
 
-                {isFoodOrDelivery && (
-                    <section className="space-y-6 p-6 border-2 border-primary/20 rounded-[2rem] bg-primary/[0.02] animate-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
-                                <ShieldCheck className="h-5 w-5" />
-                            </div>
-                            <h3 className="font-black text-lg text-primary">وثائق التوصيل والأغذية</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="grid gap-2 p-4 bg-white rounded-2xl border shadow-sm group hover:border-primary/40 transition-all">
-                                <Label className="font-black text-xs text-gray-700 flex items-center gap-2">
-                                    <Landmark className="h-3.5 w-3.5 text-primary" /> انتهاء رخصة القيادة
-                                </Label>
-                                <DateInput 
-                                    value={formData.drivingLicenseExpiry} 
-                                    onChange={d => handleSelectChange('drivingLicenseExpiry', d)} 
-                                    className="h-10"
-                                />
-                            </div>
-                            <div className="grid gap-2 p-4 bg-white rounded-2xl border shadow-sm group hover:border-primary/40 transition-all">
-                                <Label className="font-black text-xs text-gray-700 flex items-center gap-2">
-                                    <FileCheck className="h-3.5 w-3.5 text-primary" /> انتهاء كرت الصحة
-                                </Label>
-                                <DateInput 
-                                    value={formData.healthCardExpiry} 
-                                    onChange={d => handleSelectChange('healthCardExpiry', d)} 
-                                    className="h-10"
-                                />
-                            </div>
-                        </div>
-                    </section>
-                )}
-
                 <section className="space-y-6 p-6 border rounded-[2rem] bg-muted/10">
                     <h3 className="font-black text-lg flex items-center gap-2">
                         <Briefcase className="h-5 w-5 text-primary" /> التعيين والدوام
@@ -279,11 +281,22 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">القسم *</Label>
-                            <InlineSearchList value={formData.department || ''} onSelect={v => { handleSelectChange('department', v); handleSelectChange('jobTitle', ''); }} options={departmentOptions} placeholder="اختر القسم..." />
+                            <InlineSearchList 
+                                value={formData.department || ''} 
+                                onSelect={v => { handleSelectChange('department', v); handleSelectChange('jobTitle', ''); }} 
+                                options={departmentOptions} 
+                                placeholder={deptsLoading ? "تحميل..." : "اختر القسم..."} 
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">المسمى الوظيفي *</Label>
-                            <InlineSearchList value={formData.jobTitle || ''} onSelect={v => handleSelectChange('jobTitle', v)} options={filteredJobOptions} placeholder="اختر المسمى..." disabled={!formData.department} />
+                            <InlineSearchList 
+                                value={formData.jobTitle || ''} 
+                                onSelect={v => handleSelectChange('jobTitle', v)} 
+                                options={jobOptions} 
+                                placeholder={!formData.department ? "اختر القسم أولاً" : loadingJobs ? "جاري التحميل..." : "اختر المسمى..."} 
+                                disabled={!formData.department || loadingJobs} 
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label className="font-bold mr-1">تاريخ المباشرة</Label>
@@ -411,3 +424,4 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
+
