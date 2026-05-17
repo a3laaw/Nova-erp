@@ -19,11 +19,15 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       className={cn("p-3 bg-white rounded-[2rem] shadow-2xl border-none", className)}
+      // 🛡️ تفعيل القوائم المنسدلة بشكل دائم وسيادي
+      captionLayout="dropdown-buttons"
+      fromYear={1950}
+      toYear={2050}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-2 relative items-center gap-2 px-10",
-        caption_label: "hidden", // نُخفي العنوان الثابت تماماً لنفسح المجال للقوائم
+        caption_label: "hidden", // إخفاء العنوان الثابت
         caption_dropdowns: "flex justify-center gap-2 items-center z-20 relative pointer-events-auto",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
@@ -48,7 +52,7 @@ function Calendar({
         day_disabled: "text-muted-foreground opacity-20",
         day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
-        dropdown: "rdp-dropdown native-select-fix cursor-pointer", // كلاس مخصص للإصلاح الجذري
+        dropdown: "rdp-dropdown native-select-fix cursor-pointer", // كلاس مخصص للتحكم عبر الماوس
         dropdown_month: "relative",
         dropdown_year: "relative",
         ...classNames,

@@ -106,7 +106,7 @@
 }
 
 .native-select-fix select {
-  appearance: auto !important; /* نستخدم المظهر الافتراضي للمتصفح لضمان عمل الماوس 100% */
+  appearance: auto !important; 
   background-color: #f8fafc !important;
   border: 2px solid #e2e8f0 !important;
   border-radius: 12px !important;
