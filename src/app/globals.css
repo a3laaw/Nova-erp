@@ -61,49 +61,41 @@
     border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
   }
 
-  /* العنصر الرئيسي - فاتح بوضوح */
+  /* العنصر الرئيسي - فاتح (أيقونة برتقالية) */
   .nav-capsule {
     @apply bg-white/60 border border-white/80 text-[#1e1b4b] font-bold shadow-sm transition-all duration-300;
   }
   
-  .nav-capsule:hover {
-    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-white font-black shadow-lg border-none scale-[1.02];
+  .nav-capsule svg {
+    @apply text-[#FF7A00] transition-colors duration-300;
   }
   
-  .nav-capsule:hover svg {
-    @apply text-white !important;
+  /* الهوفر والنشط - خلفية برتقالية (أيقونة كحلية للوضوح) */
+  .nav-capsule:hover, .nav-capsule-active {
+    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
+    @apply text-[#1e1b4b] font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
+  }
+  
+  .nav-capsule:hover svg, .nav-capsule-active svg {
+    @apply text-[#1e1b4b] !important;
   }
 
-  /* العنصر الفرعي - فاتح أقل قليلاً */
+  /* العنصر الفرعي */
   .nav-capsule-sub {
     @apply bg-white/30 border border-white/40 text-[#1e1b4b]/80 font-bold transition-all duration-300;
   }
   
+  .nav-capsule-sub svg {
+    @apply text-[#FF7A00]/70 transition-colors duration-300;
+  }
+
   .nav-capsule-sub:hover {
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-white font-black shadow-md border-none;
+    @apply text-[#1e1b4b] font-black shadow-md border-none;
   }
   
   .nav-capsule-sub:hover svg {
-    @apply text-white !important;
-  }
-
-  /* الحالة النشطة - التدرج البرتقالي الذهبي */
-  .nav-capsule-active {
-    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-white font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
-  }
-  
-  .nav-capsule-active svg {
-    @apply text-white !important;
-  }
-
-  /* تخصيص أيقونات القائمة لضمان اللون الأبيض في الحالات النشطة */
-  [data-state="collapsed"] .nav-capsule-active svg,
-  [data-state="collapsed"] .nav-capsule:hover svg,
-  [data-state="collapsed"] .nav-capsule-sub:hover svg {
-    @apply text-white !important;
+    @apply text-[#1e1b4b] !important;
   }
 
   .luminous-card {
