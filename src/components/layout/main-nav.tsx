@@ -181,15 +181,17 @@ const navItems = {
   ]
 };
 
-function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ...props }: any) {
+function SidebarMenuButton({ isActive, tooltip, children, asChild, className, isSub = false, ...props }: any) {
   const { state, isMobile } = useSidebar();
   const button = (
     <BaseSidebarMenuButton
       isActive={isActive}
       className={cn(
-        "my-2 h-12 rounded-xl transition-all duration-300 flex items-center w-full px-4",
+        "my-1.5 h-12 rounded-xl transition-all duration-300 flex items-center w-full px-4",
         "group-data-[collapsible=icon]:!size-14 group-data-[collapsible=icon]:!p-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto",
-        isActive ? "nav-capsule-active" : "nav-capsule",
+        isActive 
+          ? "nav-capsule-active" 
+          : (isSub ? "nav-capsule-sub" : "nav-capsule"),
         className
       )}
       asChild={asChild}
@@ -203,7 +205,7 @@ function SidebarMenuButton({ isActive, tooltip, children, asChild, className, ..
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent side="left" align="center" className="font-black bg-[#FF7A00] text-[#1E293B] border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
+          <TooltipContent side="left" align="center" className="font-black bg-[#FF7A00] text-white border-none rounded-lg shadow-xl">{tooltip}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -298,7 +300,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 <span className="text-right truncate text-[13px] font-black flex-1">
                     {item.label}
                 </span>
-                {Icon && <Icon className="size-6 shrink-0 ml-3" />}
+                {Icon && <Icon className={cn("size-6 shrink-0 ml-3", isActive ? "text-white" : "text-primary")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -312,12 +314,12 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         "rounded-xl py-2 h-10 transition-all border border-transparent flex items-center justify-start px-4",
                         isChildActive 
                           ? "nav-capsule-active" 
-                          : "nav-capsule"
+                          : "nav-capsule-sub"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
                             <span className="text-[11px] font-black truncate flex-1 text-right">{child.label}</span>
-                            {child.icon && <child.icon className="h-4 w-4 ml-3" />}
+                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-white" : "opacity-40")} />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -365,8 +367,8 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
       <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2 bg-white/5 rounded-b-3xl">
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/20 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-                    <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-[#1E293B] font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
+                <div className="bg-white/40 border border-white/60 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/60 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
+                    <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-white font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
                         {currentUser.fullName?.charAt(0) || 'N'}
                     </div>
                     <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
@@ -375,10 +377,10 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
                     </div>
                 </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-2xl" dir="rtl">
-                <DropdownMenuLabel className="font-black text-xs px-3 py-2 text-slate-400">خيارات الجلسة</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onLogout} className="text-red-600 font-black rounded-xl py-3 cursor-pointer focus:bg-red-50">
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-2xl bg-white border-none" dir="rtl">
+                <DropdownMenuLabel className="font-black text-xs px-3 py-2 text-slate-400 uppercase tracking-widest">خيارات الجلسة</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-slate-100" />
+                <DropdownMenuItem onClick={onLogout} className="text-red-600 font-black rounded-xl py-3 cursor-pointer focus:bg-red-50 transition-all">
                     <Trash2 className="ml-2 h-4 w-4" /> تسجيل الخروج
                 </DropdownMenuItem>
             </DropdownMenuContent>
