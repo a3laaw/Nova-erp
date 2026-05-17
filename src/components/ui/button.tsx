@@ -5,25 +5,25 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-bold ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 shadow-md hover:shadow-lg active:scale-95",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-black transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 theme-glass:bg-[#1e1b4b] theme-glass:text-white theme-glass:hover:bg-black",
+        default: "bg-primary text-primary-foreground glass-3d-button border-orange-600/30",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg",
         outline:
-          "border-2 border-input bg-background hover:bg-accent hover:text-accent-foreground theme-glass:bg-white/40 theme-glass:border-white/60 theme-glass:text-[#1e1b4b] theme-glass:hover:bg-white/60",
+          "border-2 border-white/60 bg-white/40 backdrop-blur-md text-foreground hover:bg-white/60 hover:shadow-md",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 theme-glass:bg-white/20 theme-glass:text-[#1e1b4b] theme-glass:hover:bg-white/30",
-        ghost: "hover:bg-accent hover:text-accent-foreground shadow-none theme-glass:text-[#1e1b4b] theme-glass:hover:bg-white/10",
-        link: "text-primary underline-offset-4 hover:underline shadow-none theme-glass:text-primary theme-glass:font-black",
+          "bg-white/60 text-primary border-b-4 border-primary/10 hover:bg-white shadow-lg",
+        ghost: "hover:bg-primary/5 hover:text-primary transition-colors",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-11 px-6 py-2",
-        sm: "h-9 rounded-lg px-3",
-        lg: "h-14 rounded-2xl px-10 text-base",
-        icon: "h-10 w-10",
+        default: "h-12 px-6 py-2",
+        sm: "h-9 rounded-xl px-3 text-xs",
+        lg: "h-14 rounded-3xl px-12 text-base",
+        icon: "h-11 w-11 rounded-2xl",
       },
     },
     defaultVariants: {

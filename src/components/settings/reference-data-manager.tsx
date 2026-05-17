@@ -60,7 +60,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { useSubscription } from '@/hooks/use-subscription';
 
-// --- 🛡️ التصحيح الجذري لمصفوفة السحب والإفلات (dnd-kit) ---
+// --- 🛡️ محرك السحب والإفلات السيادي (dnd-kit) ---
 import {
   DndContext,
   closestCenter,
@@ -103,17 +103,17 @@ function SortableRefListItem({ id, children, isActive }: { id: string, children:
         ref={setNodeRef} 
         style={style} 
         className={cn(
-            "group relative flex items-center justify-between p-4 rounded-[1.8rem] cursor-default transition-all border-2 mb-2",
+            "group relative flex items-center justify-between p-5 rounded-[2rem] cursor-default transition-all border-2 mb-3",
             isActive 
-              ? "bg-primary border-primary text-white shadow-xl scale-[1.02]" 
+              ? "bg-primary border-primary text-white shadow-2xl scale-[1.02] ring-8 ring-primary/5" 
               : "bg-white/60 hover:bg-white hover:border-primary/20 border-transparent shadow-sm"
         )}
     >
-        <div className="flex items-center gap-4 flex-1">
+        <div className="flex items-center gap-5 flex-1">
             <button 
                 {...attributes} 
                 {...listeners} 
-                className="cursor-grab active:cursor-grabbing p-1.5 rounded-xl hover:bg-primary/10 transition-colors"
+                className="cursor-grab active:cursor-grabbing p-2 rounded-xl hover:bg-primary/10 transition-colors"
                 type="button"
             >
                 <GripVertical className={cn("h-5 w-5", isActive ? "text-white" : "text-primary opacity-30 group-hover:opacity-100")} />
@@ -124,22 +124,22 @@ function SortableRefListItem({ id, children, isActive }: { id: string, children:
   );
 }
 
-function StatCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
+function SummaryCard({ title, count, icon, onNavigate, colorClass, loading, description }: { title: string, count: number, icon: React.ReactNode, onNavigate: () => void, colorClass: string, loading: boolean, description: string }) {
     return (
         <Card 
             onClick={onNavigate} 
-            className="group cursor-pointer border-none shadow-lg rounded-[2.5rem] bg-white/40 backdrop-blur-xl hover-lift overflow-hidden relative"
+            className="group cursor-pointer border-none shadow-2xl rounded-[3rem] bg-white/45 backdrop-blur-3xl hover-lift overflow-hidden relative border-white/60"
         >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-primary/10 transition-all duration-700" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-primary/20 transition-all duration-700" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10 p-8">
                 <CardTitle className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</CardTitle>
-                <div className={cn("p-3 rounded-[1.2rem] transition-all shadow-inner group-hover:scale-110", colorClass)}>{icon}</div>
+                <div className={cn("p-4 rounded-2xl transition-all shadow-inner group-hover:scale-110 group-hover:shadow-lg", colorClass)}>{icon}</div>
             </CardHeader>
-            <CardContent className="relative z-10">
-                {loading ? <Skeleton className="h-10 w-16 mt-1" /> : <div className="text-5xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
-                <p className="text-[11px] font-bold text-slate-500 mt-2">{description}</p>
-                <div className="flex items-center gap-1 text-[10px] text-primary font-black mt-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 uppercase tracking-widest">
-                    ضبط الإعدادات <ArrowRight className="h-3 w-3"/>
+            <CardContent className="relative z-10 px-8 pb-8">
+                {loading ? <Skeleton className="h-10 w-16 mt-1" /> : <div className="text-6xl font-black font-mono tracking-tighter text-[#1e1b4b]">{count}</div>}
+                <p className="text-xs font-black text-slate-500 mt-3">{description}</p>
+                <div className="flex items-center gap-1 text-[10px] text-primary font-black mt-6 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 uppercase tracking-[0.2em]">
+                    تخصيص الإعدادات <ArrowRight className="h-3 w-3"/>
                 </div>
             </CardContent>
         </Card>
@@ -239,7 +239,7 @@ export function ReferenceDataManager() {
             });
 
             await batch.commit();
-            toast({ title: 'تم تحديث الترتيب' });
+            toast({ title: 'تم الترتيب بنجاح' });
         } catch (e) {
             toast({ variant: 'destructive', title: 'فشل الترتيب' });
         } finally {
@@ -271,7 +271,7 @@ export function ReferenceDataManager() {
                 await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
             }
             
-            toast({ title: 'نجاح الحفظ' });
+            toast({ title: 'تم الحفظ والمزامنة' });
             closeDialog();
         } catch (e: any) { 
             toast({ variant: 'destructive', title: 'فشل ترحيل البيانات' }); 
@@ -289,7 +289,7 @@ export function ReferenceDataManager() {
         try {
             const finalPath = getTenantPath(relativePath, tenantId);
             await deleteDoc(doc(firestore, finalPath, itemToDelete.id));
-            toast({ title: 'تم الحذف بنجاح' });
+            toast({ title: 'تم الحذف النهائي' });
             setIsDeleteDialogOpen(false); 
             setItemToDelete(null);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الحذف' }); } finally { setIsSaving(false); }
@@ -314,55 +314,55 @@ export function ReferenceDataManager() {
                 });
             }
             await batch.commit();
-            toast({ title: 'نجاح الاستيراد' });
+            toast({ title: 'نجاح الاستيراد المرجعي' });
             setIsImportConfirmOpen(false);
         } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الاستيراد' }); } finally { setIsImporting(false); }
     };
 
     if (view === 'main') {
         return (
-            <div className="space-y-10" dir="rtl">
-                <Card className="rounded-[3rem] border-none shadow-xl overflow-hidden bg-gradient-to-l from-white to-orange-50/50 backdrop-blur-3xl">
-                    <CardHeader className="pb-10 px-10 border-b border-primary/10">
-                        <div className="flex items-center gap-5">
-                            <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary shadow-inner">
-                                <Settings2 className="h-10 w-10" />
+            <div className="space-y-12" dir="rtl">
+                <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-l from-white to-orange-50/50 backdrop-blur-3xl border-white/60">
+                    <CardHeader className="p-12 pb-10 border-b border-primary/10">
+                        <div className="flex items-center gap-6">
+                            <div className="p-5 bg-primary/10 rounded-[2.2rem] text-primary shadow-inner border border-primary/20">
+                                <Settings2 className="h-12 w-12" />
                             </div>
                             <div className="space-y-1">
-                                <CardTitle className="text-3xl font-black text-[#1e1b4b] tracking-tight">إعدادات القوائم السيادية</CardTitle>
-                                <CardDescription className="text-lg font-bold text-slate-500">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي للمكتب.</CardDescription>
+                                <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">إعدادات القوائم السيادية</CardTitle>
+                                <CardDescription className="text-xl font-bold text-slate-500">تخصيص الأقسام، المواقع، وهيكل الخدمات المرجعي للمكتب.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
                 </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <StatCard 
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 px-2">
+                    <SummaryCard 
                         title="الهيكل التنظيمي" 
                         count={primaryItems?.length || 0} 
-                        icon={<Building2 className="h-8 w-8"/>} 
+                        icon={<Building2 className="h-10 w-10"/>} 
                         onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
                         colorClass="bg-blue-600/10 text-blue-600" 
                         loading={loadingPrimary} 
-                        description="الأقسام والوظائف ومراحل العمل" 
+                        description="الأقسام والوظائف ومراحل العمل المعتمدة." 
                     />
-                    <StatCard 
+                    <SummaryCard 
                         title="رادار المواقع" 
                         count={primaryItems?.length || 0} 
-                        icon={<MapPin className="h-8 w-8"/>} 
+                        icon={<MapPin className="h-10 w-10"/>} 
                         onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
                         colorClass="bg-emerald-600/10 text-emerald-600" 
                         loading={loadingPrimary} 
-                        description="توزيع المحافظات والمناطق" 
+                        description="توزيع المحافظات والمناطق التابعة لها." 
                     />
-                    <StatCard 
+                    <SummaryCard 
                         title="دليل الخدمات" 
                         count={primaryItems?.length || 0} 
-                        icon={<Workflow className="h-8 w-8"/>} 
+                        icon={<Workflow className="h-10 w-10"/>} 
                         onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-orange-600/10 text-primary" 
                         loading={loadingPrimary} 
-                        description="قائمة الطلبات والخدمات الهندسية" 
+                        description="قائمة الطلبات والخدمات الهندسية المتاحة." 
                     />
                 </div>
             </div>
@@ -371,60 +371,60 @@ export function ReferenceDataManager() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            <Card className="rounded-[3rem] border-none shadow-2xl overflow-hidden glass-effect border-white/20">
-                <CardHeader className="p-8 bg-gradient-to-r from-primary to-orange-400 text-white relative">
-                    <div className="absolute top-0 right-0 w-64 h-full bg-white/10 -skew-x-12 transform translate-x-20" />
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                        <div className="flex items-center gap-5">
-                            <div className="p-4 bg-white/20 rounded-[1.8rem] backdrop-blur-md border border-white/30 shadow-xl">
-                                {view === 'departments' ? <Building2 className="h-8 w-8" /> : view === 'locations' ? <MapPin className="h-8 w-8" /> : <Workflow className="h-8 w-8" />}
+            <Card className="rounded-[3.5rem] border-none shadow-2xl overflow-hidden glass-effect border-white/60">
+                <CardHeader className="p-10 orange-gold-gradient text-white relative">
+                    <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32" />
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-8 relative z-10">
+                        <div className="flex items-center gap-6">
+                            <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                                {view === 'departments' ? <Building2 className="h-10 w-10" /> : view === 'locations' ? <MapPin className="h-10 w-10" /> : <Workflow className="h-10 w-10" />}
                             </div>
                             <div className="text-right">
-                                <CardTitle className="text-3xl font-black tracking-tight">
+                                <CardTitle className="text-3xl font-black tracking-tighter text-white">
                                     {view === 'departments' ? 'إدارة الأقسام والوظائف' : view === 'locations' ? 'تخصيص المواقع الجغرافية' : 'إدارة أنواع الخدمات'}
                                 </CardTitle>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <Sparkles className="h-3 w-3 text-amber-200 animate-pulse" />
-                                    <CardDescription className="text-white/80 font-bold text-sm">قم بالسحب والإفلات لترتيب أولويات العرض في النظام.</CardDescription>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                    <CardDescription className="text-white/90 font-black text-sm uppercase tracking-widest">قم بالسحب والإفلات لترتيب أولويات العرض في النظام.</CardDescription>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex gap-4">
                             {view !== 'transactions' && (
-                                <Button variant="secondary" onClick={() => setIsImportConfirmOpen(true)} className="bg-white/90 hover:bg-white text-primary rounded-2xl font-black h-11 px-6 gap-2 shadow-lg">
-                                    <DownloadCloud className="h-4 w-4"/> استيراد القوالب
+                                <Button variant="secondary" onClick={() => setIsImportConfirmOpen(true)} className="bg-white/90 hover:bg-white text-primary rounded-2xl font-black h-12 px-8 gap-3 shadow-xl transition-all active:scale-95">
+                                    <DownloadCloud className="h-5 w-5"/> استيراد القوالب
                                 </Button>
                             )}
-                            <Button onClick={() => setView('main')} variant="outline" className="text-white border-white/40 hover:bg-white/10 rounded-2xl font-black h-11 px-6 gap-2">
-                                <X className="h-4 w-4" /> إغلاق
+                            <Button onClick={() => setView('main')} variant="outline" className="text-white border-white/40 hover:bg-white/10 rounded-2xl font-black h-12 px-8 gap-2 backdrop-blur-md">
+                                <X className="h-5 w-5" /> إغلاق العرض
                             </Button>
                         </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="grid grid-cols-1 md:grid-cols-12 min-h-[600px]">
+                    <div className="grid grid-cols-1 md:grid-cols-12 min-h-[650px]">
                         {/* القائمة اليمنى - التصنيفات الرئيسية */}
-                        <div className="md:col-span-4 border-l border-primary/5 bg-slate-50/30 flex flex-col">
-                            <div className="p-8 border-b bg-primary/5 flex justify-between items-center">
+                        <div className="md:col-span-4 border-l-2 border-primary/5 bg-slate-50/20 flex flex-col">
+                            <div className="p-10 border-b bg-primary/5 flex justify-between items-center">
                                 <div className="space-y-0.5">
-                                    <Label className="font-black text-[#1e1b4b] text-base">القائمة الرئيسية</Label>
-                                    <p className="text-[10px] font-bold text-slate-400">تحكم بالهيكل الأساسي</p>
+                                    <Label className="font-black text-[#1e1b4b] text-xl tracking-tight">القائمة الرئيسية</Label>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Sovereign Core Structure</p>
                                 </div>
-                                <Button size="icon" onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-10 w-10 rounded-[1.2rem] shadow-lg shadow-primary/20"><Plus className="h-5 w-5" /></Button>
+                                <Button onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-12 w-12 rounded-[1.5rem] shadow-xl shadow-primary/20"><Plus className="h-6 w-6" /></Button>
                             </div>
-                            <ScrollArea className="flex-1 p-6">
-                                {loadingPrimary ? <div className="space-y-3"><Skeleton className="h-14 w-full rounded-2xl"/><Skeleton className="h-14 w-full rounded-2xl"/></div> : 
-                                primaryItems.length === 0 ? <p className="text-center p-20 text-muted-foreground italic font-bold opacity-30">لا توجد سجلات.</p> :
+                            <ScrollArea className="flex-1 p-8">
+                                {loadingPrimary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> : 
+                                primaryItems.length === 0 ? <p className="text-center p-20 text-muted-foreground italic font-black opacity-20">لا توجد سجلات حالياً.</p> :
                                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'primary')}>
                                     <SortableContext items={primaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                                        <div className="space-y-2">
+                                        <div className="space-y-3">
                                             {primaryItems.map(item => (
                                                 <SortableRefListItem key={item.id} id={item.id} isActive={selectedPrimaryId === item.id}>
                                                     <div className="flex items-center justify-between flex-1" onClick={() => setSelectedPrimaryId(item.id)}>
-                                                        <span className="font-black text-sm truncate">{item.name}</span>
+                                                        <span className="font-black text-base truncate pr-2">{item.name}</span>
                                                         <div className={cn("flex gap-1.5 transition-all", selectedPrimaryId === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-white/20 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setIsPrimaryDialogOpen(true); }}><Pencil className="h-3.5 w-3.5"/></Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl hover:bg-red-100/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-3.5 w-3.5"/></Button>
+                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white/30 text-current" onClick={(e) => { e.stopPropagation(); setEditingItem(item); setItemName(item.name); setIsPrimaryDialogOpen(true); }}><Pencil className="h-4 w-4"/></Button>
+                                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-red-500/20 text-current" onClick={(e) => { e.stopPropagation(); setItemToDelete({ id: item.id, name: item.name, target: 'primary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-4 w-4"/></Button>
                                                         </div>
                                                     </div>
                                                 </SortableRefListItem>
@@ -436,50 +436,50 @@ export function ReferenceDataManager() {
                         </div>
 
                         {/* القائمة اليسرى - التفاصيل */}
-                        <div className="md:col-span-8 flex flex-col bg-white/50">
+                        <div className="md:col-span-8 flex flex-col bg-white/40 backdrop-blur-md">
                             {selectedPrimaryId && view !== 'transactions' ? (
                                 <>
-                                    <div className="p-8 border-b bg-muted/10">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-3 bg-white rounded-2xl shadow-sm border border-primary/10"><ListTree className="h-6 w-6 text-primary"/></div>
-                                                <div>
-                                                    <h3 className="text-2xl font-black text-[#1e1b4b]">{selectedPrimary?.name}</h3>
-                                                    <p className="text-xs font-bold text-slate-400">إدارة القوائم الفرعية والمحتوى</p>
+                                    <div className="p-10 border-b bg-muted/5">
+                                        <div className="flex justify-between items-center mb-8">
+                                            <div className="flex items-center gap-5">
+                                                <div className="p-4 bg-white rounded-[1.5rem] shadow-xl border border-primary/10"><ListTree className="h-8 w-8 text-primary"/></div>
+                                                <div className="space-y-1">
+                                                    <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{selectedPrimary?.name}</h3>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة الهيكل الفرعي والمحتوى المخصص</p>
                                                 </div>
                                             </div>
-                                            <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-12 px-8 shadow-xl shadow-primary/10 gap-2">
-                                                <PlusCircle className="h-5 w-5" /> إضافة {activeSubTab === 'jobs' ? 'وظيفة' : activeSubTab === 'stages' ? 'مرحلة' : 'منطقة'}
+                                            <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
+                                                <PlusCircle className="h-6 w-6" /> إضافة {activeSubTab === 'jobs' ? 'وظيفة' : activeSubTab === 'stages' ? 'مرحلة' : 'منطقة'}
                                             </Button>
                                         </div>
                                         {view === 'departments' && (
-                                            <div className="flex bg-white/60 p-1.5 rounded-[1.2rem] border border-primary/5 w-fit shadow-inner">
-                                                <Button variant={activeSubTab === 'jobs' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('jobs')} className="rounded-xl px-6 font-black text-xs h-9 transition-all">الوظائف والمهن</Button>
-                                                <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-xl px-6 font-black text-xs h-9 transition-all">مراحل سير العمل</Button>
+                                            <div className="flex bg-white/60 p-1.5 rounded-[1.5rem] border border-primary/10 w-fit shadow-inner">
+                                                <Button variant={activeSubTab === 'jobs' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('jobs')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">الوظائف والمهن</Button>
+                                                <Button variant={activeSubTab === 'stages' ? 'secondary' : 'ghost'} size="sm" onClick={() => setActiveSubTab('stages')} className="rounded-xl px-10 font-black text-xs h-11 transition-all">مراحل سير العمل</Button>
                                             </div>
                                         )}
                                     </div>
-                                    <ScrollArea className="flex-1 p-8">
-                                        {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-14 w-full rounded-2xl"/><Skeleton className="h-14 w-full rounded-2xl"/></div> :
+                                    <ScrollArea className="flex-1 p-10">
+                                        {loadingSecondary ? <div className="space-y-4"><Skeleton className="h-16 w-full rounded-[1.8rem]"/><Skeleton className="h-16 w-full rounded-[1.8rem]"/></div> :
                                         secondaryItems.length === 0 ? (
-                                            <div className="h-80 flex flex-col items-center justify-center grayscale opacity-20 border-4 border-dashed rounded-[3rem] border-primary/5 m-4">
-                                                <PlusCircle className="h-16 w-16 mb-4 text-primary animate-pulse"/>
-                                                <p className="font-black text-xl">لا توجد بيانات فرعية.</p>
+                                            <div className="h-96 flex flex-col items-center justify-center grayscale opacity-10 border-4 border-dashed rounded-[3.5rem] border-primary/5 m-8">
+                                                <PlusCircle className="h-24 w-24 mb-6 text-primary animate-pulse"/>
+                                                <p className="font-black text-3xl">لا توجد بيانات فرعية.</p>
                                             </div>
                                         ) : (
                                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => handleDragEnd(e, 'secondary')}>
                                             <SortableContext items={secondaryItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                                                <div className="grid gap-3">
+                                                <div className="grid grid-cols-1 gap-4">
                                                     {secondaryItems.map(item => (
                                                         <SortableRefListItem key={item.id} id={item.id}>
                                                             <div className="flex items-center justify-between flex-1">
-                                                                <div className="flex items-center gap-5">
-                                                                    <div className="p-2.5 bg-primary/5 rounded-[1rem] border border-primary/10 shadow-sm"><Activity className="h-4 w-4 text-primary opacity-60"/></div>
-                                                                    <span className="font-black text-lg text-[#1e1b4b]">{item.name}</span>
+                                                                <div className="flex items-center gap-6">
+                                                                    <div className="p-3.5 bg-primary/5 rounded-[1.2rem] border border-primary/10 shadow-inner"><Activity className="h-5 w-5 text-primary opacity-60"/></div>
+                                                                    <span className="font-black text-xl text-[#1e1b4b] tracking-tight">{item.name}</span>
                                                                 </div>
                                                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                                                    <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl border-2 border-primary/10 bg-white hover:bg-primary hover:text-white" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-5 w-5"/></Button>
-                                                                    <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl border-2 border-red-100 bg-white text-red-600 hover:bg-red-600 hover:text-white" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-5 w-5"/></Button>
+                                                                    <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border-2 border-primary/10 bg-white hover:bg-primary hover:text-white shadow-sm" onClick={() => { setEditingItem(item); setItemName(item.name); setIsSecondaryDialogOpen(true); }}><Pencil className="h-6 w-6"/></Button>
+                                                                    <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl border-2 border-red-100 bg-white text-red-600 hover:bg-red-600 hover:text-white shadow-sm" onClick={() => { setItemToDelete({ id: item.id, name: item.name, target: 'secondary' }); setIsDeleteDialogOpen(true); }}><Trash2 className="h-6 w-6"/></Button>
                                                                 </div>
                                                             </div>
                                                         </SortableRefListItem>
@@ -491,17 +491,17 @@ export function ReferenceDataManager() {
                                     </ScrollArea>
                                 </>
                             ) : (
-                                <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-                                    <div className="p-10 bg-gradient-to-b from-primary/5 to-transparent rounded-full mb-8 relative">
-                                        <Layers className="h-32 w-32 text-primary/10 animate-pulse" />
+                                <div className="flex-1 flex flex-col items-center justify-center p-20 text-center">
+                                    <div className="p-16 bg-gradient-to-b from-primary/10 to-transparent rounded-full mb-10 relative">
+                                        <Layers className="h-40 w-40 text-primary/5 animate-pulse" />
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <ListTree className="h-12 w-12 text-primary opacity-20" />
+                                            <ListTree className="h-16 w-16 text-primary opacity-30" />
                                         </div>
                                     </div>
-                                    <h3 className="text-3xl font-black text-[#1e1b4b] tracking-tighter max-w-sm">
-                                        {view === 'transactions' ? 'دليل الخدمات الهندسية' : 'اختر تصنيفاً لإدارة هيكله الداخلي'}
+                                    <h3 className="text-4xl font-black text-[#1e1b4b] tracking-tighter max-w-md leading-tight">
+                                        {view === 'transactions' ? 'دليل الخدمات الهندسية' : 'اختر تصنيفاً من القائمة اليمنى للتحكم في محتواه'}
                                     </h3>
-                                    <p className="text-slate-400 font-bold mt-4">استخدم القائمة اليمنى لاختيار القسم أو المحافظة.</p>
+                                    <p className="text-slate-400 font-bold text-lg mt-6">واجهة تفاعلية ذكية مدعومة بالسحب والإفلات.</p>
                                 </div>
                             )}
                         </div>
@@ -511,21 +511,21 @@ export function ReferenceDataManager() {
 
             {/* الحوارات (Dialogs) */}
             <Dialog open={isPrimaryDialogOpen || isSecondaryDialogOpen} onOpenChange={closeDialog}>
-                <DialogContent dir="rtl" className="max-w-md rounded-[2.8rem] p-10 shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-none bg-white">
+                <DialogContent dir="rtl" className="max-w-md rounded-[3rem] p-10 shadow-[0_40px_100px_rgba(0,0,0,0.3)] border-none bg-white/95 backdrop-blur-2xl">
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader>
-                            <div className="p-3 bg-primary/10 rounded-2xl text-primary w-fit mb-4 shadow-inner"><PlusCircle className="h-8 w-8"/></div>
-                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل السجل' : 'إضافة سجل جديد'}</DialogTitle>
-                            <DialogDescription className="font-bold text-slate-500">سيتم حفظ التغييرات وتعميمها على كافة فروع النظام.</DialogDescription>
+                            <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
+                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل السجل' : 'إضافة سجل سيادي'}</DialogTitle>
+                            <DialogDescription className="font-bold text-slate-500 text-base">سيتم حفظ التغييرات وتحديث قواعد العمل للمنشأة فوراً.</DialogDescription>
                         </DialogHeader>
-                        <div className="py-8">
-                            <Label className="font-black text-[#1e1b4b] pr-2 block mb-3 text-sm">الاسم الرسمي للسجل (بالعربية) *</Label>
-                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-14 rounded-2xl border-2 text-xl font-black text-primary bg-slate-50 focus:bg-white shadow-inner transition-all" placeholder="اكتب هنا..." />
+                        <div className="py-10">
+                            <Label className="font-black text-[#1e1b4b] pr-3 block mb-4 text-sm uppercase tracking-widest">الاسم الرسمي (بالعربية) *</Label>
+                            <Input value={itemName} onChange={e => setItemName(e.target.value)} required className="h-16 rounded-[1.5rem] border-2 text-2xl font-black text-primary bg-slate-50/50 focus:bg-white shadow-inner transition-all" placeholder="اكتب هنا..." />
                         </div>
-                        <DialogFooter className="gap-3 pt-4 border-t">
-                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-xl font-black h-12 px-8">إلغاء</Button>
-                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-14 bg-primary text-white shadow-xl shadow-primary/20">
-                                {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ البيانات
+                        <DialogFooter className="gap-4 pt-6 border-t">
+                            <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
+                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px]">
+                                {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ السجل
                             </Button>
                         </DialogFooter>
                     </form>
@@ -533,31 +533,31 @@ export function ReferenceDataManager() {
             </Dialog>
 
             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
+                <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12 glass-effect">
                     <AlertDialogHeader>
-                        <div className="p-4 bg-red-50 text-red-600 rounded-3xl w-fit mb-4 shadow-inner"><Trash2 className="h-10 w-10"/></div>
-                        <AlertDialogTitle className="text-2xl font-black text-red-700 tracking-tight">تأكيد الحذف النهائي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-2">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> تماماً من المنظومة وكافة الارتباطات التابعة له. <br/><br/> هل أنت متأكد من المتابعة؟</AlertDialogDescription>
+                        <div className="p-5 bg-red-100 text-red-600 rounded-[1.8rem] w-fit mb-6 shadow-inner"><Trash2 className="h-12 w-12"/></div>
+                        <AlertDialogTitle className="text-3xl font-black text-red-700 tracking-tighter">تأكيد الحذف النهائي؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xl font-bold text-slate-600 leading-relaxed mt-4">سيتم مسح سجل <strong className="text-red-900">"{itemToDelete?.name}"</strong> تماماً من المنظومة السيادية. <br/><br/> هل أنت متأكد من المتابعة؟</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-8 gap-4">
-                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-2xl font-black h-12 px-12 shadow-xl shadow-red-200">
-                            {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، حذف'}
+                    <AlertDialogFooter className="mt-10 gap-4">
+                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isSaving} className="bg-red-600 hover:bg-red-700 rounded-2xl font-black h-12 px-16 shadow-xl shadow-red-200">
+                            {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : 'نعم، تأكيد الحذف'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-10">
+                <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12">
                     <AlertDialogHeader>
-                        <div className="p-4 bg-primary/10 text-primary rounded-3xl w-fit mb-4 shadow-inner"><DownloadCloud className="h-10 w-10"/></div>
-                        <AlertDialogTitle className="text-2xl font-black text-[#1e1b4b] tracking-tight">تأكيد استيراد القوالب؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-2">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمناطق الافتراضية المعتمدة للمكاتب الهندسية في الكويت آلياً لتوفير وقتك.</AlertDialogDescription>
+                        <div className="p-5 bg-primary/10 text-primary rounded-[1.8rem] w-fit mb-6 shadow-inner"><DownloadCloud className="h-12 w-12"/></div>
+                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب المرجعية؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمدن الافتراضية المعتمدة آلياً لتوفير وقت التأسيس.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-8 gap-4">
-                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-2xl font-black h-12 px-12 bg-primary shadow-xl shadow-primary/20">
+                    <AlertDialogFooter className="mt-10 gap-4">
+                        <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30">
                             {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -566,3 +566,4 @@ export function ReferenceDataManager() {
         </div>
     );
 }
+
