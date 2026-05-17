@@ -6,39 +6,50 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * محرك إدارة المنشآت الموحد (V74.0):
- * تم تحصينه لضمان إنشاء ملف المستخدم داخل المنشأة (Tenant Profile) فور التأسيس.
+ * محرك إدارة المنشآت الموحد (V118.0):
+ * تم تحصينه أمنياً ليقرأ من متغيرات البيئة (FIREBASE_SERVICE_ACCOUNT_JSON)
+ * كبديل سيادي للملفات المكشوفة على GitHub.
  */
 
 function getAdminApp() {
   if (getApps().length === 0) {
-    const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
+    let serviceAccount;
+
+    // 🛡️ الأولوية لمتغير البيئة المشفر (للنشر السحابي الآمن)
+    const envServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     
-    if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-        throw new Error("MISSING_SERVICE_ACCOUNT_FILE");
+    if (envServiceAccount) {
+        try {
+            serviceAccount = JSON.parse(envServiceAccount);
+        } catch (e) {
+            console.error("Invalid Service Account JSON in ENV");
+        }
     }
 
-    try {
-        const fileContent = fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8');
-        const serviceAccount = JSON.parse(fileContent);
-        
-        if (!serviceAccount.private_key || !serviceAccount.project_id) {
-            throw new Error("INVALID_SERVICE_ACCOUNT_JSON");
+    // 📂 الخيار الثاني: الملف المحلي (للتطوير فقط)
+    if (!serviceAccount) {
+        const SERVICE_ACCOUNT_PATH = path.join(process.cwd(), 'service-account.json');
+        if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+            serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
         }
+    }
 
+    if (!serviceAccount) {
+        throw new Error("CRITICAL_SECURITY_ERROR: Missing Firebase Service Account Configuration.");
+    }
+
+    // تنظيف المفتاح الخاص من أي تشوه في النقل
+    if (serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key
             .replace(/\\n/g, '\n')
             .replace(/"/g, '')
             .trim();
-
-        return initializeApp({
-            credential: cert(serviceAccount),
-            projectId: serviceAccount.project_id
-        });
-    } catch (e: any) {
-        console.error("Critical: Admin Init Failed:", e.message);
-        throw e;
     }
+
+    return initializeApp({
+        credential: cert(serviceAccount),
+        projectId: serviceAccount.project_id
+    });
   }
   return getApp();
 }
@@ -75,7 +86,6 @@ export async function POST(request: NextRequest) {
                 role: 'Admin'
             });
 
-            // ⚡ تحديث الفهرس العالمي
             await db.collection('global_users').doc(userRecord.uid).set({
                 email: sanitizedEmail,
                 companyId: companyId,
@@ -83,7 +93,6 @@ export async function POST(request: NextRequest) {
                 createdAt: FieldValue.serverTimestamp()
             });
 
-            // 🛡️ إنشاء ملف المستخدم داخل المنشأة لضمان استقرار الدخول
             await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
                 id: userRecord.uid,
                 uid: userRecord.uid,
@@ -124,7 +133,6 @@ export async function POST(request: NextRequest) {
                 updatedAt: FieldValue.serverTimestamp()
             }, { merge: true });
 
-            // تحديث ملف المنشأة
             await db.collection('companies').doc(companyId).collection('users').doc(uid).set({
                 email: sanitizedEmail,
                 fullName: displayName,
@@ -158,7 +166,6 @@ export async function POST(request: NextRequest) {
             role: 'Admin'
         });
 
-        // 1. الفهرس العالمي
         await db.collection('global_users').doc(userRecord.uid).set({
             email: sanitizedEmail,
             companyId: generatedCompanyId,
@@ -166,7 +173,6 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp()
         });
 
-        // 2. سجل الشركة
         await db.collection('companies').doc(generatedCompanyId).set({
             id: generatedCompanyId,
             name: companyName || 'منشأة جديدة',
@@ -177,11 +183,9 @@ export async function POST(request: NextRequest) {
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
             maxUsersLimit: 5,
-            subscriptionType: 'trial',
-            subscriptionExpiryDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
+            subscriptionType: 'trial'
         });
 
-        // 3. 🛡️ ملف المستخدم داخل المنشأة (الحلقة المفقودة)
         await db.collection('companies').doc(generatedCompanyId).collection('users').doc(userRecord.uid).set({
             id: userRecord.uid,
             uid: userRecord.uid,

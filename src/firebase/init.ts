@@ -6,20 +6,26 @@ import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
 /**
- * 🛡️ محرك التهيئة السيادي الموحد (V48.0)
- * المشروع المعتمد والنهائي: nov-erp-1-25549967-c24e5
+ * 🛡️ محرك التهيئة السيادي الموحد (V118.0)
+ * تم التطهير: المفاتيح الآن تُجلب من متغيرات البيئة المشفرة.
  */
 const firebaseConfig: FirebaseOptions = {
-  apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
-  authDomain: "nov-erp-1-25549967-c24e5.firebaseapp.com",
-  projectId: "nov-erp-1-25549967-c24e5",
-  storageBucket: "nov-erp-1-25549967-c24e5.firebasestorage.app",
-  messagingSenderId: "71297676078",
-  appId: "1:71297676078:web:b956ab00372e6ba237c0bf"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
 function initializeFirebase(): { app: FirebaseApp; auth: Auth; firestore: Firestore; storage: FirebaseStorage; } | null {
   try {
+    // التحقق من وجود المفاتيح قبل البدء لمنع انهيار النظام
+    if (!firebaseConfig.apiKey) {
+        console.warn("⚠️ Firebase Config Missing: Environment variables are not set.");
+        return null;
+    }
+
     const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     const auth = getAuth(app);
     const firestore = getFirestore(app);
