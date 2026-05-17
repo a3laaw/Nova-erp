@@ -136,7 +136,7 @@ const navItems = {
         { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Package },
         { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام (GRN)', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف مواد المشاريع', icon: ArrowUpFromLine },
-        { href: '/dashboard/purchasing/purchase-orders', label: 'أوات الشراء', icon: ShoppingCart },
+        { href: '/dashboard/purchasing/purchase-orders', label: 'أوامر الشراء', icon: ShoppingCart },
         { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية', icon: ArrowLeftRight },
         { href: '/dashboard/warehouse/adjustments', label: 'المردودات والتسويات', icon: ReturnIcon },
         { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: PieChart },
@@ -233,7 +233,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
         <SidebarMenuButton isActive={isActive} tooltip={item.label} asChild>
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full">
-            <span className="flex-1 text-right truncate text-[13px] font-black group-data-[collapsible=icon]:hidden">
+            <span className={cn(
+                "flex-1 text-right truncate text-[13px] font-black group-data-[collapsible=icon]:hidden transition-colors",
+                isActive ? "text-white" : "text-[#1e1b4b] group-hover/btn:text-white"
+            )}>
                 {item.label}
             </span>
             {Icon && <Icon className={cn("size-6 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0 transition-colors group-hover/btn:text-white", isActive ? "text-white" : "text-primary")} />}
@@ -297,7 +300,10 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full">
                 <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20 group-hover/btn:text-white group-hover/btn:opacity-100", isActive && "text-white opacity-100")} />
-                <span className="text-right truncate text-[13px] font-black flex-1">
+                <span className={cn(
+                    "text-right truncate text-[13px] font-black flex-1 transition-colors",
+                    isActive ? "text-white" : "text-[#1e1b4b] group-hover/btn:text-white"
+                )}>
                     {item.label}
                 </span>
                 {Icon && <Icon className={cn("size-6 shrink-0 ml-3 transition-colors group-hover/btn:text-white", isActive ? "text-white" : "text-primary")} />}
@@ -318,8 +324,16 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full">
-                            <span className="text-[11px] font-black truncate flex-1 text-right">{child.label}</span>
-                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3 transition-colors group-hover/subbtn:text-white", isChildActive ? "text-white" : "opacity-40")} />}
+                            <span className={cn(
+                                "text-[11px] font-black truncate flex-1 text-right transition-colors",
+                                isChildActive ? "text-white" : "text-[#1e1b4b]/80 group-hover/subbtn:text-white"
+                            )}>
+                                {child.label}
+                            </span>
+                            {child.icon && <child.icon className={cn(
+                                "h-4 w-4 ml-3 transition-colors", 
+                                isChildActive ? "text-white" : "text-primary opacity-40 group-hover/subbtn:text-white group-hover/subbtn:opacity-100"
+                            )} />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
