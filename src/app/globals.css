@@ -77,59 +77,42 @@
   }
 }
 
-[data-radix-popper-content-wrapper] {
-  z-index: 999999 !important;
-  pointer-events: auto !important;
-}
-
+/* 🛡️ تحرير القوائم المنسدلة للتعامل مع الماوس (Mouse Unlock Matrix) 🛡️ */
+[data-radix-popper-content-wrapper],
 [role="listbox"],
 [role="menu"],
 [role="dialog"],
-[data-state="open"][data-radix-select-content],
-[data-state="open"][data-radix-popover-content] {
-  pointer-events: auto !important;
+.rdp-caption_dropdowns,
+.rdp-dropdown,
+.native-select-fix {
   z-index: 999999 !important;
+  pointer-events: auto !important;
 }
 
 [role="option"],
 [role="menuitem"],
-[cmdk-item] {
+[cmdk-item],
+.rdp-dropdown select {
   cursor: pointer !important;
   pointer-events: auto !important;
 }
 
-/* 🎨 تحسين مظهر قوائم التقويم المنسدلة (Professional Date Picker UI) 🎨 */
-.rdp-caption {
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-}
-
-.rdp-caption_label {
-  display: none !important; /* Hide static text when dropdowns are active */
-}
-
+/* 🎨 تنسيق مُنتقي التاريخ المطور (Sovereign Date Picker UI) 🎨 */
 .rdp-caption_dropdowns {
   display: flex !important;
-  gap: 4px !important;
+  gap: 8px !important;
   align-items: center !important;
+  justify-content: center !important;
 }
 
-.rdp-dropdown {
-  position: relative !important;
-  display: inline-flex !important;
-  align-items: center !important;
-}
-
-.rdp-dropdown select {
-  appearance: none !important;
+.native-select-fix select {
+  appearance: auto !important; /* نستخدم المظهر الافتراضي للمتصفح لضمان عمل الماوس 100% */
   background-color: #f8fafc !important;
   border: 2px solid #e2e8f0 !important;
   border-radius: 12px !important;
-  padding: 4px 12px !important;
+  padding: 6px 12px !important;
   font-family: inherit !important;
-  font-size: 11px !important;
+  font-size: 13px !important;
   font-weight: 900 !important;
   color: #1e1b4b !important;
   cursor: pointer !important;
@@ -137,10 +120,11 @@
   transition: all 0.2s !important;
 }
 
-.rdp-dropdown select:hover {
+.native-select-fix select:hover {
   background-color: #ffffff !important;
   border-color: #FF5C00 !important;
   color: #FF5C00 !important;
+  box-shadow: 0 4px 12px rgba(255, 92, 0, 0.1) !important;
 }
 
 .scrollbar-none::-webkit-scrollbar { display: none; }
