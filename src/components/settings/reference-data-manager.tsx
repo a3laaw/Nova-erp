@@ -123,10 +123,8 @@ export function ReferenceDataManager() {
         return '';
     }, [view, activeSubTab]);
 
-    // 🛡️ استخدام الخطاف السيادي للجلب اللحظي
     const { data: primaryItems, loading: loadingPrimary } = useSubscription<any>(firestore, primaryCollectionName || null, [orderBy('name')]);
     
-    // 🛡️ جلب البيانات الفرعية (Jobs, Stages, Areas) عبر المسار السيادي المتداخل
     const secondaryRelativePath = useMemo(() => {
         if (!selectedPrimaryId || !primaryCollectionName || !secondaryCollectionName) return null;
         return `${primaryCollectionName}/${selectedPrimaryId}/${secondaryCollectionName}`;
@@ -136,13 +134,9 @@ export function ReferenceDataManager() {
 
     const selectedPrimary = useMemo(() => (primaryItems || []).find(i => i.id === selectedPrimaryId), [primaryItems, selectedPrimaryId]);
 
-    /**
-     * محرك الحفظ الموحد:
-     * يضمن استخدام getTenantPath لفك عائق الـ Permissions وضمان العزل.
-     */
     const handleSave = async (type: 'primary' | 'secondary') => {
         if (!firestore || !itemName.trim() || !tenantId) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير مكتملة أو لم يتم تحديد المنشأة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'البيانات غير مكتملة.' });
             return;
         }
 
@@ -151,12 +145,11 @@ export function ReferenceDataManager() {
 
         setIsSaving(true);
         try {
-            // 🏰 توجيه المسار للمجلد السيادي للشركة
             const finalPath = getTenantPath(relativePath, tenantId);
             const payload = { 
                 name: itemName, 
                 updatedAt: serverTimestamp(),
-                companyId: tenantId // 🛡️ التاج السيادي
+                companyId: tenantId
             };
 
             if (editingItem) {
@@ -165,11 +158,10 @@ export function ReferenceDataManager() {
                 await addDoc(collection(firestore, finalPath), { ...payload, createdAt: serverTimestamp() });
             }
             
-            toast({ title: 'نجاح الحفظ', description: 'تم تحديث البيانات المرجعية للمنظمة.' });
+            toast({ title: 'نجاح الحفظ' });
             closeDialog();
         } catch (e: any) { 
-            console.error("Save Error:", e);
-            toast({ variant: 'destructive', title: 'فشل ترحيل البيانات', description: 'تأكد من صلاحياتك كمدير منشأة.' }); 
+            toast({ variant: 'destructive', title: 'فشل ترحيل البيانات' }); 
         } finally { 
             setIsSaving(false); 
         }
@@ -214,7 +206,7 @@ export function ReferenceDataManager() {
                 });
             }
             await batch.commit();
-            toast({ title: 'نجاح الاستيراد السيادي', description: 'تم استنساخ القوالب الافتراضية لمنشأتك.' });
+            toast({ title: 'نجاح الاستيراد' });
             setIsImportConfirmOpen(false);
         } catch (e) { 
             toast({ variant: 'destructive', title: 'خطأ في الاستيراد' }); 
@@ -231,8 +223,8 @@ export function ReferenceDataManager() {
                         <div className="flex items-center gap-4">
                             <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Settings2 className="h-8 w-8" /></div>
                             <div>
-                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">مركز البيانات المرجعية السيادي</CardTitle>
-                                <CardDescription className="text-base font-black text-slate-500">تخصيص القوائم، هيكل العمل الفني، وقواعد التنظيم الداخلي للمنظمة.</CardDescription>
+                                <CardTitle className="text-3xl font-black text-[#1e1b4b]">إعدادات القوائم والبيانات</CardTitle>
+                                <CardDescription className="text-base font-black text-slate-500">تخصيص الأقسام، المواقع، وأنواع الخدمات الهندسية للمكتب.</CardDescription>
                             </div>
                         </div>
                     </CardHeader>
@@ -246,25 +238,25 @@ export function ReferenceDataManager() {
                         onNavigate={() => { setView('departments'); setActiveSubTab('jobs'); }} 
                         colorClass="bg-blue-100 text-blue-600" 
                         loading={loadingPrimary} 
-                        description="توزيع المهام والوظائف الفنية"
+                        description="تحديد الهيكل الإداري والوظائف"
                     />
                     <StatCard 
-                        title="المواقع والمناطق" 
+                        title="توزيع المواقع" 
                         count={primaryItems?.length || 0} 
                         icon={<Globe className="h-6 w-6"/>} 
                         onNavigate={() => { setView('locations'); setActiveSubTab('areas'); }} 
                         colorClass="bg-emerald-100 text-emerald-600" 
                         loading={loadingPrimary} 
-                        description="تخصيص النطاق الجغرافي للعمل"
+                        description="إدارة المناطق الجغرافية للعمل"
                     />
                     <StatCard 
-                        title="أنواع المعاملات" 
+                        title="أنواع الخدمات" 
                         count={primaryItems?.length || 0} 
                         icon={<Workflow className="h-6 w-6"/>} 
                         onNavigate={() => { setView('transactions'); setSelectedPrimaryId(null); }} 
                         colorClass="bg-purple-100 text-purple-600" 
                         loading={loadingPrimary} 
-                        description="قائمة الخدمات الهندسية المقدمة"
+                        description="قائمة الخدمات الهندسية والطلبات"
                     />
                 </div>
             </div>
@@ -281,18 +273,20 @@ export function ReferenceDataManager() {
                                 {view === 'departments' ? <Building2 className="h-8 w-8" /> : view === 'locations' ? <MapPin className="h-8 w-8" /> : <Workflow className="h-8 w-8" />}
                             </div>
                             <div className="text-white text-right">
-                                <CardTitle className="text-2xl font-black">{view === 'departments' ? 'الأقسام والوظائف' : view === 'locations' ? 'المحافظات والمناطق' : 'أنواع الخدمات'}</CardTitle>
-                                <CardDescription className="text-white/60 font-black">إدارة الهيكل المرجعي الداخلي للمنشأة.</CardDescription>
+                                <CardTitle className="text-2xl font-black">
+                                    {view === 'departments' ? 'إدارة الأقسام' : view === 'locations' ? 'توزيع المواقع' : 'دليل الخدمات'}
+                                </CardTitle>
+                                <CardDescription className="text-white/60 font-black">إدارة الهيكل المرجعي الموحد للمكتب.</CardDescription>
                             </div>
                         </div>
                         <div className="flex gap-2">
                             {view !== 'transactions' && (
                                 <Button variant="ghost" onClick={() => setIsImportConfirmOpen(true)} className="text-white hover:bg-white/10 border border-white/20 rounded-xl font-black">
-                                    <DownloadCloud className="h-4 w-4 ml-2"/> استيراد الافتراضي
+                                    <DownloadCloud className="h-4 w-4 ml-2"/> استيراد القوالب
                                 </Button>
                             )}
                             <Button onClick={() => setView('main')} variant="ghost" className="text-white hover:bg-white/10 rounded-xl font-black gap-2">
-                                <X className="h-4 w-4" /> العودة للملخص
+                                <X className="h-4 w-4" /> العودة
                             </Button>
                         </div>
                     </div>
@@ -304,7 +298,9 @@ export function ReferenceDataManager() {
                     <div className="grid grid-cols-1 md:grid-cols-12 min-h-[500px]">
                         <div className="md:col-span-4 border-l bg-slate-50/50 flex flex-col">
                             <div className="p-6 border-b flex justify-between items-center bg-muted/20">
-                                <Label className="font-black text-[#1e1b4b] text-base">{view === 'departments' ? 'القسم الفني' : view === 'locations' ? 'المحافظة' : 'نوع المعاملة'}</Label>
+                                <Label className="font-black text-[#1e1b4b] text-base">
+                                    {view === 'departments' ? 'الأقسام' : view === 'locations' ? 'الموقع الرئيسي' : 'الخدمات'}
+                                </Label>
                                 <Button size="icon" variant="ghost" onClick={() => { setEditingItem(null); setItemName(''); setIsPrimaryDialogOpen(true); }} className="h-9 w-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"><Plus className="h-5 w-5" /></Button>
                             </div>
                             <ScrollArea className="flex-1 p-4">
@@ -367,7 +363,7 @@ export function ReferenceDataManager() {
                                 <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-20 grayscale">
                                     <Layers className="h-24 w-24 mb-6 text-primary animate-pulse" />
                                     <h3 className="text-2xl font-black text-[#1e1b4b]">
-                                        {view === 'transactions' ? 'مصفوفة أنواع الخدمات' : 'اختر تصنيفاً لإدارة هيكله الداخلي'}
+                                        {view === 'transactions' ? 'دليل الخدمات الهندسية' : 'اختر تصنيفاً لإدارة هيكله الداخلي'}
                                     </h3>
                                 </div>
                             )}
@@ -412,8 +408,8 @@ export function ReferenceDataManager() {
             <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl bg-white">
                     <AlertDialogHeader>
-                        <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد البيانات القياسية؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية القياسية آلياً لمجلد منشأتك.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-xl font-black text-[#1e1b4b]">تأكيد استيراد القوالب؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-black text-slate-500">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمواقع الافتراضية المعتمدة للمكاتب الهندسية آلياً.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="gap-2">
                         <AlertDialogCancel className="rounded-xl font-black">إلغاء</AlertDialogCancel>
