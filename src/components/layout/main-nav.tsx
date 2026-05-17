@@ -185,7 +185,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   // Render a flat item
   if (!item.children && item.href) {
     return (
-      <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0">
+      <SidebarMenuItem className="px-4">
         <BaseSidebarMenuButton 
           isActive={isActive} 
           asChild 
@@ -194,7 +194,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             isActive && "nav-item-box-active"
           )}
         >
-          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
+          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full px-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
             <span className="flex-1 text-right truncate text-[14px] font-black group-data-[collapsible=icon]:hidden">
                 {item.label}
             </span>
@@ -229,7 +229,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     </div>
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
-                <TooltipContent side="left" className="font-black bg-[#FF5C00] text-white border-none rounded-lg shadow-xl">{item.label}</TooltipContent>
+                <TooltipContent side="left" className="font-black bg-primary text-white border-none rounded-lg shadow-xl">{item.label}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <DropdownMenuContent side="left" align="start" className="w-72 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none" dir="rtl">
@@ -240,11 +240,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     return (
                         <DropdownMenuItem key={child.href} asChild className={cn(
                             "rounded-xl py-3 px-4 mb-1",
-                            isChildActive ? "bg-[#FF5C00] text-white font-black" : "hover:bg-orange-50 text-[#1e1b4b]"
+                            isChildActive ? "bg-primary text-white font-black" : "hover:bg-orange-50 text-[#1e1b4b]"
                         )}>
                             <Link href={child.href} className="flex items-center justify-between w-full">
                                 <span className="font-black text-xs">{child.label}</span>
-                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-white" : "text-[#FF5C00]")} />}
+                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-white" : "text-primary")} />}
                             </Link>
                         </DropdownMenuItem>
                     );
@@ -256,7 +256,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       );
     }
 
-    // Expanded state: Collapsible WITHOUT OFFSET SHIFTING
+    // Expanded state: Straight vertical line with zero offset
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
@@ -277,19 +277,20 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             </BaseSidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 border-none pr-4">
+            {/* Zero horizontal offset container */}
+            <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 sidebar-no-offset">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href.split('?')[0];
                 return (
                   <SidebarMenuSubItem key={child.href}>
                     <SidebarMenuSubButton isActive={isChildActive} asChild className={cn(
                         "rounded-xl py-2 h-11 border-none px-4",
-                        isChildActive ? "bg-[#FF5C00] text-white font-black shadow-md" : "bg-white/60 hover:bg-orange-50 text-[#1e1b4b]"
+                        isChildActive ? "nav-item-box-active font-black shadow-md" : "bg-white/60 hover:bg-orange-50 text-[#1e1b4b]"
                     )}>
                       <Link href={child.href} onClick={() => setOpenMobile(false)}>
                         <div className="flex items-center justify-between w-full h-full">
                             <span className="text-[12px] font-bold truncate flex-1 text-right">{child.label}</span>
-                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-white" : "text-[#FF5C00]")} />}
+                            {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-black" : "text-primary")} />}
                         </div>
                       </Link>
                     </SidebarMenuSubButton>
@@ -316,7 +317,7 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
         <div className="flex flex-col items-center">
           <span className="text-3xl font-black text-[#1e1b4b] tracking-tighter group-data-[collapsible=icon]:text-xl">Nova</span>
           <div className="flex items-center gap-2 mt-1 group-data-[collapsible=icon]:hidden">
-              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#FF5C00]">ENTERPRISE</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-primary">ENTERPRISE</span>
           </div>
         </div>
       </SidebarHeader>
@@ -338,12 +339,12 @@ export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedU
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <div className="bg-white/80 border border-white/60 rounded-[1.5rem] p-4 flex items-center shadow-sm hover:bg-white transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-                    <div className="w-10 h-10 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
+                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
                         {currentUser.fullName?.charAt(0) || 'N'}
                     </div>
                     <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
                         <p className="text-xs font-black truncate text-[#1e1b4b] leading-none mb-1">{currentUser.fullName}</p>
-                        <p className="text-[8px] truncate font-black uppercase tracking-widest text-[#FF5C00]">{currentUser.role}</p>
+                        <p className="text-[8px] truncate font-black uppercase tracking-widest text-primary">{currentUser.role}</p>
                     </div>
                 </div>
             </DropdownMenuTrigger>

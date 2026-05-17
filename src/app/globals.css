@@ -12,7 +12,7 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100% / 0.95;
     --popover-foreground: 222 47% 11%;
-    --primary: 22 100% 50%; /* برتقالي نابض #FF5C00 */
+    --primary: 22 100% 50%; /* برتقالي #FF5C00 */
     --primary-foreground: 0 0% 100%;
     --secondary: 215 25% 27%;
     --secondary-foreground: 210 40% 98%;
@@ -48,32 +48,34 @@
     box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
   }
 
-  /* 🟠 نمط المربعات العمودية المستقيمة 🟠 */
+  /* 🟠 المربع المتدرج الذهبي-البرتقالي 🟠 */
   .nav-item-box {
-    @apply flex items-center gap-4 p-4 rounded-[1.5rem] bg-[#FF5C00] text-white transition-all duration-200 border-none w-full shadow-md;
+    background: linear-gradient(135deg, #FFB000 0%, #FF7A00 100%) !important;
+    @apply flex items-center gap-4 p-4 rounded-[1.5rem] text-white transition-all duration-300 border-none w-full shadow-md;
   }
   
   .nav-item-box svg {
-    @apply text-white size-6 shrink-0 transition-colors duration-200;
+    @apply text-white size-6 shrink-0 transition-all duration-300;
   }
 
-  /* ⚪ حالة الهوفر والنشاط: خلفية بيضاء، أيقونة سوداء ⚪ */
+  /* ⚪ حالة الهوفر والنشاط السيادية: خلفية بيضاء، أيقونة سوداء ⚪ */
   .nav-item-box:hover, 
   .nav-item-box-active {
-    @apply bg-white text-black shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] scale-[1.02] ring-0 !important;
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15) !important;
+    @apply scale-[1.02] ring-0 !important;
   }
 
   .nav-item-box:hover svg,
   .nav-item-box-active svg {
-    @apply text-black !important;
+    color: #000000 !important;
+    @apply scale-110 !important;
   }
 
-  .nav-item-box-sub {
-    @apply flex items-center gap-3 p-3 rounded-2xl bg-white border-2 border-orange-50 text-[#FF5C00] font-bold transition-all hover:bg-orange-50;
-  }
-
-  .nav-item-box-sub[data-active="true"] {
-    @apply bg-[#FF5C00] text-white border-none shadow-md;
+  /* 📏 منع الإزاحة للأقسام الفرعية لضمان خط عمودي واحد 📏 */
+  .sidebar-no-offset {
+    @apply pr-0 mr-0 ml-0 pl-0 border-none !important;
   }
 }
 
