@@ -74,6 +74,7 @@ import {
   Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import type { AuthenticatedUser } from '@/context/auth-context';
 import { useLanguage } from '@/context/language-context';
 import { ScrollArea } from '../ui/scroll-area';
@@ -330,7 +331,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   return null;
 }
 
-export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
+export function MainNav({ currentUser, onLogout }: { currentUser: AuthenticatedUser, onLogout: () => void }) {
   const pathname = usePathname();
   const { language } = useLanguage();
   const currentNavItems = navItems[language] || navItems.ar;
@@ -360,15 +361,26 @@ export function MainNav({ currentUser }: { currentUser: AuthenticatedUser, onLog
       </SidebarContent>
 
       <SidebarFooter className="p-4 mt-auto group-data-[collapsible=icon]:p-2">
-        <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/20 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
-            <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-[#1E293B] font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
-                {currentUser.fullName?.charAt(0) || 'N'}
-            </div>
-            <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
-                <p className="text-xs font-black truncate text-[#1E293B] leading-none mb-1">{currentUser.fullName}</p>
-                <p className="text-[8px] truncate font-black uppercase tracking-widest text-[#FF7A00]">{currentUser.role}</p>
-            </div>
-        </div>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <div className="bg-white/10 border border-white/20 rounded-2xl p-4 flex items-center shadow-sm backdrop-blur-md group hover:bg-white/20 transition-all cursor-pointer group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:justify-center">
+                    <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-[#1E293B] font-black shadow-lg group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
+                        {currentUser.fullName?.charAt(0) || 'N'}
+                    </div>
+                    <div className="mr-3 text-right overflow-hidden group-data-[collapsible=icon]:hidden flex-1">
+                        <p className="text-xs font-black truncate text-[#1E293B] leading-none mb-1">{currentUser.fullName}</p>
+                        <p className="text-[8px] truncate font-black uppercase tracking-widest text-[#FF7A00]">{currentUser.role}</p>
+                    </div>
+                </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-2 shadow-2xl" dir="rtl">
+                <DropdownMenuLabel className="font-black text-xs px-3 py-2 text-slate-400">خيارات الجلسة</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onLogout} className="text-red-600 font-black rounded-xl py-3 cursor-pointer focus:bg-red-50">
+                    <Trash2 className="ml-2 h-4 w-4" /> تسجيل الخروج
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </>
   );

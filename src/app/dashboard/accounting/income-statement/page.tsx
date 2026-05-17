@@ -47,13 +47,12 @@ export default function IncomeStatementPage() {
     const { branding } = useBranding();
     
     const [isGenerating, setIsGenerating] = useState(false);
-    const [reportData, setReportData] = setReportData | null>(null);
+    const [reportData, setReportData] = useState<IncomeStatementData | null>(null);
     
     const [dateFrom, setDateFrom] = useState<Date | undefined>(() => startOfYear(new Date()));
     const [dateTo, setDateTo] = useState<Date | undefined>(() => endOfYear(new Date()));
     const [selectedProjectId, setSelectedProjectId] = useState('all');
     
-    // 🛡️ جلب البيانات عبر الخطافات السيادية
     const { data: accounts, loading: accountsLoading } = useSubscription<Account>(
         firestore, 
         user?.currentCompanyId ? 'chartOfAccounts' : null
@@ -99,7 +98,11 @@ export default function IncomeStatementPage() {
                 else if (acc.code.startsWith('5')) accountMaps.expense.set(acc.id, acc.name);
             });
             
-            const totals = { revenue: new Map<string, number>(), cogs: new Map<string, number>(), expense: new Map<string, number>() };
+            const totals = { 
+                revenue: new Map<string, number>(), 
+                cogs: new Map<string, number>(), 
+                expense: new Map<string, number>() 
+            };
 
             filteredEntries.forEach(entry => {
                 entry.lines.forEach(line => {
