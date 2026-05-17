@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, Trash2, Edit, Loader2, Calendar, Search, Eye, EyeOff } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit, Loader2, Calendar, Search, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,11 +42,9 @@ import { doc, updateDoc, query, orderBy, collection } from 'firebase/firestore';
 import { searchEmployees } from '@/lib/cache/fuse-search';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
-import { DateInput } from '../ui/date-input';
 import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-
 
 type EmployeeStatus = 'active' | 'on-leave' | 'terminated';
 
@@ -137,39 +135,46 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
     const handleTerminateConfirm = async () => {
         if (!employeeToTerminate || !terminationReason || !firestore || !tenantId) return;
         setIsTerminating(true);
+        
+        // 🛡️ استخدام المسار السيادي الموحد
         const employeePath = getTenantPath(`employees/${employeeToTerminate.id}`, tenantId);
         const employeeRef = doc(firestore, employeePath);
-        const updateData = { status: 'terminated', terminationDate: new Date(), terminationReason: terminationReason };
+        const updateData = { status: 'terminated' as const, terminationDate: new Date(), terminationReason: terminationReason };
 
         try {
             await updateDoc(employeeRef, updateData).catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: employeePath,
                     operation: 'update',
                     requestResourceData: updateData
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
+                throw serverError;
             });
-            toast({ title: 'نجاح', description: 'تم إنهاء خدمة الموظف.'});
-        } finally { setIsTerminating(false); setEmployeeToTerminate(null); setTerminationReason(null); }
+            toast({ title: 'تم إنهاء الخدمة', description: `تم تحديث حالة ${employeeToTerminate.fullName} بنجاح.`});
+        } finally { 
+            setIsTerminating(false); 
+            setEmployeeToTerminate(null); 
+            setTerminationReason(null); 
+        }
     };
 
     const handleReactivate = async (employee: Employee) => {
         if (!firestore || !tenantId) return;
+        
         const employeePath = getTenantPath(`employees/${employee.id}`, tenantId);
         const employeeRef = doc(firestore, employeePath);
         const updateData = { status: 'active' as const, terminationReason: null, terminationDate: null };
 
         try {
             await updateDoc(employeeRef, updateData).catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: employeePath,
                     operation: 'update',
                     requestResourceData: updateData
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
+                throw serverError;
             });
-            toast({ title: 'نجاح', description: `تم إعادة ${employee.fullName} للخدمة بنجاح.` });
+            toast({ title: 'تمت إعادة التنشيط', description: `عاد ${employee.fullName} إلى الخدمة النشطة.` });
         } catch (error) {
             console.error(error);
         }
@@ -213,14 +218,13 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                             <TableHead className="font-black text-[#7209B7]">رقم الملف</TableHead>
                             <TableHead className="font-black text-[#7209B7]">الوظيفة والقسم</TableHead>
                             <TableHead className="font-black text-[#7209B7]">تاريخ التعيين</TableHead>
-                            <TableHead className="text-left font-black text-[#7209B7] flex items-center justify-end gap-2">
+                            <TableHead className="text-left font-black text-[#7209B7] flex items-center justify-end gap-2 h-14">
                                 <span>الراتب</span>
                                 <Button 
                                     variant="ghost" 
                                     size="icon" 
                                     className="h-6 w-6 text-primary hover:bg-primary/10 rounded-full" 
                                     onClick={() => setShowSalaries(!showSalaries)}
-                                    title={showSalaries ? "إخفاء الرواتب" : "إظهار الرواتب"}
                                 >
                                     {showSalaries ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                                 </Button>
@@ -238,7 +242,7 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                             <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground font-bold italic">لا توجد سجلات موظفين مطابقة.</TableCell></TableRow>
                         ) : (
                             filteredEmployees.map((employee) => (
-                                <TableRow key={employee.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
+                                <TableRow key={employee.id} className={cn("hover:bg-[#F3E8FF]/20 group transition-colors h-16", employee.status === 'terminated' && "opacity-60")}>
                                     <TableCell className="px-8 font-black text-gray-800">
                                         <Link href={`/dashboard/hr/employees/${employee.id}`} className="hover:underline">{employee.fullName}</Link>
                                     </TableCell>
@@ -263,15 +267,27 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4" /></Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-xl">
-                                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}`}><Eye className="ml-2 h-4 w-4" /> عرض الملف</Link></DropdownMenuItem>
-                                                <DropdownMenuItem asChild><Link href={`/dashboard/hr/employees/${employee.id}/edit`}><Edit className="ml-2 h-4 w-4" /> تعديل</Link></DropdownMenuItem>
+                                            <DropdownMenuContent align="end" dir="rtl" className="rounded-xl p-2 shadow-2xl">
+                                                <DropdownMenuLabel className="font-black px-3 py-2">خيارات الملف</DropdownMenuLabel>
+                                                <DropdownMenuItem asChild className="rounded-lg py-3">
+                                                    <Link href={`/dashboard/hr/employees/${employee.id}`} className="flex items-center gap-2">
+                                                        <Eye className="h-4 w-4" /> عرض الملف الشامل
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem asChild className="rounded-lg py-3">
+                                                    <Link href={`/dashboard/hr/employees/${employee.id}/edit`} className="flex items-center gap-2">
+                                                        <Edit className="ml-2 h-4 w-4" /> تعديل البيانات
+                                                    </Link>
+                                                </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 {employee.status !== 'terminated' ? (
-                                                    <DropdownMenuItem onClick={() => setEmployeeToTerminate(employee)} className="text-destructive">إنهاء الخدمة</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setEmployeeToTerminate(employee)} className="text-destructive font-bold gap-2 rounded-lg py-3">
+                                                        <Trash2 className="h-4 w-4" /> إنهاء الخدمة
+                                                    </DropdownMenuItem>
                                                 ) : (
-                                                    <DropdownMenuItem onClick={() => handleReactivate(employee)}>إعادة للخدمة</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleReactivate(employee)} className="text-green-600 font-bold gap-2 rounded-lg py-3">
+                                                        <RotateCcw className="h-4 w-4" /> إعادة تفعيل الملف
+                                                    </DropdownMenuItem>
                                                 )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -284,15 +300,20 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
             </div>
 
             <AlertDialog open={!!employeeToTerminate} onOpenChange={() => setEmployeeToTerminate(null)}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl">
-                    <AlertDialogHeader><AlertDialogTitle>إنهاء خدمة الموظف</AlertDialogTitle><AlertDialogDescription>هل أنت متأكد من تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى منتهية خدمته؟</AlertDialogDescription></AlertDialogHeader>
-                    <div className="flex gap-4 justify-center py-4">
-                        <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')} className="rounded-xl">استقالة</Button>
-                        <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')} className="rounded-xl">إنهاء خدمات</Button>
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-black text-red-700">إنهاء خدمة موظف</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold">هل أنت متأكد من تغيير حالة الموظف "{employeeToTerminate?.fullName}" إلى منتهية خدمته؟ سيتم تجميد حسابه فوراً.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="flex gap-4 justify-center py-6">
+                        <Button variant={terminationReason === 'resignation' ? 'default' : 'outline'} onClick={() => setTerminationReason('resignation')} className="rounded-xl h-11 px-10 font-black">استقالة</Button>
+                        <Button variant={terminationReason === 'termination' ? 'default' : 'outline'} onClick={() => setTerminationReason('termination')} className="rounded-xl h-11 px-10 font-black">إنهاء خدمات</Button>
                     </div>
-                    <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleTerminateConfirm} disabled={!terminationReason || isTerminating} className="bg-destructive rounded-xl">تأكيد الإنهاء</AlertDialogAction>
+                    <AlertDialogFooter className="gap-2 border-t pt-6">
+                        <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleTerminateConfirm} disabled={!terminationReason || isTerminating} className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-10 shadow-lg shadow-red-100">
+                            {isTerminating ? <Loader2 className="animate-spin h-5 w-5"/> : 'تأكيد الإنهاء النهائي'}
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

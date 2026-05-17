@@ -17,6 +17,8 @@ import type { Employee } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function NewEmployeePage() {
     const router = useRouter();
@@ -30,9 +32,10 @@ export default function NewEmployeePage() {
     const tenantId = currentUser?.currentCompanyId;
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const generateEmployeeNumber = async () => {
             try {
+                // 🛡️ توجيه عداد الأرقام الوظيفية لمسار المنشأة
                 const counterPath = getTenantPath('counters/employees', tenantId);
                 const counterRef = doc(firestore, counterPath);
                 const counterDoc = await getDoc(counterRef);
@@ -50,18 +53,16 @@ export default function NewEmployeePage() {
     }, [firestore, tenantId]);
     
     const handleSave = useCallback(async (newEmployeeData: Partial<Employee>) => {
-        if (!firestore || !currentUser || !employeeNumber || employeeNumber === 'Error') {
-             toast({ variant: 'destructive', title: 'خطأ', description: 'لا يمكن الحفظ، الرقم الوظيفي غير متاح.' });
+        if (!firestore || !currentUser || !employeeNumber || employeeNumber === 'Error' || !tenantId) {
+             toast({ variant: 'destructive', title: 'عائق هويّة', description: 'الرقم الوظيفي غير متاح أو لم يتم تحديد المنشأة.' });
              return;
         }
         
         setIsSaving(true);
-        let newEmployeeId = '';
+        const employeesCollectionPath = getTenantPath('employees', tenantId);
 
         try {
-            const employeesCollectionPath = getTenantPath('employees', tenantId);
-            
-            // 🛡️ فحص رقم الجوال والمدني في مسار المنشأة
+            // 🛡️ فحص التكرار داخل نطاق المنشأة فقط
             const mobileQuery = query(collection(firestore, employeesCollectionPath), where('mobile', '==', newEmployeeData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {
@@ -94,37 +95,25 @@ export default function NewEmployeePage() {
                   carriedLeaveDays: 0,
                   sickLeaveUsed: 0,
                   emergencyLeaveUsed: 0,
-                  companyId: tenantId || null 
+                  companyId: tenantId
                 };
 
                 const newEmployeeRef = doc(collection(firestore, employeesCollectionPath));
-                newEmployeeId = newEmployeeRef.id;
                 transaction.set(newEmployeeRef, cleanFirestoreData(finalEmployeeData));
+            }).catch(async (serverError) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: employeesCollectionPath,
+                    operation: 'create',
+                    requestResourceData: newEmployeeData
+                }));
+                throw serverError;
             });
 
             toast({ title: 'نجاح التأسيس', description: 'تم إنشاء ملف الموظف بنجاح.' });
-            
-            // ⚡ التوجيه الفوري لتقليل الإحساس بالثقل
             router.push(`/dashboard/hr/employees`);
-            
-            // 🚀 تشغيل الإشعارات في الخلفية (Fire and Forget)
-            const adminHRUsersQuery = query(collection(firestore, getTenantPath('users', tenantId)), where('role', 'in', ['Admin', 'HR']));
-            getDocs(adminHRUsersQuery).then(querySnapshot => {
-                querySnapshot.forEach(userDoc => {
-                    const userId = userDoc.id;
-                    if (userId !== currentUser.id) {
-                        createNotification(firestore, {
-                            userId: userId,
-                            title: 'تمت إضافة موظف جديد',
-                            body: `قام ${currentUser.fullName} بإضافة الموظف الجديد "${newEmployeeData.fullName}".`,
-                            link: `/dashboard/hr/employees`
-                        });
-                    }
-                });
-            });
 
         } catch (error: any) {
-            toast({ title: "خطأ", description: error.message, variant: "destructive" });
+            toast({ title: "فشل الحفظ", description: error.message, variant: "destructive" });
             setIsSaving(false);
         }
     }, [firestore, currentUser, toast, router, employeeNumber, tenantId]);
@@ -133,7 +122,7 @@ export default function NewEmployeePage() {
         <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8 border-b">
                 <CardTitle className="text-2xl font-black">إضافة موظف جديد</CardTitle>
-                <CardDescription className="text-base font-medium">قم بتعبئة بيانات الموظف الجديد لإنشاء ملف له في المنشأة الحالية.</CardDescription>
+                <CardDescription className="text-base font-medium">إنشاء ملف وظيفي معزول للموظف في سجلات منشأتك.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
                 <EmployeeForm

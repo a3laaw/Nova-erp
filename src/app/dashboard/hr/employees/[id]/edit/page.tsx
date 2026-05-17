@@ -8,7 +8,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -18,11 +17,9 @@ import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp, wri
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/auth-context';
-import type { Employee, AuditLog } from '@/lib/types';
+import type { Employee } from '@/lib/types';
 import { EmployeeForm } from '@/components/hr/employee-form';
 import { cleanFirestoreData, formatCurrency, getTenantPath } from '@/lib/utils';
-import { toFirestoreDate } from '@/services/date-converter';
-import { format } from 'date-fns';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -39,7 +36,7 @@ export default function EditEmployeePage() {
 
     // 🛡️ توجيه مسار الاستماع للمنظومة المعزولة
     const employeePath = useMemo(() => getTenantPath(`employees/${id}`, tenantId), [id, tenantId]);
-    const { data: employee, loading, error } = useDocument<Employee>(firestore, employeePath);
+    const { data: employee, loading } = useDocument<Employee>(firestore, employeePath);
 
     const handleSave = useCallback(async (updatedData: Partial<Employee>) => {
         if (!firestore || !currentUser || !id || !employee || !tenantId) return;
@@ -57,6 +54,7 @@ export default function EditEmployeePage() {
             { key: 'mobile', label: 'رقم الجوال' },
             { key: 'basicSalary', label: 'الراتب الأساسي', isCurrency: true },
             { key: 'jobTitle', label: 'المسمى الوظيفي' },
+            { key: 'department', label: 'القسم' }
         ];
 
         fieldMappings.forEach(({ key, label, isCurrency }) => {
@@ -81,8 +79,8 @@ export default function EditEmployeePage() {
             batch.update(employeeRefDoc, safeData);
 
             if (changesToLog.length > 0) {
-                 const logPath = getTenantPath(`employees/${id}/auditLogs`, tenantId);
-                 const logCollectionRef = collection(firestore, logPath);
+                 const auditLogPath = getTenantPath(`employees/${id}/auditLogs`, tenantId);
+                 const logCollectionRef = collection(firestore, auditLogPath);
                  changesToLog.forEach(logEntry => {
                      const logRef = doc(logCollectionRef);
                      batch.set(logRef, {
@@ -95,27 +93,27 @@ export default function EditEmployeePage() {
             }
 
             await batch.commit().catch(async (serverError) => {
-                const permissionError = new FirestorePermissionError({
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: finalEmployeePath,
                     operation: 'update',
                     requestResourceData: safeData
-                });
-                errorEmitter.emit('permission-error', permissionError);
+                }));
                 throw serverError;
             });
 
-            toast({ title: 'تم الحفظ بنجاح' });
+            toast({ title: 'تم الحفظ', description: 'تم ترحيل تعديلات الملف الوظيفي وسجل التدقيق.' });
             router.push(`/dashboard/hr/employees/${id}`);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Save Error:", error);
+            toast({ variant: 'destructive', title: 'عائق صلاحيات', description: error.message || 'فشل ترحيل التعديلات.' });
             setIsSaving(false);
         }
     }, [firestore, currentUser, id, employee, tenantId, router, toast]);
 
-    if (loading) return <div className="p-8"><Skeleton className="h-64 w-full rounded-[2rem]" /></div>;
+    if (loading) return <div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
 
     return (
-        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl" dir="rtl">
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8 border-b">
                 <CardTitle className="text-2xl font-black">تعديل ملف الموظف</CardTitle>
                 <CardDescription className="font-bold">تحديث البيانات الوظيفية والمالية لـ {employee?.fullName}.</CardDescription>
