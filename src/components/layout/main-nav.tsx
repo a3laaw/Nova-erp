@@ -235,11 +235,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full">
             <span className={cn(
                 "flex-1 text-right truncate text-[13px] font-black group-data-[collapsible=icon]:hidden",
-                isActive ? "text-[#1e1b4b]" : "text-[#1e1b4b] group-hover/btn:text-[#1e1b4b]"
+                isActive ? "text-black" : "text-[#1e1b4b]"
             )}>
                 {item.label}
             </span>
-            {Icon && <Icon className={cn("size-6 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "text-[#1e1b4b]" : "text-primary")} />}
+            {Icon && <Icon className={cn("size-6 shrink-0 ml-3 group-data-[collapsible=icon]:ml-0", isActive ? "text-black" : "text-primary")} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -263,7 +263,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                             isActive ? "nav-capsule-active" : "nav-capsule"
                           )}
                         >
-                          {Icon && <Icon className={cn("size-6 transition-colors", isActive ? "text-[#1e1b4b]" : "text-primary group-hover/btn:text-[#1e1b4b]")} />}
+                          {Icon && <Icon className={cn("size-6 transition-colors", isActive ? "text-black" : "text-primary group-hover/btn:text-black")} />}
                         </BaseSidebarMenuButton>
                     </div>
                   </DropdownMenuTrigger>
@@ -279,11 +279,11 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                     return (
                         <DropdownMenuItem key={child.href} asChild className={cn(
                             "rounded-xl py-3 px-4 cursor-pointer mb-1 transition-all",
-                            isChildActive ? "bg-primary text-[#1e1b4b] font-black shadow-lg" : "hover:bg-slate-100 text-[#1e1b4b]"
+                            isChildActive ? "bg-primary text-black font-black shadow-lg" : "hover:bg-slate-100 text-[#1e1b4b]"
                         )}>
                             <Link href={child.href} className="flex items-center justify-between w-full">
-                                <span className={cn("font-black text-xs", isChildActive && "text-[#1e1b4b]")}>{child.label}</span>
-                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-[#1e1b4b]" : "text-primary")} />}
+                                <span className={cn("font-black text-xs", isChildActive && "text-black")}>{child.label}</span>
+                                {child.icon && <child.icon className={cn("h-4 w-4 ml-3", isChildActive ? "text-black" : "text-primary")} />}
                             </Link>
                         </DropdownMenuItem>
                     );
@@ -301,14 +301,14 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           <CollapsibleTrigger asChild>
             <SidebarMenuButton isActive={isActive}>
               <div className="flex items-center justify-between w-full h-full">
-                <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20", isActive && "text-[#1e1b4b] opacity-100")} />
+                <ChevronLeft className={cn("h-3.5 w-3.5 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-20", isActive && "text-black opacity-100")} />
                 <span className={cn(
                     "text-right truncate text-[13px] font-black flex-1 transition-colors",
-                    isActive ? "text-[#1e1b4b]" : "text-[#1e1b4b] group-hover/btn:text-[#1e1b4b]"
+                    isActive ? "text-black" : "text-[#1e1b4b] group-hover/btn:text-black"
                 )}>
                     {item.label}
                 </span>
-                {Icon && <Icon className={cn("size-6 shrink-0 ml-3 transition-colors", isActive ? "text-[#1e1b4b]" : "text-primary group-hover/btn:text-[#1e1b4b]")} />}
+                {Icon && <Icon className={cn("size-6 shrink-0 ml-3 transition-colors", isActive ? "text-black" : "text-primary group-hover/btn:text-black")} />}
               </div>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -328,13 +328,13 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                         <div className="flex items-center justify-between w-full h-full">
                             <span className={cn(
                                 "text-[11px] font-black truncate flex-1 text-right transition-colors",
-                                isChildActive ? "text-[#1e1b4b]" : "text-[#1e1b4b]/80 group-hover/subbtn:text-[#1e1b4b]"
+                                isChildActive ? "text-black" : "text-[#1e1b4b]/80 group-hover/subbtn:text-black"
                             )}>
                                 {child.label}
                             </span>
                             {child.icon && <child.icon className={cn(
                                 "h-4 w-4 ml-3 transition-colors", 
-                                isChildActive ? "text-[#1e1b4b]" : "text-primary group-hover/subbtn:text-[#1e1b4b]"
+                                isChildActive ? "text-black" : "text-primary group-hover/subbtn:text-black"
                             )} />}
                         </div>
                       </Link>

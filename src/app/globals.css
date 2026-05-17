@@ -69,14 +69,14 @@
     @apply text-[#FF7A00] transition-colors duration-300;
   }
   
-  /* العنصر النشط أو الهوفر: خلفية برتقالية وأيقونة كحلية للتباين القصوى */
+  /* العنصر النشط أو الهوفر: خلفية برتقالية وأيقونة سوداء للتباين القصوى */
   .nav-capsule:hover, .nav-capsule-active {
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-[#1e1b4b] font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
+    @apply text-black font-black shadow-lg border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
   }
   
   .nav-capsule:hover svg, .nav-capsule-active svg {
-    @apply text-[#1e1b4b] !important; /* ضمان ظهور الأيقونة بلون كحلي فوق البرتقالي */
+    @apply text-black !important; /* أيقونة سوداء بسيطة فوق البرتقالي */
   }
 
   .nav-capsule-sub {
@@ -89,11 +89,11 @@
 
   .nav-capsule-sub:hover {
     background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-[#1e1b4b] font-black shadow-md border-none;
+    @apply text-black font-black shadow-md border-none;
   }
   
   .nav-capsule-sub:hover svg {
-    @apply text-[#1e1b4b] !important;
+    @apply text-black !important;
   }
 }
 
