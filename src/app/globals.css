@@ -12,7 +12,7 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100% / 0.95;
     --popover-foreground: 222 47% 11%;
-    --primary: 22 100% 50%; /* برتقالي نابض فلات #FF5C00 */
+    --primary: 22 100% 50%; /* برتقالي نابض #FF5C00 */
     --primary-foreground: 0 0% 100%;
     --secondary: 215 25% 27%;
     --secondary-foreground: 210 40% 98%;
@@ -48,17 +48,24 @@
     box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
   }
 
-  /* 🟠 نمط المربعات البرتقالية المستديرة (Vibrant Orange Flat Style) 🟠 */
+  /* 🟠 نمط المربعات العمودية المستقيمة 🟠 */
   .nav-item-box {
-    @apply flex items-center gap-4 p-4 rounded-[1.5rem] bg-[#FF5C00] text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:shadow-lg active:scale-95 border-none;
+    @apply flex items-center gap-4 p-4 rounded-[1.5rem] bg-[#FF5C00] text-white transition-all duration-200 border-none w-full shadow-md;
   }
   
   .nav-item-box svg {
-    @apply text-white size-6 shrink-0;
+    @apply text-white size-6 shrink-0 transition-colors duration-200;
   }
 
+  /* ⚪ حالة الهوفر والنشاط: خلفية بيضاء، أيقونة سوداء ⚪ */
+  .nav-item-box:hover, 
   .nav-item-box-active {
-    @apply bg-[#FF5C00] ring-4 ring-orange-500/20 shadow-xl scale-[1.03];
+    @apply bg-white text-black shadow-[0_10px_30px_-10px_rgba(0,0,0,0.15)] scale-[1.02] ring-0 !important;
+  }
+
+  .nav-item-box:hover svg,
+  .nav-item-box-active svg {
+    @apply text-black !important;
   }
 
   .nav-item-box-sub {

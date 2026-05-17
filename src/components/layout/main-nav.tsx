@@ -40,7 +40,6 @@ import {
   Landmark,
   PencilRuler,
   Settings2,
-  ChevronLeft,
   UsersRound,
   Search,
   FileText,
@@ -183,6 +182,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
 
   const isActive = item.href ? currentPath === item.href : isAnyChildActive;
 
+  // Render a flat item
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem className="px-4 group-data-[collapsible=icon]:px-0">
@@ -194,7 +194,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             isActive && "nav-item-box-active"
           )}
         >
-          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full">
+          <Link href={item.href} onClick={() => setOpenMobile(false)} className="flex items-center justify-between w-full h-full px-4 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center">
             <span className="flex-1 text-right truncate text-[14px] font-black group-data-[collapsible=icon]:hidden">
                 {item.label}
             </span>
@@ -205,7 +205,9 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
   
+  // Render an item with children
   if (item.children) {
+    // Collapsed state: Dropdown
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
@@ -254,6 +256,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       );
     }
 
+    // Expanded state: Collapsible WITHOUT OFFSET SHIFTING
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
@@ -265,8 +268,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
                 isActive && "nav-item-box-active"
               )}
             >
-              <div className="flex items-center justify-between w-full h-full">
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-40", isActive && "opacity-100")} />
+              <div className="flex items-center justify-between w-full h-full px-4">
                 <span className="text-right truncate text-[14px] font-black flex-1">
                     {item.label}
                 </span>
