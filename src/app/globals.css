@@ -12,28 +12,27 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100% / 0.95;
     --popover-foreground: 222 47% 11%;
-    --primary: 29 100% 50%; /* البرتقالي التقني #FF7A00 */
+    --primary: 22 100% 50%; /* برتقالي نابض فلات #FF5C00 */
     --primary-foreground: 0 0% 100%;
     --secondary: 215 25% 27%;
     --secondary-foreground: 210 40% 98%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 29 100% 50% / 0.1;
+    --accent: 22 100% 50% / 0.1;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 29 100% 50%;
-    --radius: 2rem;
+    --ring: 22 100% 50%;
+    --radius: 1.5rem;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body {
-    background: linear-gradient(135deg, #fef3c7 0%, #fff7ed 30%, #fff 60%, #fffbeb 100%);
-    background-attachment: fixed;
+    background: #F8F9FB;
     color: #1e1b4b;
     font-family: 'Tajawal', sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -43,63 +42,31 @@
 
 @layer components {
   .glass-effect {
-    background: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
   }
 
-  .glass-3d-button {
-    @apply relative overflow-hidden transition-all duration-300 active:scale-95 shadow-[0_8px_20px_-5px_rgba(255,122,0,0.3)] hover:shadow-[0_15px_30px_-5px_rgba(255,122,0,0.4)] hover:-translate-y-0.5 border-b-4 border-primary/40 rounded-2xl font-black;
+  /* 🟠 نمط المربعات البرتقالية المستديرة (Vibrant Orange Flat Style) 🟠 */
+  .nav-item-box {
+    @apply flex items-center gap-4 p-4 rounded-[1.5rem] bg-[#FF5C00] text-white shadow-md transition-all duration-200 hover:scale-[1.02] hover:shadow-lg active:scale-95 border-none;
+  }
+  
+  .nav-item-box svg {
+    @apply text-white size-6 shrink-0;
   }
 
-  .sidebar-glass {
-    background: rgba(255, 255, 255, 0.15) !important;
-    backdrop-filter: blur(15px) !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.3) !important;
+  .nav-item-box-active {
+    @apply bg-[#FF5C00] ring-4 ring-orange-500/20 shadow-xl scale-[1.03];
   }
 
-  /* ⚪️ العنصر العادي (سكون): كبسولة بيضاء واضحة وأيقونة برتقالية حادة ⚪️ */
-  .nav-capsule {
-    @apply bg-white/90 border border-white/100 text-[#1e1b4b] font-bold shadow-md transition-all duration-300;
-  }
-  
-  .nav-capsule svg {
-    color: #FF7A00 !important; /* البرتقالي الرسمي يظهر بوضوح فوق الأبيض */
-    @apply transition-colors duration-300;
-  }
-  
-  /* 🔥 العنصر النشط أو الهوفر: خلفية برتقالية وأيقونة بيضاء ناصعة للتباين 🔥 */
-  .nav-capsule:hover, .nav-capsule-active {
-    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-white font-black shadow-xl border-none scale-[1.02] ring-4 ring-orange-500/10 !important;
-  }
-  
-  .nav-capsule:hover svg, 
-  .nav-capsule-active svg,
-  [data-state="active"] svg {
-    color: #FFFFFF !important;
-    stroke: #FFFFFF !important;
+  .nav-item-box-sub {
+    @apply flex items-center gap-3 p-3 rounded-2xl bg-white border-2 border-orange-50 text-[#FF5C00] font-bold transition-all hover:bg-orange-50;
   }
 
-  /* العناصر الفرعية: أقل سطوعاً في السكون */
-  .nav-capsule-sub {
-    @apply bg-white/50 border border-white/60 text-[#1e1b4b]/80 font-bold transition-all duration-300;
-  }
-  
-  .nav-capsule-sub svg {
-    @apply text-[#FF7A00]/70;
-  }
-
-  .nav-capsule-sub:hover, .nav-capsule-sub[data-active="true"] {
-    background: linear-gradient(135deg, #FF7A00 0%, #FFB000 100%) !important;
-    @apply text-white font-black shadow-md border-none !important;
-  }
-  
-  .nav-capsule-sub:hover svg, .nav-capsule-sub[data-active="true"] svg {
-    color: #FFFFFF !important;
-    stroke: #FFFFFF !important;
+  .nav-item-box-sub[data-active="true"] {
+    @apply bg-[#FF5C00] text-white border-none shadow-md;
   }
 }
 
