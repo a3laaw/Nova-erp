@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, PlusCircle, UserCircle, ShieldCheck, ArrowRight, Search, Pencil, Trash2, Lock, UserX, UserCheck, Loader2, AlertCircle, Sparkles, Key } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ShieldCheck, Search, Pencil, Trash2, UserX, UserCheck, Loader2, Sparkles, Banknote } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,16 +33,14 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useFirebase } from '@/firebase';
-import { collection, doc, updateDoc, deleteDoc, serverTimestamp, getDocs, query, orderBy, where, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, updateDoc, serverTimestamp, getDocs, query, orderBy, where, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '../ui/skeleton';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { cn, cleanFirestoreData } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { useCompany } from '@/context/company-context';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 const roleTranslations: Record<UserProfile['role'], string> = {
     Admin: 'مدير نظام',
@@ -70,11 +68,10 @@ interface UserWithEmployee extends UserProfile {
 }
 
 export function UsersTable() {
-    const { firestore } = useFirebase();
+    const { firestore, auth } = useFirebase();
     const { user: currentUser } = useAuth();
     const { currentCompany } = useCompany();
     const { toast } = useToast();
-    const router = useRouter();
 
     const [users, setUsers] = useState<UserWithEmployee[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -85,17 +82,21 @@ export function UsersTable() {
     const [userToToggle, setUserToToggle] = useState<UserWithEmployee | null>(null);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const savingRef = useRef(false);
 
-    const tenantId = useMemo(() => currentUser?.currentCompanyId, [currentUser]);
-    const basePrefix = useMemo(() => tenantId ? `companies/${tenantId}/` : '', [tenantId]);
+    const tenantId = currentUser?.currentCompanyId;
 
     const fetchUsersAndEmployees = useCallback(async () => {
         if (!firestore || !tenantId) return;
         setLoading(true);
         try {
+            const employeesPath = getTenantPath('employees', tenantId);
+            const usersPath = getTenantPath('users', tenantId);
+
             const [employeesSnapshot, usersSnapshot] = await Promise.all([
-                getDocs(query(collection(firestore, `${basePrefix}employees`), orderBy('fullName'))),
-                getDocs(query(collection(firestore, `${basePrefix}users`), orderBy('createdAt', 'desc')))
+                getDocs(query(collection(firestore, employeesPath), orderBy('fullName'))),
+                getDocs(query(collection(firestore, usersPath), orderBy('createdAt', 'desc')))
             ]);
 
             const empList = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
@@ -112,19 +113,16 @@ export function UsersTable() {
             });
             setUsers(usersList);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'خطأ في جلب المستخدمين' });
+            console.error(error);
+            toast({ variant: 'destructive', title: 'خطأ في التحميل', description: 'فشل جلب قائمة المستخدمين.' });
         } finally {
             setLoading(false);
         }
-    }, [firestore, tenantId, basePrefix, toast]);
+    }, [firestore, tenantId, toast]);
 
     useEffect(() => {
-        if (firestore && tenantId && (currentUser?.role === 'Admin' || currentUser?.role === 'Developer')) {
-            fetchUsersAndEmployees();
-        } else {
-            setLoading(false);
-        }
-    }, [firestore, currentUser, tenantId, fetchUsersAndEmployees]);
+        if (tenantId) fetchUsersAndEmployees();
+    }, [tenantId, fetchUsersAndEmployees]);
 
     const filteredUsers = useMemo(() => {
         if (!searchQuery) return users;
@@ -136,104 +134,97 @@ export function UsersTable() {
     }, [users, searchQuery]);
 
     const quotaInfo = useMemo(() => {
-        // 🛡️ التعديل السيادي: المطور لا يخضع لقيود الحصة عند العرض
-        const isDev = currentUser?.role === 'Developer';
-        const totalLimit = currentCompany?.maxUsersLimit || (isDev ? 99 : 0);
+        const totalLimit = currentCompany?.maxUsersLimit || 5;
         const usedCount = users.length;
         return {
             totalLimit,
             usedCount,
-            isFull: !isDev && totalLimit > 0 && usedCount >= totalLimit,
-            remaining: Math.max(0, totalLimit - usedCount)
+            isFull: usedCount >= totalLimit,
         };
-    }, [currentCompany, users, currentUser?.role]);
+    }, [currentCompany, users]);
 
-    const handleSaveUser = async (userData: Partial<UserProfile>) => {
-        if (!firestore || !currentUser || !tenantId) return;
+    /**
+     * محرك الحفظ السيادي:
+     * يستدعي الـ API لإنشاء حساب Auth وتوثيق الفهرس العالمي والمنشأة في وقت واحد.
+     */
+    const handleSaveUser = async (userData: Partial<UserProfile> & { newPassword?: string }) => {
+        if (!firestore || !auth?.currentUser || !tenantId || savingRef.current) return;
         
-        if (!selectedUser && quotaInfo.isFull) {
-            toast({ 
-                variant: 'destructive', 
-                title: 'حصة التراخيص مكتملة', 
-                description: `لقد استنفدت كامل عدد المستخدمين المسموح به (${quotaInfo.totalLimit}).` 
-            });
-            return;
-        }
+        savingRef.current = true;
+        setIsSaving(true);
 
         try {
-            const globalIndexQuery = query(collection(firestore, 'global_users'), where('username', '==', userData.username));
-            const globalIndexSnap = await getDocs(globalIndexQuery);
+            const idToken = await auth.currentUser.getIdToken();
             
-            if (!globalIndexSnap.empty && (!selectedUser || globalIndexSnap.docs[0].data().email !== userData.email)) {
-                toast({ variant: 'destructive', title: 'اسم مستخدم محجوز', description: 'اسم المستخدم هذا مستخدم من قبل منشأة أخرى.' });
-                return;
-            }
-
-            const batch = writeBatch(firestore);
-            const userTenantRef = selectedUser?.id 
-                ? doc(firestore, `${basePrefix}users`, selectedUser.id)
-                : doc(collection(firestore, `${basePrefix}users`));
-            
-            const cleanData = cleanFirestoreData({
-                ...userData,
-                updatedAt: serverTimestamp(),
-                companyId: tenantId
+            // 🚀 استدعاء محرك إدارة الهوية الآمن (API)
+            const response = await fetch('/api/manage-tenant-user', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ 
+                    action: 'create_tenant_user',
+                    companyId: tenantId,
+                    email: userData.email,
+                    password: userData.newPassword,
+                    displayName: userData.fullName,
+                    username: userData.username,
+                    role: userData.role,
+                    employeeId: userData.employeeId
+                })
             });
 
-            batch.set(userTenantRef, {
-                ...cleanData,
-                isActive: selectedUser ? selectedUser.isActive : false,
-                createdAt: selectedUser ? selectedUser.createdAt : serverTimestamp(),
-            }, { merge: true });
-
-            if (!selectedUser) {
-                const globalIndexRef = doc(collection(firestore, 'global_users'));
-                batch.set(globalIndexRef, {
-                    username: userData.username,
-                    email: userData.email,
-                    companyId: tenantId,
-                    role: userData.role
-                });
+            const result = await response.json();
+            if (result.success) {
+                toast({ title: '✅ تم تفعيل الحساب', description: 'تم إنشاء حساب الموظف وفهرسته بنجاح.' });
+                setIsFormOpen(false);
+                fetchUsersAndEmployees();
+            } else {
+                throw new Error(result.error || 'فشل محرك التفعيل في السيرفر.');
             }
-
-            await batch.commit();
-            toast({ title: 'نجاح الحفظ', description: 'تم إنشاء الحساب وربطه بالفهرس العالمي.' });
-            setIsFormOpen(false);
-            fetchUsersAndEmployees();
-        } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+        } catch (error: any) {
+            console.error("IAM Engine Error:", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'خطأ في التفعيل', 
+                description: error.message || 'حدث خطأ أثناء محاولة تأسيس الحساب.' 
+            });
+        } finally {
+            setIsSaving(false);
+            savingRef.current = false;
         }
     };
     
-    const handleToggleActivationConfirm = async () => {
-        if (!userToToggle || !firestore) return;
-        const newStatus = !userToToggle.isActive;
+    const handleToggleActivation = async (user: UserWithEmployee) => {
+        if (!firestore || !tenantId) return;
+        const usersPath = getTenantPath(`users/${user.id}`, tenantId);
         try {
-            await updateDoc(doc(firestore, `${basePrefix}users`, userToToggle.id!), { 
-                isActive: newStatus,
-                ...(newStatus && !userToToggle.activatedAt && { activatedAt: serverTimestamp() })
+            await updateDoc(doc(firestore, usersPath), { 
+                isActive: !user.isActive,
+                updatedAt: serverTimestamp()
             });
-            toast({ title: 'نجاح الإجراء', description: `تم ${newStatus ? 'تفعيل' : 'إلغاء تفعيل'} الحساب.` });
+            toast({ title: 'نجاح الإجراء', description: 'تم تحديث حالة الحساب.' });
             fetchUsersAndEmployees();
-        } finally {
-            setIsAlertOpen(false);
-            setUserToToggle(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'عائق صلاحيات' });
         }
     };
 
     const handleDeleteUser = async (user: UserWithEmployee) => {
-        if (!firestore || !tenantId) return;
-        if (!confirm('سيتم حذف حساب الدخول والفهرس العالمي. هل تود المتابعة؟')) return;
+        if (!firestore || !tenantId || !confirm(`سيتم حذف حساب ${user.username} نهائياً. هل أنت متأكد؟`)) return;
         
         try {
             const batch = writeBatch(firestore);
-            batch.delete(doc(firestore, `${basePrefix}users`, user.id!));
-            const globalIndexQuery = query(collection(firestore, 'global_users'), where('email', '==', user.email));
-            const globalIndexSnap = await getDocs(globalIndexQuery);
-            globalIndexSnap.forEach(d => batch.delete(d.ref));
+            const userRef = doc(firestore, getTenantPath(`users/${user.id}`, tenantId));
+            batch.delete(userRef);
+
+            const globalQuery = query(collection(firestore, 'global_users'), where('email', '==', user.email));
+            const globalSnap = await getDocs(globalQuery);
+            globalSnap.forEach(d => batch.delete(d.ref));
+
             await batch.commit();
-            toast({ title: 'تم الحذف', description: 'تم مسح الحساب بالكامل من المنصة.' });
+            toast({ title: 'تم الحذف', description: 'تم مسح الحساب وفهرسته بالكامل.' });
             fetchUsersAndEmployees();
         } catch (e) {
             toast({ variant: 'destructive', title: 'خطأ في الحذف' });
@@ -244,12 +235,12 @@ export function UsersTable() {
     <div className="space-y-8" dir="rtl">
         <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-4">
-                <div className="p-3 bg-indigo-600/10 rounded-2xl text-indigo-600 shadow-inner">
+                <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
                     <ShieldCheck className="h-8 w-8" />
                 </div>
                 <div>
-                    <h2 className="text-2xl font-black text-[#1e1b4b]">إدارة حسابات المستخدمين</h2>
-                    <p className="text-sm font-bold text-slate-500 mt-1">تحكم في صلاحيات دخول الموظفين وتفعيل حساباتهم المعزولة.</p>
+                    <h2 className="text-2xl font-black text-[#1e1b4b]">إدارة حسابات الموظفين</h2>
+                    <p className="text-sm font-bold text-slate-500 mt-1">تفعيل صلاحيات الدخول للمهندسين والمحاسبين داخل المنشأة.</p>
                 </div>
             </div>
 
@@ -262,14 +253,14 @@ export function UsersTable() {
                         </span>
                         <span className="text-slate-400 font-black text-xl">/</span>
                         <span className="text-slate-500 font-black text-2xl font-mono">
-                            {quotaInfo.totalLimit || '...'}
+                            {quotaInfo.totalLimit}
                         </span>
                     </div>
                 </div>
                 <Button 
                     onClick={() => { setSelectedUser(null); setIsFormOpen(true); }} 
                     disabled={quotaInfo.isFull || loading}
-                    className="h-12 rounded-xl font-black gap-2 shadow-lg bg-[#1e1b4b] text-white hover:bg-black"
+                    className="h-12 rounded-xl font-black gap-2 shadow-lg"
                 >
                     <PlusCircle className="h-5 w-5" /> إضافة مستخدم
                 </Button>
@@ -290,13 +281,13 @@ export function UsersTable() {
             </CardHeader>
             <CardContent className="p-0">
                 <Table>
-                    <TableHeader className="bg-muted/50 h-14">
+                    <TableHeader className="bg-[#F8F9FE] h-14">
                         <TableRow className="border-none">
-                            <TableHead className="px-10 font-black text-[#1e1b4b]">حساب الدخول (Username)</TableHead>
-                            <TableHead className="font-black text-[#1e1b4b]">الموظف المرتبط</TableHead>
-                            <TableHead className="font-black text-[#1e1b4b]">الدور</TableHead>
-                            <TableHead className="font-black text-[#1e1b4b] text-center">الحالة</TableHead>
-                            <TableHead className="w-[100px] text-center font-black text-[#1e1b4b]">إجراء</TableHead>
+                            <TableHead className="px-10 font-black text-[#7209B7]">حساب الدخول (Username)</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">الموظف المرتبط</TableHead>
+                            <TableHead className="font-black text-[#7209B7]">الدور</TableHead>
+                            <TableHead className="font-black text-[#7209B7] text-center">الحالة</TableHead>
+                            <TableHead className="w-[100px] text-center font-black text-[#7209B7]">إجراء</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -305,29 +296,24 @@ export function UsersTable() {
                                 <TableRow key={i}><TableCell colSpan={5} className="px-10 py-6"><Skeleton className="h-10 w-full rounded-2xl" /></TableCell></TableRow>
                             ))
                         ) : filteredUsers.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="h-64 text-center text-slate-300 font-black text-2xl uppercase italic">No Accounts Found</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="h-48 text-center text-slate-300 font-black italic">لم يتم العثور على حسابات.</TableCell></TableRow>
                         ) : (
                             filteredUsers.map((user) => (
-                                <TableRow key={user.id} className="hover:bg-primary/5 transition-colors h-24 border-b last:border-0 group">
+                                <TableRow key={user.id} className="hover:bg-primary/[0.02] transition-colors h-24 border-b last:border-0 group">
                                     <TableCell className="px-10">
                                         <div className="flex flex-col">
                                             <span className="font-mono text-lg font-black text-[#1e1b4b]">@{user.username}</span>
                                             <span className="text-[9px] text-slate-400 font-mono opacity-60">{user.email}</span>
                                         </div>
                                     </TableCell>
+                                    <TableCell className="font-black text-slate-800">{user.employeeFullName || 'غير مرتبط بملف'}</TableCell>
                                     <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-black text-slate-800">{user.employeeFullName || 'غير مرتبط بملف'}</span>
-                                            <span className="text-[10px] font-bold text-slate-400">{user.employeeCivilId}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline" className={cn("px-4 py-1 rounded-xl font-black text-[10px] border-2 shadow-sm", roleColors[user.role])}>
+                                        <Badge variant="outline" className={cn("px-4 py-1 rounded-xl font-black text-[10px] border-2", roleColors[user.role])}>
                                             {roleTranslations[user.role]}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <Badge variant={user.isActive ? 'default' : 'secondary'} className={cn("px-4 py-1 rounded-xl font-black text-[10px] shadow-sm", user.isActive ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-500')}>
+                                        <Badge variant={user.isActive ? 'default' : 'secondary'} className={cn("px-4 py-1 rounded-xl font-black text-[10px]", user.isActive ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-500')}>
                                             {user.isActive ? 'نشط' : 'موقف'}
                                         </Badge>
                                     </TableCell>
@@ -335,18 +321,18 @@ export function UsersTable() {
                                        {currentUser?.id !== user.id && (
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl border bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-5 w-5 text-[#1e1b4b]" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl border bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-5 w-5" /></Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl shadow-2xl border-none p-2 bg-white/95 backdrop-blur-xl">
                                                 <DropdownMenuLabel className="font-black px-3 py-2 text-[#1e1b4b]">إدارة الحساب</DropdownMenuLabel>
                                                 <DropdownMenuItem onClick={() => { setSelectedUser(user); setIsFormOpen(true); }} className="gap-2 rounded-xl py-3 font-bold text-[#1e1b4b]">
                                                     <Pencil className="h-4 w-4 text-primary" /> تعديل البيانات
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => { setUserToToggle(user); setIsAlertOpen(true); }} className={cn("gap-2 rounded-xl py-3 font-bold", user.isActive ? "text-orange-600" : "text-green-600")}>
+                                                <DropdownMenuItem onClick={() => handleToggleActivation(user)} className={cn("gap-2 rounded-xl py-3 font-bold", user.isActive ? "text-orange-600" : "text-green-600")}>
                                                     {user.isActive ? <UserX className="h-4 w-4"/> : <UserCheck className="h-4 w-4"/>}
                                                     {user.isActive ? 'إيقاف الدخول' : 'تفعيل الدخول'}
                                                 </DropdownMenuItem>
-                                                <DropdownMenuSeparator className="bg-slate-100" />
+                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem className="text-red-600 gap-2 rounded-xl py-3 font-bold focus:bg-red-50" onClick={() => handleDeleteUser(user)}>
                                                     <Trash2 className="h-4 w-4" /> حذف الحساب نهائياً
                                                 </DropdownMenuItem>
@@ -370,30 +356,9 @@ export function UsersTable() {
                 user={selectedUser}
                 employees={employees}
                 allUsers={users}
+                isSaving={isSaving}
             />
         )}
-
-        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-            <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl glass-effect">
-                <AlertDialogHeader>
-                    <div className={cn("p-4 rounded-3xl w-fit mb-4 shadow-inner", userToToggle?.isActive ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600")}>
-                        {userToToggle?.isActive ? <UserX className="h-10 w-10"/> : <UserCheck className="h-10 w-10"/>}
-                    </div>
-                    <AlertDialogTitle className="text-2xl font-black text-[#1e1b4b]">
-                        {userToToggle?.isActive ? 'تأكيد إيقاف الدخول؟' : 'تأكيد تفعيل الدخول؟'}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed">
-                        هل أنت متأكد من تغيير حالة حساب الموظف <strong className="text-[#1e1b4b]">@{userToToggle?.username}</strong>؟ 
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter className="mt-8 gap-3">
-                    <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleToggleActivationConfirm} className={cn("rounded-xl font-black h-12 px-12 shadow-lg", userToToggle?.isActive ? "bg-orange-600 hover:bg-orange-700 shadow-orange-100" : "bg-green-600 hover:bg-green-700 shadow-green-100")}>
-                        نعم، اعتماد الإجراء
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
     </div>
     );
 }

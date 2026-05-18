@@ -14,17 +14,18 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Sparkles, ShieldCheck } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
 interface UserFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (user: Partial<UserProfile>) => void;
+  onSave: (user: Partial<UserProfile> & { newPassword?: string }) => void;
   user: UserProfile | null;
   employees: Employee[];
   allUsers: UserProfile[];
+  isSaving: boolean;
 }
 
 const roleOptions = [
@@ -35,7 +36,11 @@ const roleOptions = [
     { value: 'HR', label: 'موارد بشرية' },
 ];
 
-export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }: UserFormProps) {
+/**
+ * نموذج تأسيس حساب موظف:
+ * تم تطهير الخانات من الملء التلقائي (Autofill Clean) لضمان بقائها نظيفة.
+ */
+export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, isSaving }: UserFormProps) {
   const { toast } = useToast();
   const { user: currentAdmin } = useAuth();
   const isEditing = !!user;
@@ -54,17 +59,19 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   }, [employees, allUsers, user, isEditing]);
 
   useEffect(() => {
-    if (user && isEditing) {
-        setFormData({
-            id: user.id,
-            employeeId: user.employeeId,
-            username: user.username,
-            role: user.role,
-        });
-    } else {
-        setFormData({ employeeId: '', username: '', role: 'Engineer' });
+    if (isOpen) {
+        if (user && isEditing) {
+            setFormData({
+                id: user.id,
+                employeeId: user.employeeId,
+                username: user.username,
+                role: user.role,
+            });
+        } else {
+            setFormData({ employeeId: '', username: '', role: 'Engineer' });
+        }
+        setPassword('');
     }
-    setPassword('');
   }, [user, isEditing, isOpen]);
   
   const handleUsernameChange = (val: string) => {
@@ -75,7 +82,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!formData.employeeId || !formData.username) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى إكمال البيانات المطلوبة.' });
+          toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'يرجى اختيار الموظف واسم المستخدم.' });
           return;
       }
       
@@ -84,7 +91,8 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       
       const dataToSave: any = { 
           ...formData, 
-          email: internalEmail
+          email: internalEmail,
+          fullName: employees.find(e => e.id === formData.employeeId)?.fullName
       };
 
       if (password) {
@@ -95,33 +103,39 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md rounded-[2rem] shadow-2xl border-none p-0 overflow-hidden" dir="rtl">
-        {/* 🛡️ إضافة autoComplete="off" للنموذج بالكامل لمنع المتصفح من التدخل */}
+    <Dialog open={isOpen} onOpenChange={(open) => !isSaving && onClose()}>
+      <DialogContent className="sm:max-w-md rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden" dir="rtl">
+        {/* 🛡️ درع منع الملء التلقائي المتطور */}
         <form onSubmit={handleSubmit} autoComplete="off">
-            {/* حقل وهمي لخداع محرك الملء التلقائي في Chrome */}
-            <input type="text" style={{ display: 'none' }} />
-            <input type="password" style={{ display: 'none' }} />
+            {/* حقول وهمية لجذب محركات Autofill بعيداً عن الخانات الحقيقية */}
+            <input type="text" name="fake-username" style={{ display: 'none' }} tabIndex={-1} />
+            <input type="password" name="fake-password" style={{ display: 'none' }} tabIndex={-1} />
 
             <DialogHeader className="p-8 bg-primary/5 border-b">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><UserPlus className="h-6 w-6"/></div>
+                    <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                        <UserPlus className="h-6 w-6"/>
+                    </div>
                     <div>
-                        <DialogTitle className="text-xl font-black">{isEditing ? 'تعديل بيانات الدخول' : 'تأسيس حساب موظف'}</DialogTitle>
-                        <DialogDescription className="text-xs font-bold">إدارة صلاحيات الدخول للموظف في المنشأة.</DialogDescription>
+                        <DialogTitle className="text-xl font-black text-[#1e1b4b]">
+                            {isEditing ? 'تعديل حساب الدخول' : 'تأسيس حساب موظف'}
+                        </DialogTitle>
+                        <DialogDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">إدارة صلاحيات الدخول للموظف في المنشأة</DialogDescription>
                     </div>
                 </div>
             </DialogHeader>
 
             <div className="p-8 space-y-6">
                 <div className="grid gap-2">
-                    <Label className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
+                    <Label className="font-black text-gray-700 pr-1 flex items-center gap-2">
+                        <ShieldCheck className="h-3 w-3 text-primary"/> الموظف المعني *
+                    </Label>
                     <InlineSearchList
                         value={formData.employeeId || ''}
                         onSelect={(v) => setFormData(prev => ({ ...prev, employeeId: v }))}
                         options={availableEmployees.map(e => ({ value: e.id!, label: e.fullName }))}
                         placeholder="اختر موظفاً من القائمة..."
-                        disabled={isEditing}
+                        disabled={isEditing || isSaving}
                     />
                 </div>
 
@@ -130,16 +144,19 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     <div className="relative">
                         <Input 
                             id="username" 
+                            name="new-username-field"
                             value={formData.username} 
                             onChange={e => handleUsernameChange(e.target.value)}
                             placeholder="ali.ahmed" 
                             dir="ltr" 
                             required 
-                            autoComplete="new-username" // 🛡️ درع منع استرجاع اليوزر المحفوظ
+                            autoComplete="new-username"
+                            disabled={isSaving}
                             className="h-12 rounded-xl font-black text-primary border-2 pl-12"
                         />
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground opacity-40">.nova</div>
                     </div>
+                    <p className="text-[9px] font-bold text-muted-foreground pr-1">هذا الاسم سيستخدم لتسجيل الدخول بدلاً من البريد.</p>
                 </div>
 
                  <div className="grid gap-2">
@@ -148,31 +165,35 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     </Label>
                     <Input 
                         id="password" 
+                        name="new-password-field"
                         type="password" 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="8 أحرف على الأقل..."
                         required={!isEditing} 
-                        autoComplete="new-password" // 🛡️ درع منع استرجاع الباسورد المحفوظ
+                        autoComplete="new-password"
+                        disabled={isSaving}
                         className="h-12 rounded-xl font-mono border-2"
                     />
                 </div>
 
                 <div className="grid gap-2">
-                    <Label className="font-black text-gray-700 pr-1">الدور والصلاحيات *</Label>
+                    <Label className="font-black text-gray-700 pr-1">الدور والصلاحيات الممنوحة *</Label>
                      <InlineSearchList
                         value={formData.role || ''}
                         onSelect={(v) => setFormData(prev => ({ ...prev, role: v as any }))}
                         options={roleOptions}
                         placeholder="حدد دور الموظف..."
+                        disabled={isSaving}
                     />
                 </div>
             </div>
 
             <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
-                <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                <Button type="submit" className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/20 bg-primary text-white">
-                    {isEditing ? 'تحديث الحساب' : 'تفعيل الحساب الآن'}
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
+                <Button type="submit" disabled={isSaving || (!isEditing && !password)} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">
+                    {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Sparkles className="ml-2 h-4 w-4" />}
+                    {isEditing ? 'حفظ التعديلات' : 'تفعيل الحساب الآن'}
                 </Button>
             </DialogFooter>
         </form>

@@ -7,7 +7,7 @@ import path from 'path';
 
 /**
  * 🛡️ محرك إدارة المنشآت الموحد (Sovereign IAM Engine):
- * تم تحصينه أمنياً لفحص التوكن السيادي ومنع العبور غير المصرح.
+ * تم تحديثه ليسمح لمديري الشركات (Admins) بإنشاء مستخدمين لمنشآتهم.
  */
 
 function getAdminApp() {
@@ -50,74 +50,75 @@ export async function POST(request: NextRequest) {
     
     const token = authHeader.split('Bearer ')[1];
     
-    // 🛡️ التطهير: فحص صلاحيات التوكن قبل البدء بأي عملية
+    // 🛡️ فحص صلاحيات التوكن
     let decodedToken;
     try {
         decodedToken = await adminAuth.verifyIdToken(token);
-        if (decodedToken.role !== 'Developer' && !decodedToken.isSuperAdmin) {
-            return NextResponse.json({ error: 'Forbidden: Missing Super Admin Authority' }, { status: 403 });
-        }
     } catch (e) {
         return NextResponse.json({ error: 'Unauthorized: Invalid Token' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { action, email, password, displayName, companyId, companyName, contactName, activity, requestId, firebaseConfig } = body;
+    const { action, email, password, displayName, companyId, username, role, employeeId } = body;
     const sanitizedEmail = email?.toLowerCase().trim();
 
-    if (action === 'create') {
-        let userRecord;
-        try {
-            userRecord = await adminAuth.createUser({ email: sanitizedEmail, password, displayName });
-        } catch (e: any) {
-            if (e.code === 'auth/email-already-exists') userRecord = await adminAuth.getUserByEmail(sanitizedEmail);
-            else throw e;
-        }
+    // 🛡️ السماح للمطور أو لمدير المنشأة بإنشاء مستخدم لمنشأته
+    const isDeveloper = decodedToken.role === 'Developer' || decodedToken.isSuperAdmin;
+    const isAdminOfTargetCompany = decodedToken.role === 'Admin' && decodedToken.companyId === companyId;
 
-        if (companyId) {
-            await adminAuth.setCustomUserClaims(userRecord.uid, { companyId, role: 'Admin' });
-            await db.collection('global_users').doc(userRecord.uid).set({
-                email: sanitizedEmail, companyId, role: 'Admin', createdAt: FieldValue.serverTimestamp()
-            });
-            await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
-                id: userRecord.uid, uid: userRecord.uid, email: sanitizedEmail, fullName: displayName || 'Admin',
-                role: 'Admin', isActive: true, companyId, createdAt: FieldValue.serverTimestamp()
-            }, { merge: true });
-        }
-        return NextResponse.json({ success: true, uid: userRecord.uid });
+    if (!isDeveloper && !isAdminOfTargetCompany) {
+        return NextResponse.json({ error: 'Forbidden: Insufficient Authority to manage this tenant' }, { status: 403 });
     }
 
-    if (action === 'instant_setup') {
-        const genId = companyId || `comp-${Math.random().toString(36).substring(2, 9)}`;
+    if (action === 'create' || action === 'create_tenant_user') {
         let userRecord;
         try {
-            userRecord = await adminAuth.createUser({ email: sanitizedEmail, password, displayName: contactName });
+            // 1. إنشاء المستخدم في Firebase Auth
+            userRecord = await adminAuth.createUser({ 
+                email: sanitizedEmail, 
+                password, 
+                displayName 
+            });
         } catch (e: any) {
-            if (e.code === 'auth/email-already-exists') userRecord = await adminAuth.getUserByEmail(sanitizedEmail);
-            else throw e;
+            if (e.code === 'auth/email-already-exists') {
+                userRecord = await adminAuth.getUserByEmail(sanitizedEmail);
+            } else {
+                throw e;
+            }
         }
 
-        await adminAuth.setCustomUserClaims(userRecord.uid, { companyId: genId, role: 'Admin' });
-        await db.collection('global_users').doc(userRecord.uid).set({ email: sanitizedEmail, companyId: genId, role: 'Admin', createdAt: FieldValue.serverTimestamp() });
-        await db.collection('companies').doc(genId).set({
-            id: genId, name: companyName, activity: activity || 'consulting', adminEmail: sanitizedEmail,
-            firebaseConfig: firebaseConfig || {}, isActive: true, createdAt: FieldValue.serverTimestamp(),
-            maxUsersLimit: 5, subscriptionType: 'trial'
-        });
-        await db.collection('companies').doc(genId).collection('users').doc(userRecord.uid).set({
-            id: userRecord.uid, uid: userRecord.uid, email: sanitizedEmail, fullName: contactName,
-            role: 'Admin', isActive: true, companyId: genId, createdAt: FieldValue.serverTimestamp()
-        });
+        // 2. حقن ادعاءات المنشأة (Custom Claims) لضمان تفعيل الـ SaaS Isolation
+        await adminAuth.setCustomUserClaims(userRecord.uid, { companyId, role: role || 'User' });
 
-        if (requestId) {
-            await db.collection('company_requests').doc(requestId).update({ status: 'activated', activatedAt: FieldValue.serverTimestamp(), companyId: genId });
-        }
-        return NextResponse.json({ success: true, companyId: genId, uid: userRecord.uid });
+        // 3. التوثيق في الفهرس العالمي (Global User Index)
+        await db.collection('global_users').doc(userRecord.uid).set({
+            email: sanitizedEmail,
+            username: username,
+            companyId,
+            role: role || 'User',
+            createdAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        // 4. حفظ الملف الشخصي داخل مسار المنشأة المعزول
+        await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
+            id: userRecord.uid,
+            uid: userRecord.uid,
+            email: sanitizedEmail,
+            username: username,
+            fullName: displayName || 'User',
+            role: role || 'User',
+            employeeId: employeeId || null,
+            isActive: true,
+            companyId,
+            createdAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        return NextResponse.json({ success: true, uid: userRecord.uid });
     }
 
     return NextResponse.json({ success: false, error: "ACTION_NOT_FOUND" });
   } catch (error: any) {
-    console.error("IAM ERROR:", error);
+    console.error("IAM SOVEREIGN ENGINE ERROR:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
