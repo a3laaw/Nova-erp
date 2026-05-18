@@ -14,7 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus, Sparkles, ShieldCheck, User } from 'lucide-react';
+import { UserPlus, Sparkles, ShieldCheck, User, Loader2 } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
@@ -29,16 +29,17 @@ interface UserFormProps {
 }
 
 const roleOptions = [
-    { value: 'Admin', label: 'مدير نظام' },
-    { value: 'Engineer', label: 'مهندس تنفيذ' },
-    { value: 'Accountant', label: 'محاسب مالي' },
-    { value: 'Secretary', label: 'سكرتارية' },
-    { value: 'HR', label: 'موارد بشرية' },
+    { value: 'Admin', label: 'مدير نظام (Admin)' },
+    { value: 'Engineer', label: 'مهندس تنفيذ (Engineer)' },
+    { value: 'Accountant', label: 'محاسب مالي (Accountant)' },
+    { value: 'Secretary', label: 'سكرتارية (Secretary)' },
+    { value: 'HR', label: 'موارد بشرية (HR)' },
 ];
 
 /**
- * نموذج تأسيس حساب موظف (Username-Centric V4.0):
- * تم حذف خانة البريد الإلكتروني نهائياً والاعتماد على اسم المستخدم فقط للدخول.
+ * نموذج تأسيس حساب موظف (Username-Centric V5.0):
+ * - تم حذف خانة البريد الإلكتروني نهائياً والاعتماد على اسم المستخدم فقط للدخول.
+ * - دروع متطورة لمنع المتصفح من حشو بيانات المالك في الخانات.
  */
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, isSaving }: UserFormProps) {
   const { toast } = useToast();
@@ -75,7 +76,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
   }, [user, isEditing, isOpen]);
   
   const handleUsernameChange = (val: string) => {
-    // تطهير اسم المستخدم ليكون صالحاً كمعرف دخول فريد
+    // تطهير اسم المستخدم ليكون صالحاً كمعرف دخول فريد (صغير وبدون مسافات)
     const sanitized = val.toLowerCase().replace(/[^a-z0-9]/g, '');
     setFormData(prev => ({ ...prev, username: sanitized }));
   };
@@ -88,8 +89,8 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
       }
       
       const tenantId = currentAdmin?.currentCompanyId;
-      // توليد المعرف التقني في الخلفية (مخفي عن المستخدم)
-      const internalEmail = `${formData.username}@${tenantId}.nova`;
+      // توليد المعرف التقني في الخلفية لربط الحساب بجوجل
+      const internalEmail = `${formData.username}@${tenantId || 'global'}.nova`;
       
       const dataToSave: any = { 
           ...formData, 
@@ -106,11 +107,13 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isSaving && onClose()}>
-      <DialogContent className="sm:max-w-md rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden" dir="rtl">
+      <DialogContent className="sm:max-w-md rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden bg-white" dir="rtl">
         <form onSubmit={handleSubmit} autoComplete="off">
-            {/* درع منع الملء التلقائي */}
-            <input type="text" name="prevent_autofill" style={{ display: 'none' }} tabIndex={-1} />
-            <input type="password" name="prevent_autofill_pwd" style={{ display: 'none' }} tabIndex={-1} />
+            {/* 🛡️ درع تضليلي لمنع الملء التلقائي للمتصفح 🛡️ */}
+            <div className="hidden">
+                <input type="text" name="fake_user" />
+                <input type="password" name="fake_pass" />
+            </div>
 
             <DialogHeader className="p-8 bg-primary/5 border-b">
                 <div className="flex items-center gap-4">
@@ -121,7 +124,9 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                         <DialogTitle className="text-xl font-black text-[#1e1b4b]">
                             {isEditing ? 'تعديل حساب الدخول' : 'تأسيس حساب موظف'}
                         </DialogTitle>
-                        <DialogDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">إدارة هوية الدخول للموظف في المنشأة</DialogDescription>
+                        <DialogDescription className="text-[10px] font-black uppercase tracking-widest text-slate-500 mt-1">
+                            تفعيل هوية الدخول للموظف (Username Only)
+                        </DialogDescription>
                     </div>
                 </div>
             </DialogHeader>
@@ -129,34 +134,34 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
             <div className="p-8 space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-gray-700 pr-1 flex items-center gap-2">
-                        <ShieldCheck className="h-3 w-3 text-primary"/> الموظف المستهدف *
+                        <ShieldCheck className="h-3 w-3 text-primary"/> الموظف المستهدف من السجلات *
                     </Label>
                     <InlineSearchList
                         value={formData.employeeId || ''}
                         onSelect={(v) => setFormData(prev => ({ ...prev, employeeId: v }))}
                         options={availableEmployees.map(e => ({ value: e.id!, label: e.fullName }))}
-                        placeholder="اختر موظفاً من القائمة..."
+                        placeholder="اختر موظفاً..."
                         disabled={isEditing || isSaving}
                     />
                 </div>
 
                  <div className="grid gap-2">
-                    <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم المختار (User) *</Label>
+                    <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم للدخول (Username) *</Label>
                     <div className="relative">
                         <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-30" />
                         <Input 
                             id="username" 
                             value={formData.username} 
                             onChange={e => handleUsernameChange(e.target.value)}
-                            placeholder="ali.ahmed" 
+                            placeholder="e.g. ali.ahmed" 
                             dir="ltr" 
                             required 
-                            autoComplete="new-username"
+                            autoComplete="off"
                             disabled={isSaving}
-                            className="h-12 rounded-xl font-black text-primary border-2 pr-10 text-center text-lg"
+                            className="h-12 rounded-xl font-black text-primary border-2 pr-10 text-center text-lg shadow-sm"
                         />
                     </div>
-                    <p className="text-[9px] font-bold text-muted-foreground text-center">هذا هو الاسم الذي سيستخدمه الموظف للدخول بدلاً من الإيميل.</p>
+                    <p className="text-[9px] font-bold text-muted-foreground text-center">الموظف سيستخدم هذا الاسم بدلاً من الإيميل.</p>
                 </div>
 
                  <div className="grid gap-2">
@@ -168,16 +173,16 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                         type="password" 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="8 أحرف على الأقل..."
+                        placeholder="••••••••"
                         required={!isEditing} 
                         autoComplete="new-password"
                         disabled={isSaving}
-                        className="h-12 rounded-xl font-mono border-2 text-center text-lg"
+                        className="h-12 rounded-xl font-mono border-2 text-center text-lg shadow-sm"
                     />
                 </div>
 
                 <div className="grid gap-2">
-                    <Label className="font-black text-gray-700 pr-1">الدور والصلاحيات الممنوحة *</Label>
+                    <Label className="font-black text-gray-700 pr-1">الدور والصلاحيات في المنظومة *</Label>
                      <InlineSearchList
                         value={formData.role || ''}
                         onSelect={(v) => setFormData(prev => ({ ...prev, role: v as any }))}
@@ -190,9 +195,9 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
 
             <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                 <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                <Button type="submit" disabled={isSaving || (!isEditing && !password)} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">
+                <Button type="submit" disabled={isSaving || (!isEditing && !password)} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2">
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Sparkles className="ml-2 h-4 w-4" />}
-                    {isEditing ? 'حفظ التعديلات' : 'تفعيل الحساب فوراً'}
+                    {isEditing ? 'حفظ التعديلات' : 'تفعيل الحساب'}
                 </Button>
             </DialogFooter>
         </form>

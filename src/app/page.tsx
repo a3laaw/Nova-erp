@@ -22,8 +22,9 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * بوابة الدخول (Username-Aware Gateway V107.0)
- * تم تحديث المنطق ليقبل "اسم المستخدم" مباشرة ويبحث عن المعرف التقني في الخلفية.
+ * بوابة الدخول السيادية (Username-Enabled Gateway V6.0):
+ * - تقبل "اسم المستخدم" أو "البريد الإلكتروني".
+ * - تقوم بالبحث عن البريد التقني آلياً عند إدخال اليوزر.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -54,7 +55,7 @@ export default function LoginPage() {
     try {
         let loginEmail = identifier.trim().toLowerCase();
 
-        // إذا كان المدخل "اسم مستخدم" وليس إيميل، نبحث عن المعرف التقني
+        // 🛡️ معالجة الدخول باسم المستخدم (Lookup Engine)
         if (!loginEmail.includes('@') && firestore) {
             const globalUsersRef = collection(firestore, 'global_users');
             const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
@@ -92,7 +93,7 @@ export default function LoginPage() {
               <div className="h-20 w-20 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
               <ShieldCheck className="h-8 w-8 text-primary absolute inset-0 m-auto animate-pulse" />
           </div>
-          <p className="text-foreground font-black text-xl tracking-tighter">جاري استعادة الجلسة...</p>
+          <p className="text-foreground font-black text-xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
       </div>
     );
   }
@@ -104,21 +105,17 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
 
       <div className="p-1.5 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-[0_25px_80px_-15px_rgba(255,122,0,0.25)] animate-in zoom-in-95 duration-1000 relative z-10">
-        
         <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
-            
-            <CardHeader className="py-10 px-8 text-center bg-transparent">
-                <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-[0_15px_35px_rgba(255,122,0,0.4)] border-4 border-white/30 transition-transform hover:scale-105 duration-500">
+            <CardHeader className="py-10 px-8 text-center">
+                <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />
                 </div>
-                
                 <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</CardTitle>
-                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em]">نظام الإدارة المتكامل</CardDescription>
+                <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em]">بوابة الموظفين والمديرين</CardDescription>
             </CardHeader>
-            
             <CardContent className="px-10 pb-12 space-y-8">
                 {(authError || localError) && (
-                    <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x duration-500 bg-red-50/50">
+                    <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription className="text-xs font-bold">{localError || authError}</AlertDescription>
                     </Alert>
@@ -127,7 +124,7 @@ export default function LoginPage() {
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم (User ID)</Label>
                             <div className="relative">
                                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                                 <Input 
@@ -136,7 +133,7 @@ export default function LoginPage() {
                                     className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner pr-10" 
                                     required 
                                     placeholder="Username"
-                                    autoComplete="off"
+                                    autoComplete="username"
                                 />
                             </div>
                         </div>
@@ -147,33 +144,33 @@ export default function LoginPage() {
                                 type="password" 
                                 value={password} 
                                 onChange={e => setPassword(e.target.value)} 
-                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner" 
+                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 shadow-inner" 
                                 required 
                                 placeholder="••••••••"
-                                autoComplete="new-password"
+                                autoComplete="current-password"
                             />
-                            <div className="flex justify-center">
-                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-primary/70 hover:text-primary transition-colors">نسيت كلمة المرور؟</button>
-                            </div>
                         </div>
 
-                        <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-[0_15px_35px_rgba(255,122,0,0.3)] bg-gradient-to-r from-[#FF7A00] to-[#FFB000] hover:scale-[1.02] text-white border-none transition-all active:scale-95 group">
-                            {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول"}
+                        <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
+                            {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول النظام"}
                             {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                         </Button>
+                        <div className="text-center">
+                            <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-primary/70 hover:text-primary transition-colors">نسيت كلمة المرور؟</button>
+                        </div>
                     </form>
                 ) : (
-                    <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
+                    <form onSubmit={handleResetPassword} className="space-y-6">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني المسجل</Label>
-                            <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-[#F8F9FB]" required placeholder="your@email.com" autoComplete="off" />
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد المربوط بحسابك</Label>
+                            <Input value={identifier} onChange={(e) => setIdentifier(e.target.value)} className="h-14 rounded-2xl border-2 text-center font-bold text-lg shadow-inner bg-[#F8F9FB]" required placeholder="your@email.com" />
                         </div>
                         <Button type="submit" disabled={isSubmitting} className="w-full h-14 rounded-2xl font-black text-lg gap-3 bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white shadow-xl">
                             {isSubmitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Send className="h-5 w-5" />}
                             إرسال رابط التعيين
                         </Button>
                         <button type="button" onClick={() => setMode('login')} className="w-full text-xs font-black opacity-50 flex items-center justify-center gap-2 hover:opacity-100 transition-opacity">
-                            <ArrowRight className="h-4 w-4 rotate-180" /> العودة لشاشة الدخول
+                            <ArrowRight className="h-4 w-4 rotate-180" /> العودة للدخول
                         </button>
                     </form>
                 )}
