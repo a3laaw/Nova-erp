@@ -46,7 +46,15 @@ service cloud.firestore {
 
     // 📊 تحصين استعلامات المجموعات
     match /{path=**}/userProductivity/{id} {
-        allow read, write: if request.auth != null && (isDeveloper() || (request.auth.uid == resource.data.userId && isTenantMember(resource.data.companyId)));
+        allow read, write: if request.auth != null && (isDeveloper() || (request.auth.uid == resource.data.userId && isTenantMember(request.auth.token.companyId)));
+    }
+
+    // 🛡️ السماح للموظفين برؤية طلباتهم الخاصة بالاستئذان والإجازات حتى لو فشل الكليم المباشر في بعض المتصفحات
+    match /{path=**}/leaveRequests/{id} {
+        allow read: if request.auth != null && (isDeveloper() || resource.data.employeeId == request.auth.token.employeeId || resource.data.createdBy == request.auth.uid);
+    }
+    match /{path=**}/permissionRequests/{id} {
+        allow read: if request.auth != null && (isDeveloper() || resource.data.employeeId == request.auth.token.employeeId || resource.data.createdBy == request.auth.uid);
     }
   }
 }

@@ -27,9 +27,7 @@ import {
     Calculator, 
     FileCheck, 
     AlertCircle,
-    MessageSquare,
-    ShieldCheck,
-    ShieldAlert
+    Badge as LucideBadgeIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -161,7 +159,6 @@ export default function LeaveRequestDetailsPage() {
                     <ArrowRight className="h-4 w-4"/> عودة للقائمة
                 </Button>
                 <div className="flex gap-3">
-                    {/* 🛡️ درع حماية الأزرار الإجرائية: يظهر للمدير فقط 🛡️ */}
                     {isAdmin && (
                         <>
                             {leaveRequest.status === 'approved' && (
@@ -200,7 +197,6 @@ export default function LeaveRequestDetailsPage() {
                 </header>
 
                 <main className="py-12 space-y-12">
-                    {/* 🛡️ رادار رد الإدارة السيادي (Management Reply Radar) 🛡️ */}
                     {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason || leaveRequest.adminComment) && (
                         <Alert 
                             variant={leaveRequest.status === 'rejected' ? 'destructive' : 'default'} 
@@ -231,7 +227,7 @@ export default function LeaveRequestDetailsPage() {
                     <section className="grid grid-cols-2 gap-10 bg-muted/20 p-10 rounded-[2.5rem] border-2 border-dashed border-primary/10 shadow-inner">
                         <div className="space-y-6">
                             <InfoRow label="اسم الموظف" value={<span className="font-black text-xl text-slate-900">{leaveRequest.employeeName}</span>} icon={<User className="h-5 w-5 text-primary opacity-40"/>}/>
-                            <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-black text-primary">{employee.employeeNumber}</span>} icon={<ShieldCheck className="h-5 w-5 text-primary opacity-40"/>}/>
+                            <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-black text-primary">{employee.employeeNumber}</span>} icon={<LucideBadgeIcon className="h-5 w-5 text-primary opacity-40"/>}/>
                         </div>
                         <div className="space-y-6">
                             <InfoRow label="القسم الإداري" value={<span className="font-black">{employee.department}</span>} icon={<Briefcase className="h-5 w-5 text-primary opacity-40"/>}/>
@@ -279,7 +275,7 @@ export default function LeaveRequestDetailsPage() {
 
                     <div className="space-y-4">
                         <h4 className="font-black text-slate-800 flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5 text-primary opacity-40"/>
+                            <Sparkles className="h-5 w-5 text-primary opacity-40"/>
                             مبررات وتفاصيل طلب الموظف:
                         </h4>
                         <div className="p-8 border-2 border-dashed rounded-[2.5rem] bg-muted/10 min-h-[120px] text-lg leading-loose font-medium text-slate-800 shadow-inner">
