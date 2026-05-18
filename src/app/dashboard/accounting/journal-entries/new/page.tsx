@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { Save, X, Loader2, PlusCircle, Trash2, AlertTriangle, ArrowUp, ArrowDown, Target, Building2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup } from 'firebase/firestore';
+import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, where } from 'firebase/firestore';
 import type { Account, ClientTransaction, Employee, Department } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
@@ -143,7 +143,9 @@ export default function NewJournalEntryPage() {
     const generateEntryNumber = async () => {
         try {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'journalEntries');
+            // 🛡️ استخدام المسار المعزول للعدادات
+            const counterPath = getTenantPath('counters/journalEntries', tenantId);
+            const counterRef = doc(firestore, counterPath);
             const counterDoc = await getDoc(counterRef);
             let nextNumber = 1;
             if (counterDoc.exists()) {
@@ -165,7 +167,6 @@ export default function NewJournalEntryPage() {
   , [accounts]);
 
   const projectOptions = useMemo(() => projects.map(p => ({ value: `${p.clientId}/${p.id}`, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
-  const deptOptions = useMemo(() => departments.map(d => ({ value: d.id!, label: d.name })), [departments]);
 
   const onSubmit = async (data: JournalEntryFormValues) => {
     if (!firestore || !currentUser || !tenantId || submittingRef.current) return;
@@ -175,7 +176,8 @@ export default function NewJournalEntryPage() {
     try {
         await runTransaction(firestore, async (transaction) => {
             const currentYear = new Date().getFullYear();
-            const counterRef = doc(firestore, 'counters', 'journalEntries');
+            const counterPath = getTenantPath('counters/journalEntries', tenantId);
+            const counterRef = doc(firestore, counterPath);
             const counterDoc = await transaction.get(counterRef);
             let nextNumber = (counterDoc.data()?.counts?.[currentYear] || 0) + 1;
             
@@ -230,12 +232,12 @@ export default function NewJournalEntryPage() {
             transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
         });
         
-        toast({ title: 'نجاح الحفظ', description: 'تم تسجيل القيد في دفاتر المنشأة.' });
+        toast({ title: 'تم الحفظ', description: 'تم تسجيل القيد في دفاتر المنشأة.' });
         router.push('/dashboard/accounting/journal-entries');
 
     } catch (error) {
         console.error('Error saving journal entry:', error);
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ القيد، يرجى التأكد من الصلاحيات.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ القيد.' });
         setIsSubmitting(false);
         submittingRef.current = false;
     }
@@ -321,14 +323,14 @@ export default function NewJournalEntryPage() {
                                         />
                                     </TableCell>
                                     <TableCell>
-                                        <Input {...register(`lines.${index}.notes`)} disabled={isSubmitting} className="border-none shadow-none text-xs italic bg-transparent" placeholder="إضافة وصف..." />
+                                        <Input {...register(`lines.${index}.notes`)} disabled={isSubmitting} className="border-none shadow-none text-xs italic bg-transparent" placeholder="وصف البند..." />
                                     </TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
                         <TableFooter className="bg-primary/5 h-20">
                             <TableRow className="border-t-4 border-primary/20">
-                                <TableCell colSpan={3} className="text-right px-12 font-black text-xl">إجماليات القيد المزدوج:</TableCell>
+                                <TableCell colSpan={3} className="text-right px-12 font-black text-xl">الإجماليات:</TableCell>
                                 <TableCell className="text-center font-mono text-xl font-black text-blue-700">{formatCurrency(totalDebit)}</TableCell>
                                 <TableCell className="text-center font-mono text-xl font-black text-red-700">{formatCurrency(totalCredit)}</TableCell>
                                 <TableCell className={cn("text-left font-mono font-black text-xs px-6", Math.abs(balance) > 0.001 ? "text-red-600" : "text-green-600")}>
@@ -349,7 +351,7 @@ export default function NewJournalEntryPage() {
                 <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSubmitting} className="h-14 px-10 rounded-2xl font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSubmitting || Math.abs(balance) > 0.001} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 min-w-[320px] gap-3">
                     {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>}
-                    اعتماد وحفظ القيد المبوب
+                    اعتماد القيد
                 </Button>
             </CardFooter>
         </form>

@@ -14,7 +14,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, where, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, Timestamp } from 'firebase/firestore';
 import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse, Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -46,6 +46,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const tenantId = currentUser?.currentCompanyId;
 
     const [isSaving, setIsSaving] = useState(false);
     const [accounts, setAccounts] = useState<Account[]>([]);
@@ -75,24 +76,22 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     const watchedItems = useWatch({ control, name: "items" });
     const issueType = watch('issueType');
     const selectedProjectId = watch('projectId');
-    const selectedClientId = watch('clientId');
-    const issueDate = watch('date');
 
     const totalCost = useMemo(() =>
-        (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
+        (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
     [watchedItems]);
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const fetchRefData = async () => {
             setLoadingRefs(true);
             try {
                 const [accSnap, projSnap, clientSnap, empSnap, deptSnap] = await Promise.all([
-                    getDocs(query(collection(firestore, 'chartOfAccounts'), orderBy('code'))),
-                    getDocs(query(collectionGroup(firestore, 'transactions'))),
-                    getDocs(collection(firestore, 'clients')),
-                    getDocs(query(collection(firestore, 'employees'))),
-                    getDocs(query(collection(firestore, 'departments'))),
+                    getDocs(query(collection(firestore, getTenantPath('chartOfAccounts', tenantId)), orderBy('code'))),
+                    getDocs(query(collectionGroup(firestore, 'transactions'), where('companyId', '==', tenantId))),
+                    getDocs(collection(firestore, getTenantPath('clients', tenantId))),
+                    getDocs(query(collection(firestore, getTenantPath('employees', tenantId)))),
+                    getDocs(query(collection(firestore, getTenantPath('departments', tenantId)))),
                 ]);
                 
                 setAccounts(accSnap.docs.map(d => ({id: d.id, ...d.data()} as Account)));
@@ -109,10 +108,10 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
             }
         };
         fetchRefData();
-    }, [firestore, toast]);
+    }, [firestore, tenantId, toast]);
 
     useEffect(() => {
-        if (issueType !== 'project_site' || !selectedProjectId || !firestore) {
+        if (issueType !== 'project_site' || !selectedProjectId || !firestore || !tenantId) {
             setBoqItems([]);
             return;
         }
@@ -124,7 +123,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     setBoqItems([]);
                     return;
                 }
-                const itemsSnap = await getDocs(query(collection(firestore, `boqs/${project.boqId}/items`), orderBy('itemNumber')));
+                const itemsSnap = await getDocs(query(collection(firestore, getTenantPath(`boqs/${project.boqId}/items`, tenantId)), orderBy('itemNumber')));
                 const items = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoqItem));
                 setBoqItems(items.filter(i => !i.isHeader));
             } catch (error) {
@@ -134,7 +133,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
             }
         }
         fetchBoq();
-    }, [selectedProjectId, firestore, projects, issueType]);
+    }, [selectedProjectId, firestore, projects, issueType, tenantId]);
 
     const projectOptions = useMemo(() => projects.map(p => ({ value: p.id!, label: `${p.clientName} - ${p.transactionType}` })), [projects]);
     const clientOptions = useMemo(() => clients.map(c => ({ value: c.id!, label: c.nameAr })), [clients]);
@@ -152,13 +151,13 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
 
 
     const onSubmit = async (data: IssueFormValues) => {
-        if (!firestore || !currentUser) return;
+        if (!firestore || !currentUser || !tenantId) return;
         const inventoryAccount = accounts.find(a => a.code === '1104');
         const expenseCode = data.issueType === 'project_site' ? '5104' : '5101';
         const projectExpenseAccount = accounts.find(a => a.code === expenseCode) || accounts.find(a => a.code === '51');
 
         if (!inventoryAccount || !projectExpenseAccount) {
-            toast({ variant: 'destructive', title: 'خطأ محاسبي', description: 'حسابات المخزون أو التكاليف غير معرفة.' });
+            toast({ variant: 'destructive', title: 'تنبيه', description: 'حسابات المخزون أو التكاليف غير معرفة في المنشأة.' });
             return;
         }
 
@@ -166,13 +165,14 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
-                const counterRef = doc(firestore, 'counters', 'materialIssues');
+                const counterPath = getTenantPath('counters/materialIssues', tenantId);
+                const counterRef = doc(firestore, counterPath);
                 const counterDoc = await transaction.get(counterRef);
                 const nextNumber = ((counterDoc.data()?.counts || {})[currentYear] || 0) + 1;
                 const issueNumber = `MI-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
                 
-                const newIssueRef = doc(collection(firestore, 'inventoryAdjustments'));
-                const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
+                const newIssueRef = doc(collection(firestore, getTenantPath('inventoryAdjustments', tenantId)));
+                const newJournalEntryRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)));
 
                 let autoTags = {};
                 let narration = '';
@@ -187,7 +187,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     autoTags = { clientId: projectInfo?.clientId, transactionId: data.projectId, auto_profit_center: data.projectId, auto_resource_id: projectInfo?.assignedEngineerId, ...(department && { auto_dept_id: department.id }) };
                 } else {
                     clientInfo = clients.find(c => c.id === data.clientId);
-                    narration = `تسليم بضاعة مباعة للعميل: ${clientInfo?.nameAr} (${data.notes || ''})`;
+                    narration = `تسليم بضاعة للعميل: ${clientInfo?.nameAr} (${data.notes || ''})`;
                     autoTags = { clientId: data.clientId };
                 }
 
@@ -224,6 +224,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     journalEntryId: newJournalEntryRef.id,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
+                    companyId: tenantId
                 }));
 
                 transaction.set(newJournalEntryRef, cleanFirestoreData({
@@ -241,12 +242,13 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     transactionId: data.projectId || null,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
+                    companyId: tenantId
                 }));
 
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
             });
 
-            toast({ title: 'نجاح', description: 'تم حفظ إذن الصرف وتحديث الكفالات آلياً.' });
+            toast({ title: 'نجاح', description: 'تم حفظ إذن الصرف وتحديث الكفالات.' });
             router.push('/dashboard/warehouse/material-issue');
         } catch (error) {
             console.error(error);
@@ -265,10 +267,10 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                     render={({ field }) => (
                         <div className="flex gap-4">
                             <Button type="button" variant={field.value === 'project_site' ? 'default' : 'outline'} onClick={() => field.onChange('project_site')} className="rounded-xl font-bold">
-                                <Building2 className="ml-2 h-4 w-4" /> صرف لمشروع إنشائي
+                                <Building2 className="ml-2 h-4 w-4" /> صرف لمشروع
                             </Button>
                             <Button type="button" variant={field.value === 'direct_sale' ? 'default' : 'outline'} onClick={() => field.onChange('direct_sale')} className="rounded-xl font-bold">
-                                <ShoppingCart className="ml-2 h-4 w-4" /> تسليم بضاعة مباعة
+                                <ShoppingCart className="ml-2 h-4 w-4" /> تسليم مبيعات
                             </Button>
                         </div>
                     )}
@@ -278,7 +280,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-muted/30 p-6 rounded-2xl border border-primary/10">
                 {issueType === 'project_site' ? (
                     <div className="grid gap-2">
-                        <Label className="font-bold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary"/> المشروع (مركز التكلفة) *</Label>
+                        <Label className="font-bold flex items-center gap-2"><Building2 className="h-4 w-4 text-primary"/> المشروع *</Label>
                         <Controller control={control} name="projectId" render={({ field }) => (
                             <InlineSearchList value={field.value || ''} onSelect={field.onChange} options={projectOptions} placeholder="اختر المشروع..." disabled={loadingRefs || isSaving} />
                         )} />
@@ -311,7 +313,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                             <TableRow className="h-14 border-b-2">
                                 <TableHead className="w-[60px]"></TableHead>
                                 {issueType === 'project_site' && <TableHead className="w-[250px] font-bold">بند المقايسة (BOQ)</TableHead>}
-                                <TableHead className="font-bold">الصنف المصروف</TableHead>
+                                <TableHead className="font-bold">الصنف</TableHead>
                                 <TableHead className="w-32 text-center font-bold">الكمية</TableHead>
                                 <TableHead className="w-40 text-left font-bold px-6">إجمالي التكلفة</TableHead>
                             </TableRow>
@@ -333,7 +335,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                         {issueType === 'project_site' && (
                                             <TableCell>
                                                 <Controller control={control} name={`items.${index}.boqItemId`} render={({ field: boqField }) => (
-                                                    <InlineSearchList value={boqField.value || ''} onSelect={(val) => { boqField.onChange(val); setValue(`items.${index}.itemId`, ''); }} options={boqItemOptions} placeholder="اختر بند المقايسة..." disabled={loadingBoq || !selectedProjectId} className="border-none shadow-none focus-visible:ring-0 text-sm font-semibold" />
+                                                    <InlineSearchList value={boqField.value || ''} onSelect={(val) => { boqField.onChange(val); setValue(`items.${index}.itemId`, ''); }} options={boqItemOptions} placeholder="بند المقايسة..." disabled={loadingBoq || !selectedProjectId} className="border-none shadow-none focus-visible:ring-0 text-sm font-semibold" />
                                                 )} />
                                             </TableCell>
                                         )}
@@ -343,7 +345,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                                                     <InlineSearchList value={itemField.value} onSelect={(val) => { itemField.onChange(val); const itemData = allItems.find(i => i.id === val); if (itemData) setValue(`items.${index}.unitCost`, itemData.costPrice || 0); }} options={allowedItems} placeholder="اختر مادة..." disabled={(issueType === 'project_site' && !lineItem?.boqItemId) || isSaving} className="border-none shadow-none focus-visible:ring-0 text-lg font-bold" />
                                                     {selectedItemInfo?.warrantyYears && selectedItemInfo.warrantyYears > 0 && (
                                                         <div className="px-3 flex items-center gap-1 text-[10px] text-primary font-bold">
-                                                            <ShieldCheck className="h-3 w-3" /> كفالة لمدة {selectedItemInfo.warrantyYears} سنة
+                                                            <ShieldCheck className="h-3 w-3" /> كفالة {selectedItemInfo.warrantyYears} سنة
                                                         </div>
                                                     )}
                                                 </div>
@@ -357,7 +359,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
                         </TableBody>
                         <TableFooter className="bg-primary/5">
                             <TableRow className="h-20 border-t-4 border-primary/20">
-                                <TableCell colSpan={issueType === 'project_site' ? 4 : 3} className="text-right px-12 font-black text-xl">إجمالي قيمة التكلفة المنصرفة:</TableCell>
+                                <TableCell colSpan={issueType === 'project_site' ? 4 : 3} className="text-right px-12 font-black text-xl">إجمالي التكلفة:</TableCell>
                                 <TableCell className="text-left font-mono text-2xl font-black text-primary px-6 border-r bg-primary/5">{formatCurrency(totalCost)}</TableCell>
                             </TableRow>
                         </TableFooter>

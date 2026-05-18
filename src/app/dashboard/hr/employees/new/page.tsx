@@ -35,7 +35,7 @@ export default function NewEmployeePage() {
         if (!firestore || !tenantId) return;
         const generateEmployeeNumber = async () => {
             try {
-                // 🛡️ توجيه عداد الأرقام الوظيفية لمسار المنشأة
+                // 🛡️ توجيه عداد الأرقام الوظيفية لمسار المنشأة المعزول
                 const counterPath = getTenantPath('counters/employees', tenantId);
                 const counterRef = doc(firestore, counterPath);
                 const counterDoc = await getDoc(counterRef);
@@ -54,7 +54,7 @@ export default function NewEmployeePage() {
     
     const handleSave = useCallback(async (newEmployeeData: Partial<Employee>) => {
         if (!firestore || !currentUser || !employeeNumber || employeeNumber === 'Error' || !tenantId) {
-             toast({ variant: 'destructive', title: 'عائق هويّة', description: 'الرقم الوظيفي غير متاح أو لم يتم تحديد المنشأة.' });
+             toast({ variant: 'destructive', title: 'تنبيه', description: 'الرقم الوظيفي غير متاح حالياً أو لم يتم تحديد المنشأة.' });
              return;
         }
         
@@ -62,7 +62,6 @@ export default function NewEmployeePage() {
         const employeesCollectionPath = getTenantPath('employees', tenantId);
 
         try {
-            // 🛡️ فحص التكرار داخل نطاق المنشأة فقط
             const mobileQuery = query(collection(firestore, employeesCollectionPath), where('mobile', '==', newEmployeeData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {
@@ -109,7 +108,7 @@ export default function NewEmployeePage() {
                 throw serverError;
             });
 
-            toast({ title: 'نجاح التأسيس', description: 'تم إنشاء ملف الموظف بنجاح.' });
+            toast({ title: 'تم الحفظ', description: 'تم إنشاء ملف الموظف بنجاح.' });
             router.push(`/dashboard/hr/employees`);
 
         } catch (error: any) {
@@ -122,7 +121,7 @@ export default function NewEmployeePage() {
         <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl overflow-hidden" dir="rtl">
             <CardHeader className="bg-primary/5 pb-8 border-b">
                 <CardTitle className="text-2xl font-black">إضافة موظف جديد</CardTitle>
-                <CardDescription className="text-base font-medium">إنشاء ملف وظيفي معزول للموظف في سجلات منشأتك.</CardDescription>
+                <CardDescription className="text-base font-medium">إنشاء ملف وظيفي للموظف في سجلات منشأتك.</CardDescription>
             </CardHeader>
             <CardContent className="p-8">
                 <EmployeeForm

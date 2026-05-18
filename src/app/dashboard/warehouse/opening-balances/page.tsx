@@ -30,7 +30,7 @@ import { useFirebase, useSubscription } from '@/firebase';
 import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import type { Account, Item } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
+import { formatCurrency, cleanFirestoreData, getTenantPath } from '@/lib/utils';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 import { DateInput } from '@/components/ui/date-input';
@@ -55,6 +55,7 @@ export default function OpeningBalancesPage() {
     const { firestore } = useFirebase();
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
+    const tenantId = currentUser?.currentCompanyId;
 
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -78,25 +79,25 @@ export default function OpeningBalancesPage() {
     [watchedItems]);
     
      useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const fetchAccounts = async () => {
-            const accSnap = await getDocs(query(collection(firestore, 'chartOfAccounts')));
+            const accSnap = await getDocs(query(collection(firestore, getTenantPath('chartOfAccounts', tenantId))));
             setAccounts(accSnap.docs.map(d => ({ id: d.id, ...d.data() } as Account)));
         };
         fetchAccounts();
-     }, [firestore]);
+     }, [firestore, tenantId]);
 
     const itemOptions = useMemo(() => (items || []).map(i => ({ value: i.id!, label: i.name, searchKey: i.sku })), [items]);
     const getIsItemExpiryTracked = (itemId: string) => items.find(i => i.id === itemId)?.expiryTracked || false;
 
     const onSubmit = async (data: OpeningBalanceFormValues) => {
-        if (!firestore || !currentUser) return;
+        if (!firestore || !currentUser || !tenantId) return;
         
         const inventoryAccount = accounts.find(a => a.code === '1104');
         const openingEquityAccount = accounts.find(a => a.code === '34');
 
         if (!inventoryAccount || !openingEquityAccount) {
-            toast({ variant: 'destructive', title: 'خطأ في الحسابات', description: 'لم يتم العثور على حساب المخزون أو حساب الأرصدة الافتتاحية.' });
+            toast({ variant: 'destructive', title: 'تنبيه', description: 'حسابات المخزون أو الأرصدة الافتتاحية غير معرفة في المنشأة.' });
             return;
         }
 
@@ -104,7 +105,8 @@ export default function OpeningBalancesPage() {
         try {
             await runTransaction(firestore, async (transaction) => {
                 const currentYear = new Date().getFullYear();
-                const counterRef = doc(firestore, 'counters', 'inventoryAdjustments');
+                const counterPath = getTenantPath('counters/inventoryAdjustments', tenantId);
+                const counterRef = doc(firestore, counterPath);
                 const counterDoc = await transaction.get(counterRef);
                 let nextNumber = 1;
                 if (counterDoc.exists()) {
@@ -113,8 +115,8 @@ export default function OpeningBalancesPage() {
                 }
                 const newAdjNumber = `OB-${currentYear}-${String(nextNumber).padStart(4, '0')}`;
                 
-                const newAdjustmentRef = doc(collection(firestore, 'inventoryAdjustments'));
-                const newJournalEntryRef = doc(collection(firestore, 'journalEntries'));
+                const newAdjustmentRef = doc(collection(firestore, getTenantPath('inventoryAdjustments', tenantId)));
+                const newJournalEntryRef = doc(collection(firestore, getTenantPath('journalEntries', tenantId)));
 
                 const processedItems = data.items.map(item => {
                     const selectedItem = items.find(i => i.id === item.itemId)!;
@@ -139,6 +141,7 @@ export default function OpeningBalancesPage() {
                     journalEntryId: newJournalEntryRef.id,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
+                    companyId: tenantId
                 };
                 
                 const jeData = {
@@ -154,6 +157,7 @@ export default function OpeningBalancesPage() {
                     ],
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.id,
+                    companyId: tenantId
                 };
 
                 transaction.set(counterRef, { counts: { [currentYear]: nextNumber } }, { merge: true });
@@ -161,7 +165,7 @@ export default function OpeningBalancesPage() {
                 transaction.set(newJournalEntryRef, cleanFirestoreData(jeData));
             });
 
-            toast({ title: 'نجاح', description: 'تم حفظ الأرصدة الافتتاحية وإنشاء القيد المحاسبي.' });
+            toast({ title: 'تم الحفظ', description: 'تم تسجيل الأرصدة الافتتاحية والقيود المالية.' });
             router.push('/dashboard/warehouse/items');
 
         } catch (error) {
@@ -173,61 +177,74 @@ export default function OpeningBalancesPage() {
     };
 
     return (
-        <Card className="max-w-4xl mx-auto" dir="rtl">
-            <form onSubmit={handleSubmit}>
-                <CardHeader>
-                    <CardTitle>إدخال أرصدة افتتاحية للمخزون</CardTitle>
-                    <CardDescription>استخدم هذه الشاشة لتسجيل الكميات والتكاليف الأولية للأصناف عند بدء استخدام النظام.</CardDescription>
+        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-2xl" dir="rtl">
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <CardHeader className="bg-primary/5 pb-8 border-b">
+                    <CardTitle className="text-2xl font-black">إدخال أرصدة افتتاحية للمخزون</CardTitle>
+                    <CardDescription>تسجيل الكميات والتكاليف الأولية للأصناف عند تأسيس المنشأة.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="p-8 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="date">تاريخ الإدخال <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="date" className="font-bold mr-1">تاريخ الإدخال *</Label>
                             <Controller name="date" control={control} render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} />
                             {errors.date && <p className="text-xs text-destructive">{errors.date.message}</p>}
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="notes">ملاحظات</Label>
-                            <Input id="notes" {...register('notes')} placeholder="مثال: جرد نهاية العام" />
+                            <Label htmlFor="notes" className="font-bold mr-1">ملاحظات عامة</Label>
+                            <Input id="notes" {...register('notes')} placeholder="مثال: جرد تأسيسي..." className="h-11 rounded-xl" />
                         </div>
                     </div>
                     
-                    <div className="border rounded-lg">
+                    <div className="border-2 rounded-[2rem] overflow-hidden shadow-sm">
                         <Table>
-                            <TableHeader><TableRow><TableHead className="w-2/5">الصنف</TableHead><TableHead>الكمية</TableHead><TableHead>تكلفة الوحدة</TableHead><TableHead>تاريخ الصلاحية</TableHead><TableHead className="text-left">الإجمالي</TableHead><TableHead><span className="sr-only">حذف</span></TableHead></TableRow></TableHeader>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="w-12"></TableHead>
+                                    <TableHead className="w-2/5 font-bold">الصنف</TableHead>
+                                    <TableHead className="text-center font-bold">الكمية</TableHead>
+                                    <TableHead className="text-center font-bold">التكلفة</TableHead>
+                                    <TableHead className="text-left px-8 font-bold">الإجمالي</TableHead>
+                                </TableRow>
+                            </TableHeader>
                             <TableBody>
                                 {fields.map((field, index) => {
                                     const item = watchedItems?.[index] || {};
                                     const lineTotal = (Number(item?.quantity) || 0) * (Number(item?.unitCost) || 0);
-                                    const showExpiry = item.itemId && getIsItemExpiryTracked(item.itemId);
                                     return (
-                                    <TableRow key={field.id}>
-                                        <TableCell><Controller name={`items.${index}.itemId`} control={control} render={({ field }) => (<InlineSearchList value={field.value} onSelect={field.onChange} options={itemOptions} placeholder="اختر صنفًا..." />)} /></TableCell>
-                                        <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr" /></TableCell>
-                                        <TableCell><Input type="number" step="0.001" {...register(`items.${index}.unitCost`)} className="dir-ltr" /></TableCell>
-                                        <TableCell>
-                                            {showExpiry ? <Controller name={`items.${index}.expiryDate`} control={control} render={({ field }) => ( <DateInput value={field.value} onChange={field.onChange} /> )} /> : <span className="text-xs text-muted-foreground">لا يتطلب</span>}
+                                    <TableRow key={field.id} className="h-16 border-b last:border-0 hover:bg-muted/5">
+                                        <TableCell className="text-center">
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1} className="text-destructive rounded-full"><Trash2 className="h-4 w-4"/></Button>
                                         </TableCell>
-                                        <TableCell className="text-left font-mono">{formatCurrency(lineTotal)}</TableCell>
-                                        <TableCell><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4 text-destructive"/></Button></TableCell>
+                                        <TableCell>
+                                            <Controller name={`items.${index}.itemId`} control={control} render={({ field: f }) => (<InlineSearchList value={f.value} onSelect={f.onChange} options={itemOptions} placeholder="اختر صنفاً..." className="border-none shadow-none font-bold text-base bg-transparent" />)} />
+                                        </TableCell>
+                                        <TableCell><Input type="number" step="any" {...register(`items.${index}.quantity`)} className="dir-ltr text-center font-black border-none focus-visible:ring-0" /></TableCell>
+                                        <TableCell><Input type="number" step="0.001" {...register(`items.${index}.unitCost`)} className="dir-ltr text-center font-bold text-primary border-none focus-visible:ring-0" /></TableCell>
+                                        <TableCell className="text-left font-mono font-black text-lg px-8 bg-muted/5">{formatCurrency(lineTotal)}</TableCell>
                                     </TableRow>
                                 )})}
                             </TableBody>
-                            <TableFooter><TableRow><TableCell colSpan={4} className="font-bold text-lg">الإجمالي</TableCell><TableCell colSpan={2} className="text-left font-bold font-mono text-lg">{formatCurrency(totalCost)}</TableCell></TableRow></TableFooter>
+                            <TableFooter className="bg-primary/5 h-16">
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-right px-12 font-black text-xl">إجمالي الأرصدة:</TableCell>
+                                    <TableCell className="text-left font-mono font-black text-2xl text-primary px-8">{formatCurrency(totalCost)}</TableCell>
+                                </TableRow>
+                            </TableFooter>
                         </Table>
                     </div>
                      <div className="flex justify-start">
-                        <Button type="button" variant="outline" onClick={() => append({ itemId: '', quantity: 1, unitCost: 0 })}>
-                            <PlusCircle className="ml-2 h-4 w-4" /> إضافة صنف
+                        <Button type="button" variant="outline" onClick={() => append({ itemId: '', quantity: 1, unitCost: 0 })} className="h-12 border-dashed border-2 rounded-2xl gap-2 font-bold">
+                            <PlusCircle className="ml-2 h-4 w-4" /> إضافة
                         </Button>
                     </div>
                     {errors.items && <p className="text-destructive text-sm mt-2">{errors.items.root?.message || errors.items.message}</p>}
                 </CardContent>
-                <CardFooter className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => router.back()}>إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || itemsLoading}>
+                <CardFooter className="flex justify-end gap-3 p-8 border-t bg-muted/10">
+                    <Button type="button" variant="ghost" onClick={() => router.back()} className="h-12 px-8 font-bold">إلغاء</Button>
+                    <Button type="submit" disabled={isSaving || itemsLoading} className="h-12 px-12 rounded-xl font-black text-lg shadow-xl shadow-primary/30 gap-2">
                         {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4"/>}
-                        حفظ الأرصدة الافتتاحية
+                        حفظ الأرصدة
                     </Button>
                 </CardFooter>
             </form>
