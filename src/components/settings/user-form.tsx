@@ -87,7 +87,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
           email: internalEmail
       };
 
-      // 🛡️ التطهير: لا نرسل كلمة المرور لـ Firestore أبداً
       if (password) {
           dataToSave.newPassword = password;
       }
@@ -98,10 +97,15 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md rounded-[2rem] shadow-2xl border-none p-0 overflow-hidden" dir="rtl">
-        <form onSubmit={handleSubmit}>
+        {/* 🛡️ إضافة autoComplete="off" للنموذج بالكامل لمنع المتصفح من التدخل */}
+        <form onSubmit={handleSubmit} autoComplete="off">
+            {/* حقل وهمي لخداع محرك الملء التلقائي في Chrome */}
+            <input type="text" style={{ display: 'none' }} />
+            <input type="password" style={{ display: 'none' }} />
+
             <DialogHeader className="p-8 bg-primary/5 border-b">
                 <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-2xl text-primary"><UserPlus className="h-6 w-6"/></div>
+                    <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><UserPlus className="h-6 w-6"/></div>
                     <div>
                         <DialogTitle className="text-xl font-black">{isEditing ? 'تعديل بيانات الدخول' : 'تأسيس حساب موظف'}</DialogTitle>
                         <DialogDescription className="text-xs font-bold">إدارة صلاحيات الدخول للموظف في المنشأة.</DialogDescription>
@@ -131,6 +135,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                             placeholder="ali.ahmed" 
                             dir="ltr" 
                             required 
+                            autoComplete="new-username" // 🛡️ درع منع استرجاع اليوزر المحفوظ
                             className="h-12 rounded-xl font-black text-primary border-2 pl-12"
                         />
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground opacity-40">.nova</div>
@@ -148,6 +153,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="8 أحرف على الأقل..."
                         required={!isEditing} 
+                        autoComplete="new-password" // 🛡️ درع منع استرجاع الباسورد المحفوظ
                         className="h-12 rounded-xl font-mono border-2"
                     />
                 </div>
@@ -165,7 +171,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
 
             <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                 <Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                <Button type="submit" className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/20">
+                <Button type="submit" className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/20 bg-primary text-white">
                     {isEditing ? 'تحديث الحساب' : 'تفعيل الحساب الآن'}
                 </Button>
             </DialogFooter>
