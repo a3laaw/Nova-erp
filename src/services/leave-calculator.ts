@@ -52,44 +52,48 @@ export function calculateWorkingDays(
 
 /**
  * محرك تحليل شرائح الإجازة المرضية (Kuwaiti Labor Law Tiers)
- * 15 يوم: 100%
- * 10 أيام: 75%
- * 10 أيام: 50%
- * 10 أيام: 25%
- * 30 يوم: 0%
+ * - الأيام 1-15: 100% (أجر كامل)
+ * - الأيام 16-25: 75%
+ * - الأيام 26-35: 50%
+ * - الأيام 36-45: 25%
+ * - الأيام 46-75: 0% (بدون أجر)
  */
-export const calculateSickLeaveTiers = (totalUsedBefore: number, requested: number) => {
+export const calculateSickLeaveTiers = (totalUsedBefore: number, requestedDays: number) => {
   const tiers = [
-    { start: 0, end: 15, rate: 1, label: 'أجر كامل (100%)' },
-    { start: 15, end: 25, rate: 0.75, label: '75% من الأجر' },
-    { start: 25, end: 35, rate: 0.5, label: '50% من الأجر' },
-    { start: 35, end: 45, rate: 0.25, label: '25% من الأجر' },
+    { start: 0, end: 15, rate: 1, label: 'بأجر كامل (100%)' },
+    { start: 15, end: 25, rate: 0.75, label: 'بـ 75% من الأجر' },
+    { start: 25, end: 35, rate: 0.5, label: 'بـ 50% من الأجر' },
+    { start: 35, end: 45, rate: 0.25, label: 'بـ 25% من الأجر' },
     { start: 45, end: 75, rate: 0, label: 'بدون أجر (0%)' },
   ];
 
-  const results: { label: string; days: number; rate: number }[] = [];
-  let remaining = requested;
-  let currentPos = totalUsedBefore;
+  const breakdown: { label: string; days: number; rate: number }[] = [];
+  let remainingToDistribute = requestedDays;
+  let currentUsedCounter = totalUsedBefore;
 
   for (const tier of tiers) {
-    if (remaining <= 0) break;
-    if (currentPos >= tier.end) continue;
+    if (remainingToDistribute <= 0) break;
+    
+    // إذا كان الموظف قد استهلك هذه الشريحة بالكامل سابقاً، ننتقل للتالية
+    if (currentUsedCounter >= tier.end) continue;
 
-    const availableInTier = tier.end - currentPos;
-    const amountToTake = Math.min(remaining, availableInTier);
+    // حساب المتبقي المتاح في هذه الشريحة
+    const tierCapacity = tier.end - currentUsedCounter;
+    const daysInThisTier = Math.min(remainingToDistribute, tierCapacity);
 
-    if (amountToTake > 0) {
-      results.push({ label: tier.label, days: amountToTake, rate: tier.rate });
-      remaining -= amountToTake;
-      currentPos += amountToTake;
+    if (daysInThisTier > 0) {
+      breakdown.push({ label: tier.label, days: daysInThisTier, rate: tier.rate });
+      remainingToDistribute -= daysInThisTier;
+      currentUsedCounter += daysInThisTier;
     }
   }
 
-  if (remaining > 0) {
-    results.push({ label: 'بدون أجر (تعدى 75 يوم)', days: remaining, rate: 0 });
+  // أي أيام تتجاوز الـ 75 يوماً تعتبر تلقائياً بدون أجر
+  if (remainingToDistribute > 0) {
+    breakdown.push({ label: 'بدون أجر (تجاوز 75 يوم)', days: remainingToDistribute, rate: 0 });
   }
 
-  return results;
+  return breakdown;
 };
 
 /**

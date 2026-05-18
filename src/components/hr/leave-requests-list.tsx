@@ -38,6 +38,7 @@ import { cn, getTenantPath } from '@/lib/utils';
 import Link from 'next/link';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
+import { createNotification, findUserIdByEmployeeId } from '@/services/notification-service';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -70,7 +71,6 @@ export function LeaveRequestsList() {
 
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
 
-  // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته
   const queryConstraints = useMemo(() => {
       const constraints = [];
       if (!isAdmin && currentUser?.employeeId) {
@@ -113,17 +113,30 @@ export function LeaveRequestsList() {
     setIsProcessingAction(true);
     try {
         const finalPath = getTenantPath(`leaveRequests/${requestToProcess.req.id}`, tenantId);
-        await updateDoc(doc(firestore, finalPath), {
+        const requestData = {
             status: requestToProcess.action,
             [requestToProcess.action === 'approved' ? 'approvedBy' : 'rejectedBy']: currentUser.id,
             [requestToProcess.action === 'approved' ? 'approvedAt' : 'rejectedAt']: serverTimestamp(),
             rejectionReason: adminComment,
             adminComment: adminComment 
-        });
+        };
+        
+        await updateDoc(doc(firestore, finalPath), requestData);
+        
+        // 🚀 إرسال إشعار للموظف بالقرار
+        const targetUserId = await findUserIdByEmployeeId(firestore, requestToProcess.req.employeeId);
+        if (targetUserId) {
+            createNotification(firestore, {
+                userId: targetUserId,
+                title: requestToProcess.action === 'approved' ? '✅ تمت الموافقة على إجازتك' : '❌ تم رفض طلب الإجازة',
+                body: `قامت الإدارة بـ ${requestToProcess.action === 'approved' ? 'قبول' : 'رفض'} طلب إجازتك. ${adminComment ? `ملاحظة الإدارة: ${adminComment}` : ''}`,
+                link: `/dashboard/hr/leaves/${requestToProcess.req.id}`
+            });
+        }
         
         toast({ 
-            title: requestToProcess.action === 'approved' ? '✅ تم القبول' : '❌ تم الرفض', 
-            description: 'تم تحديث حالة الطلب وإرسال الرد للموظف.' 
+            title: requestToProcess.action === 'approved' ? 'تم القبول' : 'تم الرفض', 
+            description: 'تم تحديث حالة الطلب وإشعار الموظف فورا.' 
         });
         
         setRequestToProcess(null);
@@ -158,7 +171,7 @@ export function LeaveRequestsList() {
           </TableHeader>
           <TableBody>
             {leaveRequests.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-black">لا توجد طلبات إجازة لعرضها في سجلك.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-black">لا توجد طلبات إجازة لعرضها.</TableCell></TableRow>
             ) : (
               leaveRequests.map(req => (
                 <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 h-16 group transition-colors">
@@ -277,4 +290,3 @@ export function LeaveRequestsList() {
     </>
   );
 }
-

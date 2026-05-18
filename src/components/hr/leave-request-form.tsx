@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, User, AlertCircle, CalendarCheck, Info, Calculator } from 'lucide-react';
+import { Loader2, Save, User, AlertCircle, CalendarCheck, Info, Calculator, Sparkles } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getTenantPath, cleanFirestoreData } from '@/lib/utils';
 import { startOfDay, endOfDay } from 'date-fns';
 import { Separator } from '../ui/separator';
+import { createNotification } from '@/services/notification-service';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -28,6 +29,13 @@ interface LeaveRequestFormProps {
   onSaveSuccess: () => void;
   leaveRequestToEdit?: LeaveRequest | null;
 }
+
+const leaveTypeTranslations: Record<string, string> = {
+    'Annual': 'سنوية',
+    'Sick': 'مرضية',
+    'Emergency': 'طارئة',
+    'Unpaid': 'بدون أجر'
+};
 
 export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestToEdit }: LeaveRequestFormProps) {
   const { firestore } = useFirebase();
@@ -71,7 +79,6 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
     }
   }, [isOpen, leaveRequestToEdit, currentUser, isAdmin]);
 
-  // فحص استهلاك المرضيات وتداخل المواعيد
   useEffect(() => {
     if (!isOpen || !firestore || !selectedEmployeeId || !tenantId) return;
 
@@ -133,16 +140,36 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
         days: leaveDuration.totalDays,
         workingDays: leaveDuration.workingDays,
         notes,
-        status: 'pending',
+        status: 'pending' as const,
         createdAt: serverTimestamp(),
         companyId: tenantId
       };
       
-      if (leaveRequestToEdit?.id) await updateDoc(doc(firestore, leavePath, leaveRequestToEdit.id), cleanFirestoreData(dataToSave));
-      else await addDoc(collection(firestore, leavePath), dataToSave);
+      let finalId = '';
+      if (leaveRequestToEdit?.id) {
+          finalId = leaveRequestToEdit.id;
+          await updateDoc(doc(firestore, leavePath, finalId), cleanFirestoreData(dataToSave));
+      } else {
+          const docRef = await addDoc(collection(firestore, leavePath), dataToSave);
+          finalId = docRef.id;
+      }
+      
+      // 🚀 إرسال إشعارات للإدارة والـ HR
+      const adminHRUsersQuery = query(collection(firestore, getTenantPath('users', tenantId)), where('role', 'in', ['Admin', 'HR']));
+      const adminsSnap = await getDocs(adminHRUsersQuery);
+      adminsSnap.forEach(adminDoc => {
+          if (adminDoc.id !== currentUser.id) {
+              createNotification(firestore, {
+                  userId: adminDoc.id,
+                  title: 'طلب إجازة جديد',
+                  body: `قدم الموظف ${(selectedEmployee as any).fullName} طلب إجازة ${leaveTypeTranslations[leaveType]}.`,
+                  link: `/dashboard/hr/leaves`
+              });
+          }
+      });
       
       onSaveSuccess(); onClose();
-      toast({ title: 'تم تقديم الطلب' });
+      toast({ title: 'تم تقديم الطلب', description: 'تم إخطار الإدارة والـ HR بطلبك الجديد.' });
     } catch (error) { setIsSaving(false); }
   };
 

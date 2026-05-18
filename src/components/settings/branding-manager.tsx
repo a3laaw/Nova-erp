@@ -21,10 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/context/auth-context';
 import { Badge } from '@/components/ui/badge';
 
-/**
- * حقل رفع الصور المطور:
- * يدعم الرفع المباشر والروابط الخارجية مع معاينة ذكية.
- */
 function ImageUploadField({
   id,
   label,
@@ -65,7 +61,7 @@ function ImageUploadField({
             <Label htmlFor={id} className="font-black text-[#1e1b4b] flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-primary" /> {label}
             </Label>
-            {preview && <Badge className="bg-green-600 text-white text-[8px] animate-pulse border-none">ملف جديد جاهز للرفع</Badge>}
+            {preview && <Badge className="bg-green-600 text-white text-[8px] animate-pulse border-none">ملف جديد بانتظار الرفع</Badge>}
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -125,7 +121,7 @@ function ImageUploadField({
 
 export function BrandingManager() {
     const { firestore, storage } = useFirebase();
-    const { user: currentUser, refreshToken } = useAuth();
+    const { user: currentUser } = useAuth();
     const { branding, loading } = useBranding();
     const { toast } = useToast();
     const router = useRouter();
@@ -158,7 +154,6 @@ export function BrandingManager() {
 
         setIsSaving(true);
         try {
-            await refreshToken();
             const finalData = { ...formData };
             
             if (storage) {
@@ -214,7 +209,7 @@ export function BrandingManager() {
                             </div>
                         </div>
                         <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2 text-slate-500 hover:bg-white no-print">
-                            <ArrowRight className="h-4 w-4" /> العودة للإعدادات
+                            <ArrowRight className="h-4 w-4" /> العودة
                         </Button>
                     </div>
                 </CardHeader>
@@ -273,7 +268,7 @@ export function BrandingManager() {
                                 label="ترويسة المكاتبات الرسمية (Header)" 
                                 currentUrl={formData.header_image_url || undefined} 
                                 onUrlChange={(url) => handleFieldChange('header_image_url', url)} 
-                                onFileChange={(file) => handleFieldChange('header_image_url', file)} 
+                                onFileChange={(file) => handleFileChange('header_image_url', file)} 
                                 disabled={isSaving} 
                             />
                         </div>
