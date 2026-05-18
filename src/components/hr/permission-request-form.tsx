@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, PermissionRequest, LeaveRequest } from '@/lib/types';
-import { Loader2, Save, User, AlertCircle, Clock, CalendarCheck, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, User, AlertCircle, Clock, CalendarCheck, CheckCircle2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -80,12 +80,10 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             const monthEnd = endOfMonth(date);
             const permissionsPath = getTenantPath('permissionRequests', tenantId);
             
+            // 🛡️ استعلام "خالٍ من الفهارس": جلب كافة طلبات الموظف والفلترة برمجياً لتجنب خطأ الـ Index 🛡️
             const q = query(
                 collection(firestore, permissionsPath),
-                where('employeeId', '==', selectedEmployeeId),
-                where('date', '>=', monthStart),
-                where('date', '<=', monthEnd),
-                where('status', 'in', ['pending', 'approved'])
+                where('employeeId', '==', selectedEmployeeId)
             );
             
             const snap = await getDocs(q);
@@ -93,7 +91,16 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             snap.forEach(docSnap => {
                 const data = docSnap.data() as PermissionRequest;
                 if (permissionToEdit && docSnap.id === permissionToEdit.id) return;
-                total += (data.durationHours || 0);
+                
+                const pDate = toFirestoreDate(data.date);
+                if (
+                    pDate && 
+                    pDate >= monthStart && 
+                    pDate <= monthEnd && 
+                    ['pending', 'approved'].includes(data.status)
+                ) {
+                    total += (data.durationHours || 0);
+                }
             });
             setMonthlyTotalHours(total);
         } finally { setLoadingQuota(false); }
@@ -125,14 +132,17 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     setOverlapError(null);
 
     try {
-      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || { fullName: currentUser.fullName };
+      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
       const checkDateStart = startOfDay(date);
 
       const leavesPath = getTenantPath('leaveRequests', tenantId);
-      const leavesQuery = query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId), where('status', 'in', ['approved', 'on-leave', 'returned']));
+      
+      // 🛡️ فلترة برمجية لتجنب الفهرس المركب 🛡️
+      const leavesQuery = query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId));
       const leavesSnapshot = await getDocs(leavesQuery);
       const hasOverlappingLeave = leavesSnapshot.docs.some(docSnap => {
           const l = docSnap.data() as LeaveRequest;
+          if (!['approved', 'on-leave', 'returned'].includes(l.status)) return false;
           const start = toFirestoreDate(l.startDate);
           const end = toFirestoreDate(l.endDate);
           return start && end && checkDateStart >= startOfDay(start) && checkDateStart <= endOfDay(end);
@@ -146,7 +156,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       const permissionsPath = getTenantPath('permissionRequests', tenantId);
       const dataToSave = {
         employeeId: selectedEmployeeId,
-        employeeName: (selectedEmployee as any).fullName,
+        employeeName: selectedEmployee?.fullName || currentUser.fullName,
         type: permissionType,
         date: date,
         durationHours: duration,
@@ -163,7 +173,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden bg-white" dir="rtl">
+      <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden bg-white">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="p-8 bg-primary/5 border-b">
             <div className="flex items-center gap-4">

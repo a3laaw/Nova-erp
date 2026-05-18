@@ -40,7 +40,7 @@ export default function DashboardLayout({
   // 🎨 شاشة التحميل بالهوية الجديدة (خلفية فاتحة وتوهج برتقالي/ذهبي)
   if (loading || !mounted) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden">
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
         {/* هالة التوهج الذهبي-البرتقالي */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
         
@@ -50,7 +50,7 @@ export default function DashboardLayout({
                 <Loader className="h-10 w-10 text-primary absolute inset-0 m-auto animate-pulse" />
             </div>
             <div className="text-center space-y-4">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري استعادة جلسة العمل...</p>
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري الدخول للمنظومة...</p>
                 {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl bg-white/40">
                         <div className="flex items-center gap-2 text-primary justify-center mb-2">
@@ -73,7 +73,7 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]">
+       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#FFFDF0]" dir="rtl">
         <div className="p-6 bg-red-500/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />
         </div>

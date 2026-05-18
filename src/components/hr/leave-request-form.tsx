@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, User, AlertCircle, Stethoscope, Clock, CheckCircle2, CalendarRange } from 'lucide-react';
+import { Loader2, Save, User, AlertCircle, Stethoscope, Clock, CalendarRange } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -96,16 +96,18 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
         const start = startOfYear(new Date());
         const end = endOfYear(new Date());
         const leavePath = getTenantPath('leaveRequests', tenantId);
+        
+        // 🛡️ استعلام "خالٍ من الفهارس": جلب كافة طلبات الموظف والفلترة برمجياً لتجنب خطأ الـ Index 🛡️
         const q = query(
             collection(firestore, leavePath),
             where('employeeId', '==', selectedEmployeeId),
-            where('leaveType', '==', 'Sick'),
-            where('status', 'in', ['approved', 'on-leave', 'returned'])
+            where('leaveType', '==', 'Sick')
         );
         const snap = await getDocs(q);
         let used = 0;
-        snap.forEach(doc => {
-            const data = doc.data() as LeaveRequest;
+        snap.forEach(docSnap => {
+            const data = docSnap.data() as LeaveRequest;
+            if (!['approved', 'on-leave', 'returned'].includes(data.status)) return;
             const lStart = toFirestoreDate(data.startDate);
             if (lStart && lStart >= start && lStart <= end) used += (data.workingDays || 0);
         });
@@ -144,11 +146,14 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
 
     try {
       const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
-      const overlapQuery = query(collection(firestore, leaveCollectionPath), where('employeeId', '==', selectedEmployeeId), where('status', 'in', ['pending', 'approved', 'on-leave']));
+      
+      // 🛡️ فلترة برمجية لتجنب الفهرس المركب 🛡️
+      const overlapQuery = query(collection(firestore, leaveCollectionPath), where('employeeId', '==', selectedEmployeeId));
       const overlapSnap = await getDocs(overlapQuery);
       const hasOverlap = overlapSnap.docs.some(docSnap => {
           if (leaveRequestToEdit && docSnap.id === leaveRequestToEdit.id) return false;
           const existing = docSnap.data() as LeaveRequest;
+          if (!['pending', 'approved', 'on-leave'].includes(existing.status)) return false;
           const exStart = toFirestoreDate(existing.startDate);
           const exEnd = toFirestoreDate(existing.endDate);
           return (exStart && exEnd && startOfDay(startDate) <= endOfDay(exEnd) && endOfDay(endDate) >= startOfDay(exStart));

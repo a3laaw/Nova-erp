@@ -92,7 +92,7 @@ export default function LoginPage() {
               <div className="h-20 w-20 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
               <ShieldCheck className="h-8 w-8 text-primary absolute inset-0 m-auto animate-pulse" />
           </div>
-          <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري استعادة جلسة العمل...</p>
+          <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري الدخول للمنظومة...</p>
       </div>
     );
   }

@@ -125,8 +125,8 @@ export default function LeaveRequestDetailsPage() {
         } catch (e) { setIsProcessing(false); }
     };
 
-    if (leaveLoading || employeeLoading || brandingLoading) return <div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
-    if (!leaveRequest || !employee) return <div className="text-center p-10">تعذر تحميل تفاصيل طلب الإجازة.</div>;
+    if (leaveLoading || employeeLoading || brandingLoading) return <div className="p-8 max-w-4xl mx-auto" dir="rtl"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
+    if (!leaveRequest || !employee) return <div className="text-center p-10" dir="rtl">تعذر تحميل تفاصيل طلب الإجازة.</div>;
 
     const startDate = toFirestoreDate(leaveRequest.startDate);
     const endDate = toFirestoreDate(leaveRequest.endDate);

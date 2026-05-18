@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, FileText, AlertCircle, MessageSquare, Eye } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, MessageSquare, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { PermissionRequest, Employee } from '@/lib/types';
@@ -156,7 +156,7 @@ export function PermissionRequestsList() {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 p-4 bg-[#F8F9FE] rounded-[2rem] border shadow-inner no-print">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 p-4 bg-[#F8F9FE] rounded-[2rem] border shadow-inner no-print" dir="rtl">
         <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-40" />
             <Input
@@ -172,7 +172,7 @@ export function PermissionRequestsList() {
         </Button>
       </div>
 
-      <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white">
+      <div className="border-2 rounded-[2rem] overflow-hidden shadow-xl bg-white" dir="rtl">
         <Table>
           <TableHeader className="bg-[#F8F9FE] h-14">
             <TableRow className="border-none">
@@ -304,7 +304,7 @@ export function PermissionRequestsList() {
                         requestToAction?.action === 'approve' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
                     )}
                 >
-                    {isProcessingAction ? <Loader2 className="h-6 w-6"/> : 'تأكيد وحفظ القرار'}
+                    {isProcessingAction ? <Loader2 className="animate-spin h-6 w-6"/> : 'تأكيد وحفظ القرار'}
                 </Button>
                 <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2">إلغاء</AlertDialogCancel>
             </AlertDialogFooter>
