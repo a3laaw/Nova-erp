@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -51,14 +50,14 @@ export default function AppointmentsPage() {
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
                 <CardHeader className="pb-8 px-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-                        <div className="space-y-1 text-center lg:text-right">
+                        <div className="space-y-2 text-center lg:text-right">
                             <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-4">
+                                إدارة المواعيد والتقويم
                                 <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
                                     <CalendarDays className="h-8 w-8" />
                                 </div>
-                                إدارة المواعيد والتقويم
                             </CardTitle>
-                            <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-16">
+                            <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-0 lg:pr-12">
                                 تنظيم زيارات القسم المعماري وحجز القاعات بنظام ذكي لمنع التعارض.
                             </CardDescription>
                         </div>
@@ -69,11 +68,11 @@ export default function AppointmentsPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl" className="w-full">
                 <div className="flex justify-center mb-10">
                     <TabsList className="w-full max-w-2xl h-16 shadow-xl border-white/60">
-                        <TabsTrigger value="architectural" className="gap-2 h-full text-base">
+                        <TabsTrigger value="architectural" className="gap-2 h-full text-base font-black">
                             <CalendarDays className="h-4 w-4" />
                             مواعيد القسم المعماري
                         </TabsTrigger>
-                        <TabsTrigger value="rooms" className="gap-2 h-full text-base">
+                        <TabsTrigger value="rooms" className="gap-2 h-full text-base font-black">
                             <Home className="h-4 w-4" />
                             حجوزات القاعات
                         </TabsTrigger>
