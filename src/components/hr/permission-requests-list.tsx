@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -13,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, FileText, AlertCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, FileText, AlertCircle, MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { PermissionRequest, Employee } from '@/lib/types';
@@ -63,7 +64,7 @@ export function PermissionRequestsList() {
   const [isDeleting, setIsDeleting] = useState(false);
   
   const [requestToAction, setRequestToAction] = useState<{ request: PermissionRequest, action: 'approve' | 'reject' } | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
+  const [adminComment, setAdminComment] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
@@ -83,7 +84,7 @@ export function PermissionRequestsList() {
       return constraints;
   }, [isAdmin, currentUser?.employeeId]);
 
-  const { data: rawRequests, loading: loadingRequests, error: reqError } = useSubscription<PermissionRequest>(firestore, 'permissionRequests', queryConstraints);
+  const { data: rawRequests, loading: loadingRequests } = useSubscription<PermissionRequest>(firestore, 'permissionRequests', queryConstraints);
   const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
   const permissionRequests = useMemo(() => {
@@ -131,11 +132,6 @@ export function PermissionRequestsList() {
   const handleConfirmAction = async () => {
     if (!requestToAction || !firestore || !currentUser || !tenantId) return;
     
-    if(requestToAction.action === 'reject' && !rejectionReason.trim()) {
-        toast({variant: 'destructive', title: 'خطأ', description: 'سبب الرفض مطلوب.'});
-        return;
-    }
-
     setIsProcessingAction(true);
     try {
         const finalPath = getTenantPath(`permissionRequests/${requestToAction.request.id}`, tenantId);
@@ -146,7 +142,7 @@ export function PermissionRequestsList() {
             status: newStatus,
             approvedBy: currentUser.id,
             approvedAt: serverTimestamp(),
-            ...(newStatus === 'rejected' && { rejectionReason: rejectionReason })
+            adminComment: adminComment
         });
         
         toast({ title: 'تم التنفيذ', description: `تم ${newStatus === 'approved' ? 'الموافقة على' : 'رفض'} الطلب.` });
@@ -155,21 +151,9 @@ export function PermissionRequestsList() {
     } finally {
         setIsProcessingAction(false);
         setRequestToAction(null);
-        setRejectionReason('');
+        setAdminComment('');
     }
   };
-
-  if (reqError) {
-      return (
-          <Alert variant="destructive" className="rounded-2xl border-2 py-6 bg-red-50">
-              <AlertCircle className="h-6 w-6" />
-              <AlertTitle className="text-red-800 font-black text-lg">عائق في الاتصال السحابي</AlertTitle>
-              <AlertDescription className="text-red-700 font-bold mt-1">
-                  يرجى التأكد من تسجيل الدخول للمنشأة الصحيحة أو إعادة تحميل الصفحة.
-              </AlertDescription>
-          </Alert>
-      );
-  }
 
   return (
     <>
@@ -227,7 +211,7 @@ export function PermissionRequestsList() {
                              {isAdmin && req.status === 'pending' && (
                                 <>
                                     <DropdownMenuItem onClick={() => setRequestToAction({request: req, action: 'approve'})} className="text-green-600 font-bold gap-2 py-3 rounded-lg focus:bg-green-50">
-                                        <Check className="h-4 w-4" /> موافقة
+                                        <Check className="h-4 w-4" /> موافقة مع رد
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setRequestToAction({request: req, action: 'reject'})} className="text-red-600 font-bold gap-2 py-3 rounded-lg focus:bg-red-50">
                                         <X className="h-4 w-4" /> رفض مع ذكر السبب
@@ -241,8 +225,8 @@ export function PermissionRequestsList() {
                                 </DropdownMenuItem>
                             )}
                             {req.status === 'pending' && (
-                                <DropdownMenuItem className="text-red-600 font-black gap-2 py-3 rounded-lg focus:bg-red-50" onClick={() => setRequestToDelete(req)}>
-                                    <Trash2 className="h-4 w-4" /> حذف الطلب
+                                <DropdownMenuItem className="text-red-600 font-black gap-2 rounded-lg py-3 focus:bg-red-50" onClick={() => setRequestToDelete(req)}>
+                                    <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
                                 </DropdownMenuItem>
                             )}
                             {req.status !== 'pending' && (
@@ -274,7 +258,7 @@ export function PermissionRequestsList() {
                 <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2">سيتم مسح طلب الاستئذان نهائياً من سجلات الموظف. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-8 gap-3">
-                <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg shadow-red-200">
                     {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف الطلب'}
                 </AlertDialogAction>
@@ -282,7 +266,7 @@ export function PermissionRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!requestToAction} onOpenChange={() => { setRequestToAction(null); setRejectionReason(''); }}>
+      <AlertDialog open={!!requestToAction} onOpenChange={() => { setRequestToAction(null); setAdminComment(''); }}>
         <AlertDialogContent dir="rtl" className="rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden bg-white">
             <AlertDialogHeader className={cn("p-8 text-white", requestToAction?.action === 'approve' ? "bg-green-600" : "bg-red-600")}>
                 <div className="flex items-center gap-4">
@@ -300,27 +284,22 @@ export function PermissionRequestsList() {
                 </div>
             </AlertDialogHeader>
             <div className="p-8 space-y-6">
-                {requestToAction?.action === 'reject' && (
-                    <div className="grid gap-3">
-                        <Label className="font-black text-slate-700 flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-primary" /> مبررات الرفض الإداري *
-                        </Label>
-                        <Textarea
-                            placeholder="اكتب سبب الرفض هنا ليظهر للموظف..."
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            className="rounded-2xl border-2 p-4 text-base font-medium min-h-[140px]"
-                        />
-                    </div>
-                )}
-                {requestToAction?.action === 'approve' && (
-                    <p className="text-lg font-bold text-slate-600 leading-relaxed">أنت على وشك الموافقة على الطلب. سيتم تجاهل خصم التأخير في حال وجود سجل بصمة مطابق لهذا التاريخ.</p>
-                )}
+                <div className="grid gap-3">
+                    <Label className="font-black text-slate-700 flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-primary" /> الرد الإداري / الملاحظات *
+                    </Label>
+                    <Textarea
+                        placeholder="اكتب ردك هنا ليرزه الموظف فوراً..."
+                        value={adminComment}
+                        onChange={(e) => setAdminComment(e.target.value)}
+                        className="rounded-2xl border-2 p-4 text-base font-medium min-h-[140px]"
+                    />
+                </div>
             </div>
             <AlertDialogFooter className="p-8 bg-muted/10 border-t gap-3 flex flex-row-reverse">
                 <Button 
                     onClick={handleConfirmAction} 
-                    disabled={isProcessingAction || (requestToAction?.action === 'reject' && !rejectionReason.trim())} 
+                    disabled={isProcessingAction || !adminComment.trim()} 
                     className={cn(
                         "flex-1 h-14 rounded-2xl font-black text-lg shadow-xl",
                         requestToAction?.action === 'approve' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
