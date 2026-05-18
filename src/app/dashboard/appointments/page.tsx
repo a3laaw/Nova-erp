@@ -47,6 +47,7 @@ export default function AppointmentsPage() {
 
     return (
         <div className="space-y-10" dir="rtl">
+            {/* 🛡️ الهيدر الرئيسي السيادي للمواعيد */}
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
                 <CardHeader className="pb-8 px-10">
                     <div className="flex flex-col lg:flex-row items-center justify-between gap-6">

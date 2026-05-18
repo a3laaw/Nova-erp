@@ -14,6 +14,7 @@ import {
 export default function JournalEntriesPage() {
     return (
         <div className="space-y-10" dir="rtl">
+            {/* 🛡️ الهيدر الرئيسي السيادي لقيود اليومية */}
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-purple-50 dark:from-card dark:to-card">
                 <CardHeader className="pb-8 px-10 border-b">
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
@@ -23,7 +24,7 @@ export default function JournalEntriesPage() {
                             </div>
                             <div>
                                 <CardTitle className="text-3xl font-black">قيود اليومية العامة</CardTitle>
-                                <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-16">عرض وإدارة كافة القيود المحاسبية المرحلة والمسودة في النظام.</CardDescription>
+                                <CardDescription className="text-base font-bold text-slate-500 mt-1">عرض وإدارة كافة القيود المحاسبية المرحلة والمسودة في النظام.</CardDescription>
                             </div>
                         </div>
                         <Button asChild className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-purple-100 bg-purple-600 hover:bg-purple-700">

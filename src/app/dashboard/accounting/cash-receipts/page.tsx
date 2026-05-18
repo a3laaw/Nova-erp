@@ -14,6 +14,7 @@ import {
 export default function CashReceiptsPage() {
     return (
         <div className="space-y-10" dir="rtl">
+            {/* 🛡️ الهيدر الرئيسي السيادي لسندات القبض */}
             <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-green-50 dark:from-card dark:to-card">
                 <CardHeader className="pb-8 px-10 border-b">
                     <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
@@ -23,7 +24,7 @@ export default function CashReceiptsPage() {
                             </div>
                             <div>
                                 <CardTitle className="text-3xl font-black">سندات القبض (التحصيل)</CardTitle>
-                                <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-16">متابعة كافة المبالغ المحصلة من العملاء والتحويلات البنكية.</CardDescription>
+                                <CardDescription className="text-base font-bold text-slate-500 mt-1">متابعة كافة المبالغ المحصلة من العملاء والتحويلات البنكية.</CardDescription>
                             </div>
                         </div>
                         <Button asChild className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-green-100 bg-green-600 hover:bg-green-700">
