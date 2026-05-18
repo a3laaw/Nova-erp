@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -29,8 +28,7 @@ import {
     FileCheck, 
     AlertCircle,
     MessageSquare,
-    ShieldCheck,
-    Badge as BadgeIcon
+    ShieldCheck
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -226,7 +224,7 @@ export default function LeaveRequestDetailsPage() {
                     <section className="grid grid-cols-2 gap-10 bg-muted/20 p-10 rounded-[2.5rem] border-2 border-dashed border-primary/10 shadow-inner">
                         <div className="space-y-6">
                             <InfoRow label="اسم الموظف" value={<span className="font-black text-xl text-slate-900">{leaveRequest.employeeName}</span>} icon={<User className="h-5 w-5 text-primary opacity-40"/>}/>
-                            <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-black text-primary">{employee.employeeNumber}</span>} icon={<BadgeIcon className="h-5 w-5 text-primary opacity-40"/>}/>
+                            <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-black text-primary">{employee.employeeNumber}</span>} icon={<ShieldCheck className="h-5 w-5 text-primary opacity-40"/>}/>
                         </div>
                         <div className="space-y-6">
                             <InfoRow label="القسم الإداري" value={<span className="font-black">{employee.department}</span>} icon={<Briefcase className="h-5 w-5 text-primary opacity-40"/>}/>
@@ -329,3 +327,4 @@ export default function LeaveRequestDetailsPage() {
         </div>
     );
 }
+

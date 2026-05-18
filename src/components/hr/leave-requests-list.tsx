@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -12,7 +11,8 @@ import {
   deleteDoc, 
   where, 
   updateDoc,
-  serverTimestamp 
+  serverTimestamp,
+  getDocs
 } from 'firebase/firestore';
 import {
   Table,
@@ -70,19 +70,19 @@ export function LeaveRequestsList() {
 
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
 
-  // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته
+  // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته (القديمة والجديدة)
   const queryConstraints = useMemo(() => {
-      // للمدير: نرى كل شيء. للموظف: نرى ما أنشأناه بأنفسنا (createdBy) أو ما يخص رقمنا الوظيفي
       const constraints = [];
-      if (!isAdmin && currentUser?.id) {
-          constraints.push(where('createdBy', '==', currentUser.id));
+      // للمدير: يرى كل شيء. للموظف: نرى ما يخص رقمنا الوظيفي لضمان ظهور البيانات القديمة والجديدة
+      if (!isAdmin && currentUser?.employeeId) {
+          constraints.push(where('employeeId', '==', currentUser.employeeId));
       }
       return constraints;
-  }, [isAdmin, currentUser?.id]);
+  }, [isAdmin, currentUser?.employeeId]);
 
   const { data: rawLeaveRequests, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', queryConstraints);
 
-  // ترتيب البيانات برمجياً لضمان الدقة وتجنب حاجة الفهارس (Indexes)
+  // ترتيب البيانات برمجياً لضمان الدقة وتجنب حاجة الفهارس
   const leaveRequests = useMemo(() => {
       return [...rawLeaveRequests].sort((a, b) => {
           const dateA = toFirestoreDate(a.createdAt)?.getTime() || 0;
@@ -112,11 +112,6 @@ export function LeaveRequestsList() {
   const handleConfirmDecision = async () => {
     if (!requestToProcess || !firestore || !tenantId || !currentUser) return;
     
-    if (requestToProcess.action === 'rejected' && !adminComment.trim()) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'يجب ذكر سبب الرفض لتوضيح القرار للموظف.' });
-        return;
-    }
-
     setIsProcessingAction(true);
     try {
         const finalPath = getTenantPath(`leaveRequests/${requestToProcess.req.id}`, tenantId);
@@ -256,12 +251,12 @@ export function LeaveRequestsList() {
                 <div className="grid gap-3">
                     <Label className="font-black text-slate-700 flex items-center gap-2">
                         <MessageSquare className="h-4 w-4 text-primary" />
-                        {requestToProcess?.action === 'approved' ? 'ملاحظة إدارية إضافية (اختياري)' : 'سبب الرفض الإداري (إلزامي) *'}
+                        الرد الإداري أو سبب الرفض *
                     </Label>
                     <Textarea 
                         value={adminComment}
                         onChange={(e) => setAdminComment(e.target.value)}
-                        placeholder={requestToProcess?.action === 'approved' ? "مثال: استمتع بإجازتك، يرجى تسليم العهدة..." : "اشرح سبب الرفض للموظف..."}
+                        placeholder="اكتب ردك هنا ليرزه الموظف فوراً..."
                         className="rounded-2xl border-2 p-4 text-base font-medium min-h-[140px] focus:ring-primary/20"
                     />
                 </div>
@@ -269,7 +264,7 @@ export function LeaveRequestsList() {
             <AlertDialogFooter className="p-8 bg-muted/10 border-t gap-3 flex flex-row-reverse">
                 <Button 
                     onClick={handleConfirmDecision} 
-                    disabled={isProcessingAction || (requestToProcess?.action === 'rejected' && !adminComment.trim())} 
+                    disabled={isProcessingAction || !adminComment.trim()} 
                     className={cn(
                         "flex-1 h-14 rounded-2xl font-black text-lg shadow-xl",
                         requestToProcess?.action === 'approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
