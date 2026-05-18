@@ -28,7 +28,8 @@ import {
     FileCheck, 
     AlertCircle,
     MessageSquare,
-    ShieldCheck
+    ShieldCheck,
+    ShieldAlert
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -101,6 +102,8 @@ export default function LeaveRequestDetailsPage() {
     const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
     const [actualDate, setActualDate] = useState<Date | undefined>(new Date());
 
+    const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
+
     const leavePath = useMemo(() => getTenantPath(`leaveRequests/${id}`, tenantId), [id, tenantId]);
     const { data: leaveRequest, loading: leaveLoading } = useDocument<LeaveRequest>(firestore, leavePath);
     
@@ -158,15 +161,20 @@ export default function LeaveRequestDetailsPage() {
                     <ArrowRight className="h-4 w-4"/> عودة للقائمة
                 </Button>
                 <div className="flex gap-3">
-                    {leaveRequest.status === 'approved' && (
-                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 font-black gap-2 rounded-xl text-white shadow-lg">
-                            <PlaneTakeoff className="h-4 w-4"/> تسجيل المغادرة
-                        </Button>
-                    )}
-                    {leaveRequest.status === 'on-leave' && (
-                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 font-black gap-2 rounded-xl text-white shadow-lg">
-                            <Home className="h-4 w-4"/> إشعار مباشرة العمل
-                        </Button>
+                    {/* 🛡️ درع حماية الأزرار الإجرائية: يظهر للمدير فقط 🛡️ */}
+                    {isAdmin && (
+                        <>
+                            {leaveRequest.status === 'approved' && (
+                                <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 font-black gap-2 rounded-xl text-white shadow-lg">
+                                    <PlaneTakeoff className="h-4 w-4"/> تسجيل المغادرة
+                                </Button>
+                            )}
+                            {leaveRequest.status === 'on-leave' && (
+                                <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 font-black gap-2 rounded-xl text-white shadow-lg">
+                                    <Home className="h-4 w-4"/> إشعار مباشرة العمل
+                                </Button>
+                            )}
+                        </>
                     )}
                     <Button onClick={() => window.print()} variant="outline" className="rounded-xl font-bold gap-2 border-2"><Printer className="h-4 w-4"/> طباعة المستند</Button>
                 </div>
