@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -123,7 +122,7 @@ export function LeaveRequestsList() {
         
         await updateDoc(doc(firestore, finalPath), requestData);
         
-        // 🚀 إرسال إشعار للموظف بالقرار النهائي
+        // 🚀 إرسال إشعار للموظف بالقرار النهائي مع رابط مباشر
         const targetUserId = await findUserIdByEmployeeId(firestore, requestToProcess.req.employeeId);
         if (targetUserId) {
             createNotification(firestore, {

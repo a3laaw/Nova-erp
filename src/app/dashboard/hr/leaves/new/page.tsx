@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -143,7 +142,7 @@ export default function NewLeaveRequestPage() {
 
         try {
             const leavePath = getTenantPath('leaveRequests', tenantId);
-            const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
+            const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || { fullName: currentUser.fullName };
             
             const dataToSave = {
                 employeeId: selectedEmployeeId,
@@ -159,7 +158,7 @@ export default function NewLeaveRequestPage() {
                 companyId: tenantId
             };
 
-            await addDoc(collection(firestore, leavePath), cleanFirestoreData(dataToSave));
+            const newDocRef = await addDoc(collection(firestore, leavePath), cleanFirestoreData(dataToSave));
             
             // 🚀 إرسال إشعارات فورية للإدارة والـ HR
             const adminHRUsersQuery = query(collection(firestore, getTenantPath('users', tenantId)), where('role', 'in', ['Admin', 'HR']));
@@ -170,7 +169,7 @@ export default function NewLeaveRequestPage() {
                         userId: adminDoc.id,
                         title: 'طلب إجازة جديد',
                         body: `قدم الموظف ${selectedEmployee?.fullName || currentUser.fullName} طلب إجازة ${leaveTypeTranslations[leaveType]}.`,
-                        link: `/dashboard/hr/leaves`
+                        link: `/dashboard/hr/leaves/${newDocRef.id}`
                     });
                 }
             });

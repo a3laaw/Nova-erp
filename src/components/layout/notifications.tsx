@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -20,6 +19,7 @@ import { ar } from 'date-fns/locale';
 import Link from 'next/link';
 import { useNotifications } from '@/hooks/use-notifications';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 const formatDate = (dateValue: any) => {
     if (!dateValue) return '';
@@ -34,17 +34,27 @@ const formatDate = (dateValue: any) => {
 export function Notifications() {
   const { notifications, loading } = useNotifications();
   const { firestore } = useFirebase();
+  const router = useRouter();
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.isRead).length;
   }, [notifications]);
 
-  const handleMarkAsRead = (notificationId: string) => {
-    if (!firestore || !notificationId) return;
-    const notifRef = doc(firestore, 'notifications', notificationId);
-    updateDoc(notifRef, { isRead: true }).catch(error => {
-      console.error("Failed to mark notification as read:", error);
-    });
+  const handleNotificationClick = (notification: any) => {
+    if (!firestore || !notification.id) return;
+    
+    // 1. تحديث حالة القراءة فوراً
+    if (!notification.isRead) {
+        const notifRef = doc(firestore, 'notifications', notification.id);
+        updateDoc(notifRef, { isRead: true }).catch(error => {
+          console.error("Failed to mark notification as read:", error);
+        });
+    }
+
+    // 2. التوجيه المباشر للرابط المرفق
+    if (notification.link) {
+        router.push(notification.link);
+    }
   };
 
   return (
@@ -74,26 +84,22 @@ export function Notifications() {
             <div className="p-10 text-center text-xs font-bold text-muted-foreground italic opacity-40">لا توجد إشعارات حالياً.</div>
             )}
             {!loading && notifications.slice(0, 10).map(notif => (
-            <DropdownMenuItem key={notif.id} className="p-0 mb-1" asChild>
-                <Link
-                href={notif.link || '#'}
-                className="flex items-start gap-3 cursor-pointer p-4 rounded-2xl hover:bg-muted/50 transition-colors w-full h-full"
-                onClick={() => {
-                    if (!notif.isRead && notif.id) {
-                        handleMarkAsRead(notif.id);
-                    }
-                }}
-                >
+            <DropdownMenuItem 
+              key={notif.id} 
+              className="p-0 mb-1" 
+              onClick={() => handleNotificationClick(notif)}
+            >
+                <div className="flex items-start gap-3 cursor-pointer p-4 rounded-2xl hover:bg-muted/50 transition-colors w-full h-full">
                     {!notif.isRead && <Circle className="h-2 w-2 mt-2 fill-primary text-primary flex-shrink-0" />}
                     <div className={cn("flex-1 space-y-1", notif.isRead && "mr-5")}>
                     <p className="font-black text-sm text-[#1e1b4b] leading-tight">{notif.title}</p>
                     <p className="text-[11px] font-medium text-slate-500 line-clamp-2 leading-relaxed">{notif.body}</p>
                     <p className="text-[9px] font-bold text-slate-400 mt-2 flex items-center gap-1">
-                        <div className="h-1 w-1 rounded-full bg-slate-300" />
+                        <span className="h-1 w-1 rounded-full bg-slate-300" />
                         {formatDate(notif.createdAt)}
                     </p>
                     </div>
-                </Link>
+                </div>
             </DropdownMenuItem>
             ))}
         </div>

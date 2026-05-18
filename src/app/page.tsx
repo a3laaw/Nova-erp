@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,13 +20,29 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
-const NELogo = () => (
-  <svg width="120" height="120" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
-    <circle cx="100" cy="100" r="90" fill="white" fillOpacity="0.1" />
-    <path d="M50 150V50L100 150V50" stroke="#FF7A00" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M120 50H170V80H120V110H160V140H120V170H170" stroke="#FFB000" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M180 20L195 40L180 60" fill="#FFB000" />
-    <path d="M20 180L5 160L20 140" fill="#FF7A00" />
+/**
+ * شعار نوفا البسيط والجميل لصفحة الدخول.
+ */
+const NovaLogo = () => (
+  <svg width="120" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
+    <text 
+      x="50%" 
+      y="60%" 
+      dominantBaseline="middle" 
+      textAnchor="middle" 
+      fontFamily="inherit" 
+      fontWeight="900" 
+      fontSize="42" 
+      fill="url(#loginGradient)"
+    >
+      NOVA
+    </text>
+    <defs>
+      <linearGradient id="loginGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#FFB000" />
+        <stop offset="100%" stopColor="#FF7A00" />
+      </linearGradient>
+    </defs>
   </svg>
 );
 
@@ -90,11 +105,11 @@ export default function LoginPage() {
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/10 rounded-full blur-[100px] animate-pulse" />
           <div className="relative">
-              <div className="h-24 w-24 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
+              <div className="h-24 w-24 rounded-full border-4 border-primary/5 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.15)]" />
               <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
-                  <NELogo />
+                  <NovaLogo />
               </div>
           </div>
           <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري فتح جلسة العمل...</p>
@@ -108,7 +123,7 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
 
       <div className="p-1.5 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-[0_25px_80px_-15px_rgba(255,122,0,0.25)] animate-in zoom-in-95 duration-1000 relative z-10">
-        <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
+        <Card className="w-full max-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
             <CardHeader className="py-10 px-8 text-center">
                 <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />
