@@ -48,7 +48,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   
   const isAdmin = ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '');
 
-  // 🛡️ تصفير الحالة لضمان عدم تعليق الأزرار أو الرسائل القديمة عند الفتح
+  // 🛡️ تصفير الحالة (State Reset Matrix) لضمان عدم تعليق التحذيرات القديمة
   useEffect(() => {
     if (isOpen) {
         setIsSaving(false);
@@ -69,9 +69,9 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
   }, [isOpen, permissionToEdit, currentUser, isAdmin]);
 
-  // 🛡️ فحص الرصيد والتحقق من التداخل عند تغيير البيانات
+  // 🛡️ فحص الرصيد والتحقق من التداخل عند تغيير البيانات - مع تصفير الخطأ فوراً
   useEffect(() => {
-    setOverlapError(null);
+    setOverlapError(null); // تصفير الخطأ فوراً عند أي تغيير لتجنب "التعليق"
     if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
         setMonthlyTotalHours(0);
         return;
@@ -84,7 +84,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             const monthEnd = endOfMonth(date);
             const permissionsPath = getTenantPath('permissionRequests', tenantId);
             
-            // جلب الطلبات للموظف المعني للمراجعة البرمجية (لتجنب أخطاء الفهارس)
             const q = query(
                 collection(firestore, permissionsPath),
                 where('employeeId', '==', selectedEmployeeId)

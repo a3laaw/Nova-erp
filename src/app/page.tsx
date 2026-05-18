@@ -12,16 +12,19 @@ import {
     AlertCircle, 
     Send,
     ArrowRight,
-    User
+    User,
+    Building2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import Link from 'next/link';
 
 /**
- * شعار نوفا البسيط والجميل لصفحة الدخول.
+ * شعار نوفا المدمج (NOVA Inline SVG):
+ * تصميم فني بسيط وباهر يتناسب مع التوهج الذهبي والبرتقالي.
  */
 const NovaLogo = () => (
   <svg width="120" height="60" viewBox="0 0 160 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
@@ -34,6 +37,7 @@ const NovaLogo = () => (
       fontWeight="900" 
       fontSize="42" 
       fill="url(#loginGradient)"
+      style={{ filter: 'drop-shadow(0px 0px 8px rgba(255,122,0,0.3))' }}
     >
       NOVA
     </text>
@@ -123,7 +127,7 @@ export default function LoginPage() {
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
 
       <div className="p-1.5 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-[0_25px_80px_-15px_rgba(255,122,0,0.25)] animate-in zoom-in-95 duration-1000 relative z-10">
-        <Card className="w-full max-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
+        <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
             <CardHeader className="py-10 px-8 text-center">
                 <div className="bg-gradient-to-br from-[#FF7A00] to-[#E66D00] p-6 rounded-[2.2rem] w-fit mx-auto mb-6 shadow-xl border-4 border-white/30 transition-transform hover:scale-105 duration-500">
                     <LogIn className="h-10 w-10 text-white" />
@@ -131,7 +135,7 @@ export default function LoginPage() {
                 <CardTitle className="text-4xl font-black text-[#1e1b4b] tracking-tighter">Nova ERP</CardTitle>
                 <CardDescription className="text-[#FF7A00] font-black mt-2 text-xs uppercase tracking-[0.2em]">بوابة الموظفين والمديرين</CardDescription>
             </CardHeader>
-            <CardContent className="px-10 pb-12 space-y-8">
+            <CardContent className="px-10 pb-8 space-y-8">
                 {(authError || localError) && (
                     <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x">
                         <AlertCircle className="h-4 w-4" />
@@ -169,12 +173,27 @@ export default function LoginPage() {
                             />
                         </div>
 
-                        <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
-                            {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول النظام"}
-                            {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
-                        </Button>
-                        <div className="text-center">
-                            <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-primary/70 hover:text-primary transition-colors">نسيت كلمة المرور؟</button>
+                        <div className="space-y-4">
+                            <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2.5rem] font-black text-2xl gap-4 shadow-xl bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white border-none transition-all active:scale-95 group">
+                                {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول النظام"}
+                                {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
+                            </Button>
+                            
+                            <div className="flex flex-col items-center gap-3">
+                                <button type="button" onClick={() => setMode('forgot-password')} className="text-xs font-black text-slate-400 hover:text-primary transition-colors">نسيت كلمة المرور؟</button>
+                                
+                                <Separator className="w-1/2 opacity-10" />
+                                
+                                <div className="text-center pt-2">
+                                    <p className="text-[10px] font-bold text-slate-400 mb-3">هل تملك مكتباً هندسياً أو شركة مقاولات؟</p>
+                                    <Button asChild variant="outline" className="h-11 px-8 rounded-xl border-2 border-primary/20 text-primary font-black text-xs gap-2 hover:bg-primary/5 shadow-sm">
+                                        <Link href="/register">
+                                            <Building2 className="h-4 w-4" />
+                                            طلب انضمام منشأة جديدة
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 ) : (
@@ -198,3 +217,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+import { Separator } from '@/components/ui/separator';

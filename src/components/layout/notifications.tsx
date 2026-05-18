@@ -43,7 +43,7 @@ export function Notifications() {
   const handleNotificationClick = (notification: any) => {
     if (!firestore || !notification.id) return;
     
-    // 1. تحديث حالة القراءة فوراً
+    // 1. تحديث حالة القراءة فوراً في الخلفية
     if (!notification.isRead) {
         const notifRef = doc(firestore, 'notifications', notification.id);
         updateDoc(notifRef, { isRead: true }).catch(error => {
@@ -51,7 +51,7 @@ export function Notifications() {
         });
     }
 
-    // 2. التوجيه المباشر للرابط المرفق
+    // 2. التوجيه المباشر والسيادي للرابط المرفق (Redirect to Transaction/Leave/etc.)
     if (notification.link) {
         router.push(notification.link);
     }

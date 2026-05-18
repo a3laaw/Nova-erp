@@ -16,12 +16,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle, User } from 'lucide-react';
+import { Loader2, Save, CalendarCheck, ArrowRight, AlertCircle, User } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
-import { calculateWorkingDays, calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -65,7 +65,7 @@ export default function NewLeaveRequestPage() {
 
     // 🛡️ تعريف صلاحية الإدارة (Sovereign Authority Logic)
     const isAdmin = useMemo(() => 
-        currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer'
+        ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '')
     , [currentUser]);
 
     useEffect(() => {
@@ -160,9 +160,11 @@ export default function NewLeaveRequestPage() {
 
             const newDocRef = await addDoc(collection(firestore, leavePath), cleanFirestoreData(dataToSave));
             
-            // 🚀 إرسال إشعارات فورية للإدارة والـ HR
-            const adminHRUsersQuery = query(collection(firestore, getTenantPath('users', tenantId)), where('role', 'in', ['Admin', 'HR']));
+            // 🚀 إرسال إشعارات فورية للإدارة والـ HR مع رابط مباشر
+            const usersPath = getTenantPath('users', tenantId);
+            const adminHRUsersQuery = query(collection(firestore, usersPath), where('role', 'in', ['Admin', 'HR']));
             const adminsSnap = await getDocs(adminHRUsersQuery);
+            
             adminsSnap.forEach(adminDoc => {
                 if (adminDoc.id !== currentUser.id) {
                     createNotification(firestore, {
@@ -197,7 +199,7 @@ export default function NewLeaveRequestPage() {
                 <form onSubmit={handleSubmit}>
                     <CardHeader className="bg-primary/5 pb-8 border-b">
                         <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>
-                        <CardDescription className="text-base">تحديد التواريخ لضمان دقة رصيد الإجازات وسجل الحضور.</CardDescription>
+                        <CardDescription className="text-base font-medium">تحديد التواريخ لضمان دقة رصيد الإجازات وسجل الحضور.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-8 space-y-6">
                         {overlapError && (
@@ -227,7 +229,7 @@ export default function NewLeaveRequestPage() {
                             )}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label className="font-black text-gray-700 pr-1">نوع الإجازة *</Label>
                                 <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
@@ -239,6 +241,12 @@ export default function NewLeaveRequestPage() {
                                         <SelectItem value="Unpaid">بدون أجر</SelectItem>
                                     </SelectContent>
                                 </Select>
+                            </div>
+                            <div className="grid gap-2 text-center">
+                                <Label className="font-bold text-xs opacity-50">أيام العمل المحتسبة</Label>
+                                <div className="h-12 rounded-xl bg-primary/5 border-2 border-dashed border-primary/20 flex items-center justify-center font-black text-primary text-xl">
+                                    {leaveDuration.workingDays} يوم
+                                </div>
                             </div>
                         </div>
 
@@ -252,20 +260,6 @@ export default function NewLeaveRequestPage() {
                                 <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-12 rounded-xl" />
                             </div>
                         </div>
-
-                        {leaveDuration.totalDays > 0 && (
-                            <div className="text-sm font-black text-primary p-6 bg-primary/5 rounded-3xl border-2 border-dashed border-primary/20 flex justify-around animate-in zoom-in-95">
-                                <div className="text-center">
-                                    <p className="text-[10px] uppercase opacity-60">إجمالي الأيام</p>
-                                    <p className="text-2xl">{leaveDuration.totalDays} يوم</p>
-                                </div>
-                                <Separator orientation="vertical" className="h-10 bg-primary/20" />
-                                <div className="text-center">
-                                    <p className="text-[10px] uppercase opacity-60">أيام العمل</p>
-                                    <p className="text-2xl">{leaveDuration.workingDays} يوم</p>
-                                </div>
-                            </div>
-                        )}
 
                         <div className="grid gap-2">
                             <Label className="font-bold text-gray-700 pr-1">السبب / ملاحظات إضافية *</Label>
@@ -284,3 +278,4 @@ export default function NewLeaveRequestPage() {
         </div>
     );
 }
+
