@@ -23,10 +23,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, X, Pencil, CheckCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, X, Pencil, CheckCircle, Eye, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
-import type { LeaveRequest, Employee } from '@/lib/types';
+import type { LeaveRequest } from '@/lib/types';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { cn, getTenantPath } from '@/lib/utils';
 import Link from 'next/link';
+import { Textarea } from '../ui/textarea';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -62,11 +63,15 @@ export function LeaveRequestsList() {
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // States for Rejection Logic
+  const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
+
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
 
   const queryConstraints = useMemo(() => {
       const constraints = [orderBy('createdAt', 'desc')];
-      // 🛡️ فلترة سيادية للمستخدم العادي: لا يرى إلا طلباته
       if (!isAdmin && currentUser?.employeeId) {
           constraints.push(where('employeeId', '==', currentUser.employeeId));
       }
@@ -102,21 +107,33 @@ export function LeaveRequestsList() {
             approvedBy: currentUser.id,
             approvedAt: serverTimestamp()
         });
-        toast({ title: '✅ تمت الموافقة' });
+        toast({ title: '✅ تمت الموافقة على الطلب بنجاح' });
     } catch (e) { toast({ variant: 'destructive', title: 'عائق صلاحيات' }); }
   };
 
-  const handleReject = async (req: LeaveRequest) => {
-    if (!firestore || !tenantId || !currentUser) return;
+  const handleConfirmReject = async () => {
+    if (!requestToReject || !firestore || !tenantId || !currentUser || !rejectionReason.trim()) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'يجب ذكر سبب الرفض.' });
+        return;
+    }
+
+    setIsProcessingAction(true);
     try {
-        const finalPath = getTenantPath(`leaveRequests/${req.id}`, tenantId);
+        const finalPath = getTenantPath(`leaveRequests/${requestToReject.id}`, tenantId);
         await updateDoc(doc(firestore, finalPath), {
             status: 'rejected',
             rejectedBy: currentUser.id,
-            rejectedAt: serverTimestamp()
+            rejectedAt: serverTimestamp(),
+            rejectionReason: rejectionReason
         });
-        toast({ title: '❌ تم الرفض' });
-    } catch (e) { toast({ variant: 'destructive', title: 'عائق صلاحيات' }); }
+        toast({ title: '❌ تم رفض الطلب وتوثيق السبب' });
+        setRequestToReject(null);
+        setRejectionReason('');
+    } catch (e) { 
+        toast({ variant: 'destructive', title: 'خطأ في العملية' }); 
+    } finally { 
+        setIsProcessingAction(false); 
+    }
   };
 
   if (loading) return <Skeleton className="h-64 w-full rounded-2xl" />;
@@ -147,11 +164,10 @@ export function LeaveRequestsList() {
               leaveRequests.map(req => (
                 <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 h-16">
                   <TableCell className="px-8 font-black text-slate-800">
-                      {isAdmin ? (
-                          <Link href={`/dashboard/hr/leaves/${req.id}`} className="hover:underline">{req.employeeName}</Link>
-                      ) : (
-                          <span>{req.employeeName}</span>
-                      )}
+                      <Link href={`/dashboard/hr/leaves/${req.id}`} className="hover:underline flex items-center gap-2">
+                         {req.employeeName}
+                         <Eye className="h-3 w-3 opacity-0 group-hover:opacity-40 transition-opacity" />
+                      </Link>
                   </TableCell>
                   <TableCell><Badge variant="secondary" className="font-bold">{req.leaveType}</Badge></TableCell>
                   <TableCell className="font-mono text-xs opacity-60 font-bold">{formatDate(req.startDate)} - {formatDate(req.endDate)}</TableCell>
@@ -161,18 +177,27 @@ export function LeaveRequestsList() {
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end" dir="rtl" className="rounded-xl shadow-2xl p-2 border-none">
                             <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات الطلب</DropdownMenuLabel>
+                            
+                            <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-2">
+                                <Link href={`/dashboard/hr/leaves/${req.id}`}><Eye className="h-4 w-4 text-primary" /> عرض تفاصيل الرد</Link>
+                            </DropdownMenuItem>
+
                             {isAdmin && req.status === 'pending' && (
                                 <>
+                                    <DropdownMenuSeparator className="bg-slate-100" />
                                     <DropdownMenuItem onClick={() => handleApprove(req)} className="text-green-600 font-bold gap-2 rounded-lg py-3"><CheckCircle className="h-4 w-4"/> موافقة إدارية</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleReject(req)} className="text-red-600 font-bold gap-2 rounded-lg py-3"><X className="h-4 w-4"/> رفض الطلب</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setRequestToReject(req)} className="text-red-600 font-bold gap-2 rounded-lg py-3"><X className="h-4 w-4"/> رفض الطلب</DropdownMenuItem>
                                 </>
                             )}
+                            
                             {req.status === 'pending' && (
                                 <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-2">
                                     <Link href={`/dashboard/hr/leaves/${req.id}/edit`}><Pencil className="h-4 w-4" /> تعديل البيانات</Link>
                                 </DropdownMenuItem>
                             )}
+                            
                             <DropdownMenuSeparator className="bg-slate-100" />
+                            
                             {req.status === 'pending' && (
                                 <DropdownMenuItem className="text-red-600 font-black gap-2 rounded-lg py-3 focus:bg-red-50" onClick={() => setRequestToDelete(req)}>
                                     <Trash2 className="h-4 w-4" /> حذف الطلب
@@ -197,8 +222,41 @@ export function LeaveRequestsList() {
             </AlertDialogHeader>
             <AlertDialogFooter className="mt-6 gap-3">
                 <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">تراجع</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-lg shadow-red-200">
+                <AlertDialogAction onClick={handleDeleteRequest} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black h-12 px-12 shadow-lg shadow-red-200">
                     {isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، حذف الطلب'}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 🛡️ حوار رفض الإجازة مع ذكر السبب 🛡️ */}
+      <AlertDialog open={!!requestToReject} onOpenChange={() => { setRequestToReject(null); setRejectionReason(''); }}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+            <AlertDialogHeader>
+                <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner">
+                    <AlertCircle className="h-8 w-8" />
+                </div>
+                <AlertDialogTitle className="text-2xl font-black text-red-800">رفض طلب الإجازة</AlertDialogTitle>
+                <AlertDialogDescription className="text-base font-bold text-slate-600">
+                    الرجاء ذكر سبب الرفض للموظف "{requestToReject?.employeeName}". سيتم عرض هذا السبب للموظف في صفحة التفاصيل.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+                <Textarea 
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    placeholder="اكتب سبب الرفض هنا (مثلاً: ضغط عمل في المشروع، نقص عمالة...)"
+                    className="rounded-2xl border-2 p-4 text-sm font-bold min-h-[120px]"
+                />
+            </div>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
+                <AlertDialogAction 
+                    onClick={handleConfirmReject} 
+                    disabled={isProcessingAction || !rejectionReason.trim()} 
+                    className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-10"
+                >
+                    {isProcessingAction ? <Loader2 className="animate-spin h-4 w-4"/> : 'تأكيد الرفض النهائي'}
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

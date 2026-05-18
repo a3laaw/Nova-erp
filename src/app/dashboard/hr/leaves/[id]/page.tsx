@@ -163,7 +163,7 @@ export default function LeaveRequestDetailsPage() {
                     {leaveRequest.status === 'rejected' && (
                         <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x bg-red-50 shadow-red-100 p-6">
                             <AlertCircle className="h-6 w-6 text-red-600" />
-                            <AlertTitle className="text-red-800 font-black text-lg">تم رفض هذا الطلب</AlertTitle>
+                            <AlertTitle className="text-red-800 font-black text-lg">تم رفض هذا الطلب من قبل الإدارة</AlertTitle>
                             <AlertDescription className="text-red-700 font-bold mt-2 leading-relaxed">
                                 {leaveRequest.rejectionReason || 'عذراً، تعذر قبول الطلب في هذه الفترة بناءً على متطلبات العمل. يرجى مراجعة الإدارة لمزيد من التفاصيل.'}
                             </AlertDescription>
@@ -193,7 +193,7 @@ export default function LeaveRequestDetailsPage() {
                     </section>
 
                     <div className="space-y-3">
-                        <h4 className="font-black text-gray-700">مبررات طلب الإجازة:</h4>
+                        <h4 className="font-black text-gray-700">مبررات طلب الموظف:</h4>
                         <p className="p-6 border-2 border-dashed rounded-3xl bg-muted/10 min-h-[100px]">{leaveRequest.notes || '-'}</p>
                     </div>
                 </main>
