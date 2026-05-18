@@ -30,7 +30,7 @@ import {
     AlertCircle,
     Badge as BadgeIcon
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
@@ -189,6 +189,7 @@ export default function LeaveRequestDetailsPage() {
                 </header>
 
                 <main className="py-12 space-y-12">
+                    {/* 🛡️ بنر شفافية الرد الإداري 🛡️ */}
                     {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason || leaveRequest.adminComment) && (
                         <Alert 
                             variant={leaveRequest.status === 'rejected' ? 'destructive' : 'default'} 
@@ -322,3 +323,4 @@ export default function LeaveRequestDetailsPage() {
         </div>
     );
 }
+

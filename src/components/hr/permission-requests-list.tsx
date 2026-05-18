@@ -216,7 +216,7 @@ export function PermissionRequestsList() {
                                     <DropdownMenuItem onClick={() => setRequestToAction({request: req, action: 'reject'})} className="text-red-600 font-bold gap-2 py-3 rounded-lg focus:bg-red-50">
                                         <X className="h-4 w-4" /> رفض مع ذكر السبب
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                    <DropdownMenuSeparator />
                                 </>
                             )}
                             {req.status === 'pending' && (
@@ -314,3 +314,4 @@ export function PermissionRequestsList() {
     </>
   );
 }
+
