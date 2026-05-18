@@ -3,32 +3,28 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات السيادية (Sovereign Authority Logic V115)
+    // 🛡️ مصفوفة الصلاحيات السيادية (V119.0)
     
     function isDeveloper() {
       return request.auth != null && 
-             (request.auth.token.email.lower() == 'alaawaaheeb@gmail.com' || 
+             (request.auth.token.isSuperAdmin == true || 
               request.auth.token.role == 'Developer');
     }
 
-    // 🏰 صمام أمان مزدوج: التحقق عبر التوكن أو عبر البريد المباشر في وثيقة الشركة
     function isTenantMember(companyId) {
       return request.auth != null && 
              (request.auth.token.companyId == companyId || 
-              request.auth.token.currentCompanyId == companyId ||
-              (exists(/databases/$(database)/documents/companies/$(companyId)) && 
-               get(/databases/$(database)/documents/companies/$(companyId)).data.adminEmail.lower() == request.auth.token.email.lower()));
+              request.auth.token.currentCompanyId == companyId);
     }
 
-    // 🏯 القاعدة الذهبية للمطور: عبور شامل لكافة الوثائق
+    // 🏯 قاعدة الوصول الشاملة للمطور
     match /{document=**} {
       allow read, write: if isDeveloper();
     }
 
-    // 🏢 قواعد عزل المنشآت (SaaS Isolation)
+    // 🏢 عزل المنشآت
     match /companies/{companyId} {
       allow read: if request.auth != null;
-      // السماح بالكتابة بناءً على الانتماء الموثق (التوكن أو البريد)
       allow write: if isDeveloper() || isTenantMember(companyId);
       
       match /{allSubcollections=**} {
@@ -36,28 +32,20 @@ service cloud.firestore {
       }
     }
 
-    // 🌍 قواعد الفهرس العالمي والطلبات
+    // 🌍 الفهرس العالمي
     match /global_users/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isDeveloper());
       allow write: if isDeveloper() || (request.auth != null && request.auth.uid == uid);
     }
     
     match /company_requests/{id} {
-      allow create: if true; 
+      allow create: if request.auth != null; 
       allow read, write: if isDeveloper();
     }
 
-    // 📊 تحصين استعلامات المجموعات (Collection Group Rules)
-    match /{path=**}/transactions/{id} {
-        allow read: if request.auth != null && (isDeveloper() || isTenantMember(resource.data.companyId));
-    }
-    
-    match /{path=**}/timelineEvents/{id} {
-        allow read: if request.auth != null && (isDeveloper() || isTenantMember(resource.data.companyId));
-    }
-
+    // 📊 تحصين استعلامات المجموعات
     match /{path=**}/userProductivity/{id} {
-        allow read, write: if request.auth != null && (isDeveloper() || request.auth.uid == resource.data.userId);
+        allow read, write: if request.auth != null && (isDeveloper() || (request.auth.uid == resource.data.userId && isTenantMember(resource.data.companyId)));
     }
   }
 }

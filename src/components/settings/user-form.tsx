@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import { Label } from '../ui/label';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Info, Sparkles, UserPlus } from 'lucide-react';
+import { Sparkles, UserPlus } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
@@ -69,32 +69,26 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
   }, [user, isEditing, isOpen]);
   
   const handleUsernameChange = (val: string) => {
-    // تنظيف اسم المستخدم (حروف إنجليزية وأرقام فقط)
     const sanitized = val.toLowerCase().replace(/[^a-z0-9]/g, '');
     setFormData(prev => ({ ...prev, username: sanitized }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-
-      if (!formData.employeeId) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'يجب اختيار موظف لربط الحساب.' });
-          return;
-      }
-      if (!formData.username) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'اسم المستخدم مطلوب.' });
+      if (!formData.employeeId || !formData.username) {
+          toast({ variant: 'destructive', title: 'خطأ', description: 'يرجى إكمال البيانات المطلوبة.' });
           return;
       }
       
-      // 🛡️ إنشاء المعرف الفريد للـ SaaS خلف الكواليس
-      // ali @ company_id . nova
       const tenantId = currentAdmin?.currentCompanyId;
       const internalEmail = `${formData.username}@${tenantId}.nova`;
       
+      // 🛡️ حذف passwordHash من الحفظ في Firestore للأمان
       const dataToSave = { 
           ...formData, 
           email: internalEmail,
-          passwordHash: password 
+          // التوجيه: كلمة السر ترسل فقط لمحرك الـ Auth وليس للتخزين في Firestore
+          newPassword: password 
       };
       
       onSave(dataToSave);
@@ -140,7 +134,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                         />
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground opacity-40">.nova</div>
                     </div>
-                    <p className="text-[9px] text-muted-foreground font-bold pr-1">سيستخدم الموظف هذا الاسم فقط لتسجيل الدخول دون الحاجة لكتابة دومين.</p>
                 </div>
 
                  <div className="grid gap-2">
@@ -167,14 +160,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                         placeholder="حدد دور الموظف..."
                     />
                 </div>
-
-                <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <AlertTitle className="text-[10px] font-black uppercase text-primary">SaaS Identity Shield</AlertTitle>
-                    <AlertDescription className="text-[9px] font-bold text-slate-600">
-                        سيتم عزل هذا الحساب برمجياً؛ لا يمكن للموظف رؤية أي بيانات خارج نطاق منشأتك المعتمدة.
-                    </AlertDescription>
-                </Alert>
             </div>
 
             <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">

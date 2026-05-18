@@ -1,17 +1,19 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
-// Your web app's Firebase configuration
+/**
+ * 🛡️ محرك التهيئة السحابي (Clean Server Init):
+ * تم تحويل كافة المفاتيح لتعمل عبر متغيرات البيئة المشفرة حصراً.
+ */
 const firebaseConfig = {
-  apiKey: "AIzaSyCOreHYZzC4Egia3d7uWUOWKdzPxQ9MrS4",
-  authDomain: "nov-erp-1-25549967-c24e5.firebaseapp.com",
-  projectId: "nov-erp-1-25549967-c24e5",
-  storageBucket: "nov-erp-1-25549967-c24e5.firebasestorage.app",
-  messagingSenderId: "71297676078",
-  appId: "1:71297676078:web:b956ab00372e6ba237c0bf"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+export const db = getFirestore(app);
+export default app;
