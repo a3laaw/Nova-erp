@@ -22,8 +22,9 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * بوابة الدخول السيادية (Unified Login Gateway V8.0):
- * - تم تصحيح منطق البحث عن اسم المستخدم (Username Lookup) لتجنب أخطاء الصلاحيات.
+ * بوابة الدخول السيادية (Unified Login Gateway V9.0):
+ * - الدخول باستخدام "اسم المستخدم" فقط لراحة الموظفين.
+ * - تصميم مطابق للهوية البرتقالية الدافئة واللمسة الزجاجية.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -55,6 +56,7 @@ export default function LoginPage() {
         let loginEmail = identifier.trim().toLowerCase();
 
         // 🛡️ محرك البحث عن الهوية (Username Lookup Engine)
+        // إذا لم يكن الإدخال إيميلاً، نبحث عنه كاسم مستخدم في الفهرس العالمي
         if (!loginEmail.includes('@') && firestore) {
             const globalUsersRef = collection(firestore, 'global_users');
             const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
@@ -67,7 +69,7 @@ export default function LoginPage() {
                 loginEmail = snapshot.docs[0].data().email;
             } catch (err: any) {
                 if (err.message?.includes('permission')) {
-                    throw new Error("عذراً، واجه النظام عائقاً أمنياً في التحقق من اسم المستخدم. يرجى استخدام البريد الإلكتروني أو المحاولة لاحقاً.");
+                    throw new Error("عذراً، واجه النظام عائقاً أمنياً مؤقتاً. يرجى استخدام البريد الإلكتروني أو المحاولة لاحقاً.");
                 }
                 throw err;
             }
@@ -130,7 +132,7 @@ export default function LoginPage() {
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد الإلكتروني</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم المعتمد</Label>
                             <div className="relative">
                                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                                 <Input 
@@ -138,7 +140,7 @@ export default function LoginPage() {
                                     onChange={(e) => setIdentifier(e.target.value)} 
                                     className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner pr-12" 
                                     required 
-                                    placeholder="Username / Email"
+                                    placeholder="Username / ID"
                                     autoComplete="off"
                                 />
                             </div>

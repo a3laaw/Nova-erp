@@ -131,7 +131,7 @@ export default function AccountingDashboardPage() {
                         <QuickLink href="/dashboard/accounting/general-ledger" label="دفتر الأستاذ العام" icon={<ListTree className="h-4 w-4"/>} />
                         <QuickLink href="/dashboard/accounting/journal-entries" label="قيود اليومية" icon={<BookOpen className="h-4 w-4"/>} />
                         <QuickLink href="/dashboard/accounting/reports" label="ربحية المشاريع" icon={<PieChart className="h-4 w-4"/>} />
-                        <QuickLink href="/dashboard/accounting/reconciliation" label="التسوية البنكية" icon={<RotateCcw className="h-4 w-4"/>} />
+                        <QuickLink href="/dashboard/accounting/reconciliation" label="التسويات البنكية" icon={<RotateCcw className="h-4 w-4"/>} />
                     </CardContent>
                 </Card>
             </div>

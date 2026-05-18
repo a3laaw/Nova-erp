@@ -268,6 +268,14 @@ export default function ChartOfAccountsPage() {
         } finally { setIsSeeding(false); }
     };
 
+    const handleDelete = async () => {
+        if (!itemToDelete || !firestore) return;
+        try {
+            await deleteDoc(doc(firestore, 'chartOfAccounts', itemToDelete.id!));
+            toast({ title: 'نجاح الحذف' });
+        } finally { setIsAlertOpen(false); setAccountToDelete(null); }
+    };
+
     return (
         <div className="space-y-10" dir="rtl">
              {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
@@ -323,7 +331,7 @@ export default function ChartOfAccountsPage() {
                                             <div className="flex items-center gap-3">
                                                 {hasChildren && <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => setOpenAccounts(prev => { const n = new Set(prev); if(n.has(account.code)) n.delete(account.code); else n.add(account.code); return n; })}>{isOpen ? <Minus className="h-3 w-3"/> : <Plus className="h-3 w-3"/>}</Button>}
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-slate-800 text-base">{account.name}</span>
+                                                    <span className="font-black text-base text-slate-800">{account.name}</span>
                                                     <span className="font-mono text-[10px] text-muted-foreground opacity-60">{account.code}</span>
                                                 </div>
                                                 {account.level < 4 && <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-all h-7 w-7 text-primary bg-primary/5 rounded-lg" onClick={() => { setParentAccount(account); setEditingAccount(null); setIsFormOpen(true); }}><PlusCircle className="h-4 w-4"/></Button>}
@@ -369,11 +377,11 @@ export default function ChartOfAccountsPage() {
             <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
                 <AlertDialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
                     <AlertDialogHeader>
-                        <div className="p-3 bg-blue-100 rounded-2xl text-blue-600 w-fit mb-4 shadow-inner"><DownloadCloud className="h-10 w-10"/></div>
+                        <div className="p-5 bg-blue-100 rounded-[1.8rem] text-blue-600 w-fit mb-6 shadow-inner"><DownloadCloud className="h-12 w-12"/></div>
                         <AlertDialogTitle className="text-2xl font-black text-blue-900">تأكيد استيراد الدليل المحاسبي؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-medium leading-relaxed mt-2">سيقوم هذا الإجراء بمسح الشجرة الحالية واستبدالها بالدليل الافتراضي المعتمد. <br/><br/> <span className="font-black text-red-600">اكتب "تأكيد المسح" للاستمرار:</span></AlertDialogDescription>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بمسح الشجرة الحالية واستبدالها بالدليل الافتراضي المعتمد.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Input value={confirmSeedText} onChange={e => setConfirmSeedText(e.target.value)} className="h-14 text-center font-black text-2xl border-2 rounded-2xl bg-slate-50" placeholder="كلمة التأكيد..." />
+                    <Input value={confirmSeedText} onChange={e => setConfirmSeedText(e.target.value)} className="h-14 text-center font-black text-2xl border-2 rounded-2xl bg-slate-50" placeholder="كلمة التأكيد: تأكيد المسح" />
                     <AlertDialogFooter className="mt-8 gap-3">
                         <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">إلغاء</AlertDialogCancel>
                         <AlertDialogAction onClick={handleSeedChartOfAccounts} disabled={confirmSeedText !== 'تأكيد المسح' || isSeeding} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black h-12 px-16 shadow-xl shadow-blue-200">

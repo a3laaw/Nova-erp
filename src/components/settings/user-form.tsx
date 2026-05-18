@@ -37,10 +37,9 @@ const roleOptions = [
 ];
 
 /**
- * نموذج تأسيس حساب موظف (Username-Centric V6.0):
- * - يعتمد على اسم المستخدم فقط للدخول.
- * - دروع متطورة لمنع المتصفح من حشو بيانات المالك في الخانات.
- * - تم إصلاح خطأ استيراد Loader2.
+ * نموذج تأسيس حساب موظف (Username-Centric V7.0):
+ * - يعتمد على اسم المستخدم فقط للدخول لراحة الموظفين.
+ * - تحصين جذري ضد الـ Autofill وتصحيح استيراد Loader2.
  */
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, isSaving }: UserFormProps) {
   const { toast } = useToast();
@@ -77,7 +76,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
   }, [user, isEditing, isOpen]);
   
   const handleUsernameChange = (val: string) => {
-    // تطهير اسم المستخدم ليكون صالحاً كمعرف دخول فريد (صغير وبدون مسافات)
     const sanitized = val.toLowerCase().replace(/[^a-z0-9]/g, '');
     setFormData(prev => ({ ...prev, username: sanitized }));
   };
@@ -90,7 +88,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
       }
       
       const tenantId = currentAdmin?.currentCompanyId;
-      // توليد المعرف التقني في الخلفية لربط الحساب بجوجل
       const internalEmail = `${formData.username}@${tenantId || 'global'}.nova`;
       
       const dataToSave: any = { 
@@ -135,7 +132,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
             <div className="p-8 space-y-6">
                 <div className="grid gap-2">
                     <Label className="font-black text-gray-700 pr-1 flex items-center gap-2">
-                        <ShieldCheck className="h-3 w-3 text-primary"/> الموظف المستهدف من السجلات *
+                        <ShieldCheck className="h-3 w-3 text-primary"/> الموظف المستهدف *
                     </Label>
                     <InlineSearchList
                         value={formData.employeeId || ''}
@@ -147,7 +144,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                 </div>
 
                  <div className="grid gap-2">
-                    <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم للدخول (Username) *</Label>
+                    <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم للدخول (User ID) *</Label>
                     <div className="relative">
                         <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary opacity-30" />
                         <Input 
@@ -162,7 +159,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                             className="h-12 rounded-xl font-black text-primary border-2 pr-12 text-center text-lg shadow-sm"
                         />
                     </div>
-                    <p className="text-[9px] font-bold text-muted-foreground text-center">الموظف سيستخدم هذا الاسم بدلاً من الإيميل.</p>
+                    <p className="text-[9px] font-bold text-muted-foreground text-center">سيستخدمه الموظف للدخول بدلاً من الإيميل.</p>
                 </div>
 
                  <div className="grid gap-2">
@@ -183,7 +180,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                 </div>
 
                 <div className="grid gap-2">
-                    <Label className="font-black text-gray-700 pr-1">الدور والصلاحيات في المنظومة *</Label>
+                    <Label className="font-black text-gray-700 pr-1">الصلاحيات في المنظومة *</Label>
                      <InlineSearchList
                         value={formData.role || ''}
                         onSelect={(v) => setFormData(prev => ({ ...prev, role: v as any }))}
@@ -196,7 +193,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
 
             <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
                 <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-                <Button type="submit" disabled={isSaving || (!isEditing && !password)} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2">
+                <Button type="submit" disabled={isSaving || (!isEditing && !password)} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-primary text-white border-none">
                     {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Sparkles className="ml-2 h-4 w-4" />}
                     {isEditing ? 'حفظ التعديلات' : 'تفعيل الحساب'}
                 </Button>

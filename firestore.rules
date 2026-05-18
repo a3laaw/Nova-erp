@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات السيادية (V120.0)
+    // 🛡️ مصفوفة الصلاحيات السيادية (V125.0)
     
     function isDeveloper() {
       return request.auth != null && 
@@ -32,9 +32,9 @@ service cloud.firestore {
       }
     }
 
-    // 🌍 الفهرس العالمي
+    // 🌍 الفهرس العالمي (Global Index)
     match /global_users/{uid} {
-      // 🛡️ تصحيح سيادي: السماح بالقراءة العامة لتمكين البحث عن اليوزر عند الدخول
+      // 🛡️ تصحيح سيادي: السماح بالقراءة العامة لتمكين البحث عن اليوزر عند الدخول قبل التسجيل
       allow read: if true; 
       allow write: if isDeveloper() || (request.auth != null && request.auth.uid == uid);
     }
