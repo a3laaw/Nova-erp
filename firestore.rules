@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // 🛡️ مصفوفة الصلاحيات السيادية (V119.0)
+    // 🛡️ مصفوفة الصلاحيات السيادية (V120.0)
     
     function isDeveloper() {
       return request.auth != null && 
@@ -34,7 +34,8 @@ service cloud.firestore {
 
     // 🌍 الفهرس العالمي
     match /global_users/{uid} {
-      allow read: if request.auth != null && (request.auth.uid == uid || isDeveloper());
+      // 🛡️ تصحيح سيادي: السماح بالقراءة العامة لتمكين البحث عن اليوزر عند الدخول
+      allow read: if true; 
       allow write: if isDeveloper() || (request.auth != null && request.auth.uid == uid);
     }
     

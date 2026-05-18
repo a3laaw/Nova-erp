@@ -22,9 +22,8 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * بوابة الدخول السيادية (Unified Login Gateway V7.0):
- * - تقبل "اسم المستخدم" أو "البريد الإلكتروني".
- * - الموظف يدخل باسمه البسيط (مثل ali.ahmed) مع كلمة مروره.
+ * بوابة الدخول السيادية (Unified Login Gateway V8.0):
+ * - تم تصحيح منطق البحث عن اسم المستخدم (Username Lookup) لتجنب أخطاء الصلاحيات.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -55,17 +54,23 @@ export default function LoginPage() {
     try {
         let loginEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك البحث عن الهوية (Username Lookup)
-        // إذا لم يحتوي المدخل على @، نعتبره "اسم مستخدم" ونبحث عن إيميله التقني
+        // 🛡️ محرك البحث عن الهوية (Username Lookup Engine)
         if (!loginEmail.includes('@') && firestore) {
             const globalUsersRef = collection(firestore, 'global_users');
             const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
-            const snapshot = await getDocs(q);
             
-            if (snapshot.empty) {
-                throw new Error("عذراً، اسم المستخدم هذا غير موجود في سجلات المنظومة.");
+            try {
+                const snapshot = await getDocs(q);
+                if (snapshot.empty) {
+                    throw new Error("عذراً، اسم المستخدم هذا غير مسجل لدينا.");
+                }
+                loginEmail = snapshot.docs[0].data().email;
+            } catch (err: any) {
+                if (err.message?.includes('permission')) {
+                    throw new Error("عذراً، واجه النظام عائقاً أمنياً في التحقق من اسم المستخدم. يرجى استخدام البريد الإلكتروني أو المحاولة لاحقاً.");
+                }
+                throw err;
             }
-            loginEmail = snapshot.docs[0].data().email;
         }
 
         await login(loginEmail, password);
