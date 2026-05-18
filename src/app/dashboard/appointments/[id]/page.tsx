@@ -53,19 +53,36 @@ export default function AppointmentDetailsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [notes, setNotes] = useState('');
 
-    // جلب مراحل العمل المعتمدة للقسم المعماري
+    // ✨ جلب مراحل العمل ديناميكياً بناءً على القسم الهندسي للمعاملة
     useEffect(() => {
-        if (!firestore || !tenantId) return;
+        if (!firestore || !tenantId || !transaction?.departmentId) {
+            // كحل بديل، جلب مراحل القسم المعماري إذا لم توجد معاملة مرتبطة
+            if (firestore && tenantId && !transaction?.departmentId) {
+                const fetchArchStages = async () => {
+                    const deptsPath = getTenantPath('departments', tenantId);
+                    const deptSnap = await getDocs(query(collection(firestore, deptsPath), where('name', '==', 'القسم المعماري'), limit(1)));
+                    if (!deptSnap.empty) {
+                        const stagesSnap = await getDocs(query(collection(firestore, `${deptsPath}/${deptSnap.docs[0].id}/workStages`), orderBy('order')));
+                        setWorkStages(stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage)));
+                    }
+                };
+                fetchArchStages();
+            }
+            return;
+        }
+
         const fetchStages = async () => {
-            const deptsPath = getTenantPath('departments', tenantId);
-            const deptSnap = await getDocs(query(collection(firestore, deptsPath), where('name', '==', 'القسم المعماري'), limit(1)));
-            if (!deptSnap.empty) {
-                const stagesSnap = await getDocs(query(collection(firestore, `${deptsPath}/${deptSnap.docs[0].id}/workStages`), orderBy('order')));
+            try {
+                // جلب المراحل الهرمية للقسم المرتبط بالمعاملة
+                const stagesPath = getTenantPath(`departments/${transaction.departmentId}/workStages`, tenantId);
+                const stagesSnap = await getDocs(query(collection(firestore, stagesPath), orderBy('order')));
                 setWorkStages(stagesSnap.docs.map(d => ({ id: d.id, ...d.data() } as WorkStage)));
+            } catch (e) {
+                console.error("Error fetching dynamic stages:", e);
             }
         };
         fetchStages();
-    }, [firestore, tenantId]);
+    }, [firestore, tenantId, transaction?.departmentId]);
 
     // معالجة تحديث مرحلة العمل والربط المالي
     const handleUpdateStage = async () => {

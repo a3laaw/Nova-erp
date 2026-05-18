@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -13,7 +12,8 @@ import { Separator } from '@/components/ui/separator';
 import type { Employee, Governorate, Area, Client } from '@/lib/types';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { DialogFooter } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { cn, getTenantPath } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
 
 interface ClientFormProps {
     onSave: (data: Partial<Client>) => Promise<void>;
@@ -24,8 +24,11 @@ interface ClientFormProps {
 
 export function ClientForm({ onSave, onClose, initialData = null, isSaving = false }: ClientFormProps) {
     const { firestore } = useFirebase();
+    const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
+    const tenantId = currentUser?.currentCompanyId;
+
     const [formData, setFormData] = useState({
         nameAr: '', nameEn: '', mobile: '', governorateId: '', area: '',
         block: '', street: '', houseNumber: '',
@@ -38,29 +41,30 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
     const [refDataLoading, setRefDataLoading] = useState(true);
     const [isAreaLoading, setIsAreaLoading] = useState(false);
 
-    // التحقق من صحة رقم الجوال (افتراضياً 8 أرقام أو أكثر)
     const isMobileValid = useMemo(() => formData.mobile.length >= 8, [formData.mobile]);
 
+    // ✨ محرك جلب المناطق الهرمي السيادي
     const handleGovernorateChange = useCallback(async (govId: string, preselectArea?: string) => {
         setFormData(prev => ({ ...prev, governorateId: govId, area: '' }));
         setAreas([]);
-        if (govId && firestore) {
-            setIsAreaLoading(true);
-            try {
-                const areasQuery = query(collection(firestore, `governorates/${govId}/areas`), orderBy('name'));
-                const areasSnapshot = await getDocs(areasQuery);
-                const fetchedAreas = areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area));
-                setAreas(fetchedAreas);
-                if(preselectArea && fetchedAreas.some(a => a.name === preselectArea)) {
-                    setFormData(prev => ({...prev, area: preselectArea}));
-                }
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setIsAreaLoading(false);
+        if (!firestore || !govId || !tenantId) return;
+
+        setIsAreaLoading(true);
+        try {
+            // التوجه للمجموعة الفرعية المعزولة للمناطق تحت المحافظة
+            const areasPath = getTenantPath(`governorates/${govId}/areas`, tenantId);
+            const areasSnapshot = await getDocs(query(collection(firestore, areasPath), orderBy('name')));
+            const fetchedAreas = areasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Area));
+            setAreas(fetchedAreas);
+            if(preselectArea && fetchedAreas.some(a => a.name === preselectArea)) {
+                setFormData(prev => ({...prev, area: preselectArea}));
             }
+        } catch (e) {
+            console.error("Error fetching hierarchical areas:", e);
+        } finally {
+            setIsAreaLoading(false);
         }
-    }, [firestore]);
+    }, [firestore, tenantId]);
     
     useEffect(() => {
         if (initialData && governorates.length > 0) {
@@ -83,16 +87,19 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
     }, [initialData, governorates, handleGovernorateChange]);
 
     useEffect(() => {
-        if (!firestore) return;
+        if (!firestore || !tenantId) return;
         const fetchReferenceData = async () => {
             setRefDataLoading(true);
             try {
-                const engQuery = query(collection(firestore, 'employees'), where('status', '==', 'active'));
-                const govQuery = query(collection(firestore, 'governorates'), orderBy('name'));
-                
-                const [engSnapshot, govSnapshot] = await Promise.all([getDocs(engQuery), getDocs(govQuery)]);
+                const empPath = getTenantPath('employees', tenantId);
+                const govPath = getTenantPath('governorates', tenantId);
 
-                const fetchedEngineers: Employee[] = engSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee))
+                const [engSnapshot, govSnapshot] = await Promise.all([
+                    getDocs(query(collection(firestore, empPath), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, govPath), orderBy('name')))
+                ]);
+
+                const fetchedEngineers = engSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee))
                     .filter(e => e.department?.includes('المعماري'));
                 
                 setEngineers(fetchedEngineers);
@@ -106,7 +113,7 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
         };
 
         fetchReferenceData();
-    }, [firestore]);
+    }, [firestore, tenantId]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -149,7 +156,6 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-8">
                 <p className="text-[11px] text-muted-foreground font-medium">الحقول المميزة بالنجمة (<span className="text-destructive">*</span>) إلزامية</p>
 
-                {/* Section 1: Basic Information */}
                 <section className="bg-muted/30 p-6 rounded-[1.5rem] border border-border/50 space-y-6">
                     <div className="grid gap-2">
                         <Label htmlFor="nameAr" className="font-bold text-gray-700">اسم العميل (بالعربية) <span className="text-destructive italic">*</span></Label>
@@ -162,7 +168,6 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                                 required 
                                 placeholder="مثال: محمد عبدالله العتيبي"
                                 className="pr-10 h-12 bg-white rounded-xl shadow-sm focus:ring-primary/20 border-gray-200 transition-all"
-                                title="ادخل الاسم ثلاثياً"
                             />
                         </div>
                     </div>
@@ -200,7 +205,6 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                     </div>
                 </section>
 
-                {/* Section 2: System Assignment */}
                 <section className="space-y-4">
                     <div className="grid gap-2">
                         <Label className="font-bold text-gray-700">المهندس المسؤول <span className="text-destructive">*</span></Label>
@@ -215,7 +219,6 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
                     </div>
                 </section>
 
-                {/* Section 3: Address Section */}
                 <section className="bg-primary/[0.03] p-6 rounded-[1.5rem] border border-primary/10 space-y-6">
                     <Label className="font-black text-primary flex items-center gap-2">
                         <MapPin className="h-4 w-4" /> عنوان العميل
@@ -252,8 +255,8 @@ export function ClientForm({ onSave, onClose, initialData = null, isSaving = fal
             </div>
 
             <div className="p-6 bg-gray-50 border-t flex justify-end gap-3 rounded-b-[2rem] flex-shrink-0">
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="text-primary bg-primary/5 hover:bg-primary/10 rounded-xl px-6 h-12 font-bold gap-2">
-                    <ArrowRight className="h-4 w-4" /> إلغاء
+                <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl px-6 h-12 font-bold gap-2">
+                    <X className="h-4 w-4" /> إلغاء
                 </Button>
                 <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90 text-white rounded-xl px-10 h-12 font-black shadow-lg shadow-primary/20 gap-2">
                     {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}

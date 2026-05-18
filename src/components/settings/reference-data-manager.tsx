@@ -13,7 +13,8 @@ import {
     writeBatch, 
     getDocs, 
     serverTimestamp,
-    collectionGroup
+    collectionGroup,
+    where
 } from 'firebase/firestore'; 
 import { 
     Card, 
@@ -313,7 +314,6 @@ export function ReferenceDataManager() {
                     const newDeptRef = doc(collection(firestore, finalPrimaryPath));
                     batch.set(newDeptRef, { ...d, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
                     
-                    // 🛡️ استيراد الوظائف التابعة لهذا القسم
                     const deptJobs = defaultJobs[d.name] || [];
                     const jobsPath = getTenantPath(`departments/${newDeptRef.id}/jobs`, tenantId);
                     deptJobs.forEach((job, jIdx) => {
@@ -321,7 +321,6 @@ export function ReferenceDataManager() {
                         batch.set(jobRef, { ...job, order: jIdx, companyId: tenantId, parentId: newDeptRef.id });
                     });
 
-                    // 🛡️ استيراد مراحل العمل التابعة لهذا القسم
                     const deptStages = defaultWorkStages[d.name] || [];
                     const stagesPath = getTenantPath(`departments/${newDeptRef.id}/workStages`, tenantId);
                     deptStages.forEach((stage, sIdx) => {
@@ -334,7 +333,6 @@ export function ReferenceDataManager() {
                     const newGovRef = doc(collection(firestore, finalPrimaryPath));
                     batch.set(newGovRef, { ...g, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
 
-                    // 🛡️ استيراد المناطق التابعة لهذه المحافظة
                     const govAreas = defaultAreas[g.name] || [];
                     const areasPath = getTenantPath(`governorates/${newGovRef.id}/areas`, tenantId);
                     govAreas.forEach((area, aIdx) => {
