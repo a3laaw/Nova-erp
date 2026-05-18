@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
@@ -9,17 +9,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Info, User, AlertCircle, ShieldCheck, Stethoscope } from 'lucide-react';
+import { Loader2, Save, User, AlertCircle, Stethoscope, Clock, CheckCircle2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
-import { calculateWorkingDays, calculateAnnualLeaveBalance } from '@/services/leave-calculator';
+import { calculateWorkingDays } from '@/services/leave-calculator';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getTenantPath } from '@/lib/utils';
-import { startOfDay, endOfDay, isSameDay, isBefore, startOfYear, endOfYear } from 'date-fns';
+import { getTenantPath, formatCurrency } from '@/lib/utils';
+import { startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
+import { Badge } from '../ui/badge';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ interface LeaveRequestFormProps {
 export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestToEdit }: LeaveRequestFormProps) {
   const { firestore } = useFirebase();
   const { user: currentUser } = useAuth();
-  const { branding, loading: brandingLoading } = useBranding();
+  const { branding } = useBranding();
   const { toast } = useToast();
   const tenantId = currentUser?.currentCompanyId;
 
@@ -39,43 +40,46 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
   const [publicHolidays, setPublicHolidays] = useState<Holiday[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(true);
 
-  // Form State
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [leaveType, setLeaveType] = useState<'Annual' | 'Sick' | 'Emergency' | 'Unpaid'>('Annual');
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
   const [overlapError, setOverlapError] = useState<string | null>(null);
-  const [sickLeaveBalanceInfo, setSickLeaveBalanceInfo] = useState<{ used: number, max: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  
-  const isEditing = !!leaveRequestToEdit;
-  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
+
+  // حسابات الإجازة المرضية المتدرجة
+  const [sickLeaveStats, setSickLeaveStats] = useState({
+      used: 0,
+      tiers: {
+          fullPay: 15,
+          seventyFive: 10,
+          fifty: 10,
+          twentyFive: 10,
+          noPay: 30
+      }
+  });
+
+  const isAdmin = ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '');
 
   useEffect(() => {
     if (isOpen) {
-        if (isEditing && leaveRequestToEdit) {
+        if (leaveRequestToEdit) {
             setSelectedEmployeeId(leaveRequestToEdit.employeeId);
             setLeaveType(leaveRequestToEdit.leaveType);
             setStartDate(toFirestoreDate(leaveRequestToEdit.startDate) || undefined);
             setEndDate(toFirestoreDate(leaveRequestToEdit.endDate) || undefined);
             setNotes(leaveRequestToEdit.notes || '');
         } else {
-             if (!isAdmin) {
-              setSelectedEmployeeId(currentUser?.employeeId || '');
-            } else {
-              setSelectedEmployeeId('');
-            }
+            setSelectedEmployeeId(!isAdmin ? (currentUser?.employeeId || '') : '');
             setLeaveType('Annual');
             setStartDate(undefined);
             setEndDate(undefined);
             setNotes('');
         }
         setOverlapError(null);
-        setSickLeaveBalanceInfo(null);
     }
-  }, [isOpen, isEditing, leaveRequestToEdit, currentUser, isAdmin]);
-
+  }, [isOpen, leaveRequestToEdit, currentUser, isAdmin]);
 
   useEffect(() => {
     if (!isOpen || !firestore) return;
@@ -88,242 +92,162 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
         ]);
         setEmployees(empSnap.docs.map(d => ({ id: d.id, ...d.data() } as Employee)));
         setPublicHolidays(holidaySnap.docs.map(d => ({ id: d.id, ...d.data() } as Holiday)));
-      } catch (error) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل تحميل البيانات المرجعية.' });
-      } finally {
-        setLoadingRefs(false);
-      }
+      } finally { setLoadingRefs(false); }
     };
     fetchRefs();
-  }, [isOpen, firestore, toast]);
+  }, [isOpen, firestore]);
 
-  // ✨ محرك رصد رصيد الإجازات المرضية المتبقي (15 يوم سنوياً)
   useEffect(() => {
-    if (!isOpen || !firestore || !selectedEmployeeId || leaveType !== 'Sick' || !tenantId) {
-        setSickLeaveBalanceInfo(null);
-        return;
-    }
-
+    if (!isOpen || !firestore || !selectedEmployeeId || leaveType !== 'Sick' || !tenantId) return;
     const checkSickBalance = async () => {
         const start = startOfYear(new Date());
         const end = endOfYear(new Date());
         const leavePath = getTenantPath('leaveRequests', tenantId);
-        
         const q = query(
             collection(firestore, leavePath),
             where('employeeId', '==', selectedEmployeeId),
             where('leaveType', '==', 'Sick'),
             where('status', 'in', ['approved', 'on-leave', 'returned'])
         );
-        
         const snap = await getDocs(q);
         let used = 0;
         snap.forEach(doc => {
             const data = doc.data() as LeaveRequest;
             const lStart = toFirestoreDate(data.startDate);
-            if (lStart && lStart >= start && lStart <= end) {
-                used += (data.workingDays || 0);
-            }
+            if (lStart && lStart >= start && lStart <= end) used += (data.workingDays || 0);
         });
-        setSickLeaveBalanceInfo({ used, max: 15 });
+        setSickLeaveStats(prev => ({ ...prev, used }));
     };
-
     checkSickBalance();
   }, [isOpen, selectedEmployeeId, leaveType, firestore, tenantId]);
 
   const leaveDuration = useMemo(() => {
-    if (!startDate || !endDate) return { totalDays: 0, workingDays: 0 };
+    if (!startDate || !endDate || startDate > endDate) return { totalDays: 0, workingDays: 0 };
     return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
   }, [startDate, endDate, branding, publicHolidays]);
 
-  const employeeOptions = useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
+  const currentSickTier = useMemo(() => {
+      if (leaveType !== 'Sick') return null;
+      const u = sickLeaveStats.used;
+      if (u < 15) return { label: 'أجر كامل', color: 'text-green-600', remaining: 15 - u };
+      if (u < 25) return { label: '75% من الأجر', color: 'text-blue-600', remaining: 25 - u };
+      if (u < 35) return { label: '50% من الأجر', color: 'text-orange-600', remaining: 35 - u };
+      if (u < 45) return { label: '25% من الأجر', color: 'text-amber-600', remaining: 45 - u };
+      if (u < 75) return { label: 'بدون أجر', color: 'text-red-600', remaining: 75 - u };
+      return { label: 'تجاوز الحد الأقصى', color: 'text-red-900', remaining: 0 };
+  }, [leaveType, sickLeaveStats]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) {
-      toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
-      return;
+    if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) return;
+
+    if (leaveType === 'Sick' && currentSickTier?.remaining === 0) {
+        toast({ variant: 'destructive', title: 'تنبيه إداري', description: 'لقد استنفذ الموظف كافة شرائح الإجازة المرضية المتاحة لهذا العام (75 يوماً).' });
+        return;
     }
 
-    // ✨ التحقق من سقف الإجازة المرضية (15 يوم)
-    if (leaveType === 'Sick' && sickLeaveBalanceInfo) {
-        const remaining = sickLeaveBalanceInfo.max - sickLeaveBalanceInfo.used;
-        if (leaveDuration.workingDays > remaining) {
-            const msg = `عذراً، رصيد الإجازات المرضية المتبقي للموظف هو (${remaining}) أيام فقط لهذا العام. لا يمكن تجاوز 15 يوماً مدفوعاً.`;
-            setOverlapError(msg);
-            toast({ variant: 'destructive', title: 'تجاوز رصيد المرضيات', description: msg });
-            return;
-        }
-    }
-    
     setIsSaving(true);
     setOverlapError(null);
 
     try {
-      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || (selectedEmployeeId === currentUser?.employeeId ? { fullName: currentUser.fullName } : null);
-      if (!selectedEmployee) throw new Error('لم يتم العثور على الموظف المختار.');
-
       const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
-      
-      const overlapQuery = query(
-          collection(firestore, leaveCollectionPath),
-          where('employeeId', '==', selectedEmployeeId),
-          where('status', 'in', ['pending', 'approved', 'on-leave'])
-      );
+      const overlapQuery = query(collection(firestore, leaveCollectionPath), where('employeeId', '==', selectedEmployeeId), where('status', 'in', ['pending', 'approved', 'on-leave']));
       const overlapSnap = await getDocs(overlapQuery);
       const hasOverlap = overlapSnap.docs.some(docSnap => {
-          if (isEditing && docSnap.id === leaveRequestToEdit?.id) return false;
+          if (leaveRequestToEdit && docSnap.id === leaveRequestToEdit.id) return false;
           const existing = docSnap.data() as LeaveRequest;
           const exStart = toFirestoreDate(existing.startDate);
           const exEnd = toFirestoreDate(existing.endDate);
-          if (!exStart || !exEnd) return false;
-          
-          const requestedStart = startOfDay(startDate);
-          const requestedEnd = endOfDay(endDate);
-          const currentStart = startOfDay(exStart);
-          const currentEnd = endOfDay(exEnd);
-
-          return (requestedStart <= currentEnd && requestedEnd >= currentStart);
+          return (exStart && exEnd && startOfDay(startDate) <= endOfDay(exEnd) && endOfDay(endDate) >= startOfDay(exStart));
       });
 
       if (hasOverlap) {
-          const errorMsg = "عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت، يرجى مراجعة التواريخ المحددة.";
-          setOverlapError(errorMsg);
-          toast({ variant: 'destructive', title: 'تنبيه تداخل مواعيد', description: errorMsg });
-          setIsSaving(false);
-          return;
+          setOverlapError("عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت.");
+          setIsSaving(false); return;
       }
 
+      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || { fullName: currentUser.fullName };
       const dataToSave = {
         employeeId: selectedEmployeeId,
-        employeeName: (selectedEmployee as any).fullName || (selectedEmployee as any).nameAr,
-        leaveType: leaveType,
-        startDate: startDate,
-        endDate: endDate,
+        employeeName: (selectedEmployee as any).fullName,
+        leaveType, startDate, endDate,
         days: leaveDuration.totalDays,
         workingDays: leaveDuration.workingDays,
-        notes: notes,
+        notes,
       };
       
-      if (isEditing && leaveRequestToEdit?.id) {
-        const leaveRef = doc(firestore, 'leaveRequests', leaveRequestToEdit.id);
-        await updateDoc(leaveRef, dataToSave);
-        toast({ title: 'نجاح', description: 'تم تحديث طلب الإجازة بنجاح.' });
-      } else {
-        const newRequest = {
-            ...dataToSave,
-            status: 'pending' as const,
-            createdAt: serverTimestamp(),
-            companyId: tenantId
-        };
-        await addDoc(collection(firestore, 'leaveRequests'), newRequest);
-        toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
-      }
+      if (leaveRequestToEdit?.id) await updateDoc(doc(firestore, leaveCollectionPath, leaveRequestToEdit.id), dataToSave);
+      else await addDoc(collection(firestore, leaveCollectionPath), { ...dataToSave, status: 'pending', createdAt: serverTimestamp(), companyId: tenantId });
       
-      onSaveSuccess();
-      onClose();
-
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "فشل حفظ الطلب.";
-      toast({ variant: 'destructive', title: 'خطأ', description: message });
-    } finally {
-      setIsSaving(false);
-    }
+      onSaveSuccess(); onClose();
+      toast({ title: 'تم تقديم الطلب بنجاح' });
+    } catch (error) { setIsSaving(false); }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent dir="rtl" className="max-w-lg rounded-[2rem] shadow-2xl border-none p-0 overflow-hidden">
+      <DialogContent dir="rtl" className="max-w-lg rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden bg-white">
         <form onSubmit={handleSubmit}>
           <DialogHeader className="p-8 bg-primary/5 border-b">
-            <DialogTitle className="text-2xl font-black text-[#1e1b4b]">
-                {isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}
-            </DialogTitle>
-            <DialogDescription className="text-sm font-medium text-slate-500 mt-1">
-              تحديد التواريخ ونوع الإجازة لضمان دقة الرصيد وحساب الرواتب.
-            </DialogDescription>
+            <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><CalendarRange className="h-6 w-6" /></div>
+                <div>
+                    <DialogTitle className="text-xl font-black text-[#1e1b4b]">{leaveRequestToEdit ? 'تعديل طلب الإجازة' : 'طلب إجازة جديد'}</DialogTitle>
+                    <DialogDescription className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">تنظيم فترات الغياب والالتزام بقواعد العمل.</DialogDescription>
+                </div>
+            </div>
           </DialogHeader>
           <div className="grid gap-6 p-8">
-            {overlapError && (
-                <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 shadow-sm animate-in zoom-in-95 py-4">
-                    <AlertCircle className="h-5 w-5 text-red-600" />
-                    <AlertTitle className="text-sm font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
-                    <AlertDescription className="text-xs font-bold text-red-700 mt-1">
-                        {overlapError}
-                    </AlertDescription>
-                </Alert>
-            )}
+            {overlapError && <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 py-4"><AlertCircle className="h-5 w-5"/><AlertTitle className="text-sm font-black">تنبيه تداخل مواعيد</AlertTitle><AlertDescription className="text-xs font-bold">{overlapError}</AlertDescription></Alert>}
 
-            {leaveType === 'Sick' && sickLeaveBalanceInfo && (
-                <Alert className="rounded-2xl border-2 border-blue-500 bg-blue-50 shadow-sm py-4">
-                    <Stethoscope className="h-5 w-5 text-blue-600" />
-                    <AlertTitle className="text-sm font-black text-blue-800">رصيد الإجازات المرضية</AlertTitle>
-                    <AlertDescription className="text-xs font-bold text-blue-700 mt-1">
-                        تم استهلاك ({sickLeaveBalanceInfo.used}) أيام من أصل ({sickLeaveBalanceInfo.max}) أيام مدفوعة لهذا العام.
-                    </AlertDescription>
-                </Alert>
+            {leaveType === 'Sick' && currentSickTier && (
+                <div className="p-5 bg-blue-50 border-2 border-blue-200 rounded-3xl space-y-3 animate-in zoom-in-95">
+                    <div className="flex items-center gap-2 text-blue-800 font-black"><Stethoscope className="h-5 w-5"/> <h4 className="text-sm">وضعية الإجازة المرضية (سنوياً)</h4></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white p-3 rounded-xl border shadow-sm">
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">الشريحة الحالية</p>
+                            <p className={cn("font-black text-sm", currentSickTier.color)}>{currentSickTier.label}</p>
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border shadow-sm">
+                            <p className="text-[9px] font-black text-slate-400 uppercase mb-1">المتبقي في الشريحة</p>
+                            <p className="font-black text-sm text-blue-700">{currentSickTier.remaining} أيام</p>
+                        </div>
+                    </div>
+                </div>
             )}
 
             <div className="grid gap-2">
-                <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
-                {isAdmin ? (
-                    <InlineSearchList
-                        value={selectedEmployeeId}
-                        onSelect={setSelectedEmployeeId}
-                        options={employeeOptions}
-                        placeholder={loadingRefs ? 'جاري التحميل...' : 'اختر موظفاً من القائمة...'}
-                        disabled={loadingRefs || isSaving}
-                        className="h-12 rounded-xl border-2"
-                    />
-                ) : (
-                    <div className="h-12 rounded-xl border-2 bg-muted/20 px-4 flex items-center font-black text-[#1e1b4b] gap-2">
-                        <User className="h-4 w-4 opacity-40" />
-                        {currentUser?.fullName}
-                    </div>
-                )}
+                <Label className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
+                {isAdmin ? <InlineSearchList value={selectedEmployeeId} onSelect={setSelectedEmployeeId} options={employees.map(e => ({ value: e.id!, label: e.fullName }))} placeholder="اختر موظفاً..." disabled={loadingRefs || isSaving} /> : <div className="h-11 rounded-xl border-2 bg-muted/20 px-4 flex items-center font-black text-[#1e1b4b] gap-2"><User className="h-4 w-4 opacity-40" />{currentUser?.fullName}</div>}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="leaveType" className="font-bold mr-1">نوع الإجازة *</Label>
-                <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
-                    <SelectTrigger id="leaveType" className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
-                    <SelectContent dir="rtl">
-                        <SelectItem value="Annual">سنوية</SelectItem>
-                        <SelectItem value="Sick">مرضية (بحد أقصى 15 يوم/سنة)</SelectItem>
-                        <SelectItem value="Emergency">طارئة</SelectItem>
-                        <SelectItem value="Unpaid">بدون أجر</SelectItem>
-                    </SelectContent>
-                </Select>
-              </div>
-            </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="startDate" className="font-bold mr-1">من تاريخ *</Label>
-                <DateInput value={startDate} onChange={(d) => { setStartDate(d); setOverlapError(null); }} className="h-11 rounded-xl border-2" disabled={isSaving} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="endDate" className="font-bold mr-1">إلى تاريخ *</Label>
-                <DateInput value={endDate} onChange={(d) => { setEndDate(d); setOverlapError(null); }} className="h-11 rounded-xl border-2" disabled={isSaving} />
-              </div>
-            </div>
-            {leaveDuration.totalDays > 0 && (
-              <div className="space-y-4">
-                <div className="text-sm font-black text-primary p-4 bg-primary/5 rounded-2xl border-2 border-dashed border-primary/20 flex justify-around">
-                    <p>إجمالي الأيام: <span className="text-lg">{leaveDuration.totalDays}</span></p>
-                    <p>أيام العمل: <span className="text-lg">{leaveDuration.workingDays}</span></p>
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label className="font-bold pr-1">نوع الإجازة *</Label>
+                    <Select value={leaveType} onValueChange={(v: any) => setLeaveType(v)} disabled={isSaving}>
+                        <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
+                        <SelectContent dir="rtl">
+                            <SelectItem value="Annual">سنوية اعتيادية</SelectItem>
+                            <SelectItem value="Sick">مرضية (قانونية)</SelectItem>
+                            <SelectItem value="Emergency">طارئة / عرضية</SelectItem>
+                            <SelectItem value="Unpaid">بدون راتب</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
-              </div>
-            )}
-             <div className="grid gap-2">
-              <Label htmlFor="notes" className="font-bold mr-1">السبب / ملاحظات *</Label>
-              <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" placeholder="اشرح سبب طلب الإجازة..." disabled={isSaving} />
+                <div className="grid gap-2">
+                    <Label className="font-bold pr-1">مدة الطلب</Label>
+                    <div className="h-11 rounded-xl bg-muted/30 border-2 flex items-center justify-center font-black text-primary">{leaveDuration.workingDays} أيام عمل</div>
+                </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2"><Label className="font-bold pr-1">من تاريخ *</Label><DateInput value={startDate} onChange={setStartDate} disabled={isSaving} /></div>
+              <div className="grid gap-2"><Label className="font-bold pr-1">إلى تاريخ *</Label><DateInput value={endDate} onChange={setEndDate} disabled={isSaving} /></div>
+            </div>
+            <div className="grid gap-2"><Label className="font-bold pr-1">المبررات / ملاحظات الموظف *</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 font-medium" placeholder="اذكر سبب الإجازة بوضوح..." disabled={isSaving} /></div>
           </div>
           <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-            <Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white hover:bg-black transition-all">
-              {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
-              {isEditing ? 'حفظ التعديلات' : 'تقديم الطلب'}
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">تراجع</Button>
+            <Button type="submit" disabled={isSaving || !!overlapError} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2">
+              {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />} {leaveRequestToEdit ? 'تحديث الطلب' : 'تقديم الطلب'}
             </Button>
           </DialogFooter>
         </form>
@@ -331,3 +255,5 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
     </Dialog>
   );
 }
+
+import { CalendarRange } from 'lucide-react';

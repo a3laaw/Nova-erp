@@ -26,7 +26,6 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setMounted(true);
-    // 🛡️ صمام أمان محلي: إذا استمر التحميل أكثر من 5 ثوانٍ، نظهر خيارات الإصلاح
     const timer = setTimeout(() => {
       setShowEmergencyExit(true);
     }, 5000);
@@ -38,7 +37,6 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 1. معالجة حالة التحميل
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#1e1b4b] relative overflow-hidden">
@@ -71,7 +69,6 @@ export default function DashboardLayout({
     );
   }
 
-  // 2. التحقق من وجود المستخدم
   if (!user) {
     return (
        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 text-center p-6 bg-[#1e1b4b]">
