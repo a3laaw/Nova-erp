@@ -15,7 +15,7 @@ import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-fns';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, getTenantPath } from '@/lib/utils';
 
@@ -84,7 +84,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       
       const checkDateStart = startOfDay(date);
 
-      // 🛡️ رادار منع التضارب الوظيفي: التحقق من وجود إجازة معتمدة 🛡️
       const leavesPath = getTenantPath('leaveRequests', tenantId);
       const leavesQuery = query(
           collection(firestore, leavesPath),
@@ -101,9 +100,9 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       });
 
       if (hasOverlappingLeave) {
-          const msg = "الموظف لديه إجازة معتمدة في هذا التاريخ؛ لا يمكن الجمع بين الإجازة والاستئذان في نفس اليوم.";
+          const msg = "عذراً، الموظف لديه إجازة معتمدة في هذا التاريخ؛ لا يمكن الجمع بين الإجازة والاستئذان في نفس اليوم لضمان دقة السجلات.";
           setOverlapError(msg);
-          toast({ variant: 'destructive', title: 'تداخل مواعيد', description: msg });
+          toast({ variant: 'destructive', title: 'تنبيه تداخل مواعيد', description: msg });
           setIsSaving(false);
           return;
       }
@@ -121,7 +120,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       if (isEditing && permissionToEdit?.id) {
         const reqRef = doc(firestore, permissionsPath, permissionToEdit.id);
         await updateDoc(reqRef, dataToSave);
-        toast({ title: 'تم التحديث' });
+        toast({ title: 'تم تحديث الطلب بنجاح' });
       } else {
         const newRequest = {
             ...dataToSave,
@@ -129,7 +128,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             createdAt: serverTimestamp(),
         };
         await addDoc(collection(firestore, permissionsPath), newRequest);
-        toast({ title: 'تم تقديم الطلب' });
+        toast({ title: 'تم تقديم طلب الاستئذان' });
       }
       
       onSaveSuccess();
@@ -220,10 +219,10 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             
             <Alert className="bg-primary/5 border-primary/20 rounded-2xl">
                 <Info className="h-4 w-4 text-primary" />
-                <AlertTitle className="text-xs font-black text-primary uppercase">قواعد العمل المتبعة</AlertTitle>
+                <AlertTitle className="text-xs font-black text-primary uppercase">توجيه إداري</AlertTitle>
                 <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1 leading-relaxed">
                     • الحد الأقصى هو 3 استئذانات شهرياً. <br/>
-                    • لا يمكن طلب استئذان في أيام الإجازات المعتمدة (سنوية أو مرضية).
+                    • لا يمكن طلب استئذان في أيام الإجازات المعتمدة لضمان دقة سجلات الحضور.
                 </AlertDescription>
             </Alert>
           </div>

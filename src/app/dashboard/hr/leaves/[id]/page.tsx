@@ -186,7 +186,6 @@ export default function LeaveRequestDetailsPage() {
                 </header>
 
                 <main className="py-12 space-y-12">
-                    {/* 🛡️ رادار الرد الإداري 🛡️ */}
                     {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason || leaveRequest.adminComment) && (
                         <Alert 
                             variant={leaveRequest.status === 'rejected' ? 'destructive' : 'default'} 
@@ -200,13 +199,13 @@ export default function LeaveRequestDetailsPage() {
                                 "text-xl font-black flex items-center justify-between mb-4",
                                 leaveRequest.status === 'rejected' ? "text-red-900" : "text-green-900"
                             )}>
-                                <span>تنبيه: قرار الإدارة بخصوص الطلب</span>
+                                <span>توجيه الإدارة بخصوص الطلب</span>
                             </AlertTitle>
                             <AlertDescription className={cn(
                                 "text-lg leading-relaxed font-bold border-t-2 border-dashed pt-4 mt-2",
                                 leaveRequest.status === 'rejected' ? "text-red-700 border-red-100" : "text-green-700 border-green-100"
                             )}>
-                                {leaveRequest.rejectionReason || leaveRequest.adminComment || (leaveRequest.status === 'approved' ? 'تمت الموافقة على طلبك، نتمنى لك إجازة سعيدة.' : 'عذراً، لم تتم الموافقة على طلبك حالياً.')}
+                                {leaveRequest.rejectionReason || leaveRequest.adminComment || (leaveRequest.status === 'approved' ? 'تمت الموافقة على طلبك، نتمنى لك إجازة سعيدة.' : 'بانتظار القرار النهائي.')}
                             </AlertDescription>
                         </Alert>
                     )}
@@ -272,7 +271,7 @@ export default function LeaveRequestDetailsPage() {
                 </main>
                 
                 <footer className="pt-20 border-t-2 border-slate-100 flex justify-between items-center text-[9px] font-black uppercase tracking-[0.4em] text-slate-300">
-                    <span>Sovereign Document Management</span>
+                    <span>Document Generation System</span>
                     <span>{format(new Date(), 'PPpp', { locale: ar })}</span>
                 </footer>
             </Card>

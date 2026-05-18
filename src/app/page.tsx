@@ -21,11 +21,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
-/**
- * بوابة الدخول السيادية (Unified Login Gateway V9.0):
- * - الدخول باستخدام "اسم المستخدم" فقط لراحة الموظفين.
- * - تصميم مطابق للهوية البرتقالية الدافئة واللمسة الزجاجية.
- */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
   const { firestore } = useFirebase();
@@ -55,8 +50,6 @@ export default function LoginPage() {
     try {
         let loginEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ محرك البحث عن الهوية (Username Lookup Engine)
-        // إذا لم يكن الإدخال إيميلاً، نبحث عنه كاسم مستخدم في الفهرس العالمي
         if (!loginEmail.includes('@') && firestore) {
             const globalUsersRef = collection(firestore, 'global_users');
             const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
@@ -68,9 +61,6 @@ export default function LoginPage() {
                 }
                 loginEmail = snapshot.docs[0].data().email;
             } catch (err: any) {
-                if (err.message?.includes('permission')) {
-                    throw new Error("عذراً، واجه النظام عائقاً أمنياً مؤقتاً. يرجى استخدام البريد الإلكتروني أو المحاولة لاحقاً.");
-                }
                 throw err;
             }
         }
@@ -101,14 +91,13 @@ export default function LoginPage() {
               <div className="h-20 w-20 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
               <ShieldCheck className="h-8 w-8 text-primary absolute inset-0 m-auto animate-pulse" />
           </div>
-          <p className="text-foreground font-black text-xl tracking-tighter">جاري استعادة الجلسة السيادية...</p>
+          <p className="text-foreground font-black text-xl tracking-tighter">جاري استعادة جلسة العمل...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-white/10 relative overflow-hidden" dir="rtl">
-      {/* تأثيرات ضوئية خلفية */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/10 rounded-full blur-[100px] animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
 
@@ -132,7 +121,7 @@ export default function LoginPage() {
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم المعتمد</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد المعتمد</Label>
                             <div className="relative">
                                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                                 <Input 
