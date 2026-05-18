@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -12,7 +13,11 @@ import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
 
-const NovaLogo = () => (
+/**
+ * شعار NE ERP المطور (Inline SVG):
+ * تم برمجته يدوياً لضمان أعلى جودة ظهور واستقلال تام عن أي روابط خارجية.
+ */
+const NELogo = () => (
   <svg width="120" height="120" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
     <circle cx="100" cy="100" r="90" fill="white" fillOpacity="0.1" />
     <path d="M50 150V50L100 150V50" stroke="#FF7A00" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
@@ -56,7 +61,7 @@ export default function DashboardLayout({
             <div className="relative flex flex-col items-center">
                 <div className="h-32 w-32 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)] mb-4" />
                 <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
-                    <NovaLogo />
+                    <NELogo />
                 </div>
             </div>
             <div className="text-center space-y-2">

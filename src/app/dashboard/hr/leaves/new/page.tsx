@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -16,23 +17,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle, User } from 'lucide-react';
+import { useFirebase, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { useBranding } from '@/context/branding-context';
 import { calculateWorkingDays, calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
-import { useSubscription } from '@/hooks/use-subscription';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
-import { format, formatDistanceToNow, isBefore, startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, isBefore } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
+import { cleanFirestoreData, getTenantPath } from '@/lib/utils';
+import { createNotification } from '@/services/notification-service';
 
 const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية',
@@ -50,7 +51,7 @@ export default function NewLeaveRequestPage() {
     const tenantId = currentUser?.currentCompanyId;
 
     const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
-    const { data: publicHolidays, loading: holidaysLoading } = useSubscription<Holiday>(firestore, 'holidays');
+    const { data: publicHolidays = [], loading: holidaysLoading } = useSubscription<Holiday>(firestore, 'holidays');
     const { branding, loading: brandingLoading } = useBranding();
 
     const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -58,24 +59,24 @@ export default function NewLeaveRequestPage() {
     const [startDate, setStartDate] = useState<Date | undefined>();
     const [endDate, setEndDate] = useState<Date | undefined>();
     const [notes, setNotes] = useState('');
-    const [passportReceived, setPassportReceived] = useState(false);
     
-    const [lastLeaveInfo, setLastLeaveInfo] = useState<LeaveRequest | null>(null);
     const [overlapError, setOverlapError] = useState<string | null>(null);
-    const [loadingContext, setLoadingContext] = useState(false);
-    const [hasCheckedContext, setHasCheckedContext] = useState(false);
-
     const [isSaving, setIsSaving] = useState(false);
     const savingRef = useRef(false);
+
+    // 🛡️ تعريف صلاحية الإدارة (Sovereign Authority Logic)
+    const isAdmin = useMemo(() => 
+        currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer'
+    , [currentUser]);
 
     useEffect(() => {
         const employeeIdFromUrl = searchParams.get('employeeId');
         if (employeeIdFromUrl) {
             setSelectedEmployeeId(employeeIdFromUrl);
-        } else if (currentUser && currentUser.role !== 'Admin' && currentUser.role !== 'HR') {
+        } else if (currentUser && !isAdmin) {
             setSelectedEmployeeId(currentUser.employeeId || '');
         }
-    }, [currentUser, searchParams]);
+    }, [currentUser, searchParams, isAdmin]);
 
     useEffect(() => {
         if (startDate && endDate && isBefore(startOfDay(endDate), startOfDay(startDate))) {
@@ -83,74 +84,48 @@ export default function NewLeaveRequestPage() {
             toast({
                 variant: 'destructive',
                 title: 'تنبيه تاريخ',
-                description: 'عذراً، تاريخ نهاية الإجازة يجب أن يكون بعد تاريخ البداية.',
+                description: 'تاريخ نهاية الإجازة يجب أن يكون لاحقاً لتاريخ البداية.',
             });
         }
         setOverlapError(null);
     }, [startDate, endDate, toast]);
 
+    // 🛡️ رادار فحص التداخل
     useEffect(() => {
-        if (!firestore || !selectedEmployeeId || !tenantId) {
-            setLastLeaveInfo(null);
-            setHasCheckedContext(false);
-            return;
-        }
+        if (!firestore || !selectedEmployeeId || !startDate || !endDate || !tenantId) return;
 
-        const fetchLastLeave = async () => {
-            setLoadingContext(true);
+        const checkOverlaps = async () => {
             try {
-                const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
+                const leavePath = getTenantPath('leaveRequests', tenantId);
                 const q = query(
-                    collection(firestore, leaveCollectionPath),
+                    collection(firestore, leavePath),
                     where('employeeId', '==', selectedEmployeeId)
                 );
                 const snap = await getDocs(q);
                 
-                const history = snap.docs
-                    .map(d => ({ id: d.id, ...d.data() } as LeaveRequest))
-                    .filter(l => ['approved', 'on-leave', 'returned'].includes(l.status))
-                    .sort((a, b) => {
-                        const dateB = toFirestoreDate(b.endDate)?.getTime() || 0;
-                        const dateA = toFirestoreDate(a.endDate)?.getTime() || 0;
-                        return dateB - dateA;
-                    });
+                const hasOverlap = snap.docs.some(docSnap => {
+                    const existing = docSnap.data() as LeaveRequest;
+                    if (!['pending', 'approved', 'on-leave'].includes(existing.status)) return false;
+                    const exStart = toFirestoreDate(existing.startDate);
+                    const exEnd = toFirestoreDate(existing.endDate);
+                    return (exStart && exEnd && startOfDay(startDate) <= endOfDay(exEnd) && endOfDay(endDate) >= startOfDay(exStart));
+                });
 
-                if (history.length > 0) {
-                    setLastLeaveInfo(history[0]);
-                } else {
-                    setLastLeaveInfo(null);
-                }
-                setHasCheckedContext(true);
-            } catch (e) {
-                console.error("Context fetch failed:", e);
-            } finally {
-                setLoadingContext(false);
-            }
+                if (hasOverlap) setOverlapError("عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت.");
+                else setOverlapError(null);
+            } catch (e) { console.error(e); }
         };
-
-        fetchLastLeave();
-    }, [firestore, selectedEmployeeId, tenantId]);
+        checkOverlaps();
+    }, [selectedEmployeeId, startDate, endDate, firestore, tenantId]);
 
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
-    const leaveAnalysis = useMemo(() => {
+    const leaveDuration = useMemo(() => {
         if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) {
-            return { totalDays: 0, workingDays: 0, paidDays: 0, unpaidDays: 0 };
+            return { totalDays: 0, workingDays: 0 };
         }
-        
-        const days = calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
-        const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
-        
-        if (!selectedEmployee || leaveType !== 'Annual') {
-            return { ...days, paidDays: days.workingDays, unpaidDays: 0 };
-        }
-
-        const currentBalance = calculateAnnualLeaveBalance(selectedEmployee, new Date());
-        const paidDays = Math.min(days.workingDays, currentBalance);
-        const unpaidDays = Math.max(0, days.workingDays - paidDays);
-
-        return { ...days, paidDays, unpaidDays };
-    }, [startDate, endDate, branding, publicHolidays, employees, selectedEmployeeId, leaveType]);
+        return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
+    }, [startDate, endDate, branding, publicHolidays]);
 
     const employeeOptions = useMemo(() => (employees || []).map(e => ({ value: e.id!, label: e.fullName })), [employees]);
 
@@ -158,93 +133,68 @@ export default function NewLeaveRequestPage() {
         e.preventDefault();
         if (savingRef.current) return;
 
-        if (!firestore || !currentUser || !tenantId || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
+        if (!firestore || !currentUser || !tenantId || !selectedEmployeeId || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
-            return;
-        }
-
-        const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
-        if (!selectedEmployee) {
-             toast({ variant: 'destructive', title: 'خطأ', description: 'لم يتم العثور على الموظف.' });
             return;
         }
 
         savingRef.current = true;
         setIsSaving(true);
-        setOverlapError(null);
 
         try {
-            const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
+            const leavePath = getTenantPath('leaveRequests', tenantId);
+            const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
             
-            // 🛡️ رادار منع التداخل: فحص وجود طلبات أخرى 🛡️
-            const overlapQuery = query(
-                collection(firestore, leaveCollectionPath),
-                where('employeeId', '==', selectedEmployeeId),
-                where('status', 'in', ['pending', 'approved', 'on-leave'])
-            );
-            const overlapSnap = await getDocs(overlapQuery);
-            const hasOverlap = overlapSnap.docs.some(docSnap => {
-                const existing = docSnap.data() as LeaveRequest;
-                const exStart = toFirestoreDate(existing.startDate);
-                const exEnd = toFirestoreDate(existing.endDate);
-                if (!exStart || !exEnd) return false;
-                
-                const requestedStart = startOfDay(startDate);
-                const requestedEnd = endOfDay(endDate);
-                const currentStart = startOfDay(exStart);
-                const currentEnd = endOfDay(exEnd);
-
-                return (requestedStart <= currentEnd && requestedEnd >= currentStart);
-            });
-
-            if (hasOverlap) {
-                const errorMsg = "عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت، يرجى مراجعة التواريخ المحددة.";
-                setOverlapError(errorMsg);
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'تنبيه تداخل', 
-                    description: errorMsg 
-                });
-                setIsSaving(false);
-                savingRef.current = false;
-                return;
-            }
-
-            const newRequest = {
+            const dataToSave = {
                 employeeId: selectedEmployeeId,
-                employeeName: selectedEmployee.fullName,
+                employeeName: selectedEmployee?.fullName || currentUser.fullName,
                 leaveType: leaveType,
                 startDate: startDate,
                 endDate: endDate,
-                days: leaveAnalysis.totalDays,
-                workingDays: leaveAnalysis.workingDays,
-                unpaidDays: leaveAnalysis.unpaidDays,
+                days: leaveDuration.totalDays,
+                workingDays: leaveDuration.workingDays,
                 notes: notes,
-                passportReceived: passportReceived,
                 status: 'pending' as const,
                 createdAt: serverTimestamp(),
                 companyId: tenantId
             };
 
-            await addDoc(collection(firestore, leaveCollectionPath), newRequest);
-            toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
+            await addDoc(collection(firestore, leavePath), cleanFirestoreData(dataToSave));
+            
+            // 🚀 إرسال إشعارات فورية للإدارة والـ HR
+            const adminHRUsersQuery = query(collection(firestore, getTenantPath('users', tenantId)), where('role', 'in', ['Admin', 'HR']));
+            const adminsSnap = await getDocs(adminHRUsersQuery);
+            adminsSnap.forEach(adminDoc => {
+                if (adminDoc.id !== currentUser.id) {
+                    createNotification(firestore, {
+                        userId: adminDoc.id,
+                        title: 'طلب إجازة جديد',
+                        body: `قدم الموظف ${selectedEmployee?.fullName || currentUser.fullName} طلب إجازة ${leaveTypeTranslations[leaveType]}.`,
+                        link: `/dashboard/hr/leaves`
+                    });
+                }
+            });
+
+            toast({ title: 'تم تقديم الطلب', description: 'تم إخطار الإدارة والـ HR بطلبك بنجاح.' });
             router.push('/dashboard/hr/leaves');
         } catch (error) {
-            savingRef.current = false;
             setIsSaving(false);
-            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الطلب، يرجى المحاولة مرة أخرى.' });
+            savingRef.current = false;
+            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
         }
     };
     
+    if (loading) return <div className="p-8 max-w-4xl mx-auto"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
+
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-20" dir="rtl">
-            <div className="no-print flex items-center justify-between mb-4">
+            <div className="no-print flex items-center justify-between mb-4 px-2">
                 <Button variant="ghost" onClick={() => router.back()} className="gap-2 font-bold">
                     <ArrowRight className="h-4 w-4" /> العودة
                 </Button>
             </div>
 
-            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-white">
                 <form onSubmit={handleSubmit}>
                     <CardHeader className="bg-primary/5 pb-8 border-b">
                         <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>
@@ -252,12 +202,10 @@ export default function NewLeaveRequestPage() {
                     </CardHeader>
                     <CardContent className="p-8 space-y-6">
                         {overlapError && (
-                            <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 shadow-sm animate-in zoom-in-95 py-6">
+                            <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 py-6 animate-in zoom-in-95">
                                 <AlertCircle className="h-6 w-6 text-red-600" />
                                 <AlertTitle className="text-lg font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
-                                <AlertDescription className="text-sm font-bold text-red-700 mt-2 leading-relaxed">
-                                    {overlapError}
-                                </AlertDescription>
+                                <AlertDescription className="text-sm font-bold text-red-700 mt-2">{overlapError}</AlertDescription>
                             </Alert>
                         )}
 
@@ -268,8 +216,8 @@ export default function NewLeaveRequestPage() {
                                     value={selectedEmployeeId}
                                     onSelect={setSelectedEmployeeId}
                                     options={employeeOptions}
-                                    placeholder={loading ? 'جاري التحميل...' : 'اختر موظفاً من القائمة...'}
-                                    disabled={loading || isSaving}
+                                    placeholder="اختر موظفاً من القائمة..."
+                                    disabled={isSaving}
                                     className="h-12 rounded-xl border-2"
                                 />
                             ) : (
@@ -321,13 +269,13 @@ export default function NewLeaveRequestPage() {
                         )}
 
                         <div className="grid gap-2">
-                            <Label className="font-bold text-gray-700 pr-1">السبب / ملاحظات الطلب *</Label>
-                            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" placeholder="اذكر سبب الإجازة..." disabled={isSaving} />
+                            <Label className="font-bold text-gray-700 pr-1">السبب / ملاحظات إضافية *</Label>
+                            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4" placeholder="اذكر سبب الإجازة بوضوح..." disabled={isSaving} />
                         </div>
                     </CardContent>
                     <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
-                        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
-                        <Button type="submit" disabled={isSaving || loading || !!overlapError} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[280px]">
+                        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
+                        <Button type="submit" disabled={isSaving || !!overlapError} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[280px]">
                             {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6" />}
                             إرسال الطلب للمراجعة
                         </Button>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -177,7 +178,7 @@ export function BrandingManager() {
                 updatedAt: serverTimestamp()
             }, { merge: true });
             
-            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية والمطبوعات للمنشأة.' });
+            toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية للمنشأة.' });
             setFilesToUpload({});
 
         } catch (error: any) {
@@ -205,7 +206,7 @@ export function BrandingManager() {
                             </div>
                             <div>
                                 <CardTitle className="text-2xl font-black text-[#1e1b4b]">تخصيص الهوية والمطبوعات</CardTitle>
-                                <CardDescription className="text-base font-bold text-slate-500">تحكم في ظهور منشأتك في التقارير، السندات، والواجهة الرئيسية.</CardDescription>
+                                <CardDescription className="text-base font-bold text-slate-500">تحكم في ظهور منشأتك في التقارير والواجهة الرئيسية.</CardDescription>
                             </div>
                         </div>
                         <Button onClick={() => router.back()} variant="ghost" className="rounded-xl font-bold gap-2 text-slate-500 hover:bg-white no-print">

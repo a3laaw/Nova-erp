@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -117,26 +118,25 @@ export function LeaveRequestsList() {
             status: requestToProcess.action,
             [requestToProcess.action === 'approved' ? 'approvedBy' : 'rejectedBy']: currentUser.id,
             [requestToProcess.action === 'approved' ? 'approvedAt' : 'rejectedAt']: serverTimestamp(),
-            rejectionReason: adminComment,
             adminComment: adminComment 
         };
         
         await updateDoc(doc(firestore, finalPath), requestData);
         
-        // 🚀 إرسال إشعار للموظف بالقرار
+        // 🚀 إرسال إشعار للموظف بالقرار النهائي
         const targetUserId = await findUserIdByEmployeeId(firestore, requestToProcess.req.employeeId);
         if (targetUserId) {
             createNotification(firestore, {
                 userId: targetUserId,
-                title: requestToProcess.action === 'approved' ? '✅ تمت الموافقة على إجازتك' : '❌ تم رفض طلب الإجازة',
-                body: `قامت الإدارة بـ ${requestToProcess.action === 'approved' ? 'قبول' : 'رفض'} طلب إجازتك. ${adminComment ? `ملاحظة الإدارة: ${adminComment}` : ''}`,
+                title: requestToProcess.action === 'approved' ? '✅ موافقة على الإجازة' : '❌ رفض طلب الإجازة',
+                body: `تم ${requestToProcess.action === 'approved' ? 'قبول' : 'رفض'} طلب إجازتك من قبل الإدارة. ملاحظة: ${adminComment || 'لا توجد ملاحظات إضافية.'}`,
                 link: `/dashboard/hr/leaves/${requestToProcess.req.id}`
             });
         }
         
         toast({ 
             title: requestToProcess.action === 'approved' ? 'تم القبول' : 'تم الرفض', 
-            description: 'تم تحديث حالة الطلب وإشعار الموظف فورا.' 
+            description: 'تم تحديث حالة الطلب وإخطار الموظف آلياً.' 
         });
         
         setRequestToProcess(null);
@@ -191,13 +191,13 @@ export function LeaveRequestsList() {
                             <DropdownMenuLabel className="font-black px-3 py-2 text-xs text-slate-400 uppercase">خيارات الطلب</DropdownMenuLabel>
                             
                             <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-2">
-                                <Link href={`/dashboard/hr/leaves/${req.id}`}><Eye className="h-4 w-4 text-primary" /> عرض تفاصيل الرد</Link>
+                                <Link href={`/dashboard/hr/leaves/${req.id}`}><Eye className="h-4 w-4 text-primary" /> عرض الرد الإداري</Link>
                             </DropdownMenuItem>
 
                             {isAdmin && req.status === 'pending' && (
                                 <>
                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                    <DropdownMenuItem onClick={() => setRequestToProcess({ req, action: 'approved' })} className="text-green-600 font-bold gap-2 rounded-lg py-3"><CheckCircle className="h-4 w-4"/> قبول مع ملاحظة</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setRequestToProcess({ req, action: 'approved' })} className="text-green-600 font-bold gap-2 rounded-lg py-3"><CheckCircle className="h-4 w-4"/> موافقة فورية</DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setRequestToProcess({ req, action: 'rejected' })} className="text-red-600 font-bold gap-2 rounded-lg py-3"><X className="h-4 w-4"/> رفض مع ذكر السبب</DropdownMenuItem>
                                 </>
                             )}
@@ -262,12 +262,12 @@ export function LeaveRequestsList() {
                 <div className="grid gap-3">
                     <Label className="font-black text-slate-700 flex items-center gap-2">
                         <MessageSquare className="h-4 w-4 text-primary" />
-                        الرد الإداري أو سبب الرفض *
+                        الرد الإداري أو مبررات الرفض *
                     </Label>
                     <Textarea 
                         value={adminComment}
                         onChange={(e) => setAdminComment(e.target.value)}
-                        placeholder="اكتب ردك هنا ليرزه الموظف فوراً..."
+                        placeholder="اكتب ردك هنا ليرزه الموظف في إشعاراته فوراً..."
                         className="rounded-2xl border-2 p-4 text-base font-medium min-h-[140px] focus:ring-primary/20"
                     />
                 </div>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
-const NovaLogo = () => (
+const NELogo = () => (
   <svg width="120" height="120" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
     <circle cx="100" cy="100" r="90" fill="white" fillOpacity="0.1" />
     <path d="M50 150V50L100 150V50" stroke="#FF7A00" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
@@ -93,7 +94,7 @@ export default function LoginPage() {
           <div className="relative">
               <div className="h-24 w-24 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
               <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
-                  <NovaLogo />
+                  <NELogo />
               </div>
           </div>
           <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري فتح جلسة العمل...</p>

@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview محرك الحسابات القانونية (HR & Labor Law Engine).
  * يطبق قوانين العمل في دولة الكويت (القطاع الأهلي) بدقة رياضية.
@@ -52,11 +53,11 @@ export function calculateWorkingDays(
 
 /**
  * محرك تحليل شرائح الإجازة المرضية (Kuwaiti Labor Law Tiers)
- * - الأيام 1-15: 100% (أجر كامل)
- * - الأيام 16-25: 75%
- * - الأيام 26-35: 50%
- * - الأيام 36-45: 25%
- * - الأيام 46-75: 0% (بدون أجر)
+ * - الأيام 1-15: 100% (أجر كامل) [e.gov.kw]
+ * - الأيام 16-25: 75% [e.gov.kw]
+ * - الأيام 26-35: 50% [e.gov.kw]
+ * - الأيام 36-45: 25% [e.gov.kw]
+ * - الأيام 46-75: 0% (بدون أجر) [e.gov.kw]
  */
 export const calculateSickLeaveTiers = (totalUsedBefore: number, requestedDays: number) => {
   const tiers = [
@@ -73,11 +74,8 @@ export const calculateSickLeaveTiers = (totalUsedBefore: number, requestedDays: 
 
   for (const tier of tiers) {
     if (remainingToDistribute <= 0) break;
-    
-    // إذا كان الموظف قد استهلك هذه الشريحة بالكامل سابقاً، ننتقل للتالية
     if (currentUsedCounter >= tier.end) continue;
 
-    // حساب المتبقي المتاح في هذه الشريحة
     const tierCapacity = tier.end - currentUsedCounter;
     const daysInThisTier = Math.min(remainingToDistribute, tierCapacity);
 
@@ -88,7 +86,6 @@ export const calculateSickLeaveTiers = (totalUsedBefore: number, requestedDays: 
     }
   }
 
-  // أي أيام تتجاوز الـ 75 يوماً تعتبر تلقائياً بدون أجر
   if (remainingToDistribute > 0) {
     breakdown.push({ label: 'بدون أجر (تجاوز 75 يوم)', days: remainingToDistribute, rate: 0 });
   }
@@ -114,7 +111,7 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
 };
 
 /**
- * محرك مكافأة نهاية الخدمة
+ * محرك مكافأة نهاية الخدمة (مادة 51/53)
  */
 export const calculateGratuity = (
     employee: Employee, 
