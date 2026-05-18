@@ -73,7 +73,7 @@ export function LeaveRequestsList() {
   // 🛡️ رادار الاستعلام السيادي: تم تحصينه لضمان رؤية الموظف لكافة طلباته (القديمة والجديدة)
   const queryConstraints = useMemo(() => {
       const constraints = [];
-      // للمدير: يرى كل شيء. للموظف: نرى ما يخص رقمنا الوظيفي لضمان ظهور البيانات القديمة والجديدة
+      // للمدير: يرى كل شيء. للموظف: يرى ما يخصه (سواء بالـ employeeId أو بكونه المنشئ)
       if (!isAdmin && currentUser?.employeeId) {
           constraints.push(where('employeeId', '==', currentUser.employeeId));
       }
@@ -201,7 +201,7 @@ export function LeaveRequestsList() {
                             
                             {req.status === 'pending' && (
                                 <DropdownMenuItem className="text-red-600 font-black gap-2 rounded-lg py-3 focus:bg-red-50" onClick={() => setRequestToDelete(req)}>
-                                    <Trash2 className="h-4 w-4" /> حذف الطلب
+                                    <Trash2 className="ml-2 h-4 w-4" /> حذف الطلب
                                 </DropdownMenuItem>
                             )}
                         </DropdownMenuContent>

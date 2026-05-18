@@ -30,13 +30,12 @@ import {
     MessageSquare,
     ShieldCheck
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
-import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -194,7 +193,7 @@ export default function LeaveRequestDetailsPage() {
 
                 <main className="py-12 space-y-12">
                     {/* 🛡️ رادار رد الإدارة السيادي (Management Reply Radar) 🛡️ */}
-                    {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason) && (
+                    {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason || leaveRequest.adminComment) && (
                         <Alert 
                             variant={leaveRequest.status === 'rejected' ? 'destructive' : 'default'} 
                             className={cn(
@@ -327,4 +326,3 @@ export default function LeaveRequestDetailsPage() {
         </div>
     );
 }
-
