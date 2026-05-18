@@ -37,7 +37,7 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🎨 شاشة التحميل بالهوية الجديدة (خلفية فاتحة وتوهج برتقالي/ذهبي)
+  // 🎨 شاشة التحميل بالهوية الذهبية والبرتقالية 🎨
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">

@@ -48,8 +48,11 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   
   const isAdmin = ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '');
 
+  // 🛡️ تصفير الحالة عند الفتح لمنع تعليق زر التحميل أو رسائل الخطأ القديمة
   useEffect(() => {
     if (isOpen) {
+        setIsSaving(false);
+        setOverlapError(null);
         if (permissionToEdit) {
             setSelectedEmployeeId(permissionToEdit.employeeId);
             setPermissionType(permissionToEdit.type);
@@ -63,11 +66,12 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             setReason('');
             setDurationHours('1');
         }
-        setOverlapError(null);
     }
   }, [isOpen, permissionToEdit, currentUser, isAdmin]);
 
+  // 🛡️ رادار تصفير الأخطاء عند تغيير المدخلات (تاريخ أو موظف)
   useEffect(() => {
+    setOverlapError(null);
     if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
         setMonthlyTotalHours(0);
         return;
@@ -80,7 +84,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             const monthEnd = endOfMonth(date);
             const permissionsPath = getTenantPath('permissionRequests', tenantId);
             
-            // 🛡️ استعلام "خالٍ من الفهارس": جلب كافة طلبات الموظف والفلترة برمجياً لتجنب خطأ الـ Index 🛡️
             const q = query(
                 collection(firestore, permissionsPath),
                 where('employeeId', '==', selectedEmployeeId)
@@ -132,12 +135,9 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     setOverlapError(null);
 
     try {
-      const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
       const checkDateStart = startOfDay(date);
-
       const leavesPath = getTenantPath('leaveRequests', tenantId);
       
-      // 🛡️ فلترة برمجية لتجنب الفهرس المركب 🛡️
       const leavesQuery = query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId));
       const leavesSnapshot = await getDocs(leavesQuery);
       const hasOverlappingLeave = leavesSnapshot.docs.some(docSnap => {
@@ -156,7 +156,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       const permissionsPath = getTenantPath('permissionRequests', tenantId);
       const dataToSave = {
         employeeId: selectedEmployeeId,
-        employeeName: selectedEmployee?.fullName || currentUser.fullName,
+        employeeName: employees.find(e => e.id === selectedEmployeeId)?.fullName || currentUser.fullName,
         type: permissionType,
         date: date,
         durationHours: duration,

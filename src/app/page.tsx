@@ -84,6 +84,7 @@ export default function LoginPage() {
       } finally { setIsSubmitting(false); }
   };
 
+  // 🎨 شاشة التحميل الذهبية الموحدة 🎨
   if (globalLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#FFFDF0]" dir="rtl">
