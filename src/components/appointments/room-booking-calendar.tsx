@@ -253,7 +253,10 @@ export default function RoomBookingCalendar() {
         <div className="border rounded-lg overflow-x-auto bg-card">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                <colgroup><col className="w-[6rem] sm:w-[8rem]" />{slots.map((_, i) => <col key={i} className="w-[7rem] sm:w-[8rem]" />)}</colgroup>
+                <colgroup>
+                    <col className="w-[6rem] sm:w-[8rem]" />
+                    {slots.map((_, i) => <col key={i} className="w-[7rem] sm:w-[8rem]" />)}
+                </colgroup>
                 <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>{slots.map(time => <th key={time} className="p-1 sm:p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
                 <tbody>
                     {rooms.map(room => (
@@ -271,7 +274,7 @@ export default function RoomBookingCalendar() {
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-md cursor-pointer transition-all hover:brightness-95 shadow-sm h-full relative" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
-                                                        {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة</Badge>}
+                                                        {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة رسمية</Badge>}
                                                         <p className="font-bold text-[10px] sm:text-xs leading-tight">{booking.title}</p>
                                                         <p className="text-[9px] sm:text-[10px] mt-1">{booking.clientName}</p>
                                                     </div>
@@ -406,7 +409,8 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent dir="rtl" className="max-w-md rounded-3xl">
                  <form onSubmit={handleSubmit}>
-                    <DialogHeader><DialogTitle>{isEditing ? 'تعديل الحجز' : 'حجز جديد'}</DialogTitle><DialogDescription>حجز {dialogData.room} يوم {format(dialogData.appointmentDate, 'PP', { locale: ar })} الساعة {format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>{isEditing ? 'تعديل الحجز' : 'حجز جديد'}</DialogTitle><DialogDescription>حجز {dialogData.room} يوم {format(dialogData.appointmentDate, 'PP', { locale: ar })} الساعة {format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription></DialogHeader>
                     <div className="py-4 grid gap-4">
                          <div className="grid gap-2"><Label>عنوان الاجتماع</Label><Input value={title} onChange={e => setTitle(e.target.value)} required className="rounded-xl" /></div>
                         <div className="grid gap-2"><Label>العميل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clientOptions} placeholder="اختر العميل..." className="rounded-xl" /></div>

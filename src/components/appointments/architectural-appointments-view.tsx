@@ -31,7 +31,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, PlaneTakeoff } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, PlaneTakeoff, GripVertical } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
@@ -204,11 +204,11 @@ export default function ArchitecturalAppointmentsView() {
         const leavesPath = getTenantPath('leaveRequests', tenantId);
 
         getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave', 'terminated']))).then(snap => {
-            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري') && e.status !== 'terminated').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري') && e.status !== 'terminated').sort((a, b) => a.fullName.localeCompare(b.nameAr));
             setEngineers(arch);
         });
         getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))).then(snap => {
-            const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
+            const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr));
             setClients(clientsList);
         });
         getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
@@ -228,13 +228,6 @@ export default function ArchitecturalAppointmentsView() {
 
     useEffect(() => { if (date) fetchAppointments(date); }, [date, fetchAppointments]);
 
-    const appointments = useMemo(() => {
-      if (!rawAppointments) return [];
-      return rawAppointments.filter(appt => appt.status !== 'cancelled').map(appt => ({
-          ...appt, clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-      }));
-    }, [rawAppointments, clients]);
-
     const getEmployeeLeaveForDate = useCallback((employeeId: string, checkDate: Date) => {
         return leaveRequests.find(req => {
             if (req.employeeId !== employeeId) return false;
@@ -244,6 +237,13 @@ export default function ArchitecturalAppointmentsView() {
             return isWithinInterval(startOfDay(checkDate), { start: startOfDay(start), end: endOfDay(end) });
         });
     }, [leaveRequests]);
+
+    const appointments = useMemo(() => {
+      if (!rawAppointments) return [];
+      return rawAppointments.filter(appt => appt.status !== 'cancelled').map(appt => ({
+          ...appt, clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
+      }));
+    }, [rawAppointments, clients]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -278,7 +278,10 @@ export default function ArchitecturalAppointmentsView() {
         <div className="border rounded-lg overflow-x-auto bg-card">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                <colgroup><col className="w-[10rem]" /><{slots.map((_, i) => <col key={i} className="w-[8rem]" />)}</colgroup>
+                <colgroup>
+                    <col className="w-[10rem]" />
+                    {slots.map((_, i) => <col key={i} className="w-[8rem]" />)}
+                </colgroup>
                 <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">المهندس</th>{slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
                 <tbody>
                     {engineers.map(eng => {
@@ -295,9 +298,8 @@ export default function ArchitecturalAppointmentsView() {
                                 {isOnLeave && (
                                     <div className="flex flex-col items-center mt-1">
                                         <Badge variant="outline" className="bg-red-50 text-[8px] font-black text-red-600 border-red-200 gap-1 flex items-center justify-center">
-                                            <PlaneTakeoff className="h-2 w-2"/> في إجازة
+                                            <PlaneTakeoff className="h-2 w-2"/> في إجازة رسمية
                                         </Badge>
-                                        <span className="text-[7px] font-bold text-red-400 mt-0.5">({activeLeave?.leaveType === 'Sick' ? 'مرضية' : 'رسمية'})</span>
                                     </div>
                                 )}
                             </th>
@@ -345,22 +347,6 @@ export default function ArchitecturalAppointmentsView() {
 
     if (brandingLoading || loading) return <Skeleton className="h-[500px] w-full rounded-3xl" />;
 
-    if (!hasWorkHours) {
-        return (
-             <Card className="mt-4 rounded-3xl border-2 border-dashed">
-                <CardHeader>
-                    <CardTitle className="text-center">لم يتم تكوين أوقات الدوام</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center text-muted-foreground pb-10">
-                    <p>الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات عمل القسم المعماري.</p>
-                    <Button asChild className="mt-6 rounded-xl font-bold">
-                        <Link href="/dashboard/settings/work-hours">الذهاب إلى الإعدادات</Link>
-                    </Button>
-                </CardContent>
-            </Card>
-        )
-    }
-
     return (
         <div className="space-y-6" dir='rtl'>
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-2xl border no-print">
@@ -397,7 +383,6 @@ export default function ArchitecturalAppointmentsView() {
     );
 }
 
-// --- مكون نافذة الحجز ---
 function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, firestore, currentUser }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
@@ -445,7 +430,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent dir="rtl" className="max-w-md rounded-3xl">
                 <form onSubmit={handleSubmit}>
-                    <DialogHeader><DialogTitle>حجز موعد جديد</DialogTitle><DialogDescription>{dialogData?.engineerName} - {dialogData?.appointmentDate && format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>حجز موعد جديد</DialogTitle>
+                        <DialogDescription>{dialogData?.engineerName} - {dialogData?.appointmentDate && format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription>
+                    </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2"><Label>الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="rounded-xl" /></div>
                         <div className="flex items-center gap-2 pt-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} /><Label>عميل جديد (غير مسجل)</Label></div>
