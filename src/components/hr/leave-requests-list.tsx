@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, X, Pencil, CheckCircle, Eye, AlertCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, X, Pencil, CheckCircle, Eye, AlertCircle, MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { LeaveRequest } from '@/lib/types';
@@ -37,6 +37,7 @@ import { useAuth } from '@/context/auth-context';
 import { cn, getTenantPath } from '@/lib/utils';
 import Link from 'next/link';
 import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -63,9 +64,9 @@ export function LeaveRequestsList() {
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // States for Rejection Logic
-  const [requestToReject, setRequestToReject] = useState<LeaveRequest | null>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
+  // States for Decision Engine (Accept/Reject with Reason)
+  const [requestToProcess, setRequestToProcess] = useState<{ req: LeaveRequest, action: 'approved' | 'rejected' } | null>(null);
+  const [adminComment, setAdminComment] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
@@ -98,39 +99,35 @@ export function LeaveRequestsList() {
     }
   };
 
-  const handleApprove = async (req: LeaveRequest) => {
-    if (!firestore || !tenantId || !currentUser) return;
-    try {
-        const finalPath = getTenantPath(`leaveRequests/${req.id}`, tenantId);
-        await updateDoc(doc(firestore, finalPath), {
-            status: 'approved',
-            approvedBy: currentUser.id,
-            approvedAt: serverTimestamp()
-        });
-        toast({ title: '✅ تمت الموافقة على الطلب بنجاح' });
-    } catch (e) { toast({ variant: 'destructive', title: 'عائق صلاحيات' }); }
-  };
-
-  const handleConfirmReject = async () => {
-    if (!requestToReject || !firestore || !tenantId || !currentUser || !rejectionReason.trim()) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'يجب ذكر سبب الرفض.' });
+  const handleConfirmDecision = async () => {
+    if (!requestToProcess || !firestore || !tenantId || !currentUser) return;
+    
+    // يفرض النظام كتابة سبب في حالة الرفض فقط كمعيار رقابي
+    if (requestToProcess.action === 'rejected' && !adminComment.trim()) {
+        toast({ variant: 'destructive', title: 'خطأ', description: 'يجب ذكر سبب الرفض لتوضيح القرار للموظف.' });
         return;
     }
 
     setIsProcessingAction(true);
     try {
-        const finalPath = getTenantPath(`leaveRequests/${requestToReject.id}`, tenantId);
+        const finalPath = getTenantPath(`leaveRequests/${requestToProcess.req.id}`, tenantId);
         await updateDoc(doc(firestore, finalPath), {
-            status: 'rejected',
-            rejectedBy: currentUser.id,
-            rejectedAt: serverTimestamp(),
-            rejectionReason: rejectionReason
+            status: requestToProcess.action,
+            [requestToProcess.action === 'approved' ? 'approvedBy' : 'rejectedBy']: currentUser.id,
+            [requestToProcess.action === 'approved' ? 'approvedAt' : 'rejectedAt']: serverTimestamp(),
+            rejectionReason: adminComment, // نستخدم نفس الحقل للرسالة الإدارية
+            adminComment: adminComment // حقل إضافي للتوثيق
         });
-        toast({ title: '❌ تم رفض الطلب وتوثيق السبب' });
-        setRequestToReject(null);
-        setRejectionReason('');
+        
+        toast({ 
+            title: requestToProcess.action === 'approved' ? '✅ تم القبول' : '❌ تم الرفض', 
+            description: 'تم تحديث حالة الطلب وإرسال الرد للموظف.' 
+        });
+        
+        setRequestToProcess(null);
+        setAdminComment('');
     } catch (e) { 
-        toast({ variant: 'destructive', title: 'خطأ في العملية' }); 
+        toast({ variant: 'destructive', title: 'خطأ في ترحيل القرار' }); 
     } finally { 
         setIsProcessingAction(false); 
     }
@@ -162,7 +159,7 @@ export function LeaveRequestsList() {
               <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-bold">لا توجد طلبات إجازة حالياً.</TableCell></TableRow>
             ) : (
               leaveRequests.map(req => (
-                <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 h-16">
+                <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 h-16 group transition-colors">
                   <TableCell className="px-8 font-black text-slate-800">
                       <Link href={`/dashboard/hr/leaves/${req.id}`} className="hover:underline flex items-center gap-2">
                          {req.employeeName}
@@ -185,8 +182,8 @@ export function LeaveRequestsList() {
                             {isAdmin && req.status === 'pending' && (
                                 <>
                                     <DropdownMenuSeparator className="bg-slate-100" />
-                                    <DropdownMenuItem onClick={() => handleApprove(req)} className="text-green-600 font-bold gap-2 rounded-lg py-3"><CheckCircle className="h-4 w-4"/> موافقة إدارية</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setRequestToReject(req)} className="text-red-600 font-bold gap-2 rounded-lg py-3"><X className="h-4 w-4"/> رفض الطلب</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setRequestToProcess({ req, action: 'approved' })} className="text-green-600 font-bold gap-2 rounded-lg py-3"><CheckCircle className="h-4 w-4"/> قبول مع ملاحظة</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setRequestToProcess({ req, action: 'rejected' })} className="text-red-600 font-bold gap-2 rounded-lg py-3"><X className="h-4 w-4"/> رفض مع ذكر السبب</DropdownMenuItem>
                                 </>
                             )}
                             
@@ -229,35 +226,50 @@ export function LeaveRequestsList() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 🛡️ حوار رفض الإجازة مع ذكر السبب 🛡️ */}
-      <AlertDialog open={!!requestToReject} onOpenChange={() => { setRequestToReject(null); setRejectionReason(''); }}>
-        <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
-            <AlertDialogHeader>
-                <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4 shadow-inner">
-                    <AlertCircle className="h-8 w-8" />
+      {/* 🛡️ حوار اتخاذ القرار (قبو ردود الإدارة) 🛡️ */}
+      <AlertDialog open={!!requestToProcess} onOpenChange={() => { setRequestToProcess(null); setAdminComment(''); }}>
+        <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl overflow-hidden p-0">
+            <AlertDialogHeader className={cn("p-8 text-white", requestToProcess?.action === 'approved' ? "bg-green-600" : "bg-red-600")}>
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                        {requestToProcess?.action === 'approved' ? <CheckCircle className="h-8 w-8 text-white" /> : <AlertCircle className="h-8 w-8 text-white" />}
+                    </div>
+                    <div>
+                        <AlertDialogTitle className="text-2xl font-black text-white">
+                            {requestToProcess?.action === 'approved' ? 'قبول طلب الإجازة' : 'رفض طلب الإجازة'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-white/80 font-bold">
+                            للموظف: {requestToProcess?.req.employeeName}
+                        </AlertDialogDescription>
+                    </div>
                 </div>
-                <AlertDialogTitle className="text-2xl font-black text-red-800">رفض طلب الإجازة</AlertDialogTitle>
-                <AlertDialogDescription className="text-base font-bold text-slate-600">
-                    الرجاء ذكر سبب الرفض للموظف "{requestToReject?.employeeName}". سيتم عرض هذا السبب للموظف في صفحة التفاصيل.
-                </AlertDialogDescription>
             </AlertDialogHeader>
-            <div className="py-4">
-                <Textarea 
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="اكتب سبب الرفض هنا (مثلاً: ضغط عمل في المشروع، نقص عمالة...)"
-                    className="rounded-2xl border-2 p-4 text-sm font-bold min-h-[120px]"
-                />
+            <div className="p-8 space-y-6">
+                <div className="grid gap-3">
+                    <Label className="font-black text-slate-700 flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                        {requestToProcess?.action === 'approved' ? 'ملاحظة إدارية إضافية (اختياري)' : 'سبب الرفض الإداري (إلزامي) *'}
+                    </Label>
+                    <Textarea 
+                        value={adminComment}
+                        onChange={(e) => setAdminComment(e.target.value)}
+                        placeholder={requestToProcess?.action === 'approved' ? "مثال: استمتع بإجازتك، يرجى تسليم العهدة..." : "اشرح سبب الرفض للموظف..."}
+                        className="rounded-2xl border-2 p-4 text-base font-medium min-h-[140px] focus:ring-primary/20"
+                    />
+                </div>
             </div>
-            <AlertDialogFooter className="gap-2">
-                <AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel>
-                <AlertDialogAction 
-                    onClick={handleConfirmReject} 
-                    disabled={isProcessingAction || !rejectionReason.trim()} 
-                    className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-10"
+            <AlertDialogFooter className="p-8 bg-muted/10 border-t gap-3 flex flex-row-reverse">
+                <Button 
+                    onClick={handleConfirmDecision} 
+                    disabled={isProcessingAction || (requestToProcess?.action === 'rejected' && !adminComment.trim())} 
+                    className={cn(
+                        "flex-1 h-14 rounded-2xl font-black text-lg shadow-xl",
+                        requestToProcess?.action === 'approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                    )}
                 >
-                    {isProcessingAction ? <Loader2 className="animate-spin h-4 w-4"/> : 'تأكيد الرفض النهائي'}
-                </AlertDialogAction>
+                    {isProcessingAction ? <Loader2 className="animate-spin h-6 w-6"/> : 'تأكيد وحفظ القرار'}
+                </Button>
+                <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2">إلغاء</AlertDialogCancel>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

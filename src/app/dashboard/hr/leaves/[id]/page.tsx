@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -27,7 +28,9 @@ import {
     ArrowDownCircle, 
     Calculator, 
     FileCheck, 
-    AlertCircle 
+    AlertCircle,
+    MessageSquare,
+    ShieldCheck
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -81,7 +84,7 @@ function InfoRow({ label, value, icon }: { label: string, value: string | React.
         <div className="flex gap-4 text-sm">
             <div className="text-muted-foreground shrink-0">{icon}</div>
             <div className="font-semibold w-24 shrink-0">{label}:</div>
-            <div className="break-words">{value}</div>
+            <div className="break-words text-slate-900">{value}</div>
         </div>
     )
 }
@@ -117,10 +120,7 @@ export default function LeaveRequestDetailsPage() {
             const batch = writeBatch(firestore);
             batch.update(doc(firestore, reqPath), { status: 'on-leave', actualStartDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'on-leave' });
-            await batch.commit().catch(async (e) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
-                throw e;
-            });
+            await batch.commit();
             toast({ title: 'تم تسجيل المغادرة' });
             setIsStartDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
@@ -136,10 +136,7 @@ export default function LeaveRequestDetailsPage() {
             const batch = writeBatch(firestore);
             batch.update(doc(firestore, reqPath), { status: 'returned', actualReturnDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'active' });
-            await batch.commit().catch(async (e) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
-                throw e;
-            });
+            await batch.commit();
             toast({ title: 'تمت المباشرة' });
             setIsReturnDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
@@ -152,106 +149,174 @@ export default function LeaveRequestDetailsPage() {
     const endDate = toFirestoreDate(leaveRequest.endDate);
 
     return (
-        <div className="space-y-6" dir="rtl">
-            <div className="no-print flex justify-between items-center bg-[#F8F9FE] p-4 rounded-[2rem] border shadow-inner">
-                 <Button variant="ghost" onClick={() => router.back()} className="font-bold gap-2">
+        <div className="space-y-6 max-w-4xl mx-auto pb-20" dir="rtl">
+            <div className="no-print flex justify-between items-center bg-white/60 backdrop-blur-md p-4 rounded-[2rem] border-2 border-white/80 shadow-sm mb-4">
+                 <Button variant="ghost" onClick={() => router.back()} className="font-bold gap-2 rounded-xl">
                     <ArrowRight className="h-4 w-4"/> عودة للقائمة
                 </Button>
                 <div className="flex gap-3">
                     {leaveRequest.status === 'approved' && (
-                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 font-black gap-2 rounded-xl text-white">
+                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.startDate) || new Date()); setIsStartDialogOpen(true); }} className="bg-blue-600 font-black gap-2 rounded-xl text-white shadow-lg">
                             <PlaneTakeoff className="h-4 w-4"/> تسجيل المغادرة
                         </Button>
                     )}
                     {leaveRequest.status === 'on-leave' && (
-                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 font-black gap-2 rounded-xl text-white">
+                        <Button onClick={() => { setActualDate(toFirestoreDate(leaveRequest.endDate) || new Date()); setIsReturnDialogOpen(true); }} className="bg-indigo-600 font-black gap-2 rounded-xl text-white shadow-lg">
                             <Home className="h-4 w-4"/> إشعار مباشرة العمل
                         </Button>
                     )}
-                    <Button onClick={() => window.print()} variant="outline" className="rounded-xl font-bold gap-2"><Printer className="h-4 w-4"/> طباعة</Button>
+                    <Button onClick={() => window.print()} variant="outline" className="rounded-xl font-bold gap-2 border-2"><Printer className="h-4 w-4"/> طباعة المستند</Button>
                 </div>
             </div>
 
-            <Card className="max-w-4xl mx-auto rounded-[2.5rem] shadow-xl border-none overflow-hidden bg-white p-12">
-                <header className="flex justify-between items-start pb-6 border-b-4 border-primary">
-                    <div className="flex items-center gap-5">
-                        <Logo className="h-20 w-20 !p-3 shadow-inner border" logoUrl={branding?.logo_url} />
-                        <div>
-                            <h1 className="text-2xl font-black">{branding?.company_name || 'Nova ERP'}</h1>
-                            <p className="text-xs text-muted-foreground mt-1">{branding?.address}</p>
+            <Card className="rounded-[3rem] shadow-2xl border-none overflow-hidden bg-white p-12">
+                <header className="flex justify-between items-start pb-8 border-b-4 border-primary/20">
+                    <div className="flex items-center gap-6">
+                        <Logo className="h-24 w-24 !p-4 shadow-inner border rounded-3xl" logoUrl={branding?.logo_url} companyName={branding?.company_name} />
+                        <div className="space-y-1">
+                            <h1 className="text-3xl font-black text-slate-900">{branding?.company_name || 'Nova ERP'}</h1>
+                            <p className="text-xs text-muted-foreground font-bold">{branding?.address}</p>
                         </div>
                     </div>
-                    <div className="text-left">
+                    <div className="text-left space-y-2">
                         <h2 className="text-3xl font-black text-primary tracking-tighter">طلب إجازة رسمي</h2>
-                        <Badge variant="outline" className={cn("mt-2 px-4 py-1 border-2 font-black", statusColors[leaveRequest.status])}>{statusTranslations[leaveRequest.status]}</Badge>
+                        <div className="pt-2">
+                            <Badge variant="outline" className={cn("px-6 py-1.5 border-2 font-black text-sm rounded-full", statusColors[leaveRequest.status])}>
+                                {statusTranslations[leaveRequest.status]}
+                            </Badge>
+                        </div>
                     </div>
                 </header>
 
-                <main className="py-10 space-y-10">
-                    {/* 🛡️ إظهار سبب الرفض إذا كان الطلب مرفوضاً 🛡️ */}
-                    {leaveRequest.status === 'rejected' && (
-                        <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x bg-red-50 shadow-red-100 p-6">
-                            <AlertCircle className="h-6 w-6 text-red-600" />
-                            <AlertTitle className="text-red-800 font-black text-lg">تم رفض هذا الطلب من قبل الإدارة</AlertTitle>
-                            <AlertDescription className="text-red-700 font-bold mt-2 leading-relaxed">
-                                {leaveRequest.rejectionReason || 'عذراً، تعذر قبول الطلب في هذه الفترة بناءً على متطلبات العمل. يرجى مراجعة الإدارة لمزيد من التفاصيل.'}
+                <main className="py-12 space-y-12">
+                    {/* 🛡️ رادار رد الإدارة السيادي (Management Reply Radar) 🛡️ */}
+                    {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason) && (
+                        <Alert 
+                            variant={leaveRequest.status === 'rejected' ? 'destructive' : 'default'} 
+                            className={cn(
+                                "rounded-[2rem] border-2 shadow-xl p-8 animate-in zoom-in-95 duration-500",
+                                leaveRequest.status === 'rejected' ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                            )}
+                        >
+                            {leaveRequest.status === 'rejected' ? <XCircle className="h-8 w-8 text-red-600" /> : <CheckCircle className="h-8 w-8 text-green-600" />}
+                            <AlertTitle className={cn(
+                                "text-xl font-black flex items-center justify-between mb-4",
+                                leaveRequest.status === 'rejected' ? "text-red-900" : "text-green-900"
+                            )}>
+                                <span>قرار الإدارة والرد الرسمي:</span>
+                                <Badge className={cn("px-3 border-none font-black text-[10px]", leaveRequest.status === 'rejected' ? "bg-red-600" : "bg-green-600")}>
+                                    تم التوثيق
+                                </Badge>
+                            </AlertTitle>
+                            <AlertDescription className={cn(
+                                "text-lg leading-relaxed font-bold border-t-2 border-dashed pt-4 mt-2",
+                                leaveRequest.status === 'rejected' ? "text-red-700 border-red-100" : "text-green-700 border-green-100"
+                            )}>
+                                {leaveRequest.rejectionReason || leaveRequest.adminComment || (leaveRequest.status === 'approved' ? 'تمت الموافقة على الطلب بناءً على الأنظمة المتبعة.' : 'عذراً، الطلب مرفوض.')}
                             </AlertDescription>
                         </Alert>
                     )}
 
-                    <section className="grid grid-cols-2 gap-8 bg-muted/20 p-8 rounded-3xl border">
-                        <div className="space-y-4">
-                            <InfoRow label="اسم الموظف" value={<span className="font-black text-lg">{leaveRequest.employeeName}</span>} icon={<User className="h-5 w-5 text-primary"/>}/>
-                            <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-bold">{employee.employeeNumber}</span>} icon={<BadgeIcon className="h-4 w-4 text-primary"/>}/>
+                    <section className="grid grid-cols-2 gap-10 bg-muted/20 p-10 rounded-[2.5rem] border-2 border-dashed border-primary/10 shadow-inner">
+                        <div className="space-y-6">
+                            <InfoRow label="اسم الموظف" value={<span className="font-black text-xl text-slate-900">{leaveRequest.employeeName}</span>} icon={<User className="h-5 w-5 text-primary opacity-40"/>}/>
+                            <InfoRow label="الرقم الوظيفي" value={<span className="font-mono font-black text-primary">{employee.employeeNumber}</span>} icon={<BadgeIcon className="h-5 w-5 text-primary opacity-40"/>}/>
                         </div>
-                        <div className="space-y-4">
-                            <InfoRow label="القسم" value={<span className="font-bold">{employee.department}</span>} icon={<Briefcase className="h-5 w-5 text-primary"/>}/>
-                            <InfoRow label="المسمى الوظيفي" value={<span className="font-bold">{employee.jobTitle}</span>} icon={<FileText className="h-5 w-5 text-primary"/>}/>
+                        <div className="space-y-6">
+                            <InfoRow label="القسم الإداري" value={<span className="font-black">{employee.department}</span>} icon={<Briefcase className="h-5 w-5 text-primary opacity-40"/>}/>
+                            <InfoRow label="المسمى الوظيفي" value={<span className="font-black">{employee.jobTitle}</span>} icon={<FileText className="h-5 w-5 text-primary opacity-40"/>}/>
                         </div>
                     </section>
 
-                    <section className="grid grid-cols-2 gap-x-12 gap-y-6 text-sm">
-                        <div className="space-y-6">
-                            <div className="flex justify-between border-b border-dashed pb-2"><span>نوع الإجازة:</span> <Badge className="bg-primary/10 text-primary font-black px-4">{leaveTypeTranslations[leaveRequest.leaveType]}</Badge></div>
-                            <div className="flex justify-between border-b border-dashed pb-2"><span>إجمالي الأيام:</span> <span className="font-black">{leaveRequest.days} يوم</span></div>
+                    <section className="grid grid-cols-1 md:grid-cols-2 gap-12 text-sm">
+                        <div className="space-y-6 p-6 bg-slate-50 rounded-3xl border">
+                            <h3 className="font-black text-primary border-b pb-2 mb-4 flex items-center gap-2 uppercase tracking-widest text-[10px]">
+                                <Calculator className="h-4 w-4"/> تفاصيل الاستحقاق والنوع
+                            </h3>
+                            <div className="flex justify-between border-b border-dashed pb-3">
+                                <span className="font-bold text-muted-foreground">نوع الإجازة المطلوبة:</span> 
+                                <Badge className="bg-primary/10 text-primary font-black px-6 border-primary/20">{leaveTypeTranslations[leaveRequest.leaveType]}</Badge>
+                            </div>
+                            <div className="flex justify-between border-b border-dashed pb-3">
+                                <span className="font-bold text-muted-foreground">إجمالي أيام الغياب:</span> 
+                                <span className="font-black text-lg">{leaveRequest.days} <span className="text-xs">يوم</span></span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="font-bold text-muted-foreground">أيام العمل الفعلية:</span> 
+                                <span className="font-black text-lg text-primary">{leaveRequest.workingDays} <span className="text-xs">يوم</span></span>
+                            </div>
                         </div>
-                        <div className="space-y-6">
-                            <div className="flex justify-between border-b border-dashed pb-2"><span>بداية الإجازة:</span> <span className="font-bold">{startDate ? format(startDate, 'dd/MM/yyyy') : '-'}</span></div>
-                            <div className="flex justify-between border-b border-dashed pb-2"><span>نهاية الإجازة:</span> <span className="font-bold">{endDate ? format(endDate, 'dd/MM/yyyy') : '-'}</span></div>
+                        
+                        <div className="space-y-6 p-6 bg-slate-50 rounded-3xl border">
+                            <h3 className="font-black text-primary border-b pb-2 mb-4 flex items-center gap-2 uppercase tracking-widest text-[10px]">
+                                <Clock className="h-4 w-4"/> الجدولة الزمنية
+                            </h3>
+                            <div className="flex justify-between border-b border-dashed pb-3">
+                                <span className="font-bold text-muted-foreground">بداية الإجازة (من):</span> 
+                                <span className="font-black">{startDate ? format(startDate, 'eeee, dd/MM/yyyy', { locale: ar }) : '-'}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-dashed pb-3">
+                                <span className="font-bold text-muted-foreground">نهاية الإجازة (إلى):</span> 
+                                <span className="font-black">{endDate ? format(endDate, 'eeee, dd/MM/yyyy', { locale: ar }) : '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="font-bold text-muted-foreground">تاريخ العودة المتوقع:</span> 
+                                <span className="font-black text-indigo-600">{endDate ? format(endDate, 'dd/MM/yyyy') : '-'}</span>
+                            </div>
                         </div>
                     </section>
 
-                    <div className="space-y-3">
-                        <h4 className="font-black text-gray-700">مبررات طلب الموظف:</h4>
-                        <p className="p-6 border-2 border-dashed rounded-3xl bg-muted/10 min-h-[100px]">{leaveRequest.notes || '-'}</p>
+                    <div className="space-y-4">
+                        <h4 className="font-black text-slate-800 flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-primary opacity-40"/>
+                            مبررات وتفاصيل طلب الموظف:
+                        </h4>
+                        <div className="p-8 border-2 border-dashed rounded-[2.5rem] bg-muted/10 min-h-[120px] text-lg leading-loose font-medium text-slate-800 shadow-inner">
+                            {leaveRequest.notes || 'لم يتم إدراج مبررات إضافية للطلب.'}
+                        </div>
                     </div>
                 </main>
+                
+                <footer className="pt-20 border-t-2 border-slate-100 flex justify-between items-center text-[9px] font-black uppercase tracking-[0.4em] text-slate-300">
+                    <span>Sovereign Document Management</span>
+                    <span>{format(new Date(), 'PPpp', { locale: ar })}</span>
+                </footer>
             </Card>
 
             <AlertDialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl">
-                    <AlertDialogHeader><AlertDialogTitle>تسجيل مغادرة الموظف</AlertDialogTitle></AlertDialogHeader>
-                    <div className="py-4 space-y-2">
-                        <Label>تاريخ المغادرة الفعلي:</Label>
-                        <DateInput value={actualDate} onChange={setActualDate} />
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl p-10">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-black text-blue-900">توثيق مغادرة الموظف</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-bold text-slate-600 mt-2">
+                            أنت على وشك تسجيل البدء الفعلي لإجازة الموظف وتغيير حالته في النظام إلى "في إجازة".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-6 space-y-3">
+                        <Label className="font-black text-slate-700 pr-1">تاريخ المغادرة الفعلي للمنشأة:</Label>
+                        <DateInput value={actualDate} onChange={setActualDate} className="h-12 rounded-xl border-2" />
                     </div>
-                    <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleStartLeave} className="bg-blue-600 rounded-xl font-black px-8 text-white">تأكيد المغادرة</AlertDialogAction>
+                    <AlertDialogFooter className="gap-3 pt-6 border-t">
+                        <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleStartLeave} className="bg-blue-600 hover:bg-blue-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-blue-100">تأكيد البدء</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
             <AlertDialog open={isReturnDialogOpen} onOpenChange={setIsReturnDialogOpen}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl">
-                    <AlertDialogHeader><AlertDialogTitle>إشعار عودة للعمل</AlertDialogTitle></AlertDialogHeader>
-                    <div className="py-4 space-y-2">
-                        <Label>تاريخ المباشرة الفعلي:</Label>
-                        <DateInput value={actualDate} onChange={setActualDate} />
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl p-10">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-2xl font-black text-indigo-900">إشعار مباشرة العمل والعودة</AlertDialogTitle>
+                        <AlertDialogDescription className="text-base font-bold text-slate-600 mt-2">
+                            تأكيد عودة الموظف لمزاولة مهامه رسمياً؛ سيتم إعادة تنشيط حسابه وتثبيت تاريخ المباشرة.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="py-6 space-y-3">
+                        <Label className="font-black text-slate-700 pr-1">تاريخ المباشرة الفعلي للدوام:</Label>
+                        <DateInput value={actualDate} onChange={setActualDate} className="h-12 rounded-xl border-2" />
                     </div>
-                    <AlertDialogFooter className="gap-2">
-                        <AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleReturnToWork} className="bg-indigo-600 rounded-xl font-black px-8 text-white">تأكيد العودة</AlertDialogAction>
+                    <AlertDialogFooter className="gap-3 pt-6 border-t">
+                        <AlertDialogCancel className="rounded-xl font-bold h-12 px-8">تراجع</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleReturnToWork} className="bg-indigo-600 hover:bg-indigo-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-indigo-100">تأكيد المباشرة</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
