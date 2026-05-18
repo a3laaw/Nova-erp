@@ -1,37 +1,41 @@
-
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowLeftRight } from 'lucide-react';
+import { PlusCircle, ArrowLeftRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { TransferList } from '@/components/warehouse/transfer-list';
 
 export default function TransfersPage() {
     return (
-        <div className="space-y-6" dir="rtl">
-            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-cyan-50 dark:from-card dark:to-card">
-                <CardHeader className="pb-8 px-8 border-b">
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-cyan-600/10 rounded-2xl text-cyan-600 shadow-inner">
-                                <ArrowLeftRight className="h-8 w-8" />
+        <div className="space-y-10" dir="rtl">
+            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+                <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">التحويلات المخزنية والعهدة</CardTitle>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                    <CardDescription className="text-white/90 font-bold text-sm">متابعة حركة نقل المواد والعهدة بين المستودعات والأفرع ومخازن المواقع.</CardDescription>
+                                </div>
                             </div>
-                            <div>
-                                <CardTitle className="text-2xl font-black">التحويلات المخزنية</CardTitle>
-                                <CardDescription className="text-base font-medium">متابعة حركة نقل المواد والعهدة بين المستودعات والأفرع والمواقع.</CardDescription>
+                            <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                                <ArrowLeftRight className="h-10 w-10 text-white" />
                             </div>
                         </div>
-                        <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-cyan-100 bg-cyan-600 hover:bg-cyan-700">
+                        <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-white text-[#FF7A00] shadow-xl hover:bg-slate-50 border-none">
                             <Link href="/dashboard/warehouse/transfers/new">
-                                <PlusCircle className="ml-2 h-4 w-4" />
-                                إذن تحويل جديد
+                                <PlusCircle className="h-5 w-5" />
+                                إضافة تحويل
                             </Link>
                         </Button>
                     </div>
                 </CardHeader>
             </Card>
 
-            <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white">
+            <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white/95">
                 <CardContent className="pt-8">
                     <TransferList />
                 </CardContent>

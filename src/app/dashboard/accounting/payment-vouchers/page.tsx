@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, ArrowUpRight } from 'lucide-react';
+import { PlusCircle, ArrowUpRight, Sparkles } from 'lucide-react';
 import { PaymentVouchersList } from '@/components/accounting/payment-vouchers-list';
 import {
     Card,
@@ -14,23 +14,27 @@ import {
 export default function PaymentVouchersPage() {
     return (
         <div className="space-y-10" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي السيادي لسندات الصرف */}
-            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-red-50 dark:from-card dark:to-card">
-                <CardHeader className="pb-8 px-10 border-b">
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-red-600/10 rounded-2xl text-red-600 shadow-inner">
-                                <ArrowUpRight className="h-8 w-8" />
+            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+                <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">سندات الصرف (المدفوعات)</CardTitle>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                    <CardDescription className="text-white/90 font-bold text-sm">إدارة الشيكات الصادرة والمدفوعات النقدية للموردين ومصروفات التشغيل.</CardDescription>
+                                </div>
                             </div>
-                            <div>
-                                <CardTitle className="text-3xl font-black">سندات الصرف (المدفوعات)</CardTitle>
-                                <CardDescription className="text-base font-bold text-slate-500 mt-1">إدارة الشيكات الصادرة والمدفوعات النقدية للموردين والمصاريف.</CardDescription>
+                            <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                                <ArrowUpRight className="h-10 w-10 text-white" />
                             </div>
                         </div>
-                        <Button asChild className="h-12 px-10 rounded-2xl font-black text-lg gap-2 shadow-xl shadow-red-100 bg-red-600 hover:bg-red-700">
+                        <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-white text-[#FF7A00] shadow-xl hover:bg-slate-50 border-none">
                             <Link href="/dashboard/accounting/payment-vouchers/new">
-                                <PlusCircle className="h-6 w-6" />
-                                إضافة
+                                <PlusCircle className="h-5 w-5" />
+                                إضافة سند
                             </Link>
                         </Button>
                     </div>

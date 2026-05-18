@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -8,67 +7,49 @@ import { UnifiedOperationalRadar } from '@/components/reports/unified-operationa
 import { FinancialAchievementPipeline } from '@/components/reports/financial-achievement-pipeline';
 import { ExecutiveKpiScorecard } from '@/components/reports/executive-kpi-scorecard';
 import { GrowthOpportunitiesReport } from '@/components/reports/growth-opportunities-report';
-import { Activity, BarChart3, Coins, ShieldCheck, Sparkles, TrendingUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useAppTheme } from '@/context/theme-context';
+import { Activity, Sparkles } from 'lucide-react';
 
-/**
- * مركز تقارير الأداء الموحد.
- * تم تبسيط المسميات وإزالة الألفاظ المعقدة.
- */
 export default function OperationalIntelligenceHub() {
-  const { theme } = useAppTheme();
-  const isGlass = theme === 'glass';
+    return (
+        <div className="space-y-10" dir="rtl">
+            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+                <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">مركز تقارير الأداء الفني</CardTitle>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                    <CardDescription className="text-white/90 font-bold text-sm">رؤية شاملة تربط الإنجاز الميداني بالموقف المالي وفرص التوسع للمنشأة.</CardDescription>
+                                </div>
+                            </div>
+                            <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                                <Activity className="h-10 w-10 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                </CardHeader>
+            </Card>
 
-  return (
-    <div className="space-y-6" dir="rtl">
-        <Card className={cn(
-            "rounded-[2.5rem] border-none shadow-sm overflow-hidden",
-            isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-indigo-50 shadow-sm"
-        )}>
-            <CardHeader className="pb-8 px-8 border-b">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-600/10 rounded-2xl text-indigo-600 shadow-inner">
-                        <Activity className="h-8 w-8" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-2xl font-black text-[#1e1b4b]">مركز تقارير الأداء الفني</CardTitle>
-                        <CardDescription className="text-base font-medium">
-                            رؤية شاملة تربط الإنجاز الميداني بالموقف المالي وفرص التوسع.
-                        </CardDescription>
-                    </div>
+            <Tabs defaultValue="radar" dir="rtl">
+                <div className="flex justify-center mb-10">
+                    <TabsList className="w-full max-w-4xl h-16 bg-white/40 backdrop-blur-md p-1.5 rounded-2xl border border-white/60 shadow-xl">
+                        <TabsTrigger value="radar" className="rounded-xl flex-1 font-black gap-2 h-full transition-all">رادار المتابعة</TabsTrigger>
+                        <TabsTrigger value="finance" className="rounded-xl flex-1 font-black gap-2 h-full transition-all">ميزان التحصيل</TabsTrigger>
+                        <TabsTrigger value="growth" className="rounded-xl flex-1 font-black gap-2 h-full transition-all">فرص النمو</TabsTrigger>
+                        <TabsTrigger value="kpi" className="rounded-xl flex-1 font-black gap-2 h-full transition-all">مؤشرات الأداء</TabsTrigger>
+                    </TabsList>
                 </div>
-            </CardHeader>
-        </Card>
 
-        <Tabs defaultValue="radar" dir="rtl">
-            <div className={cn(isGlass ? "tabs-frame-secondary" : "mb-8 bg-white rounded-3xl shadow-sm p-4")}>
-                <TabsList className={cn(
-                    "grid w-full grid-cols-1 md:grid-cols-4 bg-transparent h-auto p-0 gap-4",
-                    isGlass ? "" : ""
-                )}>
-                    <TabsTrigger value="radar" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <ShieldCheck className="h-5 w-5"/> رادار متابعة العمل
-                    </TabsTrigger>
-                    <TabsTrigger value="finance" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <Coins className="h-5 w-5"/> ميزان التحصيل
-                    </TabsTrigger>
-                    <TabsTrigger value="growth" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <Sparkles className="h-5 w-5 text-amber-500 animate-pulse"/> فرص النمو
-                    </TabsTrigger>
-                    <TabsTrigger value="kpi" className={cn("py-4 rounded-xl font-black h-14 gap-3", isGlass && "tabs-trigger-card")}>
-                        <BarChart3 className="h-5 w-5"/> مؤشرات الأداء
-                    </TabsTrigger>
-                </TabsList>
-            </div>
-
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <TabsContent value="radar" className="mt-0"><UnifiedOperationalRadar /></TabsContent>
-                <TabsContent value="finance" className="mt-0"><FinancialAchievementPipeline /></TabsContent>
-                <TabsContent value="growth" className="mt-0"><GrowthOpportunitiesReport /></TabsContent>
-                <TabsContent value="kpi" className="mt-0"><ExecutiveKpiScorecard /></TabsContent>
-            </div>
-        </Tabs>
-    </div>
-  );
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <TabsContent value="radar" className="mt-0"><UnifiedOperationalRadar /></TabsContent>
+                    <TabsContent value="finance" className="mt-0"><FinancialAchievementPipeline /></TabsContent>
+                    <TabsContent value="growth" className="mt-0"><GrowthOpportunitiesReport /></TabsContent>
+                    <TabsContent value="kpi" className="mt-0"><ExecutiveKpiScorecard /></TabsContent>
+                </div>
+            </Tabs>
+        </div>
+    );
 }
