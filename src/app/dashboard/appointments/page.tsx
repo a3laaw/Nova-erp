@@ -18,13 +18,12 @@ import {
 import dynamic from 'next/dynamic';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarDays, Home } from 'lucide-react';
-import { useAppTheme } from '@/context/theme-context';
 import { cn } from '@/lib/utils';
 
 const ArchitecturalAppointmentsView = dynamic(
     () => import('@/components/appointments/architectural-appointments-view'),
     { 
-        loading: () => <Skeleton className="h-[500px] w-full rounded-3xl animate-pulse" />,
+        loading: () => <Skeleton className="h-[500px] w-full rounded-[2.5rem] animate-pulse" />,
         ssr: false 
     }
 );
@@ -32,17 +31,13 @@ const ArchitecturalAppointmentsView = dynamic(
 const RoomBookingCalendar = dynamic(
     () => import('@/components/appointments/room-booking-calendar'),
     { 
-        loading: () => <Skeleton className="h-[500px] w-full rounded-3xl animate-pulse" />,
+        loading: () => <Skeleton className="h-[500px] w-full rounded-[2.5rem] animate-pulse" />,
         ssr: false 
     }
 );
 
 export default function AppointmentsPage() {
     const searchParams = useSearchParams();
-    const { theme } = useAppTheme();
-    const isGlass = theme === 'glass';
-    
-    // محرك التبديل اللحظي بناءً على رادار الملاحة
     const [activeTab, setActiveTab] = useState('architectural');
 
     useEffect(() => {
@@ -52,19 +47,18 @@ export default function AppointmentsPage() {
     }, [searchParams]);
 
     return (
-        <div className="space-y-6" dir="rtl">
-            <Card className={cn(
-                "border-none shadow-sm rounded-[2.5rem] overflow-hidden",
-                isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-sky-50 shadow-sm"
-            )}>
-                <CardHeader className="pb-8 px-8 border-b">
-                    <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
-                            <CalendarDays className="h-8 w-8" />
-                        </div>
-                        <div>
-                            <CardTitle className="text-2xl font-black">إدارة المواعيد والتقويم</CardTitle>
-                            <CardDescription className="text-base font-medium">
+        <div className="space-y-10" dir="rtl">
+            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-sky-50 dark:from-card dark:to-card">
+                <CardHeader className="pb-8 px-10">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+                        <div className="space-y-1 text-center lg:text-right">
+                            <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-4">
+                                <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
+                                    <CalendarDays className="h-8 w-8" />
+                                </div>
+                                إدارة المواعيد والتقويم
+                            </CardTitle>
+                            <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-16">
                                 تنظيم زيارات القسم المعماري وحجز القاعات بنظام ذكي لمنع التعارض.
                             </CardDescription>
                         </div>
@@ -72,36 +66,28 @@ export default function AppointmentsPage() {
                 </CardHeader>
             </Card>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
-                <div className={cn(isGlass ? "tabs-frame-secondary" : "mb-8 bg-white rounded-3xl shadow-sm p-4")}>
-                    <TabsList className={cn(
-                        "grid w-full grid-cols-2 h-auto p-0 gap-4 bg-transparent",
-                        isGlass ? "" : ""
-                    )}>
-                        <TabsTrigger value="architectural" className={cn("py-3.5 rounded-xl font-black gap-2 h-14", isGlass && "tabs-trigger-card justify-center items-center")}>
+            <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl" className="w-full">
+                <div className="flex justify-center mb-10">
+                    <TabsList className="w-full max-w-2xl h-16 shadow-xl border-white/60">
+                        <TabsTrigger value="architectural" className="gap-2 h-full text-base">
                             <CalendarDays className="h-4 w-4" />
                             مواعيد القسم المعماري
                         </TabsTrigger>
-                        <TabsTrigger value="rooms" className={cn("py-3.5 rounded-xl font-black gap-2 h-14", isGlass && "tabs-trigger-card justify-center items-center")}>
+                        <TabsTrigger value="rooms" className="gap-2 h-full text-base">
                             <Home className="h-4 w-4" />
-                            حجوزات قاعات الاجتماعات
+                            حجوزات القاعات
                         </TabsTrigger>
                     </TabsList>
                 </div>
 
-                <Card className={cn(
-                    "border-none shadow-sm rounded-3xl overflow-hidden",
-                    isGlass ? "glass-effect" : "bg-white shadow-sm"
-                )}>
-                    <CardContent className="pt-8">
-                        <TabsContent value="architectural" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
-                            <ArchitecturalAppointmentsView />
-                        </TabsContent>
-                        <TabsContent value="rooms" className="mt-0 animate-in fade-in zoom-in-95 duration-500">
-                            <RoomBookingCalendar />
-                        </TabsContent>
-                    </CardContent>
-                </Card>
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <TabsContent value="architectural" className="mt-0">
+                        <ArchitecturalAppointmentsView />
+                    </TabsContent>
+                    <TabsContent value="rooms" className="mt-0">
+                        <RoomBookingCalendar />
+                    </TabsContent>
+                </div>
             </Tabs>
         </div>
     )
