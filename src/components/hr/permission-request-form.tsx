@@ -67,7 +67,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
   }, [isOpen, permissionToEdit, currentUser, isAdmin]);
 
-  // ✨ محرك رصد سقف الاستئذانات الشهري (12 ساعة كحد أقصى)
   useEffect(() => {
     if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
         setMonthlyTotalHours(0);
@@ -129,7 +128,6 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       const selectedEmployee = employees.find(e => e.id === selectedEmployeeId) || { fullName: currentUser.fullName };
       const checkDateStart = startOfDay(date);
 
-      // رادار منع التضارب مع الإجازات
       const leavesPath = getTenantPath('leaveRequests', tenantId);
       const leavesQuery = query(collection(firestore, leavesPath), where('employeeId', '==', selectedEmployeeId), where('status', 'in', ['approved', 'on-leave', 'returned']));
       const leavesSnapshot = await getDocs(leavesQuery);
@@ -172,7 +170,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner"><Clock className="h-6 w-6" /></div>
                 <div>
                     <DialogTitle className="text-xl font-black text-[#1e1b4b]">{permissionToEdit ? 'تعديل الاستئذان' : 'طلب استئذان جديد'}</DialogTitle>
-                    <DialogDescription className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">تنظيم الحضور والانصراف بمرونة إدارية.</DialogDescription>
+                    <DialogDescription className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">تنظيم الحضور للانصراف بمرونة إدارية.</DialogDescription>
                 </div>
             </div>
           </DialogHeader>

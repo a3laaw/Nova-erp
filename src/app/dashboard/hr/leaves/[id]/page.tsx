@@ -17,7 +17,6 @@ import {
     CheckCircle, 
     XCircle, 
     Sparkles, 
-    History, 
     Clock, 
     PlaneTakeoff, 
     Home, 
@@ -28,25 +27,21 @@ import {
     AlertCircle,
     Badge as BadgeIcon
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
-import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
-import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
-import Link from 'next/link';
+import { cn, getTenantPath } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
-const statusColors: Record<LeaveRequest['status'], string> = {
+const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   approved: 'bg-green-100 text-green-800 border-green-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
@@ -54,7 +49,7 @@ const statusColors: Record<LeaveRequest['status'], string> = {
   'returned': 'bg-indigo-100 text-indigo-800 border-indigo-200',
 };
 
-const statusTranslations: Record<LeaveRequest['status'], string> = {
+const statusTranslations: Record<string, string> = {
   pending: 'تحت المراجعة',
   approved: 'موافق عليه (بانتظار المغادرة)',
   rejected: 'مرفوض',
@@ -62,7 +57,7 @@ const statusTranslations: Record<LeaveRequest['status'], string> = {
   'returned': 'عاد للعمل',
 };
 
-const leaveTypeTranslations: Record<LeaveRequest['leaveType'], string> = {
+const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية', 'Sick': 'مرضية', 'Emergency': 'طارئة', 'Unpaid': 'بدون أجر'
 };
 
@@ -109,10 +104,7 @@ export default function LeaveRequestDetailsPage() {
             const batch = writeBatch(firestore);
             batch.update(doc(firestore, reqPath), { status: 'on-leave', actualStartDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'on-leave' });
-            await batch.commit().catch(async (e) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
-                throw e;
-            });
+            await batch.commit();
             toast({ title: 'تم توثيق المغادرة' });
             setIsStartDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
@@ -128,10 +120,7 @@ export default function LeaveRequestDetailsPage() {
             const batch = writeBatch(firestore);
             batch.update(doc(firestore, reqPath), { status: 'returned', actualReturnDate: Timestamp.fromDate(actualDate) });
             batch.update(doc(firestore, empPath), { status: 'active' });
-            await batch.commit().catch(async (e) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
-                throw e;
-            });
+            await batch.commit();
             toast({ title: 'تمت المباشرة بنجاح' });
             setIsReturnDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
@@ -273,7 +262,7 @@ export default function LeaveRequestDetailsPage() {
                 </main>
                 
                 <footer className="pt-20 border-t-2 border-slate-100 flex justify-between items-center text-[9px] font-black uppercase tracking-[0.4em] text-slate-300">
-                    <span>Document Generation System</span>
+                    <span>Generated Document System</span>
                     <span>{format(new Date(), 'PPpp', { locale: ar })}</span>
                 </footer>
             </Card>
