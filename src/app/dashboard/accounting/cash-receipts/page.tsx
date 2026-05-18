@@ -30,7 +30,7 @@ export default function CashReceiptsPage() {
                         <Button asChild className="h-11 px-6 rounded-xl font-black gap-2 shadow-lg shadow-green-100 bg-green-600 hover:bg-green-700">
                             <Link href="/dashboard/accounting/cash-receipts/new">
                                 <PlusCircle className="h-5 w-5" />
-                                إنشاء سند قبض
+                                إضافة
                             </Link>
                         </Button>
                     </div>

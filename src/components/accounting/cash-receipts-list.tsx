@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -28,7 +29,7 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { searchCashReceipts } from '@/lib/cache/fuse-search';
 import { toFirestoreDate } from '@/services/date-converter';
-import { DateInput } from '@/components/ui/date-input';
+import { DateInput } from '../ui/date-input';
 
 const paymentMethodTranslations: Record<string, string> = {
     'Cash': 'نقداً',
@@ -172,7 +173,7 @@ export function CashReceiptsList() {
             <AlertDialogContent dir="rtl" className="rounded-[2rem] p-10 border-none shadow-2xl">
                 <AlertDialogHeader>
                     <div className="p-3 bg-red-100 rounded-2xl text-red-600 w-fit mb-4"><Trash2 className="h-8 w-8"/></div>
-                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف السيادي؟</AlertDialogTitle>
+                    <AlertDialogTitle className="text-2xl font-black text-red-700">تأكيد الحذف النهائي؟</AlertDialogTitle>
                     <AlertDialogDescription className="text-lg font-medium leading-relaxed">
                         سيتم حذف السند رقم <strong className="text-foreground">"{receiptToDelete?.voucherNumber}"</strong> وكافة قيوده المحاسبية المرتبطة. هذا الإجراء سيؤثر على ميزان المراجعة ومديونية العميل.
                     </AlertDialogDescription>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -475,7 +476,7 @@ export function ReferenceDataManager() {
                                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">إدارة البنود الفرعية</p>
                                                 </div>
                                             </div>
-                                            <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3 glass-3d-button">
+                                            <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3">
                                                 <PlusCircle className="h-6 w-6" /> إضافة
                                             </Button>
                                         </div>
@@ -540,7 +541,7 @@ export function ReferenceDataManager() {
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader>
                             <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
-                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل' : 'إضافة جديد'}</DialogTitle>
+                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل' : 'إضافة'}</DialogTitle>
                         </DialogHeader>
                         <div className="py-10">
                             <Label className="font-black text-[#1e1b4b] pr-3 block mb-4 text-sm uppercase tracking-widest">الاسم المعتمد *</Label>
@@ -548,7 +549,7 @@ export function ReferenceDataManager() {
                         </div>
                         <DialogFooter className="gap-4 pt-6 border-t">
                             <Button type="button" variant="ghost" onClick={closeDialog} className="rounded-2xl font-black h-12 px-10">إلغاء</Button>
-                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px] glass-3d-button">
+                            <Button type="submit" disabled={isSaving} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30 min-w-[200px]">
                                 {isSaving ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>} حفظ
                             </Button>
                         </DialogFooter>

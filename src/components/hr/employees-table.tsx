@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -136,7 +137,6 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
         if (!employeeToTerminate || !terminationReason || !firestore || !tenantId) return;
         setIsTerminating(true);
         
-        // 🛡️ استخدام المسار السيادي الموحد
         const employeePath = getTenantPath(`employees/${employeeToTerminate.id}`, tenantId);
         const employeeRef = doc(firestore, employeePath);
         const updateData = { status: 'terminated' as const, terminationDate: new Date(), terminationReason: terminationReason };
@@ -286,7 +286,7 @@ export function EmployeesTable({ searchQuery: externalSearchQuery }: EmployeesTa
                                                     </DropdownMenuItem>
                                                 ) : (
                                                     <DropdownMenuItem onClick={() => handleReactivate(employee)} className="text-green-600 font-bold gap-2 rounded-lg py-3">
-                                                        <RotateCcw className="h-4 w-4" /> إعادة تفعيل الملف
+                                                        <RotateCcw className="h-4 w-4" /> إضافة
                                                     </DropdownMenuItem>
                                                 )}
                                             </DropdownMenuContent>

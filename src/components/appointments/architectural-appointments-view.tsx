@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -44,8 +45,6 @@ import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 
-// --- مساعدات النظام ---
-
 const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
     const slots: string[] = [];
@@ -81,8 +80,6 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
     if (!identifier.clientId && !identifier.clientMobile) return;
     try {
         const apptsPath = getTenantPath('appointments', tenantId);
-        const clientsPath = getTenantPath('clients', tenantId);
-
         const apptsQueryConstraints = [where('type', '==', 'architectural')];
         if (identifier.clientId) {
             apptsQueryConstraints.push(where('clientId', '==', identifier.clientId));
@@ -98,7 +95,8 @@ async function reconcileClientAppointments(firestore: any, tenantId: string | un
 
         let contractSigned = false;
         if (identifier.clientId) {
-            const clientSnap = await getDoc(doc(firestore, clientsPath, identifier.clientId));
+            const clientPath = getTenantPath(`clients/${identifier.clientId}`, tenantId);
+            const clientSnap = await getDoc(doc(firestore, clientPath));
             contractSigned = clientSnap.exists() && ['contracted', 'reContracted'].includes(clientSnap.data().status);
         }
         
@@ -150,50 +148,30 @@ export default function ArchitecturalAppointmentsView() {
 
     const { morningSlots, eveningSlots, hasWorkHours, isRamadan } = useMemo(() => {
         if (!date) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
-        
         const ramadanSettings = branding?.work_hours?.ramadan;
-        const isDateInRamadan = ramadanSettings?.is_enabled && ramadanSettings.start_date && ramadanSettings.end_date &&
-            date >= toFirestoreDate(ramadanSettings.start_date)! && date <= toFirestoreDate(ramadanSettings.end_date)!;
-    
+        const isDateInRamadan = ramadanSettings?.is_enabled && date >= toFirestoreDate(ramadanSettings.start_date)! && date <= toFirestoreDate(ramadanSettings.end_date)!;
         if (isDateInRamadan) {
             const slots = generateTimeSlots(ramadanSettings.start_time || '09:00', ramadanSettings.end_time || '15:00', ramadanSettings.appointment_slot_duration || 30, ramadanSettings.appointment_buffer_time || 0);
             return { morningSlots: slots, eveningSlots: [], hasWorkHours: slots.length > 0, isRamadan: true };
         }
-    
         const workHours = branding?.work_hours?.architectural;
         if (!workHours) return { morningSlots: [], eveningSlots: [], hasWorkHours: false, isRamadan: false };
-        
         const slotDuration = workHours.appointment_slot_duration || 30;
         const buffer = workHours.appointment_buffer_time || 0;
         const todayDayName = weekDays[date.getDay()].id;
-        
-        if (branding?.work_hours?.holidays?.includes(todayDayName)) {
-            return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
-        }
-    
+        if (branding?.work_hours?.holidays?.includes(todayDayName)) return { morningSlots: [], eveningSlots: [], hasWorkHours: true, isRamadan: false };
         const halfDaySettings = branding?.work_hours?.half_day;
         const isHalfDay = halfDaySettings?.day === todayDayName;
         let { morning_start_time, morning_end_time, evening_start_time, evening_end_time } = workHours;
-    
         if (isHalfDay) {
-            if (halfDaySettings.type === 'morning_only') { 
-                evening_start_time = ''; 
-                evening_end_time = ''; 
-            } else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
-                const customEnd = halfDaySettings.end_time;
-                if (customEnd <= morning_end_time) { 
-                    morning_end_time = customEnd; 
-                    evening_start_time = ''; 
-                    evening_end_time = ''; 
-                } else {
-                    evening_end_time = customEnd < evening_end_time ? customEnd : evening_end_time;
-                }
+            if (halfDaySettings.type === 'morning_only') { evening_start_time = ''; evening_end_time = ''; } 
+            else if (halfDaySettings.type === 'custom_end_time' && halfDaySettings.end_time) {
+                if (halfDaySettings.end_time <= morning_end_time) { morning_end_time = halfDaySettings.end_time; evening_start_time = ''; evening_end_time = ''; } 
+                else { evening_end_time = halfDaySettings.end_time < evening_end_time ? halfDaySettings.end_time : evening_end_time; }
             }
         }
-
         const mSlots = generateTimeSlots(morning_start_time, morning_end_time, slotDuration, buffer);
         const eSlots = generateTimeSlots(evening_start_time, evening_end_time, slotDuration, buffer);
-        
         return { morningSlots: mSlots, eveningSlots: eSlots, hasWorkHours: mSlots.length > 0 || eSlots.length > 0, isRamadan: false };
     }, [branding, date]);
 
@@ -202,14 +180,12 @@ export default function ArchitecturalAppointmentsView() {
         const employeesPath = getTenantPath('employees', tenantId);
         const clientsPath = getTenantPath('clients', tenantId);
         const leavesPath = getTenantPath('leaveRequests', tenantId);
-
-        getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave', 'terminated']))).then(snap => {
-            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري') && e.status !== 'terminated').sort((a, b) => a.fullName.localeCompare(b.nameAr));
+        getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))).then(snap => {
+            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
         });
         getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))).then(snap => {
-            const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr));
-            setClients(clientsList);
+            setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
         });
         getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
             setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
@@ -238,19 +214,11 @@ export default function ArchitecturalAppointmentsView() {
         });
     }, [leaveRequests]);
 
-    const appointments = useMemo(() => {
-      if (!rawAppointments) return [];
-      return rawAppointments.filter(appt => appt.status !== 'cancelled').map(appt => ({
-          ...appt, clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
-      }));
-    }, [rawAppointments, clients]);
+    const appointments = useMemo(() => rawAppointments.filter(appt => appt.status !== 'cancelled').map(appt => ({ ...appt, clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName })), [rawAppointments, clients]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
-        engineers.forEach(eng => {
-            grid[eng.id!] = {};
-            [...morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null);
-        });
+        engineers.forEach(eng => { grid[eng.id!] = {}; [...morningSlots, ...eveningSlots].forEach(slot => grid[eng.id!][slot] = null); });
         appointments.forEach(appt => {
             const appointmentDate = toFirestoreDate(appt.appointmentDate);
             if(!appointmentDate) return;
@@ -267,7 +235,7 @@ export default function ArchitecturalAppointmentsView() {
             const apptsPath = getTenantPath('appointments', tenantId);
             await updateDoc(doc(firestore, apptsPath, appointmentToDelete.id!), { status: 'cancelled' });
             await reconcileClientAppointments(firestore, tenantId, { clientId: appointmentToDelete.clientId, clientMobile: appointmentToDelete.clientMobile });
-            toast({ title: 'نجاح', description: 'تم إلغاء الموعد وتحديث الجدول.' });
+            toast({ title: 'نجاح التحديث' });
             if(date) fetchAppointments(date);
         } finally { setIsDeleting(false); setAppointmentToDelete(null); }
     };
@@ -275,60 +243,50 @@ export default function ArchitecturalAppointmentsView() {
     const renderGridSection = (title: string, slots: string[]) => {
       if (slots.length === 0) return null;
       return (
-        <div className="border rounded-lg overflow-x-auto bg-card">
-            <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
+        <div className="border-2 rounded-[2rem] overflow-x-auto bg-white shadow-xl">
+            <h3 className="font-black text-lg p-5 bg-[#F8F9FE] text-[#7209B7] border-b-2">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
                     <col className="w-[10rem]" />
                     {slots.map((_, i) => <col key={i} className="w-[8rem]" />)}
                 </colgroup>
-                <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">المهندس</th>{slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
+                <thead><tr className='border-b bg-[#F8F9FE]/50'><th className="sticky left-0 bg-[#F8F9FE] p-4 z-10 font-black text-[#7209B7] text-center border-l">المهندس المختص</th>{slots.map(time => <th key={time} className="p-4 text-center text-sm font-mono font-black text-[#7209B7] border-l">{time}</th>)}</tr></thead>
                 <tbody>
                     {engineers.map(eng => {
                         const activeLeave = date ? getEmployeeLeaveForDate(eng.id!, date) : null;
                         const isOnLeave = !!activeLeave;
-
                         return (
-                        <tr key={eng.id} className={cn('border-b transition-colors', isOnLeave && "bg-slate-50/50")}>
-                            <th className={cn(
-                                "sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l relative",
-                                isOnLeave && "text-slate-400"
-                            )}>
+                        <tr key={eng.id} className={cn('border-b transition-colors hover:bg-[#F3E8FF]/10', isOnLeave && "bg-red-50/20")}>
+                            <th className={cn("sticky left-0 bg-[#F8F9FE] p-4 z-10 font-black text-gray-800 text-center border-l", isOnLeave && "text-red-300 opacity-50")}>
                                 {eng.fullName}
-                                {isOnLeave && (
-                                    <div className="flex flex-col items-center mt-1">
-                                        <Badge variant="outline" className="bg-red-50 text-[8px] font-black text-red-600 border-red-200 gap-1 flex items-center justify-center">
-                                            <PlaneTakeoff className="h-2 w-2"/> في إجازة رسمية
-                                        </Badge>
-                                    </div>
-                                )}
+                                {isOnLeave && <div className="flex flex-col items-center mt-1"><Badge variant="outline" className="bg-red-50 text-[8px] font-black text-red-600 border-red-200">في إجازة رسمية</Badge></div>}
                             </th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[eng.id!]?.[time];
                                 const isClosed = !!booking?.workStageUpdated;
                                 return (
-                                    <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
+                                    <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1.5 align-top">
                                         {isOnLeave ? (
-                                            <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(239,68,68,0.03)_5px,rgba(239,68,68,0.03)_10px)] flex flex-col items-center justify-center">
+                                            <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(239,68,68,0.03)_5px,rgba(239,68,68,0.03)_10px)] flex items-center justify-center">
                                                 <span className="text-[10px] font-black text-red-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">في إجازة رسمية</span>
                                             </div>
                                         ) : booking ? (
                                              <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                     <div className="relative h-full w-full rounded-md p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:brightness-95 transition-all" style={{ backgroundColor: booking.color }}>
+                                                     <div className="relative h-full w-full rounded-2xl p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer shadow-md hover:brightness-95 transition-all" style={{ backgroundColor: booking.color }}>
                                                         {isClosed && <CheckCircle className="h-4 w-4 absolute top-1 right-1 text-white/80" />}
                                                         <p className="font-black leading-tight">{booking.clientName}</p>
                                                         {booking.visitCount && <span className="text-[10px] mt-1 opacity-75 font-bold">(الزيارة {booking.visitCount})</span>}
                                                     </div>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent dir="rtl">
-                                                    <DropdownMenuItem asChild><Link href={`/dashboard/appointments/${booking.id}`}><Eye className="ml-2 h-4 w-4" />عرض وتحديث الزيارة</Link></DropdownMenuItem>
+                                                <DropdownMenuContent dir="rtl" className="rounded-xl shadow-2xl">
+                                                    <DropdownMenuItem asChild className="rounded-lg py-3 font-bold gap-2"><Link href={`/dashboard/appointments/${booking.id}`}><Eye className="h-4 w-4" />عرض وتحديث الزيارة</Link></DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4" />إلغاء الموعد</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-red-600 font-bold gap-2 rounded-lg py-3"><Trash2 className="h-4 w-4" />إلغاء الموعد</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         ) : (
-                                            <div className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" onClick={() => {
+                                            <div className="h-full w-full hover:bg-[#7209B7]/5 transition-colors rounded-2xl no-print cursor-pointer" onClick={() => {
                                                 const apptDate = setMinutes(setHours(date!, Number(time.split(':')[0])), Number(time.split(':')[1]));
                                                 if (isPast(apptDate) && currentUser?.role !== 'Admin') return toast({ title: 'لا يمكن الحجز في الماضي' });
                                                 setDialogData({ isEditing: false, engineerId: eng.id, engineerName: eng.fullName, appointmentDate: apptDate });
@@ -345,38 +303,22 @@ export default function ArchitecturalAppointmentsView() {
         </div>
     )};
 
-    if (brandingLoading || loading) return <Skeleton className="h-[500px] w-full rounded-3xl" />;
+    if (brandingLoading || loading) return <Skeleton className="h-[500px] w-full rounded-[2.5rem]" />;
 
     return (
         <div className="space-y-6" dir='rtl'>
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-2xl border no-print">
-                <div className="flex items-center gap-3">
-                    <CalendarIcon className="text-primary h-6 w-6" />
-                    <h2 className="text-lg font-black">جدول زيارات القسم المعماري</h2>
-                </div>
-                <div className='flex items-center gap-2'>
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild><Button variant="outline" className="w-[240px] font-bold rounded-xl"><CalendarIcon className="ml-2 h-4 w-4" />{date ? format(date, "PPP", { locale: ar }) : "اختر تاريخ"}</Button></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus /></PopoverContent>
-                    </Popover>
-                </div>
-            </div>
-            
-            <div id="architectural-appointments-printable-area" className="space-y-6">
-                {isRamadan ? renderGridSection('فترة دوام رمضان', morningSlots) : (
-                    <>
-                        {renderGridSection('الفترة الصباحية', morningSlots)}
-                        {renderGridSection('الفترة المسائية', eveningSlots)}
-                    </>
+            <div id="architectural-appointments-printable-area" className="space-y-8">
+                {isRamadan ? renderGridSection('بروتوكول دوام رمضان', morningSlots) : (
+                    <>{renderGridSection('الفترة الصباحية', morningSlots)}{renderGridSection('الفترة المسائية', eveningSlots)}</>
                 )}
             </div>
 
             <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} firestore={firestore} currentUser={currentUser} />
             
             <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl">
-                    <AlertDialogHeader><AlertDialogTitle>تأكيد الإلغاء؟</AlertDialogTitle><AlertDialogDescription>سيتم تغيير حالة الموعد إلى ملغي وتعديل ترقيم الزيارات المتبقية.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleCancelBooking} className="bg-destructive rounded-xl">{isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'إلغاء الموعد'}</AlertDialogAction></AlertDialogFooter>
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                    <AlertDialogHeader><AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الإلغاء؟</AlertDialogTitle><AlertDialogDescription className="text-base font-medium">سيتم تغيير حالة الموعد إلى ملغي وتعديل ترقيم الزيارات المتبقية للعميل آلياً.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleCancelBooking} className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-8">{isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، إلغاء الموعد'}</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
@@ -401,52 +343,43 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, fi
         try {
             const apptsPath = getTenantPath('appointments', tenantId);
             const appointmentDateTime = dialogData.appointmentDate;
-            
             if (isPast(appointmentDateTime) && currentUser?.role !== 'Admin') {
-                toast({ variant: 'destructive', title: 'تاريخ غير صالح', description: 'لا يمكن إنشاء موعد في وقت قد مضى.'});
+                toast({ variant: 'destructive', title: 'عائق زمني', description: 'لا يمكن حجز موعد في الماضي.'});
                 setIsSaving(false); return;
             }
-
             if (isNewClient) {
-                const newAppt = { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId };
-                await addDoc(collection(firestore, apptsPath), newAppt);
+                await addDoc(collection(firestore, apptsPath), { title: title || newClientName, clientName: newClientName, clientMobile: newClientMobile, engineerId: dialogData.engineerId, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount: 1, color: '#facc15', createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
             } else {
                 const client = clients.find((c: any) => c.id === selectedClientId);
                 const batch = writeBatch(firestore);
-                const clientApptsQuery = query(collection(firestore, apptsPath), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled'));
-                const snap = await getDocs(clientApptsQuery);
-                const existing = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                const visitCount = existing.length + 1;
-                const newApptRef = doc(collection(firestore, apptsPath));
-                batch.set(newApptRef, { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
+                const snap = await getDocs(query(collection(firestore, apptsPath), where('clientId', '==', selectedClientId), where('type', '==', 'architectural'), where('status', '!=', 'cancelled')));
+                const visitCount = snap.size + 1;
+                batch.set(doc(collection(firestore, apptsPath)), { clientId: selectedClientId, engineerId: dialogData.engineerId, title: title || client.nameAr, appointmentDate: Timestamp.fromDate(appointmentDateTime), type: 'architectural', status: 'scheduled', visitCount, color: getVisitColor({ visitCount, contractSigned: client.status !== 'new' }), createdAt: serverTimestamp(), workStageUpdated: false, companyId: tenantId });
                 await batch.commit();
             }
-            toast({ title: 'نجاح', description: 'تم حفظ الموعد.' });
+            toast({ title: 'تم الحجز بنجاح' });
             onSaveSuccess(); onClose();
-        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحفظ' }); } finally { setIsSaving(false); }
+        } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الحجز' }); } finally { setIsSaving(false); }
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md rounded-3xl">
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
                 <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>حجز موعد جديد</DialogTitle>
-                        <DialogDescription>{dialogData?.engineerName} - {dialogData?.appointmentDate && format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription>
+                    <DialogHeader className="p-8 bg-primary/5 border-b">
+                        <DialogTitle className="text-xl font-black">حجز موعد جديد</DialogTitle>
+                        <DialogDescription className="font-bold">{dialogData?.engineerName} • {dialogData?.appointmentDate && format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid gap-2"><Label>الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="rounded-xl" /></div>
-                        <div className="flex items-center gap-2 pt-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} /><Label>عميل جديد (غير مسجل)</Label></div>
+                    <div className="p-8 space-y-6">
+                        <div className="grid gap-2"><Label className="font-black text-gray-700 pr-1">الغرض من الزيارة</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: مناقشة المخططات..." className="h-12 rounded-xl border-2" /></div>
+                        <div className="flex items-center gap-2 pt-2"><Checkbox checked={isNewClient} onCheckedChange={(c) => setIsNewClient(!!c)} /><Label className="font-black cursor-pointer">إضافة عميل جديد (Lead)</Label></div>
                         {isNewClient ? (
-                            <div className="grid grid-cols-2 gap-4 animate-in fade-in">
-                                <div className="grid gap-2"><Label>الاسم</Label><Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required className="rounded-xl" /></div>
-                                <div className="grid gap-2"><Label>الجوال</Label><Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} required className="rounded-xl" /></div>
-                            </div>
+                            <div className="grid grid-cols-2 gap-4 animate-in fade-in"><div className="grid gap-2"><Label className="font-bold text-xs">الاسم</Label><Input value={newClientName} onChange={e => setNewClientName(e.target.value)} required className="h-10 rounded-xl" /></div><div className="grid gap-2"><Label className="font-bold text-xs">الجوال</Label><Input value={newClientMobile} onChange={e => setNewClientMobile(e.target.value)} required className="h-10 rounded-xl" /></div></div>
                         ) : (
-                            <div className="grid gap-2 animate-in fade-in"><Label>العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." className="rounded-xl" /></div>
+                            <div className="grid gap-2 animate-in fade-in"><Label className="font-bold text-xs">العميل المسجل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clients.map((c: any) => ({ value: c.id, label: c.nameAr }))} placeholder="ابحث..." className="h-10" /></div>
                         )}
                     </div>
-                    <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-bold">{isSaving ? <Loader2 className="animate-spin h-4 w-4" /> : 'تأكيد الحجز'}</Button></DialogFooter>
+                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30">{isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : 'تأكيد الحجز'}</Button></DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
