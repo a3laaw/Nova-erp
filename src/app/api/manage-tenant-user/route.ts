@@ -6,8 +6,9 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * 🛡️ محرك إدارة المنشآت الموحد (Sovereign IAM Engine V5.0):
+ * 🛡️ محرك إدارة المنشآت الموحد (Sovereign IAM Engine V6.0):
  * تم تحديثه ليدعم إنشاء الحسابات باستخدام "اسم المستخدم" فقط وربطه بالمنشأة آلياً.
+ * يضمن تخزين الـ username في كافة السجلات لسهولة البحث عند الدخول.
  */
 
 function getAdminApp() {
@@ -59,7 +60,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, email, password, displayName, companyId, username, role, employeeId } = body;
 
-    // السماح للمطور أو لمدير المنشأة بإنشاء مستخدم لمنشأته
     const isDeveloper = decodedToken.role === 'Developer' || decodedToken.isSuperAdmin;
     const isAdminOfTargetCompany = decodedToken.role === 'Admin' && decodedToken.companyId === companyId;
 
@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
 
         let userRecord;
         try {
-            // 1. إنشاء المستخدم في Firebase Auth
             userRecord = await adminAuth.createUser({ 
                 email: technicalEmail, 
                 password, 
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
             username: sanitizedUsername 
         });
 
-        // 3. التوثيق في الفهرس العالمي (Global User Index) - نستخدم username للبحث السريع عند الدخول
+        // 3. التوثيق في الفهرس العالمي (Global User Index)
         await db.collection('global_users').doc(userRecord.uid).set({
             email: technicalEmail,
             username: sanitizedUsername,

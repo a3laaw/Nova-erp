@@ -22,9 +22,9 @@ import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * بوابة الدخول السيادية (Username-Enabled Gateway V6.0):
+ * بوابة الدخول السيادية (Unified Login Gateway V7.0):
  * - تقبل "اسم المستخدم" أو "البريد الإلكتروني".
- * - تقوم بالبحث عن البريد التقني آلياً عند إدخال اليوزر.
+ * - الموظف يدخل باسمه البسيط (مثل ali.ahmed) مع كلمة مروره.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
@@ -55,14 +55,15 @@ export default function LoginPage() {
     try {
         let loginEmail = identifier.trim().toLowerCase();
 
-        // 🛡️ معالجة الدخول باسم المستخدم (Lookup Engine)
+        // 🛡️ محرك البحث عن الهوية (Username Lookup)
+        // إذا لم يحتوي المدخل على @، نعتبره "اسم مستخدم" ونبحث عن إيميله التقني
         if (!loginEmail.includes('@') && firestore) {
             const globalUsersRef = collection(firestore, 'global_users');
             const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
             const snapshot = await getDocs(q);
             
             if (snapshot.empty) {
-                throw new Error("اسم المستخدم هذا غير مسجل في النظام.");
+                throw new Error("عذراً، اسم المستخدم هذا غير موجود في سجلات المنظومة.");
             }
             loginEmail = snapshot.docs[0].data().email;
         }
@@ -124,16 +125,16 @@ export default function LoginPage() {
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم (User ID)</Label>
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد الإلكتروني</Label>
                             <div className="relative">
                                 <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
                                 <Input 
                                     value={identifier} 
                                     onChange={(e) => setIdentifier(e.target.value)} 
-                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner pr-10" 
+                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner pr-12" 
                                     required 
-                                    placeholder="Username"
-                                    autoComplete="username"
+                                    placeholder="Username / Email"
+                                    autoComplete="off"
                                 />
                             </div>
                         </div>

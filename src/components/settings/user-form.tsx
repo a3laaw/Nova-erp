@@ -37,9 +37,10 @@ const roleOptions = [
 ];
 
 /**
- * نموذج تأسيس حساب موظف (Username-Centric V5.0):
- * - تم حذف خانة البريد الإلكتروني نهائياً والاعتماد على اسم المستخدم فقط للدخول.
+ * نموذج تأسيس حساب موظف (Username-Centric V6.0):
+ * - يعتمد على اسم المستخدم فقط للدخول.
  * - دروع متطورة لمنع المتصفح من حشو بيانات المالك في الخانات.
+ * - تم إصلاح خطأ استيراد Loader2.
  */
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, isSaving }: UserFormProps) {
   const { toast } = useToast();
@@ -148,7 +149,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                  <div className="grid gap-2">
                     <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم للدخول (Username) *</Label>
                     <div className="relative">
-                        <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-30" />
+                        <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary opacity-30" />
                         <Input 
                             id="username" 
                             value={formData.username} 
@@ -158,7 +159,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                             required 
                             autoComplete="off"
                             disabled={isSaving}
-                            className="h-12 rounded-xl font-black text-primary border-2 pr-10 text-center text-lg shadow-sm"
+                            className="h-12 rounded-xl font-black text-primary border-2 pr-12 text-center text-lg shadow-sm"
                         />
                     </div>
                     <p className="text-[9px] font-bold text-muted-foreground text-center">الموظف سيستخدم هذا الاسم بدلاً من الإيميل.</p>
