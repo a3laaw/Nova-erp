@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, FileText, AlertCircle, MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
@@ -314,4 +314,3 @@ export function PermissionRequestsList() {
     </>
   );
 }
-
