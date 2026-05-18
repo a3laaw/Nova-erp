@@ -51,8 +51,49 @@ export function calculateWorkingDays(
 }
 
 /**
- * حساب رصيد الإجازات السنوية:
- * الموظف يكتسب 30 يوماً في السنة (أي 2.5 يوم عن كل شهر عمل فعلي).
+ * محرك تحليل شرائح الإجازة المرضية (Kuwaiti Labor Law Tiers)
+ * 15 يوم: 100%
+ * 10 أيام: 75%
+ * 10 أيام: 50%
+ * 10 أيام: 25%
+ * 30 يوم: 0%
+ */
+export const calculateSickLeaveTiers = (totalUsedBefore: number, requested: number) => {
+  const tiers = [
+    { start: 0, end: 15, rate: 1, label: 'أجر كامل (100%)' },
+    { start: 15, end: 25, rate: 0.75, label: '75% من الأجر' },
+    { start: 25, end: 35, rate: 0.5, label: '50% من الأجر' },
+    { start: 35, end: 45, rate: 0.25, label: '25% من الأجر' },
+    { start: 45, end: 75, rate: 0, label: 'بدون أجر (0%)' },
+  ];
+
+  const results: { label: string; days: number; rate: number }[] = [];
+  let remaining = requested;
+  let currentPos = totalUsedBefore;
+
+  for (const tier of tiers) {
+    if (remaining <= 0) break;
+    if (currentPos >= tier.end) continue;
+
+    const availableInTier = tier.end - currentPos;
+    const amountToTake = Math.min(remaining, availableInTier);
+
+    if (amountToTake > 0) {
+      results.push({ label: tier.label, days: amountToTake, rate: tier.rate });
+      remaining -= amountToTake;
+      currentPos += amountToTake;
+    }
+  }
+
+  if (remaining > 0) {
+    results.push({ label: 'بدون أجر (تعدى 75 يوم)', days: remaining, rate: 0 });
+  }
+
+  return results;
+};
+
+/**
+ * حساب رصيد الإجازات السنوية
  */
 export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDate: Date): number => {
     const hireDate = toFirestoreDate(employee.hireDate);
@@ -69,7 +110,7 @@ export const calculateAnnualLeaveBalance = (employee: Partial<Employee>, asOfDat
 };
 
 /**
- * محرك مكافأة نهاية الخدمة (Gratuity Engine) - قانون العمل الكويتي رقم 6 لسنة 2010
+ * محرك مكافأة نهاية الخدمة
  */
 export const calculateGratuity = (
     employee: Employee, 
@@ -89,15 +130,14 @@ export const calculateGratuity = (
         return { gratuity: 0, leaveBalancePay: 0, noticeIndemnity: 0, total: 0, notice: 'لم يتم تحديد راتب للموظف.', yearsOfService: 0, lastSalary: 0, leaveBalance: 0, dailyWage: 0 };
     }
 
-    // تحديد تاريخ انتهاء الخدمة بناءً على نوع الإنذار
     let effectiveEndDate = noticeStartDate;
-    let noticeIndemnity = 0;
+    let noticeIndemnityValue = 0;
 
     if (noticeType === 'worked') {
         effectiveEndDate = addMonths(noticeStartDate, 3);
     } else if (noticeType === 'indemnity') {
         effectiveEndDate = noticeStartDate;
-        noticeIndemnity = salary * 3;
+        noticeIndemnityValue = salary * 3;
     }
 
     const totalDays = differenceInDays(effectiveEndDate, hireDate);
@@ -105,7 +145,6 @@ export const calculateGratuity = (
     
     let rawGratuity = 0;
 
-    // المادة 51: حساب المكافأة الأساسية
     if (years <= 5) {
         rawGratuity = years * 15 * dailyWage;
     } else {
@@ -119,36 +158,20 @@ export const calculateGratuity = (
 
     let finalGratuity = rawGratuity;
     let lawNotice = `بناءً على خدمة مدتها ${years.toFixed(2)} سنة.`;
-
-    // --- معالجة الحالات الخاصة والحرمان من المكافأة ---
     
     if (employee.terminationReason === 'misconduct') {
         finalGratuity = 0;
-        lawNotice = "المادة 41: يُحرم الموظف من المكافأة نهائياً بسبب إنهاء الخدمة لأسباب تأديبية (سوء سلوك جسيم).";
-    } else if (employee.terminationReason === 'probation_termination' || employee.terminationReason === 'probation_resignation') {
-        finalGratuity = 0;
-        lawNotice = "المادة 24: لا يستحق الموظف مكافأة نهاية خدمة عن فترة التجربة (أقل من 100 يوم).";
+        lawNotice = "المادة 41: يُحرم الموظف من المكافأة نهائياً بسبب سوء سلوك جسيم.";
     } else if (employee.terminationReason === 'resignation') {
-        // المادة 53: في حالة الاستقالة فقط يتم تطبيق الخصومات
         if (years < 3) {
             finalGratuity = 0;
-            lawNotice = "المادة 53: لا يستحق الموظف مكافأة لخدمة أقل من 3 سنوات في حالة الاستقالة.";
+            lawNotice = "المادة 53: لا يستحق مكافأة لخدمة أقل من 3 سنوات في حالة الاستقالة.";
         } else if (years < 5) {
             finalGratuity = rawGratuity * 0.5;
-            lawNotice = "المادة 53: يستحق نصف المكافأة لخدمة بين 3 و 5 سنوات في حالة الاستقالة.";
+            lawNotice = "المادة 53: يستحق نصف المكافأة لخدمة بين 3-5 سنوات.";
         } else if (years < 10) {
             finalGratuity = rawGratuity * (2/3);
-            lawNotice = "المادة 53: يستحق ثلثي المكافأة لخدمة بين 5 و 10 سنوات في حالة الاستقالة.";
-        } else {
-            lawNotice = "المادة 53: يستحق المكافأة كاملة لخدمة تزيد عن 10 سنوات.";
-        }
-    } else {
-        // أي سبب آخر (إنهاء خدمات، مادة 48، وفاة، عجز، انتهاء عقد) يستحق المكافأة كاملة مادة 51
-        if (years < 1) {
-            finalGratuity = 0;
-            lawNotice = "المادة 51: يشترط إتمام سنة واحدة على الأقل لاستحقاق المكافأة في الحالات غير الاستقالة.";
-        } else {
-            lawNotice = "يستحق الموظف المكافأة كاملة (المادة 51/52/48) حسب سبب ترك العمل المختار.";
+            lawNotice = "المادة 53: يستحق ثلثي المكافأة لخدمة بين 5-10 سنوات.";
         }
     }
 
@@ -158,8 +181,8 @@ export const calculateGratuity = (
     return { 
         gratuity: finalGratuity, 
         leaveBalancePay, 
-        noticeIndemnity,
-        total: finalGratuity + leaveBalancePay + noticeIndemnity, 
+        noticeIndemnity: noticeIndemnityValue,
+        total: finalGratuity + leaveBalancePay + noticeIndemnityValue, 
         notice: lawNotice,
         yearsOfService: years,
         lastSalary: salary,

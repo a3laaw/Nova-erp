@@ -5,13 +5,22 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { AlertCircle, RefreshCcw, LogOut, Loader2 } from 'lucide-react';
+import { AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/context/sync-context';
 import { SystemExpertChatWidget } from '@/components/ai/chat-widget';
-import Image from 'next/image';
+
+const NovaLogo = () => (
+  <svg width="120" height="120" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
+    <circle cx="100" cy="100" r="90" fill="white" fillOpacity="0.1" />
+    <path d="M50 150V50L100 150V50" stroke="#FF7A00" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M120 50H170V80H120V110H160V140H120V170H170" stroke="#FFB000" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M180 20L195 40L180 60" fill="#FFB000" />
+    <path d="M20 180L5 160L20 140" fill="#FF7A00" />
+  </svg>
+);
 
 export default function DashboardLayout({
   children,
@@ -44,16 +53,17 @@ export default function DashboardLayout({
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
         
         <div className="relative z-10 flex flex-col items-center gap-6">
-            <div className="relative">
-                <div className="h-32 w-32 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
-                <div className="absolute inset-0 m-auto flex flex-col items-center justify-center animate-pulse">
-                    <span className="text-3xl font-black tracking-tighter text-primary">NOVA</span>
+            <div className="relative flex flex-col items-center">
+                <div className="h-32 w-32 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)] mb-4" />
+                <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
+                    <NovaLogo />
                 </div>
             </div>
-            <div className="text-center space-y-4">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري الدخول لجلسة العمل...</p>
+            <div className="text-center space-y-2">
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري فتح جلسة العمل...</p>
+                <p className="text-primary font-bold text-xs uppercase tracking-[0.3em]">Preparing Environment</p>
                 {showEmergencyExit && (
-                    <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl bg-white/40">
+                    <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl bg-white/40 mt-6">
                         <div className="flex items-center gap-2 text-primary justify-center mb-2">
                             <AlertCircle className="h-4 w-4" />
                             <span className="text-[10px] font-black uppercase tracking-widest">تأخر في الاستجابة</span>
@@ -78,8 +88,8 @@ export default function DashboardLayout({
         <div className="p-6 bg-red-50/10 rounded-full border-2 border-red-500/20 mb-4">
             <AlertCircle className="h-12 w-12 text-red-600 animate-bounce" />
         </div>
-        <h2 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">انتهت جلسة العمل</h2>
-        <p className="text-slate-500 max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى بيانات منشأتك.</p>
+        <h2 className="text-3xl font-black text-[#1e1b4b] tracking-tighter">انتهت الجلسة</h2>
+        <p className="text-slate-500 max-w-xs mx-auto font-medium">يرجى تسجيل الدخول مرة أخرى للوصول إلى البيانات.</p>
         <Button onClick={handleSafeExit} className="bg-primary text-white font-black px-16 h-14 rounded-2xl mt-8 shadow-2xl hover:scale-105 transition-all">بوابة الدخول</Button>
       </div>
     );

@@ -20,6 +20,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
+const NovaLogo = () => (
+  <svg width="120" height="120" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="animate-pulse">
+    <circle cx="100" cy="100" r="90" fill="white" fillOpacity="0.1" />
+    <path d="M50 150V50L100 150V50" stroke="#FF7A00" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M120 50H170V80H120V110H160V140H120V170H170" stroke="#FFB000" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M180 20L195 40L180 60" fill="#FFB000" />
+    <path d="M20 180L5 160L20 140" fill="#FF7A00" />
+  </svg>
+);
+
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
   const { firestore } = useFirebase();
@@ -52,16 +62,9 @@ export default function LoginPage() {
         if (!loginEmail.includes('@') && firestore) {
             const globalUsersRef = collection(firestore, 'global_users');
             const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
-            
-            try {
-                const snapshot = await getDocs(q);
-                if (snapshot.empty) {
-                    throw new Error("عذراً، اسم المستخدم هذا غير مسجل لدينا.");
-                }
-                loginEmail = snapshot.docs[0].data().email;
-            } catch (err: any) {
-                throw err;
-            }
+            const snapshot = await getDocs(q);
+            if (snapshot.empty) throw new Error("عذراً، اسم المستخدم غير مسجل.");
+            loginEmail = snapshot.docs[0].data().email;
         }
 
         await login(loginEmail, password);
@@ -85,15 +88,15 @@ export default function LoginPage() {
 
   if (globalLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#FFFDF0]" dir="rtl">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-8 bg-[#FFFDF0]" dir="rtl">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
           <div className="relative">
               <div className="h-24 w-24 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
-              <div className="absolute inset-0 m-auto flex flex-col items-center justify-center animate-pulse">
-                  <span className="text-2xl font-black tracking-tighter text-primary">NOVA</span>
+              <div className="absolute inset-0 m-auto flex flex-col items-center justify-center">
+                  <NovaLogo />
               </div>
           </div>
-          <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري الدخول لجلسة العمل...</p>
+          <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري فتح جلسة العمل...</p>
       </div>
     );
   }

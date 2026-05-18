@@ -8,20 +8,21 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { useBranding, type BrandingSettings } from '@/context/branding-context';
 import { useFirebase } from '@/firebase';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity, Sparkles, AlertCircle, Link2, CloudUpload } from 'lucide-react';
+import { Loader2, Save, ImageIcon, Palette, ArrowRight, Activity, Sparkles, Link2, CloudUpload } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Separator } from '../ui/separator';
 import Image from 'next/image';
-import { cleanFirestoreData, cn, getTenantPath } from '@/lib/utils';
+import { cleanFirestoreData, cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/context/auth-context';
+import { Badge } from '@/components/ui/badge';
 
 /**
- * حقل رفع الصور المطور (Sovereign Image Field):
+ * حقل رفع الصور المطور:
  * يدعم الرفع المباشر والروابط الخارجية مع معاينة ذكية.
  */
 function ImageUploadField({
@@ -64,7 +65,7 @@ function ImageUploadField({
             <Label htmlFor={id} className="font-black text-[#1e1b4b] flex items-center gap-2">
                 <ImageIcon className="h-4 w-4 text-primary" /> {label}
             </Label>
-            {preview && <Badge className="bg-green-600 text-white text-[8px] animate-pulse">ملف جديد بانتظار الرفع</Badge>}
+            {preview && <Badge className="bg-green-600 text-white text-[8px] animate-pulse border-none">ملف جديد جاهز للرفع</Badge>}
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -132,11 +133,9 @@ export function BrandingManager() {
     const [formData, setFormData] = useState<Partial<BrandingSettings>>({});
     const [filesToUpload, setFilesToUpload] = useState<Record<string, File | null>>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [saveProgress, setSaveProgress] = useState(0);
 
     const isInitializedRef = useRef(false);
 
-    // 🛡️ تهيئة البيانات مرة واحدة لضمان عدم حدوث حلقات تكرار
     useEffect(() => {
         if (branding && !isInitializedRef.current && !loading) {
             const { id, ...cleanData } = branding;
@@ -153,52 +152,28 @@ export function BrandingManager() {
         setFilesToUpload(prev => ({ ...prev, [field]: file }));
     };
 
-    /**
-     * محرك الحفظ السيادي المطور:
-     * - يعالج كل صورة بشكل مستقل لمنع تجمد العملية.
-     * - يحفظ البيانات النصية أولاً كصمام أمان.
-     * - يفرض تحديث الصلاحيات قبل الحفظ.
-     */
     const handleSave = async () => {
         const tenantId = currentUser?.currentCompanyId;
-        if (!firestore || !tenantId) {
-            toast({ variant: 'destructive', title: 'عائق هويّة', description: 'يرجى تسجيل الدخول مجدداً لتحديد المنشأة.' });
-            return;
-        }
+        if (!firestore || !tenantId) return;
 
         setIsSaving(true);
-        setSaveProgress(10);
-        
         try {
-            // 1. ⚡ تجديد الهوية لضمان سريان قواعد الأمان
             await refreshToken();
-            setSaveProgress(30);
-
             const finalData = { ...formData };
             
-            // 2. 🚀 رفع الصور بشكل مستقل (Non-blocking individual uploads)
             if (storage) {
                 for (const [key, file] of Object.entries(filesToUpload)) {
                     if (file) {
-                        try {
-                            const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}`);
-                            const uploadResult = await uploadBytes(storageRef, file);
-                            const url = await getDownloadURL(uploadResult.ref);
-                            (finalData as any)[key] = url;
-                            setSaveProgress(prev => prev + 15);
-                        } catch (err) {
-                            console.error(`Failed to upload ${key}, continuing with text...`, err);
-                            toast({ variant: 'destructive', title: `خطأ في رفع ${key}`, description: 'سيتم حفظ بقية البيانات والروابط النصية.' });
-                        }
+                        const storageRef = ref(storage, `companies/${tenantId}/branding/${key}_${Date.now()}`);
+                        const uploadResult = await uploadBytes(storageRef, file);
+                        const url = await getDownloadURL(uploadResult.ref);
+                        (finalData as any)[key] = url;
                     }
                 }
             }
 
-            // 3. 🏰 الحفظ النهائي في الوثيقة السيادية
             const settingsPath = `companies/${tenantId}/settings/branding`;
             const settingsRef = doc(firestore, settingsPath);
-            
-            // تطهير البيانات من أي تلوث برمجي
             const cleanData = cleanFirestoreData(finalData);
             delete cleanData.id;
 
@@ -207,22 +182,13 @@ export function BrandingManager() {
                 updatedAt: serverTimestamp()
             }, { merge: true });
             
-            setSaveProgress(100);
             toast({ title: '✅ تم الحفظ بنجاح', description: 'تم تحديث الهوية البصرية والمطبوعات للمنشأة.' });
             setFilesToUpload({});
 
         } catch (error: any) {
-            console.error("Critical Branding Save Failure:", error);
-            toast({ 
-                variant: 'destructive', 
-                title: 'فشل ترحيل البيانات', 
-                description: error.message?.includes('permission') 
-                    ? 'عذراً، جوجل ترفض الكتابة حالياً. حاول إعادة تحميل الصفحة.' 
-                    : 'حدث خطأ تقني في قاعدة البيانات.'
-            });
+            toast({ variant: 'destructive', title: 'فشل ترحيل البيانات', description: 'حدث خطأ تقني في قاعدة البيانات.' });
         } finally {
             setIsSaving(false);
-            setTimeout(() => setSaveProgress(0), 1000);
         }
     };
 
@@ -235,7 +201,6 @@ export function BrandingManager() {
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto pb-20" dir="rtl">
-            {/* Header Frame */}
             <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-purple-50 dark:from-slate-900/60">
                 <CardHeader className="pb-8 px-8 border-b border-purple-100/20">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
@@ -257,7 +222,6 @@ export function BrandingManager() {
 
             <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white/70 backdrop-blur-xl">
                 <CardContent className="pt-10 space-y-12 px-10">
-                    {/* Official Data Section */}
                     <div className="space-y-8">
                         <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4 flex items-center gap-3">
                             <Activity className="h-6 w-6 text-primary" /> البيانات الرسمية لترويسة المستندات
@@ -282,7 +246,6 @@ export function BrandingManager() {
                                         <SelectItem value="general">تجارة عامة ومقاولات</SelectItem>
                                         <SelectItem value="construction">شركات البناء والترميم</SelectItem>
                                         <SelectItem value="consulting">مكاتب الاستشارات الهندسية</SelectItem>
-                                        <SelectItem value="food_delivery">خدمات التوصيل والأغذية</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -291,7 +254,6 @@ export function BrandingManager() {
 
                     <Separator className="opacity-10" />
 
-                    {/* Graphics Matrix Section */}
                     <div className="space-y-8">
                         <h3 className="font-black text-xl text-primary border-r-8 border-primary pr-4 flex items-center gap-3">
                             <ImageIcon className="h-6 w-6 text-primary" /> مصفوفة الصور والمطبوعات
@@ -311,7 +273,7 @@ export function BrandingManager() {
                                 label="ترويسة المكاتبات الرسمية (Header)" 
                                 currentUrl={formData.header_image_url || undefined} 
                                 onUrlChange={(url) => handleFieldChange('header_image_url', url)} 
-                                onFileChange={(file) => handleFileChange('header_image_url', file)} 
+                                onFileChange={(file) => handleFieldChange('header_image_url', file)} 
                                 disabled={isSaving} 
                             />
                         </div>
@@ -334,45 +296,21 @@ export function BrandingManager() {
                                     onChange={(e) => handleFieldChange('address', e.target.value)} 
                                     rows={5} 
                                     className="rounded-[2rem] p-6 border-2 bg-white/60 focus:bg-white text-base font-medium leading-loose shadow-inner" 
-                                    placeholder="أدخل العنوان التفصيلي وأرقام الهواتف الرسمية التي ستظهر في الفوتر..." 
+                                    placeholder="أدخل العنوان التفصيلي وأرقام الهواتف الرسمية..." 
                                 />
                             </div>
                         </div>
                     </div>
                 </CardContent>
 
-                <CardFooter className="p-10 border-t bg-muted/10 flex justify-between items-center">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-3 text-muted-foreground">
-                            <AlertCircle className="h-4 w-4" />
-                            <p className="text-[10px] font-black uppercase tracking-wider">سيتم تحديث كافة المطبوعات فور الحفظ</p>
-                        </div>
-                        {isSaving && saveProgress > 0 && (
-                            <div className="w-64 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">
-                                <div 
-                                    className="h-full bg-primary transition-all duration-300" 
-                                    style={{ width: `${saveProgress}%` }}
-                                />
-                            </div>
-                        )}
-                    </div>
-
+                <CardFooter className="p-10 border-t bg-muted/10 flex justify-end">
                     <Button 
                         onClick={handleSave} 
                         disabled={isSaving} 
                         className="h-16 px-20 rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-primary/30 min-w-[380px] gap-4 transition-all active:scale-95"
                     >
-                        {isSaving ? (
-                            <>
-                                <Loader2 className="animate-spin h-8 w-8" />
-                                <span>جاري الحفظ والترحيل...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Save className="h-8 w-8" />
-                                <span>اعتماد الهوية البصرية</span>
-                            </>
-                        )}
+                        {isSaving ? <Loader2 className="animate-spin h-8 w-8" /> : <Save className="h-8 w-8" />}
+                        <span>اعتماد الهوية البصرية</span>
                     </Button>
                 </CardFooter>
             </Card>
