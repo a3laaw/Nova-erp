@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -240,10 +239,12 @@ export default function ArchitecturalAppointmentsView() {
         } finally { setIsDeleting(false); setAppointmentToDelete(null); }
     };
 
+    const handlePrint = () => window.print();
+
     const renderGridSection = (title: string, slots: string[]) => {
       if (slots.length === 0) return null;
       return (
-        <div className="border-2 rounded-[2rem] overflow-x-auto bg-white shadow-xl">
+        <div className="border-2 rounded-[2rem] overflow-x-auto bg-white shadow-xl mb-8">
             <h3 className="font-black text-lg p-5 bg-[#F8F9FE] text-[#7209B7] border-b-2">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
@@ -307,7 +308,33 @@ export default function ArchitecturalAppointmentsView() {
 
     return (
         <div className="space-y-6" dir='rtl'>
-            <div id="architectural-appointments-printable-area" className="space-y-8">
+            {/* 🛡️ شريط التحكم الزمني (Sovereign Date & Control Bar) */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white/40 backdrop-blur-md p-4 rounded-[2rem] border-2 border-white/60 shadow-sm no-print mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-xl text-primary shadow-inner">
+                        <CalendarIcon className="h-5 w-5" />
+                    </div>
+                    <span className="font-black text-sm text-[#1e1b4b]">تصفح جدول المواعيد</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-[240px] justify-start text-right font-black h-11 rounded-xl border-2 bg-white shadow-sm">
+                                <CalendarIcon className="ml-2 h-4 w-4 text-primary" />
+                                {date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 rounded-[2rem] border-none shadow-2xl" align="start">
+                            <Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus locale={ar} />
+                        </PopoverContent>
+                    </Popover>
+                    <Button onClick={handlePrint} variant="outline" className="h-11 rounded-xl font-bold border-2 bg-white gap-2">
+                        <Printer className="h-4 w-4" /> طباعة الجدول
+                    </Button>
+                </div>
+            </div>
+
+            <div id="architectural-appointments-printable-area" className="space-y-4">
                 {isRamadan ? renderGridSection('بروتوكول دوام رمضان', morningSlots) : (
                     <>{renderGridSection('الفترة الصباحية', morningSlots)}{renderGridSection('الفترة المسائية', eveningSlots)}</>
                 )}

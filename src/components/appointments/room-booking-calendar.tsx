@@ -250,18 +250,18 @@ export default function RoomBookingCalendar() {
     const renderGridSection = (title: string, slots: string[]) => {
         if (slots.length === 0) return null;
         return (
-        <div className="border rounded-lg overflow-x-auto bg-card">
-            <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
+        <div className="border-2 rounded-[2rem] overflow-x-auto bg-white shadow-xl mb-8">
+            <h3 className="font-black text-lg p-5 bg-[#F8F9FE] text-[#7209B7] border-b-2 print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
                 <colgroup>
                     <col className="w-[6rem] sm:w-[8rem]" />
                     {slots.map((_, i) => <col key={i} className="w-[7rem] sm:w-[8rem]" />)}
                 </colgroup>
-                <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">القاعة</th>{slots.map(time => <th key={time} className="p-1 sm:p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
+                <thead><tr className='border-b bg-[#F8F9FE]/50'><th className="sticky left-0 bg-[#F8F9FE] p-1 sm:p-2 z-10 font-black text-[#7209B7] text-center border-l print:text-sm">القاعة</th>{slots.map(time => <th key={time} className="p-1 sm:p-2 text-center text-sm font-mono border-l font-black text-[#7209B7]">{time}</th>)}</tr></thead>
                 <tbody>
                     {rooms.map(room => (
-                        <tr key={room} className='border-b'>
-                            <th className="sticky left-0 bg-muted p-1 sm:p-2 z-10 font-semibold text-center border-l print:text-sm">{room}</th>
+                        <tr key={room} className='border-b hover:bg-[#F3E8FF]/10 transition-colors'>
+                            <th className="sticky left-0 bg-[#F8F9FE] p-1 sm:p-2 z-10 font-black text-gray-800 text-center border-l print:text-sm">{room}</th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
                                 const appointmentDate = booking ? toFirestoreDate(booking.appointmentDate) : null;
@@ -273,30 +273,30 @@ export default function RoomBookingCalendar() {
                                         {booking && appointmentDate ? (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-md cursor-pointer transition-all hover:brightness-95 shadow-sm h-full relative" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
+                                                    <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-2xl cursor-pointer transition-all hover:brightness-95 shadow-md h-full relative" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
                                                         {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">في إجازة رسمية</Badge>}
                                                         <p className="font-bold text-[10px] sm:text-xs leading-tight">{booking.title}</p>
-                                                        <p className="text-[9px] sm:text-[10px] mt-1">{booking.clientName}</p>
+                                                        <p className="text-[9px] sm:text-[10px] mt-1 font-black">{booking.clientName}</p>
                                                     </div>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent dir="rtl">
+                                                <DropdownMenuContent dir="rtl" className="rounded-xl shadow-2xl">
                                                     <DropdownMenuItem onClick={() => {
                                                         const startTime = toFirestoreDate(booking.appointmentDate);
                                                         setDialogData({ ...booking, appointmentDate: startTime });
                                                         setIsDialogOpen(true);
-                                                    }}><Pencil className="ml-2 h-4 w-4" />تعديل الموعد</DropdownMenuItem>
+                                                    }} className="font-bold py-3"><Pencil className="ml-2 h-4 w-4" />تعديل الموعد</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4" />إلغاء الموعد</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-red-600 font-bold py-3"><Trash2 className="ml-2 h-4 w-4" />إلغاء الموعد</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         ) : (
-                                            <button onClick={() => {
+                                            <div onClick={() => {
                                                 const [h, m] = time.split(':').map(Number);
                                                 const startTime = setMinutes(setHours(date!, h), m);
                                                 if (isPast(startTime)) return toast({ title: 'لا يمكن الحجز في الماضي' });
                                                 setDialogData({ room, appointmentDate: startTime });
                                                 setIsDialogOpen(true);
-                                            }} className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" />
+                                            }} className="h-full w-full hover:bg-muted/30 transition-colors rounded-2xl no-print cursor-pointer" />
                                         )}
                                     </td>
                                 );
@@ -310,21 +310,37 @@ export default function RoomBookingCalendar() {
 
     if (brandingLoading || (loading && rawAppointments.length === 0)) return <Skeleton className="h-[500px] w-full rounded-3xl" />;
     
-    if (!hasWorkHours) return <Card className="mt-4 rounded-3xl border-2 border-dashed"><CardHeader><CardTitle className="text-center">لم يتم تكوين أوقات القاعات</CardTitle></CardHeader><CardContent className="text-center text-muted-foreground pb-10"><p>الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات الدوام العامة.</p><Button asChild className="mt-6 rounded-xl font-bold"><Link href="/dashboard/settings/work-hours">الذهاب إلى الإعدادات</Link></Button></CardContent></Card>;
+    if (!hasWorkHours) return <Card className="mt-4 rounded-[2rem] border-2 border-dashed"><CardHeader><CardTitle className="text-center font-black">لم يتم تكوين أوقات القاعات</CardTitle></CardHeader><CardContent className="text-center text-muted-foreground pb-10"><p className="font-bold">الرجاء الذهاب إلى صفحة الإعدادات لتحديد أوقات الدوام العامة.</p><Button asChild className="mt-6 rounded-xl font-black h-12 px-8 shadow-xl shadow-primary/20"><Link href="/dashboard/settings/work-hours">الذهاب إلى الإعدادات</Link></Button></CardContent></Card>;
 
     return (
-        <div dir="rtl" className="p-4 space-y-6">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/50 p-4 rounded-2xl border no-print">
-                <h1 className="text-lg font-bold">تقويم حجوزات القاعات</h1>
-                 <div className="flex items-center gap-2">
+        <div dir="rtl" className="space-y-6">
+            {/* 🛡️ شريط التحكم الزمني (Sovereign Control Bar) */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white/40 backdrop-blur-md p-4 rounded-[2rem] border-2 border-white/60 shadow-sm no-print mb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-600/10 rounded-xl text-indigo-600 shadow-inner">
+                        <CalendarIcon className="h-5 w-5" />
+                    </div>
+                    <span className="font-black text-sm text-[#1e1b4b]">تصفح حجوزات القاعات</span>
+                </div>
+                <div className="flex items-center gap-3">
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild><Button variant={"outline"} className="w-[280px] justify-start text-left font-normal rounded-xl"><CalendarIcon className="ml-2 h-4 w-4" />{date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}</Button></PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={date} onSelect={(newDate) => { if (newDate) setDate(newDate); setIsCalendarOpen(false); }} initialFocus /></PopoverContent>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-[240px] justify-start text-right font-black h-11 rounded-xl border-2 bg-white shadow-sm">
+                                <CalendarIcon className="ml-2 h-4 w-4 text-indigo-600" />
+                                {date ? format(date, "PPP", { locale: ar }) : <span>اختر تاريخ</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 rounded-[2rem] border-none shadow-2xl" align="start">
+                            <Calendar mode="single" selected={date} onSelect={(d) => { if(d) setDate(d); setIsCalendarOpen(false); }} initialFocus locale={ar} />
+                        </PopoverContent>
                     </Popover>
-                 </div>
+                    <Button onClick={() => window.print()} variant="outline" className="h-11 rounded-xl font-bold border-2 bg-white gap-2">
+                        <Printer className="h-4 w-4" /> طباعة
+                    </Button>
+                </div>
             </div>
 
-            <div id="room-booking-printable-area" className="space-y-6">
+            <div id="room-booking-printable-area" className="space-y-4">
                 {isRamadan ? renderGridSection('فترة دوام رمضان', morningSlots) : (
                     <>{renderGridSection('الفترة الصباحية', morningSlots)}{renderGridSection('الفترة المسائية', eveningSlots)}</>
                 )}
@@ -332,16 +348,16 @@ export default function RoomBookingCalendar() {
 
              <div className="flex justify-center gap-4 pt-4 text-xs">
                 {Object.entries(departmentStyles).map(([dept, style]) => (
-                    <div key={dept} className="flex items-center gap-2"><div className="h-4 w-4 rounded-sm" style={{ backgroundColor: style.backgroundColor, borderLeft: style.borderLeft }} /><span className="text-sm">{dept}</span></div>
+                    <div key={dept} className="flex items-center gap-2"><div className="h-4 w-4 rounded-lg" style={{ backgroundColor: style.backgroundColor, borderLeft: style.borderLeft }} /><span className="text-sm font-black opacity-60">{dept}</span></div>
                 ))}
             </div>
 
             {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} />}
             
             <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
-                <AlertDialogContent dir="rtl" className="rounded-3xl">
-                    <AlertDialogHeader><AlertDialogTitle>تأكيد الإلغاء؟</AlertDialogTitle><AlertDialogDescription>سيتم حذف هذا الموعد بشكل دائم. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel className="rounded-xl">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBooking} disabled={isDeleting} className="bg-destructive rounded-xl">{isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، قم بالحذف'}</AlertDialogAction></AlertDialogFooter>
+                <AlertDialogContent dir="rtl" className="rounded-3xl border-none shadow-2xl">
+                    <AlertDialogHeader><AlertDialogTitle className="text-xl font-black text-red-700">تأكيد الإلغاء؟</AlertDialogTitle><AlertDialogDescription className="text-base font-medium">سيتم حذف هذا الحجز بشكل دائم. لا يمكن التراجع عن هذا الإجراء.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2"><AlertDialogCancel className="rounded-xl font-bold">تراجع</AlertDialogCancel><AlertDialogAction onClick={handleDeleteBooking} disabled={isDeleting} className="bg-red-600 hover:bg-red-700 rounded-xl font-black px-8">{isDeleting ? <Loader2 className="animate-spin h-4 w-4"/> : 'نعم، قم بالحذف'}</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
@@ -365,7 +381,7 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
             setSelectedClientId(dialogData.clientId || '');
             setSelectedEngineerId(dialogData.engineerId || '');
             setTitle(dialogData.title || '');
-            setDepartment(dialogData.department || '');
+            setDepartment(dialogData.department || 'أخرى');
             setNotes(dialogData.notes || '');
         }
     }, [isOpen, dialogData]);
@@ -400,30 +416,32 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
             const dataToSave = { clientId: selectedClientId, engineerId: selectedEngineerId, title, department, notes, meetingRoom: dialogData.room, appointmentDate: Timestamp.fromDate(dialogData.appointmentDate), type: 'room' as const, companyId: tenantId };
             if (isEditing) await updateDoc(doc(firestore, apptsPath, dialogData.id), dataToSave);
             else await addDoc(collection(firestore, apptsPath), { ...dataToSave, createdAt: serverTimestamp() });
-            toast({ title: 'نجاح', description: 'تم حفظ الحجز بنجاح.' });
+            toast({ title: 'نجاح الحجز' });
             onSaveSuccess(); onClose();
         } finally { setIsSaving(false); }
     };
     
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent dir="rtl" className="max-w-md rounded-3xl">
+            <DialogContent dir="rtl" className="max-w-md rounded-[2.5rem] border-none shadow-2xl p-0 overflow-hidden">
                  <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>{isEditing ? 'تعديل الحجز' : 'حجز جديد'}</DialogTitle><DialogDescription>حجز {dialogData.room} يوم {format(dialogData.appointmentDate, 'PP', { locale: ar })} الساعة {format(dialogData.appointmentDate, 'p', { locale: ar })}</DialogDescription></DialogHeader>
-                    <div className="py-4 grid gap-4">
-                         <div className="grid gap-2"><Label>عنوان الاجتماع</Label><Input value={title} onChange={e => setTitle(e.target.value)} required className="rounded-xl" /></div>
-                        <div className="grid gap-2"><Label>العميل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clientOptions} placeholder="اختر العميل..." className="rounded-xl" /></div>
+                    <DialogHeader className="p-8 bg-indigo-50 border-b">
+                        <DialogTitle className="text-xl font-black text-indigo-900">{isEditing ? 'تعديل حجز القاعة' : 'حجز قاعة جديد'}</DialogTitle>
+                        <DialogDescription className="font-bold text-indigo-700">{dialogData.room} • {format(dialogData.appointmentDate, 'PPp', { locale: ar })}</DialogDescription>
+                    </DialogHeader>
+                    <div className="p-8 space-y-6">
+                         <div className="grid gap-2"><Label className="font-black pr-1">عنوان الاجتماع / الغرض</Label><Input value={title} onChange={e => setTitle(e.target.value)} required className="h-12 rounded-xl border-2 font-bold" placeholder="مناقشة المشروع..." /></div>
+                        <div className="grid gap-2"><Label className="font-black pr-1">العميل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clientOptions} placeholder="ابحث..." className="h-11" /></div>
                         <div className="grid grid-cols-2 gap-4">
-                           <div className="grid gap-2"><Label>القسم</Label><select value={department} onChange={e => setDepartment(e.target.value)} required className="w-full h-10 rounded-xl border-2 border-input bg-background px-3 py-2 text-sm">{departmentOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
+                           <div className="grid gap-2"><Label className="font-black pr-1">القسم</Label><select value={department} onChange={e => setDepartment(e.target.value)} required className="w-full h-11 rounded-xl border-2 border-input bg-background px-3 py-2 text-sm font-black">{departmentOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
                             <div className="grid gap-2">
-                                <Label>المهندس المسؤول</Label>
-                                <InlineSearchList value={selectedEngineerId} onSelect={setSelectedEngineerId} options={engineerOptions} placeholder="اختر..." className="rounded-xl" />
+                                <Label className="font-black pr-1">المهندس المسؤول</Label>
+                                <InlineSearchList value={selectedEngineerId} onSelect={setSelectedEngineerId} options={engineerOptions} placeholder="اختر..." className="h-11" />
                             </div>
                         </div>
-                        <div className="grid gap-2"><Label>ملاحظات إضافية</Label><Textarea value={notes} className="rounded-xl" /></div>
+                        <div className="grid gap-2"><Label className="font-black pr-1">ملاحظات</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl border-2" rows={2} /></div>
                     </div>
-                    <DialogFooter className="gap-2"><Button type="button" variant="outline" onClick={onClose} className="rounded-xl">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-bold">{isSaving && <Loader2 className="ml-2 h-4 w-4 animate-spin"/>}{isSaving ? 'جاري الحفظ...' : 'حفظ'}</Button></DialogFooter>
+                    <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3"><Button type="button" variant="ghost" onClick={onClose} className="rounded-xl font-bold h-12 px-8">إلغاء</Button><Button type="submit" disabled={isSaving} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-indigo-100 bg-indigo-600 hover:bg-indigo-700 text-white gap-2">{isSaving && <Loader2 className="animate-spin h-5 w-5"/>}{isSaving ? 'جاري الحفظ...' : 'تأكيد الحجز'}</Button></DialogFooter>
                  </form>
             </DialogContent>
         </Dialog>
