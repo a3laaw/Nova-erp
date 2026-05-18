@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -31,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer } from 'lucide-react';
+import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, PlaneTakeoff } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -43,6 +44,7 @@ import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '../ui/badge';
 
 const rooms = ['قاعة الاجتماعات 1', 'قاعة الاجتماعات 2', 'قاعة الاجتماعات 3'];
 
@@ -180,7 +182,7 @@ export default function RoomBookingCalendar() {
             try {
                 const [clientSnap, engSnap] = await Promise.all([
                     getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))),
-                    getDocs(query(collection(firestore, employeesPath), where('status', '==', 'active'))),
+                    getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))),
                 ]);
                 const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
                 setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
@@ -361,7 +363,13 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
     }, [isOpen, dialogData]);
     
     const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
-    const engineerOptions = useMemo(() => engineers.map((e: Employee) => ({ value: e.id, label: e.fullName, searchKey: e.employeeNumber })), [engineers]);
+    
+    // إخفاء المهندسين في إجازة من قائمة الاختيار في النافذة المنبثقة لضمان عدم الحجز لهم بالخطأ
+    const engineerOptions = useMemo(() => 
+        engineers
+            .filter((e: Employee) => e.status === 'active')
+            .map((e: Employee) => ({ value: e.id, label: e.fullName, searchKey: e.employeeNumber }))
+    , [engineers]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -387,7 +395,10 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
                         <div className="grid gap-2"><Label>العميل</Label><InlineSearchList value={selectedClientId} onSelect={setSelectedClientId} options={clientOptions} placeholder="اختر العميل..." className="rounded-xl" /></div>
                         <div className="grid grid-cols-2 gap-4">
                            <div className="grid gap-2"><Label>القسم</Label><select value={department} onChange={e => setDepartment(e.target.value)} required className="w-full h-10 rounded-xl border-2 border-input bg-background px-3 py-2 text-sm">{departmentOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
-                            <div className="grid gap-2"><Label>المهندس المسؤول</Label><InlineSearchList value={selectedEngineerId} onSelect={setSelectedEngineerId} options={engineerOptions} placeholder="اختر..." className="rounded-xl" /></div>
+                            <div className="grid gap-2">
+                                <Label>المهندس المسؤول</Label>
+                                <InlineSearchList value={selectedEngineerId} onSelect={setSelectedEngineerId} options={engineerOptions} placeholder="اختر..." className="rounded-xl" />
+                            </div>
                         </div>
                         <div className="grid gap-2"><Label>ملاحظات إضافية</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} className="rounded-xl" /></div>
                     </div>

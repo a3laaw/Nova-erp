@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -31,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle } from 'lucide-react';
+import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, PlaneTakeoff } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import type { Appointment, Client, Employee } from '@/lib/types';
@@ -200,7 +201,8 @@ export default function ArchitecturalAppointmentsView() {
         const employeesPath = getTenantPath('employees', tenantId);
         const clientsPath = getTenantPath('clients', tenantId);
 
-        getDocs(query(collection(firestore, employeesPath), where('status', '==', 'active'))).then(snap => {
+        // جلب المهندسين النشطين والمجازين أيضاً لإظهارهم في الجدول مع التعطيل
+        getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))).then(snap => {
             const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
         });
@@ -262,18 +264,34 @@ export default function ArchitecturalAppointmentsView() {
         <div className="border rounded-lg overflow-x-auto bg-card">
             <h3 className="font-bold text-lg p-3 bg-muted print:text-base">{title}</h3>
              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
-                <colgroup><col className="w-[8rem]" />{slots.map((_, i) => <col key={i} className="w-[8rem]" />)}</colgroup>
+                <colgroup><col className="w-[10rem]" />{slots.map((_, i) => <col key={i} className="w-[8rem]" />)}</colgroup>
                 <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">المهندس</th>{slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
                 <tbody>
-                    {engineers.map(eng => (
-                        <tr key={eng.id} className='border-b'>
-                            <th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">{eng.fullName}</th>
+                    {engineers.map(eng => {
+                        const isOnLeave = eng.status === 'on-leave';
+                        return (
+                        <tr key={eng.id} className={cn('border-b transition-colors', isOnLeave && "bg-slate-50/50")}>
+                            <th className={cn(
+                                "sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l relative",
+                                isOnLeave && "text-slate-400"
+                            )}>
+                                {eng.fullName}
+                                {isOnLeave && (
+                                    <Badge variant="outline" className="mt-1 bg-white text-[8px] font-black text-slate-400 border-slate-200 gap-1 flex items-center justify-center">
+                                        <PlaneTakeoff className="h-2 w-2"/> في إجازة
+                                    </Badge>
+                                )}
+                            </th>
                             {slots.map(time => {
                                 const booking = bookingsGrid[eng.id!]?.[time];
                                 const isClosed = !!booking?.workStageUpdated;
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
-                                        {booking ? (
+                                        {isOnLeave ? (
+                                            <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(0,0,0,0.03)_5px,rgba(0,0,0,0.03)_10px)] flex items-center justify-center">
+                                                <span className="text-[9px] font-black text-slate-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">الموظف مجاز</span>
+                                            </div>
+                                        ) : booking ? (
                                              <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                      <div className="relative h-full w-full rounded-md p-2 text-xs text-gray-800 flex flex-col items-center justify-center text-center cursor-pointer shadow-sm hover:brightness-95 transition-all" style={{ backgroundColor: booking.color }}>
@@ -300,7 +318,7 @@ export default function ArchitecturalAppointmentsView() {
                                 );
                             })}
                         </tr>
-                    ))}
+                    )})}
                 </tbody>
             </table>
         </div>
