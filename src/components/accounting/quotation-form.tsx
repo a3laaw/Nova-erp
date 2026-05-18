@@ -353,7 +353,7 @@ export function QuotationForm({ onSave, onClose, initialData = null, isSaving = 
                   </TableFooter>
               </Table>
           </div>
-          <Button type="button" variant="outline" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة بند إضافي</Button>
+          <Button type="button" variant="outline" onClick={() => append({ id: generateId(), description: '', quantity: 1, unitPrice: 0 })} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة</Button>
       </div>
 
       <DialogFooter className="pt-8 border-t">

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,8 +19,8 @@ import {
   TableRow,
   TableFooter
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Loader2, Save, PlusCircle, Trash2, FileSignature, Calculator, LayoutGrid, CheckCircle2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { doc, updateDoc, collection, serverTimestamp, getDocs, query, runTransaction, limit, where, collectionGroup, orderBy } from 'firebase/firestore';
@@ -33,7 +32,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect, type MultiSelectOption } from '../ui/multi-select';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
 import { InlineSearchList } from '../ui/inline-search-list';
 
@@ -180,9 +179,9 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0 overflow-hidden" dir="rtl">
-        <DialogHeader className="p-6 bg-primary/5 border-b">
-            <DialogTitle className="text-xl font-black flex items-center gap-2"><FileSignature className="text-primary"/> توقيع العقد وتحويله لمشروع</DialogTitle>
-            <DialogDescription>بمجرد الاعتماد، سيتم إنشاء القيد المحاسبي لمديونية المالك والبدء بتأسيس هيكل المشروع الفني.</DialogDescription>
+        <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-2 p-6 bg-primary/5 border-b"><FileSignature className="text-primary"/> توقيع العقد وتحويله لمشروع</DialogTitle>
+            <DialogDescription className="px-6 py-2">بمجرد الاعتماد، سيتم إنشاء القيد المحاسبي لمديونية المالك والبدء بتأسيس هيكل المشروع الفني.</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1 bg-muted/5">
@@ -221,7 +220,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
                             </TableFooter>
                         </Table>
                     </div>
-                    <Button variant="outline" onClick={() => setFinancials((p: any) => ({...p, milestones: [...p.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]}))} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة دفعة مخصصة</Button>
+                    <Button variant="outline" onClick={() => setFinancials((p: any) => ({...p, milestones: [...p.milestones, {id: generateId(), name: `الدفعة الجديدة`, value: 0, condition: ''}]}))} className="w-full h-12 border-dashed border-2 rounded-2xl gap-2 font-bold"><PlusCircle className="h-4 w-4" /> إضافة</Button>
                 </section>
             </div>
         </ScrollArea>
@@ -229,7 +228,7 @@ export function ContractClausesForm({ isOpen, onClose, onSaveSuccess, transactio
         <DialogFooter className="p-6 border-t bg-white">
             <Button variant="ghost" onClick={onClose} disabled={isSaving}>إلغاء</Button>
             <Button onClick={handleSubmit} disabled={isSaving || financials.milestones.length === 0} className="h-12 px-16 rounded-2xl font-black text-lg shadow-xl shadow-primary/30 gap-2">
-                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
+                {isSaving ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
                 اعتماد وتحويل للمشروع الآن
             </Button>
         </DialogFooter>

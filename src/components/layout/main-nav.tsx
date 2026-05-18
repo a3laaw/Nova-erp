@@ -169,7 +169,7 @@ const navItems = {
       ]
     },
     { 
-      label: 'الإعدادات السيادية', 
+      label: 'إعدادات النظام', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
       hrefPrefix: '/dashboard/settings',

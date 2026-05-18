@@ -8,11 +8,10 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Save, X, Loader2, PlusCircle, Trash2, Building2, Search, Info, ShoppingCart, User, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, X, PlusCircle, Trash2, Building2, Search, Info, ShoppingCart, User, ShieldCheck } from 'lucide-react';
 import { useFirebase, useSubscription } from '@/firebase';
-import { collection, query, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, runTransaction, doc, getDoc, serverTimestamp, orderBy, collectionGroup, Timestamp } from 'firebase/firestore';
 import type { Item, ClientTransaction, Account, Employee, Department, BoqItem, ItemCategory, Warehouse, Client } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, cleanFirestoreData } from '@/lib/utils';
@@ -80,7 +79,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
     const issueDate = watch('date');
 
     const totalCost = useMemo(() =>
-        (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitCost) || 0), 0),
+        (watchedItems || []).reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
     [watchedItems]);
 
     useEffect(() => {
@@ -368,7 +367,7 @@ export function MaterialIssueForm({ onClose }: { onClose: () => void }) {
             
             <div className="flex justify-center">
                 <Button type="button" variant="secondary" onClick={() => append({ boqItemId: '', itemId: '', quantity: 1, unitCost: 0 })} className="h-12 px-8 rounded-xl font-bold gap-2">
-                    <PlusCircle className="ml-2 h-5 w-5" /> إضافة سطر صرف جديد
+                    <PlusCircle className="ml-2 h-5 w-5" /> إضافة
                 </Button>
             </div>
 

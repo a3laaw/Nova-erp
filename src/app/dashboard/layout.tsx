@@ -48,7 +48,7 @@ export default function DashboardLayout({
                 <Loader className="h-10 w-10 text-primary absolute inset-0 m-auto animate-pulse" />
             </div>
             <div className="text-center space-y-4">
-                <p className="text-foreground font-black text-2xl tracking-tighter">جاري التحميل...</p>
+                <p className="text-foreground font-black text-2xl tracking-tighter">جاري استعادة جلسة العمل...</p>
                 {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl">
                         <div className="flex items-center gap-2 text-orange-600 justify-center mb-2">

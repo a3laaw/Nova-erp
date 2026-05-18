@@ -476,7 +476,7 @@ export function ReferenceDataManager() {
                                                 </div>
                                             </div>
                                             <Button onClick={() => { setEditingItem(null); setItemName(''); setIsSecondaryDialogOpen(true); }} className="rounded-2xl font-black h-14 px-10 shadow-2xl shadow-primary/20 gap-3 glass-3d-button">
-                                                <PlusCircle className="h-6 w-6" /> إضافة بند جديد
+                                                <PlusCircle className="h-6 w-6" /> إضافة
                                             </Button>
                                         </div>
                                         {view === 'departments' && (
@@ -540,7 +540,7 @@ export function ReferenceDataManager() {
                     <form onSubmit={(e) => { e.preventDefault(); handleSave(isPrimaryDialogOpen ? 'primary' : 'secondary'); }}>
                         <DialogHeader>
                             <div className="p-4 bg-primary/10 rounded-[1.8rem] text-primary w-fit mb-6 shadow-inner"><PlusCircle className="h-10 w-10"/></div>
-                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل السجل' : 'إضافة سجل جديد'}</DialogTitle>
+                            <DialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">{editingItem ? 'تعديل' : 'إضافة جديد'}</DialogTitle>
                         </DialogHeader>
                         <div className="py-10">
                             <Label className="font-black text-[#1e1b4b] pr-3 block mb-4 text-sm uppercase tracking-widest">الاسم المعتمد *</Label>

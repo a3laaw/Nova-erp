@@ -82,8 +82,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       const tenantId = currentAdmin?.currentCompanyId;
       const internalEmail = `${formData.username}@${tenantId}.nova`;
       
-      // 🛡️ SECURITY FIX: Removed passwordHash from being stored in Firestore.
-      // Password is only passed to the Auth handler, never stored in plain/hash text in DB.
       const dataToSave = { 
           ...formData, 
           email: internalEmail,
@@ -102,7 +100,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
                     <div className="p-3 bg-primary/10 rounded-2xl text-primary"><UserPlus className="h-6 w-6"/></div>
                     <div>
                         <DialogTitle className="text-xl font-black">{isEditing ? 'تعديل بيانات الدخول' : 'تأسيس حساب موظف'}</DialogTitle>
-                        <DialogDescription className="text-xs font-bold">إدارة صلاحيات الدخول السيادية للموظف في المنشأة.</DialogDescription>
+                        <DialogDescription className="text-xs font-bold">إدارة صلاحيات الدخول للموظف في المنشأة.</DialogDescription>
                     </div>
                 </div>
             </DialogHeader>

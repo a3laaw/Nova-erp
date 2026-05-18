@@ -235,7 +235,7 @@ export default function NewJournalEntryPage() {
 
     } catch (error) {
         console.error('Error saving journal entry:', error);
-        toast({ variant: 'destructive', title: 'خطأ سيادي', description: 'فشل حفظ القيد، يرجى التأكد من الصلاحيات.' });
+        toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ القيد، يرجى التأكد من الصلاحيات.' });
         setIsSubmitting(false);
         submittingRef.current = false;
     }
@@ -247,7 +247,7 @@ export default function NewJournalEntryPage() {
             <CardHeader className="bg-primary/5 pb-8 border-b">
                 <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle className="text-2xl font-black">قيد يومية جديد (إسناد مراكز التكلفة)</CardTitle>
+                        <CardTitle className="text-2xl font-black">قيد يومية جديد</CardTitle>
                         <CardDescription>أدخل تفاصيل القيد مع إمكانية ربط كل سطر بمشروع أو قسم لضمان دقة التقارير.</CardDescription>
                     </div>
                      <div className="text-left bg-white p-3 rounded-2xl border shadow-inner">
@@ -295,7 +295,7 @@ export default function NewJournalEntryPage() {
                                     </TableCell>
                                     <TableCell>
                                         <Controller control={control} name={`lines.${index}.accountId`} render={({ field: f }) => (
-                                                <InlineSearchList value={f.value} onSelect={f.onChange} options={accountOptions} placeholder="اختر الحساب..." disabled={refDataLoading || isSubmitting} className="border-none shadow-none font-bold text-base bg-transparent" />
+                                                <InlineSearchList value={f.value} onSelect={f.onChange} options={accountOptions} placeholder="اختر حساب..." disabled={refDataLoading || isSubmitting} className="border-none shadow-none font-bold text-base bg-transparent" />
                                             )}
                                         />
                                     </TableCell>
@@ -341,14 +341,14 @@ export default function NewJournalEntryPage() {
                 
                 <div className="flex justify-start">
                     <Button type="button" variant="outline" onClick={() => append({ accountId: '', debit: '', credit: '', notes: '', projectLink: '', deptId: '' })} disabled={isSubmitting} className="h-12 px-10 rounded-2xl border-2 border-dashed border-primary/30 hover:border-primary hover:bg-primary/5 font-black text-lg text-primary gap-2">
-                        <PlusCircle className="h-5 w-5" /> إضافة سطر مالي جديد
+                        <PlusCircle className="h-5 w-5" /> إضافة
                     </Button>
                 </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-4 p-10 border-t bg-muted/10 rounded-b-[2.5rem]">
                 <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSubmitting} className="h-14 px-10 rounded-2xl font-bold">إلغاء</Button>
                 <Button type="submit" disabled={isSubmitting || Math.abs(balance) > 0.001} className="h-14 px-20 rounded-2xl font-black text-2xl shadow-2xl shadow-primary/30 min-w-[320px] gap-3">
-                    {isSubmitting ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6"/>}
+                    {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin"/> : <Save className="ml-2 h-5 w-5"/>}
                     اعتماد وحفظ القيد المبوب
                 </Button>
             </CardFooter>
