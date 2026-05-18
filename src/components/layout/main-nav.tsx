@@ -76,7 +76,8 @@ import {
   Wallet,
   Building2,
   ShieldCheck,
-  Calculator
+  Calculator,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
