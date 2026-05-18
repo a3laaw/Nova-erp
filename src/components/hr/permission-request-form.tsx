@@ -48,7 +48,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   
   const isAdmin = ['Admin', 'HR', 'Developer'].includes(currentUser?.role || '');
 
-  // 🛡️ تصفير الحالة عند الفتح لمنع تعليق زر التحميل أو رسائل الخطأ القديمة
+  // 🛡️ تصفير الحالة لضمان عدم تعليق الأزرار أو الرسائل القديمة
   useEffect(() => {
     if (isOpen) {
         setIsSaving(false);
@@ -69,7 +69,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     }
   }, [isOpen, permissionToEdit, currentUser, isAdmin]);
 
-  // 🛡️ رادار تصفير الأخطاء عند تغيير المدخلات (تاريخ أو موظف)
+  // 🛡️ فحص الرصيد الشهري بفلترة برمجية لتجنب خطأ الفهارس
   useEffect(() => {
     setOverlapError(null);
     if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
@@ -106,6 +106,8 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 }
             });
             setMonthlyTotalHours(total);
+        } catch (e) {
+            console.error("Quota check failed:", e);
         } finally { setLoadingQuota(false); }
     };
 

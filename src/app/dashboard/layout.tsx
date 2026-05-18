@@ -5,7 +5,7 @@ import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar'
 import { MainNav } from '@/components/layout/main-nav';
 import { Header } from '@/components/layout/header';
 import { useAuth } from '@/context/auth-context';
-import { Loader, AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
+import { AlertCircle, RefreshCcw, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/context/language-context';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ export default function DashboardLayout({
     router.replace('/');
   };
 
-  // 🎨 شاشة التحميل بالهوية الذهبية والبرتقالية 🎨
+  // 🎨 شاشة التحميل الذهبية الموحدة مع شعار NOVA 🎨
   if (loading || !mounted) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-8 bg-[#FFFDF0] relative overflow-hidden" dir="rtl">
@@ -46,11 +46,16 @@ export default function DashboardLayout({
         
         <div className="relative z-10 flex flex-col items-center gap-6">
             <div className="relative">
-                <div className="h-24 w-24 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
-                <Loader className="h-10 w-10 text-primary absolute inset-0 m-auto animate-pulse" />
+                {/* مؤشر الدوران الخارجي */}
+                <div className="h-32 w-32 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
+                {/* شعار NOVA في المركز */}
+                <div className="absolute inset-0 m-auto flex flex-col items-center justify-center animate-pulse">
+                    <span className="text-3xl font-black tracking-tighter text-primary">NOVA</span>
+                    <span className="text-[7px] font-black tracking-[0.4em] text-[#1e1b4b] opacity-40">ENTERPRISE</span>
+                </div>
             </div>
             <div className="text-center space-y-4">
-                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري الدخول للمنظومة...</p>
+                <p className="text-[#1e1b4b] font-black text-2xl tracking-tighter">جاري الدخول لجلسة العمل...</p>
                 {showEmergencyExit && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500 max-w-xs mx-auto p-6 glass-effect rounded-3xl border-white/20 shadow-2xl bg-white/40">
                         <div className="flex items-center gap-2 text-primary justify-center mb-2">
