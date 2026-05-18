@@ -86,12 +86,13 @@ export default function LoginPage() {
 
   if (globalLoading && !isSubmitting) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background" dir="rtl">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-[#FFFDF0]" dir="rtl">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-primary/20 rounded-full blur-[100px] animate-pulse" />
           <div className="relative">
-              <div className="h-20 w-20 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
+              <div className="h-20 w-20 rounded-full border-4 border-primary/10 border-t-primary animate-spin shadow-[0_0_40px_rgba(255,122,0,0.2)]" />
               <ShieldCheck className="h-8 w-8 text-primary absolute inset-0 m-auto animate-pulse" />
           </div>
-          <p className="text-foreground font-black text-xl tracking-tighter">جاري استعادة جلسة العمل...</p>
+          <p className="text-[#1e1b4b] font-black text-xl tracking-tighter">جاري استعادة جلسة العمل...</p>
       </div>
     );
   }

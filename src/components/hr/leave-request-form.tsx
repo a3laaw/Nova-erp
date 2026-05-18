@@ -212,7 +212,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
 
             <div className="grid gap-2">
                 <Label className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
-                {isAdmin ? <InlineSearchList value={selectedEmployeeId} onSelect={setSelectedEmployeeId} options={employees.map(e => ({ value: e.id!, label: e.fullName }))} placeholder="اختر موظفاً..." disabled={loadingRefs || isSaving} /> : <div className="h-11 rounded-xl border-2 bg-muted/20 px-4 flex items-center font-black text-[#1e1b4b] gap-2"><User className="h-4 w-4 opacity-40" />{currentUser?.fullName}</div>}
+                {isAdmin ? <InlineSearchList value={selectedEmployeeId} onSelect={setSelectedEmployeeId} options={employees.map(e => ({ value: e.id!, label: e.fullName }))} placeholder={loadingRefs ? 'جاري التحميل...' : 'اختر موظفاً...'} disabled={loadingRefs || isSaving} /> : <div className="h-11 rounded-xl border-2 bg-muted/20 px-4 flex items-center font-black text-[#1e1b4b] gap-2"><User className="h-4 w-4 opacity-40" />{currentUser?.fullName}</div>}
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -240,8 +240,8 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
           </div>
           <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">تراجع</Button>
-            <Button type="submit" disabled={isSaving || !!overlapError} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2">
-              {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="h-5 w-5" />} {leaveRequestToEdit ? 'تحديث الطلب' : 'تقديم الطلب'}
+            <Button type="submit" disabled={isSaving || !!overlapError} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white hover:bg-black transition-all">
+              {isSaving ? <Loader2 className="animate-spin h-5 w-5"/> : <Save className="ml-2 h-4 w-4" />} {leaveRequestToEdit ? 'تحديث الطلب' : 'تقديم الطلب'}
             </Button>
           </DialogFooter>
         </form>

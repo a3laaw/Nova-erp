@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -14,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '../ui/button';
-import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, FileText, AlertCircle, MessageSquare } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, Loader2, Check, X, Pencil, Search, Clock, FileText, AlertCircle, MessageSquare, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '../ui/badge';
 import type { PermissionRequest, Employee } from '@/lib/types';
@@ -112,7 +111,7 @@ export function PermissionRequestsList() {
   const handleEditClick = (req: PermissionRequest) => {
     setRequestToEdit(req);
     setIsFormOpen(true);
-  }
+  };
 
   const handleDeleteRequest = async () => {
     if (!requestToDelete || !firestore || !tenantId) return;
@@ -305,7 +304,7 @@ export function PermissionRequestsList() {
                         requestToAction?.action === 'approve' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
                     )}
                 >
-                    {isProcessingAction ? <Loader2 className="animate-spin h-6 w-6"/> : 'تأكيد وحفظ القرار'}
+                    {isProcessingAction ? <Loader2 className="h-6 w-6"/> : 'تأكيد وحفظ القرار'}
                 </Button>
                 <AlertDialogCancel className="rounded-2xl font-bold h-14 px-8 border-2">إلغاء</AlertDialogCancel>
             </AlertDialogFooter>
