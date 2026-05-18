@@ -91,7 +91,7 @@ const navItems = {
       href: '/dashboard', 
       label: 'الرئيسية', 
       icon: LayoutGrid, 
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] 
     },
     { 
       label: 'العملاء والمبيعات',
@@ -148,21 +148,21 @@ const navItems = {
     { 
       label: 'الموارد البشرية', 
       icon: Users, 
-      roles: ['Developer', 'Admin', 'HR', 'Accountant'],
+      roles: ['Developer', 'Admin', 'HR', 'Accountant', 'Engineer', 'Secretary', 'User'],
       hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'سجل الموظفين', icon: Users },
-        { href: '/dashboard/hr/payroll', label: 'مسير الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/employees', label: 'سجل الموظفين', icon: Users, roles: ['Admin', 'HR', 'Developer'] },
+        { href: '/dashboard/hr/payroll', label: 'مسير الرواتب', icon: Banknote, roles: ['Admin', 'HR', 'Accountant', 'Developer'] },
         { href: '/dashboard/hr/leaves', label: 'الإجازات', icon: CalendarCheck },
         { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
-        { href: '/dashboard/hr/custody-reconciliation', label: 'تسوية العهد', icon: Wallet },
-        { href: '/dashboard/hr/reports', label: 'تقارير الموارد', icon: Activity },
+        { href: '/dashboard/hr/custody-reconciliation', label: 'تسوية العهد', icon: Wallet, roles: ['Admin', 'Accountant', 'Developer', 'Engineer', 'Secretary'] },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموارد', icon: Activity, roles: ['Admin', 'HR', 'Developer'] },
       ]
     },
     { 
       label: 'الإنتاجية الشخصية', 
       icon: Zap, 
-      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'],
+      roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'],
       hrefPrefix: '/dashboard/productivity',
       children: [
         { href: '/dashboard/productivity?tab=tasks', label: 'مهامي الشخصية', icon: ListChecks },
@@ -184,7 +184,7 @@ const navItems = {
     },
   ],
   en: [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] },
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutGrid, roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR', 'User'] },
   ]
 };
 
@@ -193,17 +193,25 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
   const Icon = item.icon;
   if (item.roles && !item.roles.includes(userRole)) return null;
 
+  // Filter children by role
+  const visibleChildren = React.useMemo(() => {
+    if (!item.children) return null;
+    return item.children.filter((child: any) => !child.roles || child.roles.includes(userRole));
+  }, [item.children, userRole]);
+
+  if (item.children && (!visibleChildren || visibleChildren.length === 0)) return null;
+
   const isAnyChildActive = React.useMemo(() => {
-    if (!item.children) return false;
-    return item.children.some((child: any) => {
+    if (!visibleChildren) return false;
+    return visibleChildren.some((child: any) => {
         const baseUrl = child.href.split('?')[0];
         return currentPath.startsWith(baseUrl);
     });
-  }, [item.children, currentPath]);
+  }, [visibleChildren, currentPath]);
 
   const isActive = item.href ? currentPath === item.href : (item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : isAnyChildActive);
 
-  if (!item.children && item.href) {
+  if (!visibleChildren && item.href) {
     return (
       <SidebarMenuItem className="px-4">
         <BaseSidebarMenuButton 
@@ -225,7 +233,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
   
-  if (item.children) {
+  if (visibleChildren) {
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
@@ -253,7 +261,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             <DropdownMenuContent side="left" align="start" className="w-72 rounded-[1.8rem] p-2 shadow-2xl bg-white border-none" dir="rtl">
               <DropdownMenuLabel className="font-black text-slate-400 text-[10px] uppercase tracking-widest px-4 py-3 border-b mb-2">{item.label}</DropdownMenuLabel>
               <ScrollArea className="max-h-[70vh]">
-                {item.children.map((child: any) => {
+                {visibleChildren.map((child: any) => {
                     const isChildActive = currentPath === child.href.split('?')[0];
                     return (
                         <DropdownMenuItem key={child.href} asChild className={cn(
@@ -286,7 +294,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               )}
             >
               <div className="flex items-center justify-between w-full h-full px-4">
-                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-40", isActive ? "text-black" : "text-white")} />
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity(40)", isActive ? "text-black" : "text-white")} />
                 <span className="text-right truncate text-[14px] font-black flex-1 pr-2">
                     {item.label}
                 </span>
@@ -296,7 +304,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
           </CollapsibleTrigger>
           <CollapsibleContent>
             <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 sidebar-no-offset">
-              {item.children.map((child: any) => {
+              {visibleChildren.map((child: any) => {
                 const isChildActive = currentPath === child.href.split('?')[0];
                 return (
                   <SidebarMenuSubItem key={child.href}>

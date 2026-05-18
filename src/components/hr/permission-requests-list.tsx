@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -64,6 +65,8 @@ export function PermissionRequestsList() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
+
   useEffect(() => {
     const employeeId = searchParams.get('employeeId');
     if (employeeId) {
@@ -72,7 +75,15 @@ export function PermissionRequestsList() {
   }, [searchParams]);
 
   
-  const queryConstraints = useMemo(() => [orderBy('createdAt', 'desc')], []);
+  const queryConstraints = useMemo(() => {
+      const constraints = [orderBy('createdAt', 'desc')];
+      // 🛡️ فلترة سيادية للمستخدم العادي: لا يرى إلا طلباته
+      if (!isAdmin && currentUser?.employeeId) {
+          constraints.push(where('employeeId', '==', currentUser.employeeId));
+      }
+      return constraints;
+  }, [isAdmin, currentUser?.employeeId]);
+
   const { data: permissionRequests, loading: loadingRequests } = useSubscription<PermissionRequest>(firestore, 'permissionRequests', queryConstraints);
   const { data: employees, loading: loadingEmployees } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
 
@@ -148,8 +159,7 @@ export function PermissionRequestsList() {
         <Table>
           <TableHeader className="bg-[#F8F9FE]">
             <TableRow className="border-none">
-              <TableHead className="px-8 py-5 font-black text-[#7209B7]">رقم الملف</TableHead>
-              <TableHead className="font-black text-[#7209B7]">اسم الموظف</TableHead>
+              <TableHead className="px-8 font-black text-[#7209B7]">الموظف</TableHead>
               <TableHead className="font-black text-[#7209B7]">نوع الاستئذان</TableHead>
               <TableHead className="font-black text-[#7209B7]">التاريخ</TableHead>
               <TableHead className="font-black text-[#7209B7]">السبب</TableHead>
@@ -159,17 +169,15 @@ export function PermissionRequestsList() {
           </TableHeader>
           <TableBody>
             {loading && Array.from({ length: 5 }).map((_, i) => (
-              <TableRow key={i}><TableCell colSpan={7} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
+              <TableRow key={i}><TableCell colSpan={6} className="px-8"><Skeleton className="h-6 w-full rounded-lg" /></TableCell></TableRow>
             ))}
             {!loading && permissionRequests.length === 0 && (
-              <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground font-bold italic">لا توجد طلبات استئذان مسجلة.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground font-bold italic">لا توجد طلبات استئذان مسجلة.</TableCell></TableRow>
             )}
             {!loading && permissionRequests.map(req => {
-              const emp = employees.find(e => e.id === req.employeeId);
               return (
               <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 group transition-colors h-16">
-                <TableCell className="px-8 font-mono font-bold opacity-60 text-xs">{emp?.employeeNumber || '---'}</TableCell>
-                <TableCell className="font-black text-gray-800">{req.employeeName}</TableCell>
+                <TableCell className="px-8 font-black text-gray-800">{req.employeeName}</TableCell>
                 <TableCell>{typeTranslations[req.type]}</TableCell>
                 <TableCell className="font-bold text-xs opacity-60">{formatDate(req.date)}</TableCell>
                 <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground italic font-medium">{req.reason}</TableCell>
@@ -180,8 +188,8 @@ export function PermissionRequestsList() {
                             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent dir="rtl" className="rounded-xl">
-                            <DropdownMenuLabel>إجراءات الطلب</DropdownMenuLabel>
-                             {(currentUser?.role === 'Admin' || currentUser?.role === 'HR') && req.status === 'pending' && (
+                            <DropdownMenuLabel>خيارات الطلب</DropdownMenuLabel>
+                             {isAdmin && req.status === 'pending' && (
                                 <>
                                     <DropdownMenuItem onClick={() => setRequestToAction({request: req, action: 'approve'})} className="text-green-600 focus:text-green-700 focus:bg-green-50">
                                         <Check className="ml-2 h-4 w-4" /> موافقة
@@ -191,13 +199,17 @@ export function PermissionRequestsList() {
                                     </DropdownMenuItem>
                                 </>
                             )}
-                            <DropdownMenuItem onClick={() => handleEditClick(req)}>
-                                <Pencil className="ml-2 h-4 w-4" /> تعديل
-                            </DropdownMenuItem>
+                            {req.status === 'pending' && (
+                                <DropdownMenuItem onClick={() => handleEditClick(req)}>
+                                    <Pencil className="ml-2 h-4 w-4" /> تعديل
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
-                                <Trash2 className="ml-2 h-4 w-4" /> حذف
-                            </DropdownMenuItem>
+                            {req.status === 'pending' && (
+                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setRequestToDelete(req)}>
+                                    <Trash2 className="ml-2 h-4 w-4" /> حذف
+                                </DropdownMenuItem>
+                            )}
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </TableCell>
