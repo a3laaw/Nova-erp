@@ -57,13 +57,10 @@ import {
   Palette,
   Network,
   UserCheck,
-  Calculator,
-  ShieldCheck,
   RotateCcw,
   Scale,
   TrendingUp,
   Activity,
-  BarChart3,
   Waves,
   Package,
   ShoppingCart,
@@ -74,7 +71,12 @@ import {
   Trash2,
   Zap,
   ListChecks,
-  Bookmark
+  Bookmark,
+  ChevronLeft,
+  Wallet,
+  Building2,
+  ShieldCheck,
+  Calculator
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AuthenticatedUser } from '@/context/auth-context';
@@ -90,75 +92,92 @@ const navItems = {
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'] 
     },
     { 
-      label: 'العملاء',
+      label: 'العملاء والمبيعات',
       icon: UsersRound,
       roles: ['Developer', 'Admin', 'Accountant', 'Secretary', 'Engineer'],
+      hrefPrefix: '/dashboard/clients',
       children: [
         { href: '/dashboard/clients?view=registered', label: 'ملفات العملاء', icon: UsersRound },
         { href: '/dashboard/clients?view=prospective', label: 'المحتملون', icon: Search },
         { href: '/dashboard/accounting/quotations', label: 'عروض الأسعار', icon: FileText },
-        { href: '/dashboard/contracts', label: 'العقود', icon: FileSignature },
+        { href: '/dashboard/contracts', label: 'العقود الرسمية', icon: FileSignature },
       ]
     },
     { 
-      label: 'المحاسبة', 
-      icon: Landmark, 
-      roles: ['Developer', 'Admin', 'Accountant'],
-      children: [
-        { href: '/dashboard/accounting/chart-of-accounts', label: 'الحسابات', icon: ListTree },
-        { href: '/dashboard/accounting/journal-entries', label: 'القيود', icon: BookOpen },
-        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
-        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
-        { href: '/dashboard/accounting/reports', label: 'التقارير المالية', icon: PieChart },
-      ]
-    },
-    { 
-      label: 'المشاريع',
+      label: 'الهندسة والمقاولات',
       icon: PencilRuler,
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant'],
+      hrefPrefix: '/dashboard/construction',
       children: [
         { href: '/dashboard/construction/projects', label: 'المشاريع القائمة', icon: Briefcase },
         { href: '/dashboard/construction/field-visits', label: 'الزيارات الميدانية', icon: MapPin },
-        { href: '/dashboard/construction/boq', label: 'جداول الكميات', icon: ClipboardList },
+        { href: '/dashboard/construction/boq', label: 'مكتبة المقايسات (BOQ)', icon: ClipboardList },
+        { href: '/dashboard/construction/schedules', label: 'الجداول الزمنية', icon: Clock },
       ]
     },
     { 
-      label: 'المخازن',
+      label: 'المحاسبة والمالية', 
+      icon: Landmark, 
+      roles: ['Developer', 'Admin', 'Accountant'],
+      hrefPrefix: '/dashboard/accounting',
+      children: [
+        { href: '/dashboard/accounting/chart-of-accounts', label: 'شجرة الحسابات', icon: ListTree },
+        { href: '/dashboard/accounting/journal-entries', label: 'قيود اليومية', icon: BookOpen },
+        { href: '/dashboard/accounting/cash-receipts', label: 'سندات القبض', icon: ArrowDownLeft },
+        { href: '/dashboard/accounting/payment-vouchers', label: 'سندات الصرف', icon: ArrowUpRight },
+        { href: '/dashboard/accounting/reconciliation', label: 'التسويات البنكية', icon: RotateCcw },
+        { href: '/dashboard/accounting/recurring', label: 'الالتزامات الدورية', icon: CalendarCheck },
+        { href: '/dashboard/accounting/reports', label: 'التقارير التحليلية', icon: PieChart },
+      ]
+    },
+    { 
+      label: 'المخازن والمشتريات',
       icon: Package,
       roles: ['Developer', 'Admin', 'Accountant', 'Engineer'],
+      hrefPrefix: '/dashboard/warehouse',
       children: [
         { href: '/dashboard/warehouse/items', label: 'دليل الأصناف', icon: Package },
         { href: '/dashboard/warehouse/grns', label: 'أذونات الاستلام', icon: FileCheck },
         { href: '/dashboard/warehouse/material-issue', label: 'صرف المواد', icon: ArrowUpFromLine },
+        { href: '/dashboard/warehouse/transfers', label: 'التحويلات المخزنية', icon: ArrowLeftRight },
+        { href: '/dashboard/warehouse/reports', label: 'تقارير المخزون', icon: BarChart3 },
       ]
     },
     { 
-      label: 'الموظفون', 
+      label: 'الموارد البشرية', 
       icon: Users, 
-      roles: ['Developer', 'Admin', 'HR'],
+      roles: ['Developer', 'Admin', 'HR', 'Accountant'],
+      hrefPrefix: '/dashboard/hr',
       children: [
-        { href: '/dashboard/hr/employees', label: 'ملفات الموظفين', icon: Users },
-        { href: '/dashboard/hr/payroll', label: 'الرواتب', icon: Banknote },
+        { href: '/dashboard/hr/employees', label: 'سجل الموظفين', icon: Users },
+        { href: '/dashboard/hr/payroll', label: 'مسير الرواتب', icon: Banknote },
         { href: '/dashboard/hr/leaves', label: 'الإجازات', icon: CalendarCheck },
+        { href: '/dashboard/hr/permissions', label: 'الاستئذانات', icon: Clock },
+        { href: '/dashboard/hr/custody-reconciliation', label: 'تسوية العهد', icon: Wallet },
+        { href: '/dashboard/hr/reports', label: 'تقارير الموارد', icon: Activity },
       ]
     },
     { 
-      label: 'الإنتاجية', 
+      label: 'الإنتاجية الشخصية', 
       icon: Zap, 
       roles: ['Developer', 'Admin', 'Engineer', 'Accountant', 'Secretary', 'HR'],
+      hrefPrefix: '/dashboard/productivity',
       children: [
         { href: '/dashboard/productivity?tab=tasks', label: 'مهامي الشخصية', icon: ListChecks },
         { href: '/dashboard/productivity?tab=bookmarks', label: 'المفضلات', icon: Bookmark },
       ]
     },
     { 
-      label: 'الإعدادات', 
+      label: 'الإعدادات السيادية', 
       icon: Settings2, 
       roles: ['Developer', 'Admin'],
+      hrefPrefix: '/dashboard/settings',
       children: [
         { href: '/dashboard/settings/branding', label: 'الهوية والشعار', icon: Palette },
-        { href: '/dashboard/settings/users', label: 'إدارة الحسابات', icon: UserCheck },
+        { href: '/dashboard/settings/users', label: 'إدارة المستخدمين', icon: UserCheck },
         { href: '/dashboard/settings/reference-data', label: 'تجهيز القوائم', icon: Network },
+        { href: '/dashboard/settings/contract-templates', label: 'نماذج العقود', icon: FileSignature },
+        { href: '/dashboard/settings/work-hours', label: 'مواعيد العمل', icon: Clock },
       ]
     },
   ],
@@ -180,9 +199,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     });
   }, [item.children, currentPath]);
 
-  const isActive = item.href ? currentPath === item.href : isAnyChildActive;
+  const isActive = item.href ? currentPath === item.href : (item.hrefPrefix ? currentPath.startsWith(item.hrefPrefix) : isAnyChildActive);
 
-  // Render a flat item
   if (!item.children && item.href) {
     return (
       <SidebarMenuItem className="px-4">
@@ -205,9 +223,7 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
     );
   }
   
-  // Render an item with children
   if (item.children) {
-    // Collapsed state: Dropdown
     if (state === 'collapsed') {
       return (
         <SidebarMenuItem className="px-3 group-data-[collapsible=icon]:px-0">
@@ -256,7 +272,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
       );
     }
 
-    // Expanded state: Straight vertical line with zero offset
     return (
       <Collapsible defaultOpen={isActive} className="group/collapsible px-4">
         <SidebarMenuItem>
@@ -269,7 +284,8 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
               )}
             >
               <div className="flex items-center justify-between w-full h-full px-4">
-                <span className="text-right truncate text-[14px] font-black flex-1">
+                <ChevronLeft className={cn("h-4 w-4 transition-transform group-data-[state=open]/collapsible:-rotate-90 opacity-40", isActive ? "text-black" : "text-white")} />
+                <span className="text-right truncate text-[14px] font-black flex-1 pr-2">
                     {item.label}
                 </span>
                 {Icon && <Icon className="size-6 shrink-0 ml-3" />}
@@ -277,7 +293,6 @@ function NavItem({ item, userRole, currentPath }: { item: any, userRole: string,
             </BaseSidebarMenuButton>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            {/* Zero horizontal offset container */}
             <SidebarMenuSub className="mt-1 mb-2 space-y-1.5 sidebar-no-offset">
               {item.children.map((child: any) => {
                 const isChildActive = currentPath === child.href.split('?')[0];
