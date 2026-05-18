@@ -18,7 +18,18 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, PlusCircle, Pencil, Trash2, Loader2, DownloadCloud, Plus, Minus, User, ListTree } from 'lucide-react';
+import { 
+    MoreHorizontal, 
+    PlusCircle, 
+    Pencil, 
+    Trash2, 
+    Loader2, 
+    DownloadCloud, 
+    Plus, 
+    Minus, 
+    ListTree,
+    Sparkles
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirebase, useSubscription } from '@/firebase';
 import { collection, addDoc, doc, updateDoc, deleteDoc, writeBatch, getDocs, query, where, orderBy } from 'firebase/firestore';
@@ -56,6 +67,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import type { Account, JournalEntry, Employee } from '@/lib/types';
 import { formatCurrency, cn, cleanFirestoreData } from '@/lib/utils';
@@ -123,13 +135,12 @@ function AccountForm({ isOpen, onClose, onSave, account, parentAccount, accounts
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const code = formData.code || '';
         onSave({ ...formData, level: parentAccount !== null ? (parentAccount.level || 0) + 1 : 0, parentCode: parentAccount?.code || null });
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent dir="rtl" className="rounded-[2.5rem] p-10 border-none shadow-2xl">
+            <DialogContent dir="rtl" className="rounded-[2rem] p-10 border-none shadow-2xl">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-black">{isEditing ? 'تعديل الحساب' : parentAccount ? 'إضافة حساب فرعي' : 'إضافة حساب رئيسي'}</DialogTitle>
@@ -259,23 +270,28 @@ export default function ChartOfAccountsPage() {
 
     return (
         <div className="space-y-10" dir="rtl">
-             <Card className="rounded-[2.5rem] border-none shadow-sm bg-gradient-to-l from-white to-blue-50 dark:from-card dark:to-card overflow-hidden">
-                <CardHeader className="pb-8 px-10 border-b">
-                    <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">
-                                <ListTree className="h-8 w-8" />
+             {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+                <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">شجرة الحسابات العامة</CardTitle>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                    <CardDescription className="text-white/90 font-bold text-sm">إدارة الدليل المحاسبي ومراكز التكلفة والربحية للمنشأة.</CardDescription>
+                                </div>
                             </div>
-                            <div>
-                                <CardTitle className="text-3xl font-black text-blue-900">شجرة الحسابات العامة</CardTitle>
-                                <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-16">إدارة الدليل المحاسبي ومراكز التكلفة والربحية للمنشأة.</CardDescription>
+                            <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                                <ListTree className="h-10 w-10 text-white" />
                             </div>
                         </div>
                          <div className="flex gap-2">
-                            <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" className="h-11 px-6 rounded-xl font-bold gap-2 bg-white" disabled={isSeeding}>
-                                {isSeeding ? <Loader2 className="animate-spin h-4 w-4"/> : <DownloadCloud className="h-4 w-4" />} استيراد الدليل الافتراضي
+                            <Button onClick={() => setIsSeedAlertOpen(true)} variant="outline" className="h-12 px-6 rounded-2xl font-black gap-2 bg-white/20 text-white border-white/40 hover:bg-white/30 backdrop-blur-md" disabled={isSeeding}>
+                                {isSeeding ? <Loader2 className="animate-spin h-4 w-4"/> : <DownloadCloud className="h-4 w-4" />} استيراد الدليل
                             </Button>
-                            <Button onClick={() => { setEditingAccount(null); setParentAccount(null); setIsFormOpen(true); }} className="h-11 px-10 rounded-xl font-black text-lg gap-2 shadow-xl shadow-blue-100">
+                            <Button onClick={() => { setEditingAccount(null); setParentAccount(null); setIsFormOpen(true); }} className="h-12 px-8 rounded-2xl font-black gap-2 bg-white text-[#FF7A00] shadow-xl hover:bg-slate-50 border-none">
                                 <PlusCircle className="h-5 w-5" /> إضافة
                             </Button>
                         </div>
@@ -286,12 +302,12 @@ export default function ChartOfAccountsPage() {
             <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white/95">
                 <CardContent className="p-0">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-[#F8F9FE]">
                             <TableRow className="border-none">
-                                <TableHead className="px-10 font-black">اسم الحساب والترميز</TableHead>
-                                <TableHead className="font-black">النوع</TableHead>
-                                <TableHead className="font-black text-left">الرصيد الحالي</TableHead>
-                                <TableHead className="w-[100px] text-center font-black">إجراء</TableHead>
+                                <TableHead className="px-10 py-5 font-black text-[#7209B7]">اسم الحساب والترميز</TableHead>
+                                <TableHead className="font-black text-[#7209B7]">النوع</TableHead>
+                                <TableHead className="font-black text-[#7209B7] text-left">الرصيد الحالي</TableHead>
+                                <TableHead className="w-[100px] text-center font-black text-[#7209B7]">إجراء</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -302,9 +318,9 @@ export default function ChartOfAccountsPage() {
                                 const hasChildren = accounts.some(a => a.parentCode === account.code);
                                 const isOpen = openAccounts.has(account.code);
                                 return (
-                                    <TableRow key={account.id} className={cn(account.level === 0 ? 'bg-primary/[0.03] font-black' : 'hover:bg-primary/[0.02]')}>
+                                    <TableRow key={account.id} className={cn(account.level === 0 ? 'bg-primary/[0.03]' : 'hover:bg-[#F3E8FF]/20 group transition-colors')}>
                                         <TableCell style={{ paddingRight: `${(account.level || 0) * 1.5 + 2.5}rem` }} className="py-4">
-                                            <div className="flex items-center gap-3 group">
+                                            <div className="flex items-center gap-3">
                                                 {hasChildren && <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => setOpenAccounts(prev => { const n = new Set(prev); if(n.has(account.code)) n.delete(account.code); else n.add(account.code); return n; })}>{isOpen ? <Minus className="h-3 w-3"/> : <Plus className="h-3 w-3"/>}</Button>}
                                                 <div className="flex flex-col">
                                                     <span className="font-black text-slate-800 text-base">{account.name}</span>
@@ -319,6 +335,7 @@ export default function ChartOfAccountsPage() {
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border group-hover:border-primary/20"><MoreHorizontal className="h-4 w-4"/></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" dir="rtl" className="rounded-2xl p-2 shadow-2xl border-none">
+                                                    <DropdownMenuLabel className="font-black px-3 py-2">خيارات الحساب</DropdownMenuLabel>
                                                     <DropdownMenuItem onClick={() => { setEditingAccount(account); setParentAccount(accounts.find(a => a.code === account.parentCode) || null); setIsFormOpen(true); }} className="gap-2 rounded-xl py-3 font-bold"><Pencil className="h-4 w-4 text-primary"/> تعديل</DropdownMenuItem>
                                                     <DropdownMenuSeparator className="bg-slate-100" />
                                                     <DropdownMenuItem onClick={() => { setAccountToDelete(account); setIsAlertOpen(true); }} className="text-red-600 gap-2 rounded-xl py-3 font-black focus:bg-red-50"><Trash2 className="h-4 w-4"/> حذف نهائي</DropdownMenuItem>
@@ -344,7 +361,7 @@ export default function ChartOfAccountsPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-8 gap-3">
                         <AlertDialogCancel className="rounded-xl font-bold h-12 px-8 border-2">إلغاء</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => { if(accountToDelete) deleteDoc(doc(firestore!, 'chartOfAccounts', accountToDelete.id!)); setIsAlertOpen(false); }} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">نعم، حذف نهائي</AlertDialogAction>
+                        <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 rounded-xl font-black h-12 px-12 shadow-xl shadow-red-200">نعم، حذف نهائي</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

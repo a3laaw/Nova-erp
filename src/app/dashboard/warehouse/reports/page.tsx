@@ -1,7 +1,7 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, History, BarChart3, TrendingDown, TrendingUp, DollarSign, ShieldCheck, AlertTriangle, SearchCode } from 'lucide-react';
+import { Package, History, BarChart3, TrendingDown, TrendingUp, DollarSign, ShieldCheck, AlertTriangle, SearchCode, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppTheme } from '@/context/theme-context';
 
@@ -17,55 +17,50 @@ const reportList = [
 ];
 
 export default function InventoryReportsPage() {
-  const { theme } = useAppTheme();
-  const isGlass = theme === 'glass';
-
   return (
-    <div className="space-y-6" dir="rtl">
-        <Card className={cn(
-            "rounded-[2.5rem] border-none shadow-sm overflow-hidden",
-            isGlass ? "glass-effect" : "bg-gradient-to-l from-white to-purple-50 shadow-sm"
-        )}>
-            <CardHeader className="pb-8 px-8 border-b">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-purple-600/10 rounded-2xl text-purple-600 shadow-inner">
-                        <BarChart3 className="h-8 w-8" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-2xl font-black">تقارير المخزون وذكاء المشتريات</CardTitle>
-                        <CardDescription className="text-base font-medium">تحليلات مفصلة عن حركة المواد، الكفالات، والأسعار المرجعية للموردين.</CardDescription>
+    <div className="space-y-10" dir="rtl">
+        {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+        <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+            <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+            <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <CardTitle className="text-3xl font-black text-white tracking-tighter">تقارير المخزون وذكاء المشتريات</CardTitle>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                <CardDescription className="text-white/90 font-bold text-sm">تحليلات مفصلة عن حركة المواد، الكفالات، والأسعار المرجعية للموردين.</CardDescription>
+                            </div>
+                        </div>
+                        <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                            <BarChart3 className="h-10 w-10 text-white" />
+                        </div>
                     </div>
                 </div>
             </CardHeader>
         </Card>
 
-        <Card className={cn(
-            "border-none shadow-sm rounded-3xl overflow-hidden",
-            isGlass ? "glass-effect" : "bg-white"
-        )}>
-            <CardContent className="pt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {reportList.map((report) => {
+        <Card className="border-none shadow-2xl rounded-[3rem] overflow-hidden bg-white/95">
+            <CardContent className="pt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 p-10">
+                {reportList.map((report, idx) => {
                     const Icon = report.icon;
                     return (
-                        <Link href={report.href} key={report.href} className="group block">
-                            <Card className={cn(
-                                "h-full transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-2 border-transparent hover:border-primary/10",
-                                isGlass ? "bg-white/10 hover:bg-white/20" : "bg-slate-50/50"
-                            )}>
-                                <CardHeader>
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn("flex-shrink-0 p-3 rounded-xl shadow-sm", report.color)}>
-                                            <Icon className="h-6 w-6" />
+                        <Link href={report.href} key={idx} className="group block">
+                            <Card className="h-full border-none shadow-xl rounded-[2.5rem] hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 bg-white">
+                                <CardHeader className="pb-4 p-8">
+                                    <div className="flex items-start justify-between">
+                                         <div className={cn("flex-shrink-0 p-4 rounded-2xl transition-all shadow-inner group-hover:scale-110", report.color)}>
+                                            <Icon className="h-8 w-8" />
                                         </div>
-                                        <CardTitle className="text-base font-black">{report.title}</CardTitle>
                                     </div>
+                                    <CardTitle className="text-2xl font-black mt-8 text-slate-900 tracking-tight group-hover:text-primary transition-colors">{report.title}</CardTitle>
                                 </CardHeader>
-                                <CardContent>
-                                    <CardDescription className="font-medium text-xs leading-relaxed">{report.description}</CardDescription>
+                                <CardContent className="px-8 pb-8">
+                                    <CardDescription className="text-sm font-bold text-slate-500 leading-relaxed min-h-[48px]">{report.description}</CardDescription>
                                 </CardContent>
                             </Card>
                         </Link>
-                    );
+                    )
                 })}
             </CardContent>
         </Card>

@@ -29,7 +29,7 @@ export default function CustodyReconciliationsPage() {
                         <Button asChild className="h-12 px-8 rounded-2xl font-black gap-2 bg-white text-[#FF7A00] shadow-xl hover:bg-slate-50 border-none">
                             <Link href="/dashboard/hr/custody-reconciliation/new">
                                 <RotateCcw className="h-5 w-5" />
-                                رفع تسوية جديدة
+                                إضافة
                             </Link>
                         </Button>
                     </div>
