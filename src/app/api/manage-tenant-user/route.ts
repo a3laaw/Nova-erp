@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * 🛡️ محرك إدارة المنشآت الموحد (Sovereign IAM Engine):
- * تم تحديثه ليسمح لمديري الشركات (Admins) بإنشاء مستخدمين لمنشآتهم.
+ * 🛡️ محرك إدارة المنشآت الموحد (Sovereign IAM Engine V5.0):
+ * تم تحديثه ليدعم إنشاء الحسابات باستخدام "اسم المستخدم" فقط وربطه بالمنشأة آلياً.
  */
 
 function getAdminApp() {
@@ -49,8 +49,6 @@ export async function POST(request: NextRequest) {
     const db = getFirestore(app);
     
     const token = authHeader.split('Bearer ')[1];
-    
-    // 🛡️ فحص صلاحيات التوكن
     let decodedToken;
     try {
         decodedToken = await adminAuth.verifyIdToken(token);
@@ -60,9 +58,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { action, email, password, displayName, companyId, username, role, employeeId } = body;
-    const sanitizedEmail = email?.toLowerCase().trim();
 
-    // 🛡️ السماح للمطور أو لمدير المنشأة بإنشاء مستخدم لمنشأته
+    // السماح للمطور أو لمدير المنشأة بإنشاء مستخدم لمنشأته
     const isDeveloper = decodedToken.role === 'Developer' || decodedToken.isSuperAdmin;
     const isAdminOfTargetCompany = decodedToken.role === 'Admin' && decodedToken.companyId === companyId;
 
@@ -70,30 +67,37 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Forbidden: Insufficient Authority to manage this tenant' }, { status: 403 });
     }
 
-    if (action === 'create' || action === 'create_tenant_user') {
+    if (action === 'create_tenant_user') {
+        const sanitizedUsername = username.toLowerCase().trim();
+        const technicalEmail = email || `${sanitizedUsername}@${companyId}.nova`;
+
         let userRecord;
         try {
             // 1. إنشاء المستخدم في Firebase Auth
             userRecord = await adminAuth.createUser({ 
-                email: sanitizedEmail, 
+                email: technicalEmail, 
                 password, 
-                displayName 
+                displayName: displayName || username
             });
         } catch (e: any) {
             if (e.code === 'auth/email-already-exists') {
-                userRecord = await adminAuth.getUserByEmail(sanitizedEmail);
+                userRecord = await adminAuth.getUserByEmail(technicalEmail);
             } else {
                 throw e;
             }
         }
 
-        // 2. حقن ادعاءات المنشأة (Custom Claims) لضمان تفعيل الـ SaaS Isolation
-        await adminAuth.setCustomUserClaims(userRecord.uid, { companyId, role: role || 'User' });
+        // 2. حقن ادعاءات المنشأة (Custom Claims)
+        await adminAuth.setCustomUserClaims(userRecord.uid, { 
+            companyId, 
+            role: role || 'User',
+            username: sanitizedUsername 
+        });
 
-        // 3. التوثيق في الفهرس العالمي (Global User Index)
+        // 3. التوثيق في الفهرس العالمي (Global User Index) - نستخدم username للبحث السريع عند الدخول
         await db.collection('global_users').doc(userRecord.uid).set({
-            email: sanitizedEmail,
-            username: username,
+            email: technicalEmail,
+            username: sanitizedUsername,
             companyId,
             role: role || 'User',
             createdAt: FieldValue.serverTimestamp()
@@ -103,9 +107,9 @@ export async function POST(request: NextRequest) {
         await db.collection('companies').doc(companyId).collection('users').doc(userRecord.uid).set({
             id: userRecord.uid,
             uid: userRecord.uid,
-            email: sanitizedEmail,
-            username: username,
-            fullName: displayName || 'User',
+            email: technicalEmail,
+            username: sanitizedUsername,
+            fullName: displayName || username,
             role: role || 'User',
             employeeId: employeeId || null,
             isActive: true,

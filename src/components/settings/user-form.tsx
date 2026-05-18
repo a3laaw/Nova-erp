@@ -14,7 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus, Sparkles, ShieldCheck } from 'lucide-react';
+import { UserPlus, Sparkles, ShieldCheck, User } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
@@ -37,8 +37,8 @@ const roleOptions = [
 ];
 
 /**
- * نموذج تأسيس حساب موظف (Username-Centric V3.0):
- * تم حذف خانة البريد الإلكتروني لتوليدها آلياً وتطهير الخانات من الملء التلقائي.
+ * نموذج تأسيس حساب موظف (Username-Centric V4.0):
+ * تم حذف خانة البريد الإلكتروني نهائياً والاعتماد على اسم المستخدم فقط للدخول.
  */
 export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, isSaving }: UserFormProps) {
   const { toast } = useToast();
@@ -75,7 +75,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
   }, [user, isEditing, isOpen]);
   
   const handleUsernameChange = (val: string) => {
-    // تطهير اسم المستخدم من المسافات والرموز ليكون صالحاً كمعرف دخول
+    // تطهير اسم المستخدم ليكون صالحاً كمعرف دخول فريد
     const sanitized = val.toLowerCase().replace(/[^a-z0-9]/g, '');
     setFormData(prev => ({ ...prev, username: sanitized }));
   };
@@ -88,7 +88,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
       }
       
       const tenantId = currentAdmin?.currentCompanyId;
-      // 🛡️ توليد البريد التقني آلياً في الخلفية لضمان العزل السيادي
+      // توليد المعرف التقني في الخلفية (مخفي عن المستخدم)
       const internalEmail = `${formData.username}@${tenantId}.nova`;
       
       const dataToSave: any = { 
@@ -107,9 +107,8 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !isSaving && onClose()}>
       <DialogContent className="sm:max-w-md rounded-[2.5rem] shadow-2xl border-none p-0 overflow-hidden" dir="rtl">
-        {/* 🛡️ درع منع الملء التلقائي (Sovereign Autofill Shield) */}
         <form onSubmit={handleSubmit} autoComplete="off">
-            {/* حقول وهمية لجذب محركات Autofill بعيداً عن الخانات الحقيقية لتبقى نظيفة */}
+            {/* درع منع الملء التلقائي */}
             <input type="text" name="prevent_autofill" style={{ display: 'none' }} tabIndex={-1} />
             <input type="password" name="prevent_autofill_pwd" style={{ display: 'none' }} tabIndex={-1} />
 
@@ -144,9 +143,9 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                  <div className="grid gap-2">
                     <Label htmlFor="username" className="font-black text-gray-700 pr-1">اسم المستخدم المختار (User) *</Label>
                     <div className="relative">
+                        <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary opacity-30" />
                         <Input 
                             id="username" 
-                            name="user_login_field"
                             value={formData.username} 
                             onChange={e => handleUsernameChange(e.target.value)}
                             placeholder="ali.ahmed" 
@@ -154,10 +153,10 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                             required 
                             autoComplete="new-username"
                             disabled={isSaving}
-                            className="h-12 rounded-xl font-black text-primary border-2 pl-4 text-center"
+                            className="h-12 rounded-xl font-black text-primary border-2 pr-10 text-center text-lg"
                         />
                     </div>
-                    <p className="text-[9px] font-bold text-muted-foreground text-center">هذا هو الاسم الذي سيستخدمه الموظف للدخول إلى المنظومة.</p>
+                    <p className="text-[9px] font-bold text-muted-foreground text-center">هذا هو الاسم الذي سيستخدمه الموظف للدخول بدلاً من الإيميل.</p>
                 </div>
 
                  <div className="grid gap-2">
@@ -166,7 +165,6 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                     </Label>
                     <Input 
                         id="password" 
-                        name="user_pwd_field"
                         type="password" 
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -174,7 +172,7 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers, i
                         required={!isEditing} 
                         autoComplete="new-password"
                         disabled={isSaving}
-                        className="h-12 rounded-xl font-mono border-2 text-center"
+                        className="h-12 rounded-xl font-mono border-2 text-center text-lg"
                     />
                 </div>
 

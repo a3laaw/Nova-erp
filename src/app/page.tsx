@@ -13,20 +13,21 @@ import {
     AlertCircle, 
     Send,
     ArrowRight,
-    PlusCircle
+    User
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { useFirebase } from '@/firebase';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 /**
- * بوابة الدخول (Modern Simplified Gateway V106.0)
- * تم تبسيط النصوص لتلائم سوق العمل مع الحفاظ على الإطار السيادي المتدرج.
+ * بوابة الدخول (Username-Aware Gateway V107.0)
+ * تم تحديث المنطق ليقبل "اسم المستخدم" مباشرة ويبحث عن المعرف التقني في الخلفية.
  */
 export default function LoginPage() {
   const { login, resetPassword, user, loading: globalLoading, error: authError } = useAuth();
+  const { firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -34,6 +35,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'forgot-password'>('login');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -47,9 +49,26 @@ export default function LoginPage() {
     if (isSubmitting) return;
     
     setIsSubmitting(true);
+    setLocalError(null);
+
     try {
-        await login(identifier, password);
+        let loginEmail = identifier.trim().toLowerCase();
+
+        // إذا كان المدخل "اسم مستخدم" وليس إيميل، نبحث عن المعرف التقني
+        if (!loginEmail.includes('@') && firestore) {
+            const globalUsersRef = collection(firestore, 'global_users');
+            const q = query(globalUsersRef, where('username', '==', loginEmail), limit(1));
+            const snapshot = await getDocs(q);
+            
+            if (snapshot.empty) {
+                throw new Error("اسم المستخدم هذا غير مسجل في النظام.");
+            }
+            loginEmail = snapshot.docs[0].data().email;
+        }
+
+        await login(loginEmail, password);
     } catch (error: any) {
+        setLocalError(error.message);
         setIsSubmitting(false);
     }
   };
@@ -62,7 +81,7 @@ export default function LoginPage() {
           toast({ title: 'تم الإرسال', description: 'راجع بريدك لإعادة تعيين كلمة المرور.' });
           setMode('login');
       } catch (error: any) {
-          toast({ variant: 'destructive', title: 'خطأ', description: 'تأكد من البريد الإلكتروني.' });
+          toast({ variant: 'destructive', title: 'خطأ', description: 'تأكد من البيانات المدخلة.' });
       } finally { setIsSubmitting(false); }
   };
 
@@ -84,7 +103,6 @@ export default function LoginPage() {
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#FFB000]/10 rounded-full blur-[100px] animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#FF7A00]/10 rounded-full blur-[100px] animate-pulse" />
 
-      {/* 🛡️ الإطار المتدرج الذهبي والبرتقالي */}
       <div className="p-1.5 rounded-[3.8rem] bg-gradient-to-br from-[#FFB000] to-[#FF7A00] shadow-[0_25px_80px_-15px_rgba(255,122,0,0.25)] animate-in zoom-in-95 duration-1000 relative z-10">
         
         <Card className="w-full max-w-md rounded-[3.5rem] border-none shadow-none overflow-hidden bg-white/95 backdrop-blur-2xl relative">
@@ -99,25 +117,28 @@ export default function LoginPage() {
             </CardHeader>
             
             <CardContent className="px-10 pb-12 space-y-8">
-                {authError && (
+                {(authError || localError) && (
                     <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x duration-500 bg-red-50/50">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs font-bold">{authError}</AlertDescription>
+                        <AlertDescription className="text-xs font-bold">{localError || authError}</AlertDescription>
                     </Alert>
                 )}
 
                 {mode === 'login' ? (
                     <form onSubmit={handleLogin} className="space-y-8" autoComplete="off">
                         <div className="grid gap-3">
-                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">البريد الإلكتروني</Label>
-                            <Input 
-                                value={identifier} 
-                                onChange={(e) => setIdentifier(e.target.value)} 
-                                className="h-14 rounded-2xl border-2 border-slate-100 text-center font-bold text-base bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner" 
-                                required 
-                                placeholder="Email address"
-                                autoComplete="off"
-                            />
+                            <Label className="font-black text-[11px] uppercase tracking-widest text-center text-slate-400">اسم المستخدم أو البريد</Label>
+                            <div className="relative">
+                                <User className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-300" />
+                                <Input 
+                                    value={identifier} 
+                                    onChange={(e) => setIdentifier(e.target.value)} 
+                                    className="h-14 rounded-2xl border-2 border-slate-100 text-center font-black text-lg bg-[#F8F9FB]/50 focus:bg-white focus:border-primary/30 transition-all shadow-inner pr-10" 
+                                    required 
+                                    placeholder="Username"
+                                    autoComplete="off"
+                                />
+                            </div>
                         </div>
 
                         <div className="grid gap-3">
@@ -140,15 +161,6 @@ export default function LoginPage() {
                             {isSubmitting ? <Loader2 className="animate-spin h-6 w-6" /> : "دخول"}
                             {!isSubmitting && <ArrowRight className="h-6 w-6 group-hover:translate-x-1 transition-transform rotate-180" />}
                         </Button>
-
-                        <div className="pt-6 flex flex-col items-center">
-                            <Button asChild variant="ghost" className="text-slate-400 font-black gap-2 rounded-xl h-10 px-6 group hover:bg-slate-50 hover:text-primary">
-                                <Link href="/register" className="flex items-center gap-2">
-                                    <PlusCircle className="h-4 w-4 opacity-40 group-hover:rotate-90 transition-all" />
-                                    تأسيس منشأة جديدة
-                                </Link>
-                            </Button>
-                        </div>
                     </form>
                 ) : (
                     <form onSubmit={handleResetPassword} className="space-y-6" autoComplete="off">
