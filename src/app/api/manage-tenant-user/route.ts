@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import path from 'path';
 
 /**
- * 🛡️ محرك إدارة المنشآت الموحد (V119.0):
+ * 🛡️ محرك إدارة المنشآت الموحد (Sovereign IAM Engine):
  * تم تحصينه أمنياً لفحص التوكن السيادي ومنع العبور غير المصرح.
  */
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: Missing Sovereign Token' }, { status: 401 });
     }
 
     const app = getAdminApp();
@@ -49,15 +49,20 @@ export async function POST(request: NextRequest) {
     const db = getFirestore(app);
     
     const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await adminAuth.verifyIdToken(token);
     
-    // 🛡️ صمام الأمان: المطور فقط أو السوبر أدمن يمكنهم مخاطبة هذا المسار
-    if (decodedToken.role !== 'Developer' && !decodedToken.isSuperAdmin) {
-      return NextResponse.json({ error: 'Forbidden Authority' }, { status: 403 });
+    // 🛡️ التطهير: فحص صلاحيات التوكن قبل البدء بأي عملية
+    let decodedToken;
+    try {
+        decodedToken = await adminAuth.verifyIdToken(token);
+        if (decodedToken.role !== 'Developer' && !decodedToken.isSuperAdmin) {
+            return NextResponse.json({ error: 'Forbidden: Missing Super Admin Authority' }, { status: 403 });
+        }
+    } catch (e) {
+        return NextResponse.json({ error: 'Unauthorized: Invalid Token' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { action, email, password, displayName, companyId, uid, companyName, contactName, activity, requestId, firebaseConfig } = body;
+    const { action, email, password, displayName, companyId, companyName, contactName, activity, requestId, firebaseConfig } = body;
     const sanitizedEmail = email?.toLowerCase().trim();
 
     if (action === 'create') {

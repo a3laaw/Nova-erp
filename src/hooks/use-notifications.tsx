@@ -8,7 +8,8 @@ import { useSubscription } from '@/hooks/use-subscription';
 import type { Notification } from '@/lib/types';
 
 /**
- * خطاف جلب التنبيهات: تم إصلاح خطأ التوقيت في الفرز.
+ * خطاف جلب التنبيهات: 
+ * تم إصلاح خطأ التوقيت في الفرز لضمان ظهور الأحدث أولاً.
  */
 export function useNotifications() {
     const { firestore } = useFirebase();
@@ -29,9 +30,11 @@ export function useNotifications() {
         if (!notifications) return [];
         return [...notifications].sort((a, b) => {
             if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
+            
+            // 🛡️ التطهير: استخدام مراجع توقيت صحيحة لكل طرف
             const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt).getTime();
-            // 🛡️ FIXED: Corrected timeB reference to avoid identical time comparison
             const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt).getTime();
+            
             return timeB - timeA;
         });
     }, [notifications]);
