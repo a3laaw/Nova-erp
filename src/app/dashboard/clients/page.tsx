@@ -12,7 +12,7 @@ import {
 import { RegisteredClientsList } from '@/components/clients/registered-clients-list';
 import { ProspectiveClientsList } from '@/components/clients/prospective-clients-list';
 import { Button } from '@/components/ui/button';
-import { Users, UserSearch } from 'lucide-react';
+import { Users, UserSearch, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -28,20 +28,22 @@ export default function ClientsPage() {
 
     return (
         <div className="space-y-10" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي السيادي لإدارة العملاء */}
-            <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-blue-50 dark:from-card dark:to-card">
-                <CardHeader className="pb-8 px-10">
-                    <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-                        <div className="space-y-2 text-center lg:text-right">
-                            <CardTitle className="text-3xl font-black flex items-center justify-center lg:justify-start gap-4">
-                                إدارة ملفات العملاء (CRM)
-                                <div className="p-3 bg-primary/10 rounded-2xl text-primary shadow-inner">
-                                    <Users className="h-8 w-8" />
+            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+            <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+                <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+                <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                    <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                        <div className="flex items-center gap-6">
+                            <div className="text-right">
+                                <CardTitle className="text-3xl font-black text-white tracking-tighter">إدارة ملفات العملاء (CRM)</CardTitle>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                    <CardDescription className="text-white/90 font-bold text-sm">مركز التحكم في بيانات العملاء المتعاقدين وتتبع زوار المكتب الجدد.</CardDescription>
                                 </div>
-                            </CardTitle>
-                            <CardDescription className="text-base font-bold text-slate-500 mt-1 pr-0 lg:pr-12">
-                                مركز التحكم في بيانات العملاء المتعاقدين وتتبع زوار المكتب الجدد.
-                            </CardDescription>
+                            </div>
+                            <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                                <Users className="h-10 w-10 text-white" />
+                            </div>
                         </div>
                     </div>
                 </CardHeader>

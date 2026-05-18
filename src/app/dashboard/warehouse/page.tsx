@@ -1,9 +1,10 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Package, BarChart3, ArrowUpFromLine, Building2, FileCheck, ArrowLeftRight, Ban, ShoppingCart, ShieldCheck } from 'lucide-react';
+import { Package, BarChart3, ArrowUpFromLine, Building2, FileCheck, ArrowLeftRight, Ban, ShoppingCart, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 const warehouseFeatures = [
     {
@@ -67,15 +68,22 @@ const warehouseFeatures = [
 export default function WarehouseDashboardPage() {
   return (
     <div className="space-y-10" dir="rtl">
-        <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-gradient-to-l from-white to-blue-50 shadow-sm">
-            <CardHeader className="pb-8 px-10 border-b">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-blue-600/10 rounded-2xl text-blue-600 shadow-inner">
-                        <Package className="h-8 w-8" />
-                    </div>
-                    <div>
-                        <CardTitle className="text-3xl font-black">المخازن وسلسلة التوريد</CardTitle>
-                        <CardDescription className="text-base font-bold text-slate-500 mt-1">إدارة تدفق المواد، الرقابة على المخزون، وتحميل التكاليف المباشرة على المشاريع.</CardDescription>
+        {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
+        <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
+            <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
+            <CardHeader className="pb-10 pt-10 px-10 relative z-10">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <CardTitle className="text-3xl font-black text-white tracking-tighter">المخازن وسلسلة التوريد</CardTitle>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Sparkles className="h-4 w-4 text-amber-200 animate-pulse" />
+                                <CardDescription className="text-white/90 font-bold text-sm">إدارة تدفق المواد، الرقابة على المخزون، وتحميل التكاليف المباشرة على المشاريع.</CardDescription>
+                            </div>
+                        </div>
+                        <div className="p-5 bg-white/20 rounded-[2rem] backdrop-blur-xl border border-white/40 shadow-2xl">
+                            <Package className="h-10 w-10 text-white" />
+                        </div>
                     </div>
                 </div>
             </CardHeader>
