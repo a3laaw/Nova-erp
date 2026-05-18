@@ -14,8 +14,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import type { UserProfile, Employee } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Sparkles, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { InlineSearchList } from '@/components/ui/inline-search-list';
 import { useAuth } from '@/context/auth-context';
 
@@ -83,11 +82,11 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       const tenantId = currentAdmin?.currentCompanyId;
       const internalEmail = `${formData.username}@${tenantId}.nova`;
       
-      // 🛡️ حذف passwordHash من الحفظ في Firestore للأمان
+      // 🛡️ SECURITY FIX: Removed passwordHash from being stored in Firestore.
+      // Password is only passed to the Auth handler, never stored in plain/hash text in DB.
       const dataToSave = { 
           ...formData, 
           email: internalEmail,
-          // التوجيه: كلمة السر ترسل فقط لمحرك الـ Auth وليس للتخزين في Firestore
           newPassword: password 
       };
       
