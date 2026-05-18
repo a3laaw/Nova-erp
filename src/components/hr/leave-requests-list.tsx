@@ -57,9 +57,7 @@ export function LeaveRequestsList() {
   const [requestToDelete, setRequestToDelete] = useState<LeaveRequest | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 🛡️ التطهير: استخدام الاشتراك المعزول للمنشأة
   const { data: leaveRequests, loading } = useSubscription<LeaveRequest>(firestore, 'leaveRequests', [orderBy('createdAt', 'desc')]);
-  const { data: employees } = useSubscription<Employee>(firestore, 'employees');
 
   const formatDate = (dateValue: any) => {
     const date = toFirestoreDate(dateValue);
@@ -98,7 +96,6 @@ export function LeaveRequestsList() {
         const finalPath = getTenantPath(`leaveRequests/${req.id}`, tenantId);
         await updateDoc(doc(firestore, finalPath), {
             status: 'rejected',
-            // 🛡️ التطهير: تصحيح حقول الرفض لتجنب تداخل بيانات الاعتماد
             rejectedBy: currentUser.id,
             rejectedAt: serverTimestamp()
         });
@@ -112,7 +109,7 @@ export function LeaveRequestsList() {
     <>
       <div className="flex justify-end mb-6">
         <Button asChild className="h-11 px-8 rounded-xl font-black gap-2">
-          <Link href="/dashboard/hr/leaves/new"><PlusCircle className="h-5 w-5" /> طلب إجازة جديد</Link>
+          <Link href="/dashboard/hr/leaves/new"><PlusCircle className="h-5 w-5" /> إضافة</Link>
         </Button>
       </div>
 

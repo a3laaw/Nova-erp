@@ -62,6 +62,7 @@ export default function NewEmployeePage() {
         const employeesCollectionPath = getTenantPath('employees', tenantId);
 
         try {
+            // التحقق من تكرار الهاتف في مسار المنشأة المعزول
             const mobileQuery = query(collection(firestore, employeesCollectionPath), where('mobile', '==', newEmployeeData.mobile));
             const mobileSnapshot = await getDocs(mobileQuery);
             if (!mobileSnapshot.empty) {

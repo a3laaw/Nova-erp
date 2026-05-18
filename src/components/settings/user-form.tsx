@@ -82,11 +82,15 @@ export function UserForm({ isOpen, onClose, onSave, user, employees, allUsers }:
       const tenantId = currentAdmin?.currentCompanyId;
       const internalEmail = `${formData.username}@${tenantId}.nova`;
       
-      const dataToSave = { 
+      const dataToSave: any = { 
           ...formData, 
-          email: internalEmail,
-          newPassword: password 
+          email: internalEmail
       };
+
+      // 🛡️ التطهير: لا نرسل كلمة المرور لـ Firestore أبداً
+      if (password) {
+          dataToSave.newPassword = password;
+      }
       
       onSave(dataToSave);
   }
