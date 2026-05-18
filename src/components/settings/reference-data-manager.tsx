@@ -26,7 +26,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
@@ -49,11 +48,10 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
     Plus, Pencil, Trash2, Loader2, Save, PlusCircle, 
-    DownloadCloud, Building2, Globe, Workflow, 
+    DownloadCloud, Building2, Workflow, 
     ArrowRight, ListTree, Settings2,
     MapPin, X, Layers, Activity, GripVertical,
     Sparkles,
-    Briefcase,
     Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -71,7 +69,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent
-} from '@radix-ui/react-dnd-kit-core';
+} from '@dnd-kit/core';
 
 import {
   arrayMove,
@@ -79,9 +77,9 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
   useSortable
-} from '@radix-ui/react-dnd-kit-sortable';
+} from '@dnd-kit/sortable';
 
-import { CSS } from '@radix-ui/react-dnd-kit-utilities';
+import { CSS } from '@dnd-kit/utilities';
 
 function SortableRefListItem({ id, children, isActive }: { id: string, children: React.ReactNode, isActive?: boolean }) {
   const {
@@ -350,7 +348,6 @@ export function ReferenceDataManager() {
     if (view === 'main') {
         return (
             <div className="space-y-12" dir="rtl">
-                {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية 🛡️ */}
                 <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                     <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                     <CardHeader className="p-10 relative z-10 border-b border-white/10">
@@ -404,7 +401,6 @@ export function ReferenceDataManager() {
 
     return (
         <div className="space-y-6" dir="rtl">
-            {/* 🛡️ الهيدر الرئيسي السيادي المحدث بالهوية البرتقالية للموديولات الفرعية 🛡️ */}
             <Card className="rounded-[2.5rem] border-none shadow-2xl overflow-hidden bg-gradient-to-r from-[#FF7A00] to-[#FFB000] text-white relative">
                 <div className="absolute top-0 right-0 w-80 h-full bg-white/10 -skew-x-12 transform translate-x-32 pointer-events-none" />
                 <CardHeader className="p-10 relative z-10 border-b border-white/10">
