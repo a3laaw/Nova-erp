@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Upload, Info, User, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, Info, User, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -105,7 +105,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) {
-      toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
+      toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
       return;
     }
     
@@ -118,7 +118,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
 
       const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
       
-      // 🛡️ الدرع الرقابي: فحص التداخل السيادي 🛡️
+      // 🛡️ رادار منع التداخل: فحص وجود طلبات أخرى في نفس التوقيت 🛡️
       const overlapQuery = query(
           collection(firestore, leaveCollectionPath),
           where('employeeId', '==', selectedEmployeeId),
@@ -141,13 +141,9 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
       });
 
       if (hasOverlap) {
-          const errorMsg = "لديك اجازة بالفعل في هذا التوقيت لايسمح بعمل اكثر من اجازة في نفس الوقت";
+          const errorMsg = "عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت، يرجى مراجعة التواريخ المحددة.";
           setOverlapError(errorMsg);
-          toast({ 
-              variant: 'destructive', 
-              title: 'منع تداخل الإجازات', 
-              description: errorMsg 
-          });
+          toast({ variant: 'destructive', title: 'تداخل في التواريخ', description: errorMsg });
           setIsSaving(false);
           return;
       }
@@ -198,15 +194,14 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
                 {isEditing ? 'تعديل طلب إجازة' : 'طلب إجازة جديد'}
             </DialogTitle>
             <DialogDescription className="text-sm font-medium text-slate-500 mt-1">
-              {isEditing ? 'قم بتعديل تفاصيل طلب الإجازة.' : 'سيتم إرسال الطلب للموافقة من قبل الإدارة.'}
+              تحديد التواريخ ونوع الإجازة لضمان دقة الرصيد وحساب الرواتب.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 p-8">
-            {/* 🛡️ التنبيه السيادي في أعلى الشاشة داخل الـ Dialog 🛡️ */}
             {overlapError && (
                 <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 shadow-sm animate-in zoom-in-95 py-4">
-                    <ShieldAlert className="h-5 w-5 text-red-600" />
-                    <AlertTitle className="text-sm font-black text-red-800">تنبيه تداخل</AlertTitle>
+                    <AlertCircle className="h-5 w-5 text-red-600" />
+                    <AlertTitle className="text-sm font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
                     <AlertDescription className="text-xs font-bold text-red-700 mt-1">
                         {overlapError}
                     </AlertDescription>

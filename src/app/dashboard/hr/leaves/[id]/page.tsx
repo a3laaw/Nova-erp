@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -24,7 +23,6 @@ import {
     Home, 
     Briefcase, 
     Loader2, 
-    ArrowDownCircle, 
     Calculator, 
     FileCheck, 
     AlertCircle,
@@ -42,7 +40,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
-import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -189,7 +186,7 @@ export default function LeaveRequestDetailsPage() {
                 </header>
 
                 <main className="py-12 space-y-12">
-                    {/* 🛡️ بنر شفافية الرد الإداري 🛡️ */}
+                    {/* 🛡️ رادار الرد الإداري 🛡️ */}
                     {(leaveRequest.status === 'rejected' || leaveRequest.status === 'approved' || leaveRequest.rejectionReason || leaveRequest.adminComment) && (
                         <Alert 
                             variant={leaveRequest.status === 'rejected' ? 'destructive' : 'default'} 
@@ -203,16 +200,13 @@ export default function LeaveRequestDetailsPage() {
                                 "text-xl font-black flex items-center justify-between mb-4",
                                 leaveRequest.status === 'rejected' ? "text-red-900" : "text-green-900"
                             )}>
-                                <span>قرار الإدارة والرد الرسمي:</span>
-                                <Badge className={cn("px-3 border-none font-black text-[10px]", leaveRequest.status === 'rejected' ? "bg-red-600" : "bg-green-600")}>
-                                    تم التوثيق
-                                </Badge>
+                                <span>تنبيه: قرار الإدارة بخصوص الطلب</span>
                             </AlertTitle>
                             <AlertDescription className={cn(
                                 "text-lg leading-relaxed font-bold border-t-2 border-dashed pt-4 mt-2",
                                 leaveRequest.status === 'rejected' ? "text-red-700 border-red-100" : "text-green-700 border-green-100"
                             )}>
-                                {leaveRequest.rejectionReason || leaveRequest.adminComment || (leaveRequest.status === 'approved' ? 'تمت الموافقة على الطلب بناءً على الأنظمة المتبعة.' : 'عذراً، الطلب مرفوض.')}
+                                {leaveRequest.rejectionReason || leaveRequest.adminComment || (leaveRequest.status === 'approved' ? 'تمت الموافقة على طلبك، نتمنى لك إجازة سعيدة.' : 'عذراً، لم تتم الموافقة على طلبك حالياً.')}
                             </AlertDescription>
                         </Alert>
                     )}
@@ -231,18 +225,18 @@ export default function LeaveRequestDetailsPage() {
                     <section className="grid grid-cols-1 md:grid-cols-2 gap-12 text-sm">
                         <div className="space-y-6 p-6 bg-slate-50 rounded-3xl border">
                             <h3 className="font-black text-primary border-b pb-2 mb-4 flex items-center gap-2 uppercase tracking-widest text-[10px]">
-                                <Calculator className="h-4 w-4"/> تفاصيل الاستحقاق والنوع
+                                <Calculator className="h-4 w-4"/> تفاصيل الإجازة
                             </h3>
                             <div className="flex justify-between border-b border-dashed pb-3">
-                                <span className="font-bold text-muted-foreground">نوع الإجازة المطلوبة:</span> 
+                                <span className="font-bold text-muted-foreground">نوع الإجازة:</span> 
                                 <Badge className="bg-primary/10 text-primary font-black px-6 border-primary/20">{leaveTypeTranslations[leaveRequest.leaveType]}</Badge>
                             </div>
                             <div className="flex justify-between border-b border-dashed pb-3">
-                                <span className="font-bold text-muted-foreground">إجمالي أيام الغياب:</span> 
+                                <span className="font-bold text-muted-foreground">عدد الأيام الإجمالي:</span> 
                                 <span className="font-black text-lg">{leaveRequest.days} <span className="text-xs">يوم</span></span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="font-bold text-muted-foreground">أيام العمل الفعلية:</span> 
+                                <span className="font-bold text-muted-foreground">أيام العمل المحتسبة:</span> 
                                 <span className="font-black text-lg text-primary">{leaveRequest.workingDays} <span className="text-xs">يوم</span></span>
                             </div>
                         </div>
@@ -252,15 +246,15 @@ export default function LeaveRequestDetailsPage() {
                                 <Clock className="h-4 w-4"/> الجدولة الزمنية
                             </h3>
                             <div className="flex justify-between border-b border-dashed pb-3">
-                                <span className="font-bold text-muted-foreground">بداية الإجازة (من):</span> 
+                                <span className="font-bold text-muted-foreground">تاريخ البدء:</span> 
                                 <span className="font-black">{startDate ? format(startDate, 'eeee, dd/MM/yyyy', { locale: ar }) : '-'}</span>
                             </div>
                             <div className="flex justify-between border-b border-dashed pb-3">
-                                <span className="font-bold text-muted-foreground">نهاية الإجازة (إلى):</span> 
+                                <span className="font-bold text-muted-foreground">تاريخ الانتهاء:</span> 
                                 <span className="font-black">{endDate ? format(endDate, 'eeee, dd/MM/yyyy', { locale: ar }) : '-'}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="font-bold text-muted-foreground">تاريخ العودة المتوقع:</span> 
+                                <span className="font-bold text-muted-foreground">تاريخ العودة للعمل:</span> 
                                 <span className="font-black text-indigo-600">{endDate ? format(endDate, 'dd/MM/yyyy') : '-'}</span>
                             </div>
                         </div>
@@ -269,10 +263,10 @@ export default function LeaveRequestDetailsPage() {
                     <div className="space-y-4">
                         <h4 className="font-black text-slate-800 flex items-center gap-2">
                             <Sparkles className="h-5 w-5 text-primary opacity-40"/>
-                            مبررات وتفاصيل طلب الموظف:
+                            سبب تقديم الطلب من الموظف:
                         </h4>
                         <div className="p-8 border-2 border-dashed rounded-[2.5rem] bg-muted/10 min-h-[120px] text-lg leading-loose font-medium text-slate-800 shadow-inner">
-                            {leaveRequest.notes || 'لم يتم إدراج مبررات إضافية للطلب.'}
+                            {leaveRequest.notes || 'لم يتم ذكر سبب إضافي.'}
                         </div>
                     </div>
                 </main>
@@ -292,7 +286,7 @@ export default function LeaveRequestDetailsPage() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="py-6 space-y-3">
-                        <Label className="font-black text-slate-700 pr-1">تاريخ المغادرة الفعلي للمنشأة:</Label>
+                        <Label className="font-black text-slate-700 pr-1">تاريخ المغادرة الفعلي:</Label>
                         <DateInput value={actualDate} onChange={setActualDate} className="h-12 rounded-xl border-2" />
                     </div>
                     <AlertDialogFooter className="gap-3 pt-6 border-t">

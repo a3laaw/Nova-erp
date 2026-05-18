@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, X, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, X, AlertCircle, CalendarRange } from 'lucide-react';
 import { useFirebase, useDocument, useSubscription } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { doc, updateDoc, query, collection, where, getDocs } from 'firebase/firestore';
@@ -74,8 +74,8 @@ export default function EditLeaveRequestPage() {
             setEndDate(undefined);
             toast({
                 variant: 'destructive',
-                title: 'خطأ',
-                description: 'تاريخ النهاية يجب أن يكون لاحقاً لتاريخ البداية.',
+                title: 'تنبيه تاريخ',
+                description: 'تاريخ نهاية الإجازة يجب أن يكون لاحقاً لتاريخ البداية.',
             });
         }
         setOverlapError(null);
@@ -85,7 +85,7 @@ export default function EditLeaveRequestPage() {
 
     const leaveAnalysis = useMemo(() => {
         if (!startDate || !endDate || isBefore(startOfDay(endDate), startOfDay(startDate))) return { totalDays: 0, workingDays: 0 };
-        return calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || branding?.work_hours?.holidays || [], publicHolidays);
+        return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
     }, [startDate, endDate, branding, publicHolidays]);
 
     const employeeOptions = useMemo(() => (employees || []).map(e => ({ value: e.id!, label: e.fullName })), [employees]);
@@ -95,13 +95,7 @@ export default function EditLeaveRequestPage() {
         if (savingRef.current) return;
 
         if (!firestore || !currentUser || !id || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) {
-            toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
-            return;
-        }
-
-        const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
-        if (!selectedEmployee) {
-            toast({ variant: 'destructive', title: 'خطأ', description: 'الموظف المختار غير موجود.' });
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة الحقول المطلوبة.' });
             return;
         }
 
@@ -111,8 +105,6 @@ export default function EditLeaveRequestPage() {
         
         try {
             const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
-            
-            // 🛡️ الدرع الرقابي: فحص التداخل (استبعاد الطلب الحالي) 🛡️
             const overlapQuery = query(
                 collection(firestore, leaveCollectionPath),
                 where('employeeId', '==', selectedEmployeeId),
@@ -120,7 +112,7 @@ export default function EditLeaveRequestPage() {
             );
             const overlapSnap = await getDocs(overlapQuery);
             const hasOverlap = overlapSnap.docs.some(docSnap => {
-                if (docSnap.id === id) return false; // Skip the current record we are editing
+                if (docSnap.id === id) return false;
                 const existing = docSnap.data() as LeaveRequest;
                 const exStart = toFirestoreDate(existing.startDate);
                 const exEnd = toFirestoreDate(existing.endDate);
@@ -135,13 +127,9 @@ export default function EditLeaveRequestPage() {
             });
 
             if (hasOverlap) {
-                const errorMsg = "لديك اجازة بالفعل في هذا التوقيت لايسمح بعمل اكثر من اجازة في نفس الوقت";
+                const errorMsg = "يوجد تداخل مع إجازة أخرى مسجلة للموظف في نفس التوقيت المختار.";
                 setOverlapError(errorMsg);
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'منع تداخل الإجازات', 
-                    description: errorMsg 
-                });
+                toast({ variant: 'destructive', title: 'تنبيه تداخل', description: errorMsg });
                 setIsSaving(false);
                 savingRef.current = false;
                 return;
@@ -150,7 +138,6 @@ export default function EditLeaveRequestPage() {
             const leaveRef = doc(firestore, 'leaveRequests', id);
             await updateDoc(leaveRef, {
                 employeeId: selectedEmployeeId,
-                employeeName: selectedEmployee.fullName,
                 leaveType: leaveType,
                 startDate: startDate,
                 endDate: endDate,
@@ -162,51 +149,45 @@ export default function EditLeaveRequestPage() {
             
             toast({ title: 'نجاح', description: 'تم تحديث طلب الإجازة بنجاح.' });
             router.push('/dashboard/hr/leaves');
-        } catch (error) {
-            savingRef.current = false;
+        } catch (error: any) {
             setIsSaving(false);
-            const message = error instanceof Error ? error.message : "فشل التحديث.";
-            toast({ variant: 'destructive', title: 'خطأ', description: message });
+            savingRef.current = false;
+            toast({ variant: 'destructive', title: 'خطأ', description: error.message || 'فشل التحديث.' });
         }
     };
     
-    if (loading) {
-        return <div className="p-8"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
-    }
+    if (loading) return <div className="p-8"><Skeleton className="h-96 w-full rounded-[2.5rem]" /></div>;
 
     return (
         <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
             <form onSubmit={handleSubmit}>
                  <CardHeader className="bg-primary/5 pb-8 border-b">
-                    <CardTitle className="text-2xl font-black text-[#1e1b4b]">تعديل طلب إجازة</CardTitle>
-                    <CardDescription className="text-base font-medium">تعديل بيانات طلب الإجازة للموظف: {leaveRequest?.employeeName}.</CardDescription>
+                    <CardTitle className="text-2xl font-black">تعديل طلب إجازة</CardTitle>
+                    <CardDescription className="text-base">تحديث بيانات الإجازة المجدولة للموظف.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-8 space-y-6">
-                    {/* 🛡️ التنبيه السيادي في أعلى الشاشة 🛡️ */}
                     {overlapError && (
-                        <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 shadow-red-100 animate-in slide-in-from-top-4 duration-500 py-6 mb-4">
-                            <ShieldAlert className="h-6 w-6 text-red-600" />
-                            <AlertTitle className="text-lg font-black text-red-800">تنبيه رقابي حرج</AlertTitle>
-                            <AlertDescription className="text-sm font-bold text-red-700 mt-1 leading-relaxed">
-                                {overlapError}
-                            </AlertDescription>
+                        <Alert variant="destructive" className="rounded-2xl border-2 border-red-500 bg-red-50 py-6 mb-4">
+                            <AlertCircle className="h-6 w-6 text-red-600" />
+                            <AlertTitle className="text-lg font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
+                            <AlertDescription className="text-sm font-bold text-red-700 mt-1">{overlapError}</AlertDescription>
                         </Alert>
                     )}
 
                     <div className="grid gap-2">
-                        <Label className="font-bold text-gray-700 pr-1">الموظف المعني *</Label>
+                        <Label className="font-bold text-gray-700 pr-1">الموظف المعني</Label>
                         <InlineSearchList
                             value={selectedEmployeeId}
                             onSelect={setSelectedEmployeeId}
                             options={employeeOptions}
-                            placeholder="اختر موظفاً..."
-                            disabled={isSaving}
+                            placeholder="اختر..."
+                            disabled={isSaving || !currentUser?.role.includes('Admin')}
                             className="h-11 rounded-xl"
                         />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="leaveType" className="font-bold text-gray-700 pr-1">نوع الإجازة *</Label>
+                        <Label className="font-bold text-gray-700 pr-1">نوع الإجازة *</Label>
                         <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
                             <SelectTrigger className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                             <SelectContent dir="rtl">
@@ -220,21 +201,17 @@ export default function EditLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-bold text-gray-700 pr-1">من تاريخ *</Label>
+                        <Label className="font-bold text-gray-700 pr-1">من تاريخ *</Label>
                         <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-bold text-gray-700 pr-1">إلى تاريخ *</Label>
+                        <Label className="font-bold text-gray-700 pr-1">إلى تاريخ *</Label>
                         <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-11 rounded-xl" />
                       </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label className="font-bold text-gray-700 pr-1">السبب / ملاحظات *</Label>
-                      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4" disabled={isSaving} />
-                    </div>
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-xl">
-                        <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
-                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer text-gray-700">تم استلام جواز السفر</Label>
+                      <Label className="font-bold text-gray-700 pr-1">المبررات / ملاحظات</Label>
+                      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="rounded-2xl border-2 p-4" disabled={isSaving} />
                     </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">

@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Loader2, Save, Sparkles, Clock, Calculator, Info, History, ArrowRight, AlertCircle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -82,11 +82,10 @@ export default function NewLeaveRequestPage() {
             setEndDate(undefined);
             toast({
                 variant: 'destructive',
-                title: 'خطأ منطقي',
-                description: 'تاريخ النهاية يجب أن يكون لاحقاً لتاريخ البداية.',
+                title: 'تنبيه تاريخ',
+                description: 'عذراً، تاريخ نهاية الإجازة يجب أن يكون بعد تاريخ البداية.',
             });
         }
-        // Clear overlap error when dates change to allow re-checking
         setOverlapError(null);
     }, [startDate, endDate, toast]);
 
@@ -160,7 +159,7 @@ export default function NewLeaveRequestPage() {
         if (savingRef.current) return;
 
         if (!firestore || !currentUser || !tenantId || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
-            toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
+            toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
             return;
         }
 
@@ -177,7 +176,7 @@ export default function NewLeaveRequestPage() {
         try {
             const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
             
-            // 🛡️ الدرع الرقابي: فحص التداخل مع إجازات سابقة 🛡️
+            // 🛡️ رادار منع التداخل: فحص وجود طلبات أخرى 🛡️
             const overlapQuery = query(
                 collection(firestore, leaveCollectionPath),
                 where('employeeId', '==', selectedEmployeeId),
@@ -199,11 +198,11 @@ export default function NewLeaveRequestPage() {
             });
 
             if (hasOverlap) {
-                const errorMsg = "لديك اجازة بالفعل في هذا التوقيت لايسمح بعمل اكثر من اجازة في نفس الوقت";
+                const errorMsg = "عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت، يرجى مراجعة التواريخ المحددة.";
                 setOverlapError(errorMsg);
                 toast({ 
                     variant: 'destructive', 
-                    title: 'منع تداخل الإجازات', 
+                    title: 'تنبيه تداخل', 
                     description: errorMsg 
                 });
                 setIsSaving(false);
@@ -233,125 +232,108 @@ export default function NewLeaveRequestPage() {
         } catch (error) {
             savingRef.current = false;
             setIsSaving(false);
-            toast({ variant: 'destructive', title: 'عائق صلاحيات', description: 'فشل حفظ الطلب، تأكد من تسجيل الدخول للمنشأة الصحيحة.' });
+            toast({ variant: 'destructive', title: 'خطأ', description: 'فشل حفظ الطلب، يرجى المحاولة مرة أخرى.' });
         }
     };
     
     return (
-        <Card className="max-w-4xl mx-auto rounded-[2.5rem] border-none shadow-xl overflow-hidden" dir="rtl">
-            <form onSubmit={handleSubmit}>
-                 <CardHeader className="bg-primary/5 pb-8 border-b">
-                    <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>
-                    <CardDescription className="text-base">
-                      سيتم إرسال الطلب للموافقة من قبل مدير النظام أو قسم الموارد البشرية.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="p-8 space-y-6">
-                    {/* 🛡️ التنبيه السيادي في أعلى الشاشة 🛡️ */}
-                    {overlapError && (
-                        <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 shadow-red-100 animate-in slide-in-from-top-4 duration-500 py-6 mb-4">
-                            <ShieldAlert className="h-6 w-6 text-red-600" />
-                            <AlertTitle className="text-lg font-black text-red-800">تنبيه رقابي حرج</AlertTitle>
-                            <AlertDescription className="text-sm font-bold text-red-700 mt-1 leading-relaxed">
-                                {overlapError}
-                            </AlertDescription>
-                        </Alert>
-                    )}
+        <div className="space-y-6 max-w-4xl mx-auto pb-20" dir="rtl">
+            <div className="no-print flex items-center justify-between mb-4">
+                <Button variant="ghost" onClick={() => router.back()} className="gap-2 font-bold">
+                    <ArrowRight className="h-4 w-4" /> العودة
+                </Button>
+            </div>
 
-                     {(currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer') && (
-                      <div className="grid gap-2">
-                        <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
-                        <InlineSearchList
-                            value={selectedEmployeeId}
-                            onSelect={setSelectedEmployeeId}
-                            options={employeeOptions}
-                            placeholder={loading ? 'جاري التحميل...' : 'اختر موظفاً من القائمة...'}
-                            disabled={loading || isSaving}
-                            className="h-12 rounded-xl border-2"
-                        />
-                      </div>
-                    )}
-
-                    {!loadingContext && hasCheckedContext && selectedEmployeeId && (
-                        lastLeaveInfo ? (
-                            <Alert className="rounded-2xl border-2 border-primary/20 bg-primary/5 animate-in fade-in slide-in-from-top-2 duration-500">
-                                <Sparkles className="h-5 w-5 text-primary" />
-                                <AlertTitle className="text-primary font-black text-sm">سياق القرار (HR Insights)</AlertTitle>
-                                <AlertDescription className="mt-1 text-xs font-bold leading-relaxed">
-                                    كانت آخر إجازة لهذا الموظف من نوع <strong>{leaveTypeTranslations[lastLeaveInfo.leaveType]}</strong>، 
-                                    انتهت بتاريخ <strong>{format(toFirestoreDate(lastLeaveInfo.endDate)!, 'dd/MM/yyyy')}</strong> 
-                                    أي منذ <strong>{formatDistanceToNow(toFirestoreDate(lastLeaveInfo.endDate)!, { locale: ar })}</strong> تقريباً.
+            <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+                <form onSubmit={handleSubmit}>
+                    <CardHeader className="bg-primary/5 pb-8 border-b">
+                        <CardTitle className="text-2xl font-black">تقديم طلب إجازة جديد</CardTitle>
+                        <CardDescription className="text-base">تحديد التواريخ لضمان دقة رصيد الإجازات وسجل الحضور.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-8 space-y-6">
+                        {overlapError && (
+                            <Alert variant="destructive" className="rounded-3xl border-2 border-red-500 bg-red-50 shadow-sm animate-in zoom-in-95 py-6">
+                                <AlertCircle className="h-6 w-6 text-red-600" />
+                                <AlertTitle className="text-lg font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
+                                <AlertDescription className="text-sm font-bold text-red-700 mt-2 leading-relaxed">
+                                    {overlapError}
                                 </AlertDescription>
                             </Alert>
-                        ) : (
-                            <Alert className="rounded-2xl border-2 border-slate-200 bg-slate-50 animate-in fade-in">
-                                <History className="h-5 w-5 text-slate-400" />
-                                <AlertTitle className="text-slate-600 font-bold text-xs">سجل الموظف</AlertTitle>
-                                <AlertDescription className="text-xs text-slate-500 font-medium italic">
-                                    هذا الموظف لم يسبق له الخروج في إجازة مسجلة بالنظام من قبل.
-                                </AlertDescription>
-                            </Alert>
-                        )
-                    )}
+                        )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="grid gap-2">
-                        <Label htmlFor="leaveType" className="font-black text-gray-700 pr-1">نوع الإجازة <span className="text-destructive">*</span></Label>
-                        <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
-                            <SelectTrigger id="leaveType" className="h-12 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
-                            <SelectContent dir="rtl">
-                                <SelectItem value="Annual">سنوية</SelectItem>
-                                <SelectItem value="Sick">مرضية</SelectItem>
-                                <SelectItem value="Emergency">طارئة</SelectItem>
-                                <SelectItem value="Unpaid">بدون أجر</SelectItem>
-                            </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-black text-gray-700 pr-1">من تاريخ *</Label>
-                        <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-12 rounded-xl" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-black text-gray-700 pr-1">إلى تاريخ *</Label>
-                        <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-12 rounded-xl" />
-                      </div>
-                    </div>
+                        <div className="grid gap-2">
+                            <Label className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
+                            {isAdmin ? (
+                                <InlineSearchList
+                                    value={selectedEmployeeId}
+                                    onSelect={setSelectedEmployeeId}
+                                    options={employeeOptions}
+                                    placeholder={loading ? 'جاري التحميل...' : 'اختر موظفاً من القائمة...'}
+                                    disabled={loading || isSaving}
+                                    className="h-12 rounded-xl border-2"
+                                />
+                            ) : (
+                                <div className="h-12 rounded-xl border-2 bg-muted/20 px-4 flex items-center font-black text-[#1e1b4b] gap-2">
+                                    <User className="h-4 w-4 opacity-40" />
+                                    {currentUser?.fullName}
+                                </div>
+                            )}
+                        </div>
 
-                    {leaveAnalysis.totalDays > 0 && (
-                      <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                        <div className="text-sm font-bold p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col sm:flex-row justify-around gap-4 text-center">
-                            <div className="space-y-1">
-                                <p className="text-[10px] uppercase text-muted-foreground tracking-widest">إجمالي الأيام</p>
-                                <p className="text-2xl font-black">{leaveAnalysis.totalDays} يوم</p>
-                            </div>
-                            <Separator orientation="vertical" className="h-10 hidden sm:block mx-4" />
-                            <div className="space-y-1">
-                                <p className="text-[10px] uppercase text-muted-foreground tracking-widest">أيام العمل الفعلية</p>
-                                <p className="text-2xl font-black text-primary">{leaveAnalysis.workingDays} يوم</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="font-black text-gray-700 pr-1">نوع الإجازة *</Label>
+                                <Select value={leaveType} onValueChange={(v) => setLeaveType(v as any)} disabled={isSaving}>
+                                    <SelectTrigger className="h-12 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
+                                    <SelectContent dir="rtl">
+                                        <SelectItem value="Annual">سنوية</SelectItem>
+                                        <SelectItem value="Sick">مرضية</SelectItem>
+                                        <SelectItem value="Emergency">طارئة</SelectItem>
+                                        <SelectItem value="Unpaid">بدون أجر</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
-                      </div>
-                    )}
 
-                     <div className="grid gap-2">
-                      <Label htmlFor="notes" className="font-bold text-gray-700 pr-1">السبب / ملاحظات *</Label>
-                      <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" placeholder="اشرح سبب طلب الإجازة..." disabled={isSaving} />
-                    </div>
-                    <div className="flex items-center space-x-2 rtl:space-x-reverse p-4 bg-muted/30 rounded-2xl border">
-                        <Checkbox id="passportReceived" checked={passportReceived} onCheckedChange={(checked) => setPassportReceived(!!checked)} disabled={isSaving} />
-                        <Label htmlFor="passportReceived" className="font-bold cursor-pointer text-gray-700">هل تم استلام جواز السفر من الموظف؟</Label>
-                    </div>
-                </CardContent>
-                <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
-                     <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
-                    <Button type="submit" disabled={isSaving || loading} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[280px]">
-                        {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6" />}
-                        {isSaving ? 'جاري الحفظ...' : 'إرسال طلب الإجازة'}
-                    </Button>
-                </CardFooter>
-            </form>
-        </Card>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label className="font-black text-gray-700 pr-1">من تاريخ *</Label>
+                                <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-12 rounded-xl" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label className="font-black text-gray-700 pr-1">إلى تاريخ *</Label>
+                                <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-12 rounded-xl" />
+                            </div>
+                        </div>
+
+                        {leaveDuration.totalDays > 0 && (
+                            <div className="text-sm font-black text-primary p-6 bg-primary/5 rounded-3xl border-2 border-dashed border-primary/20 flex justify-around animate-in zoom-in-95">
+                                <div className="text-center">
+                                    <p className="text-[10px] uppercase opacity-60">إجمالي الأيام</p>
+                                    <p className="text-2xl">{leaveDuration.totalDays} يوم</p>
+                                </div>
+                                <Separator orientation="vertical" className="h-10 bg-primary/20" />
+                                <div className="text-center">
+                                    <p className="text-[10px] uppercase opacity-60">أيام العمل</p>
+                                    <p className="text-2xl">{leaveDuration.workingDays} يوم</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid gap-2">
+                            <Label className="font-bold text-gray-700 pr-1">السبب / ملاحظات الطلب *</Label>
+                            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium" placeholder="اذكر سبب الإجازة..." disabled={isSaving} />
+                        </div>
+                    </CardContent>
+                    <CardFooter className="bg-muted/10 p-8 border-t flex justify-end gap-3">
+                        <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSaving} className="h-12 px-8 font-bold">إلغاء</Button>
+                        <Button type="submit" disabled={isSaving || loading || !!overlapError} className="h-14 px-16 rounded-2xl font-black text-xl shadow-xl shadow-primary/30 gap-3 min-w-[280px]">
+                            {isSaving ? <Loader2 className="animate-spin h-6 w-6"/> : <Save className="h-6 w-6" />}
+                            إرسال الطلب للمراجعة
+                        </Button>
+                    </CardFooter>
+                </form>
+            </Card>
+        </div>
     );
 }
