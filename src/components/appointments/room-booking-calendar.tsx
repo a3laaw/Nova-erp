@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, addDoc, serverTimestamp, Timestamp, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid, isWithinInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Save, Pencil, Trash2, Printer, PlaneTakeoff } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Appointment, Client, Employee } from '@/lib/types';
+import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import { Checkbox } from '../ui/checkbox';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -56,14 +56,6 @@ const departmentStyles: Record<string, React.CSSProperties> = {
   "أخرى": { backgroundColor: '#f3f4f6', borderLeft: '4px solid #6b7280', color: '#374151' },
 };
 const departmentOptions = ['الكهرباء', 'الصحي', 'الإنشائي', 'المعماري', 'أخرى'];
-
-const parseTime = (timeStr: string): { hours: number, minutes: number } | null => {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  if (isNaN(hours) || !isValidNumber(minutes)) return null;
-  return { hours, minutes };
-};
-
-function isValidNumber(n: any) { return typeof n === 'number' && !isNaN(n); }
 
 const generateTimeSlots = (start: string, end: string, slotDuration: number, buffer: number): string[] => {
     if (!start || !end || !slotDuration || slotDuration <= 0) return [];
@@ -105,6 +97,7 @@ export default function RoomBookingCalendar() {
 
     const [date, setDate] = useState<Date | undefined>(undefined);
     const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
+    const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -177,17 +170,20 @@ export default function RoomBookingCalendar() {
         if (!firestore || !tenantId) return;
         const employeesPath = getTenantPath('employees', tenantId);
         const clientsPath = getTenantPath('clients', tenantId);
+        const leavesPath = getTenantPath('leaveRequests', tenantId);
 
         const fetchStaticData = async () => {
             try {
-                const [clientSnap, engSnap] = await Promise.all([
+                const [clientSnap, engSnap, leavesSnap] = await Promise.all([
                     getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))),
                     getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))),
+                    getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))),
                 ]);
                 const fetchedClients = clientSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client));
                 setClients(fetchedClients.sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar')));
                 const fetchedEngineers = engSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as Employee));
                 setEngineers(fetchedEngineers.sort((a,b) => a.fullName.localeCompare(b.fullName, 'ar')));
+                setLeaveRequests(leavesSnap.docs.map(doc => ({ id: doc.id, ...doc.data()} as LeaveRequest)));
             } catch (error) { console.error(error); }
         };
         fetchStaticData();
@@ -204,6 +200,16 @@ export default function RoomBookingCalendar() {
     }, [firestore, tenantId]);
 
     useEffect(() => { if(date) fetchAppointments(date); }, [date, fetchAppointments]);
+
+    const getEmployeeLeaveForDate = useCallback((employeeId: string, checkDate: Date) => {
+        return leaveRequests.find(req => {
+            if (req.employeeId !== employeeId) return false;
+            const start = toFirestoreDate(req.startDate);
+            const end = toFirestoreDate(req.endDate);
+            if (!start || !end) return false;
+            return isWithinInterval(startOfDay(checkDate), { start: startOfDay(start), end: endOfDay(end) });
+        });
+    }, [leaveRequests]);
 
     const appointments = useMemo(() => {
         if (!rawAppointments || clients.length === 0 || engineers.length === 0) return rawAppointments;
@@ -231,20 +237,6 @@ export default function RoomBookingCalendar() {
         return grid;
     }, [appointments, morningSlots, eveningSlots]);
 
-    const handleOpenDialog = (data: Partial<Appointment> & { room: string, time?: string, id?: string }) => {
-        if (!date) return;
-        if (data.id) {
-            setDialogData({ ...data, appointmentDate: toFirestoreDate(data.appointmentDate) });
-        } else {
-            const parsedTime = parseTime(data.time!);
-            if (!parsedTime) return;
-            const startTime = setMinutes(setHours(date, parsedTime.hours), parsedTime.minutes);
-            if (isPast(startTime)) return toast({ title: 'لا يمكن الحجز في الماضي' });
-            setDialogData({ room: data.room, appointmentDate: startTime });
-        }
-        setIsDialogOpen(true);
-    };
-
     const handleDeleteBooking = async () => {
         if (!appointmentToDelete || !firestore || !tenantId) return;
         setIsDeleting(true);
@@ -271,24 +263,39 @@ export default function RoomBookingCalendar() {
                             {slots.map(time => {
                                 const booking = bookingsGrid[room]?.[time];
                                 const appointmentDate = booking ? toFirestoreDate(booking.appointmentDate) : null;
+                                // ✨ فحص تعارض الإجازة للمهندس المسؤول عن القاعة (إن وجد)
+                                const activeLeave = (booking && booking.engineerId && date) ? getEmployeeLeaveForDate(booking.engineerId, date) : null;
+                                const isOnLeave = !!activeLeave;
+
                                 return (
                                     <td key={`${room}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {booking && appointmentDate ? (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-md cursor-pointer transition-all hover:brightness-95 shadow-sm h-full" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
+                                                    <div className="flex flex-col items-center justify-center text-center p-1 sm:p-2 rounded-md cursor-pointer transition-all hover:brightness-95 shadow-sm h-full relative" style={{ ...(departmentStyles[booking.department || 'أخرى'] || {}) }}>
+                                                        {isOnLeave && <Badge variant="destructive" className="absolute top-0.5 right-0.5 text-[6px] h-3 px-1 font-black">مجاز</Badge>}
                                                         <p className="font-bold text-[10px] sm:text-xs leading-tight">{booking.title}</p>
                                                         <p className="text-[9px] sm:text-[10px] mt-1">{booking.clientName}</p>
                                                     </div>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent dir="rtl">
-                                                    <DropdownMenuItem onClick={() => handleOpenDialog(booking)}><Pencil className="ml-2 h-4 w-4" />تعديل الموعد</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => {
+                                                        const startTime = toFirestoreDate(booking.appointmentDate);
+                                                        setDialogData({ ...booking, appointmentDate: startTime });
+                                                        setIsDialogOpen(true);
+                                                    }}><Pencil className="ml-2 h-4 w-4" />تعديل الموعد</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem onClick={() => setAppointmentToDelete(booking)} className="text-destructive"><Trash2 className="ml-2 h-4 w-4" />إلغاء الموعد</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         ) : (
-                                            <button onClick={() => handleOpenDialog({ room, time })} className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" />
+                                            <button onClick={() => {
+                                                const [h, m] = time.split(':').map(Number);
+                                                const startTime = setMinutes(setHours(date!, h), m);
+                                                if (isPast(startTime)) return toast({ title: 'لا يمكن الحجز في الماضي' });
+                                                setDialogData({ room, appointmentDate: startTime });
+                                                setIsDialogOpen(true);
+                                            }} className="h-full w-full hover:bg-muted/30 transition-colors rounded-md no-print cursor-pointer" />
                                         )}
                                     </td>
                                 );
@@ -328,7 +335,7 @@ export default function RoomBookingCalendar() {
                 ))}
             </div>
 
-            {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} />}
+            {isDialogOpen && <BookingDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSaveSuccess={() => date && fetchAppointments(date)} dialogData={dialogData} clients={clients} engineers={engineers} firestore={firestore} currentUser={currentUser} leaveRequests={leaveRequests} />}
             
             <AlertDialog open={!!appointmentToDelete} onOpenChange={() => setAppointmentToDelete(null)}>
                 <AlertDialogContent dir="rtl" className="rounded-3xl">
@@ -340,7 +347,7 @@ export default function RoomBookingCalendar() {
     );
 }
 
-function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore, currentUser }: any) {
+function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, engineers, firestore, currentUser, leaveRequests }: any) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState('');
@@ -362,14 +369,28 @@ function BookingDialog({ isOpen, onClose, onSaveSuccess, dialogData, clients, en
         }
     }, [isOpen, dialogData]);
     
+    // ✨ فحص تداخل الإجازة في المساعد
+    const getEmployeeLeaveForDate = (empId: string, checkDate: Date) => {
+        return leaveRequests.find((req: any) => {
+            if (req.employeeId !== empId) return false;
+            const start = toFirestoreDate(req.startDate);
+            const end = toFirestoreDate(req.endDate);
+            if (!start || !end) return false;
+            return isWithinInterval(startOfDay(checkDate), { start: startOfDay(start), end: endOfDay(end) });
+        });
+    };
+
     const clientOptions = useMemo(() => clients.map((c: Client) => ({ value: c.id, label: c.nameAr, searchKey: c.mobile })), [clients]);
     
-    // إخفاء المهندسين في إجازة من قائمة الاختيار في النافذة المنبثقة لضمان عدم الحجز لهم بالخطأ
+    // إخفاء المهندسين في إجازة من قائمة الاختيار لليوم المحدد
     const engineerOptions = useMemo(() => 
         engineers
-            .filter((e: Employee) => e.status === 'active')
+            .filter((e: Employee) => {
+                const hasLeave = getEmployeeLeaveForDate(e.id!, dialogData.appointmentDate);
+                return e.status === 'active' && !hasLeave;
+            })
             .map((e: Employee) => ({ value: e.id, label: e.fullName, searchKey: e.employeeNumber }))
-    , [engineers]);
+    , [engineers, dialogData.appointmentDate, leaveRequests]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

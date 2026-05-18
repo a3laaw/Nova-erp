@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useFirebase } from '@/firebase';
 import { collection, query, getDocs, where, addDoc, serverTimestamp, Timestamp, doc, updateDoc, writeBatch, getDoc, orderBy, limit } from 'firebase/firestore';
-import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid } from 'date-fns';
+import { setHours, setMinutes, startOfDay, endOfDay, format, isPast, parse, isValid, isWithinInterval } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CalendarIcon, Loader2, Printer, Eye, Pencil, Trash2, CheckCircle, PlaneTakeoff } from 'lucide-react';
 import { cn, getTenantPath } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import type { Appointment, Client, Employee } from '@/lib/types';
+import type { Appointment, Client, Employee, LeaveRequest } from '@/lib/types';
 import { InlineSearchList } from '../ui/inline-search-list';
 import Link from 'next/link';
 import { Checkbox } from '../ui/checkbox';
@@ -43,6 +43,7 @@ import { toFirestoreDate } from '@/services/date-converter';
 import { useAuth } from '@/context/auth-context';
 import { useBranding } from '@/context/branding-context';
 import { Card, CardHeader, CardContent, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
 
 // --- مساعدات النظام ---
 
@@ -136,6 +137,7 @@ export default function ArchitecturalAppointmentsView() {
     const [rawAppointments, setRawAppointments] = useState<Appointment[]>([]);
     const [engineers, setEngineers] = useState<Employee[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
+    const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -200,15 +202,20 @@ export default function ArchitecturalAppointmentsView() {
         if (!firestore || !tenantId) return;
         const employeesPath = getTenantPath('employees', tenantId);
         const clientsPath = getTenantPath('clients', tenantId);
+        const leavesPath = getTenantPath('leaveRequests', tenantId);
 
-        // جلب المهندسين النشطين والمجازين أيضاً لإظهارهم في الجدول مع التعطيل
-        getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave']))).then(snap => {
-            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري')).sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
+        // جلب البيانات المرجعية
+        getDocs(query(collection(firestore, employeesPath), where('status', 'in', ['active', 'on-leave', 'terminated']))).then(snap => {
+            const arch = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)).filter(e => e.department?.includes('المعماري') && e.status !== 'terminated').sort((a, b) => a.fullName.localeCompare(b.fullName, 'ar'));
             setEngineers(arch);
         });
         getDocs(query(collection(firestore, clientsPath), where('isActive', '==', true))).then(snap => {
             const clientsList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Client)).sort((a,b) => a.nameAr.localeCompare(b.nameAr, 'ar'));
             setClients(clientsList);
+        });
+        // ✨ رادار الإجازات المعتمدة
+        getDocs(query(collection(firestore, leavesPath), where('status', 'in', ['approved', 'on-leave', 'returned']))).then(snap => {
+            setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
         });
     }, [firestore, tenantId]);
     
@@ -230,6 +237,17 @@ export default function ArchitecturalAppointmentsView() {
           ...appt, clientName: appt.clientId ? clients.find(c => c.id === appt.clientId)?.nameAr : appt.clientName,
       }));
     }, [rawAppointments, clients]);
+
+    // ✨ محرك فحص إجازة الموظف في تاريخ محدد
+    const getEmployeeLeaveForDate = useCallback((employeeId: string, checkDate: Date) => {
+        return leaveRequests.find(req => {
+            if (req.employeeId !== employeeId) return false;
+            const start = toFirestoreDate(req.startDate);
+            const end = toFirestoreDate(req.endDate);
+            if (!start || !end) return false;
+            return isWithinInterval(startOfDay(checkDate), { start: startOfDay(start), end: endOfDay(end) });
+        });
+    }, [leaveRequests]);
 
     const bookingsGrid = useMemo(() => {
         const grid: Record<string, Record<string, Appointment | null>> = {};
@@ -268,7 +286,10 @@ export default function ArchitecturalAppointmentsView() {
                 <thead><tr className='border-b'><th className="sticky left-0 bg-muted p-2 z-10 font-semibold text-center border-l">المهندس</th>{slots.map(time => <th key={time} className="p-2 text-center text-sm font-mono border-l">{time}</th>)}</tr></thead>
                 <tbody>
                     {engineers.map(eng => {
-                        const isOnLeave = eng.status === 'on-leave';
+                        // ✨ فحص الإجازة المعتمدة في هذا التاريخ تحديداً
+                        const activeLeave = date ? getEmployeeLeaveForDate(eng.id!, date) : null;
+                        const isOnLeave = !!activeLeave;
+
                         return (
                         <tr key={eng.id} className={cn('border-b transition-colors', isOnLeave && "bg-slate-50/50")}>
                             <th className={cn(
@@ -277,9 +298,12 @@ export default function ArchitecturalAppointmentsView() {
                             )}>
                                 {eng.fullName}
                                 {isOnLeave && (
-                                    <Badge variant="outline" className="mt-1 bg-white text-[8px] font-black text-slate-400 border-slate-200 gap-1 flex items-center justify-center">
-                                        <PlaneTakeoff className="h-2 w-2"/> في إجازة
-                                    </Badge>
+                                    <div className="flex flex-col items-center mt-1">
+                                        <Badge variant="outline" className="bg-red-50 text-[8px] font-black text-red-600 border-red-200 gap-1 flex items-center justify-center">
+                                            <PlaneTakeoff className="h-2 w-2"/> في إجازة
+                                        </Badge>
+                                        <span className="text-[7px] font-bold text-red-400 mt-0.5">({activeLeave?.leaveType === 'Sick' ? 'مرضية' : 'رسمية'})</span>
+                                    </div>
                                 )}
                             </th>
                             {slots.map(time => {
@@ -288,8 +312,8 @@ export default function ArchitecturalAppointmentsView() {
                                 return (
                                     <td key={`${eng.id}-${time}`} className="relative h-24 border-l p-1 align-top">
                                         {isOnLeave ? (
-                                            <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(0,0,0,0.03)_5px,rgba(0,0,0,0.03)_10px)] flex items-center justify-center">
-                                                <span className="text-[9px] font-black text-slate-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">الموظف مجاز</span>
+                                            <div className="h-full w-full bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,rgba(239,68,68,0.03)_5px,rgba(239,68,68,0.03)_10px)] flex flex-col items-center justify-center">
+                                                <span className="text-[9px] font-black text-red-300 opacity-40 uppercase tracking-tighter rotate-[-15deg]">الموظف مجاز حالياً</span>
                                             </div>
                                         ) : booking ? (
                                              <DropdownMenu>
