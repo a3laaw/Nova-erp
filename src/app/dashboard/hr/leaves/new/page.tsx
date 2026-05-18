@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -30,7 +31,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
-import { format, formatDistanceToNow, isBefore, startOfDay } from 'date-fns';
+import { format, formatDistanceToNow, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
 
@@ -172,6 +173,39 @@ export default function NewLeaveRequestPage() {
 
         try {
             const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
+            
+            // 🛡️ الدرع الرقابي: فحص التداخل مع إجازات سابقة 🛡️
+            const overlapQuery = query(
+                collection(firestore, leaveCollectionPath),
+                where('employeeId', '==', selectedEmployeeId),
+                where('status', 'in', ['pending', 'approved', 'on-leave'])
+            );
+            const overlapSnap = await getDocs(overlapQuery);
+            const hasOverlap = overlapSnap.docs.some(docSnap => {
+                const existing = docSnap.data() as LeaveRequest;
+                const exStart = toFirestoreDate(existing.startDate);
+                const exEnd = toFirestoreDate(existing.endDate);
+                if (!exStart || !exEnd) return false;
+                
+                const requestedStart = startOfDay(startDate);
+                const requestedEnd = endOfDay(endDate);
+                const currentStart = startOfDay(exStart);
+                const currentEnd = endOfDay(exEnd);
+
+                return (requestedStart <= currentEnd && requestedEnd >= currentStart);
+            });
+
+            if (hasOverlap) {
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'تداخل في التواريخ', 
+                    description: '⚠️ يوجد بالفعل إجازة أخرى (مقبولة أو معلقة) لهذا الموظف في نفس هذه الفترة الزمنية.' 
+                });
+                setIsSaving(false);
+                savingRef.current = false;
+                return;
+            }
+
             const newRequest = {
                 employeeId: selectedEmployeeId,
                 employeeName: selectedEmployee.fullName,

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useEffect, useState } from 'react';
@@ -8,7 +9,7 @@ import type { LeaveRequest, Employee } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle, Calculator, FileCheck } from 'lucide-react';
+import { ArrowRight, Printer, Calendar, User, FileText, CheckCircle, XCircle, Sparkles, History, Clock, PlaneTakeoff, Home, Briefcase, Badge as BadgeIcon, Loader2, ArrowDownCircle, Calculator, FileCheck, AlertCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
@@ -158,6 +159,17 @@ export default function LeaveRequestDetailsPage() {
                 </header>
 
                 <main className="py-10 space-y-10">
+                    {/* 🛡️ إظهار سبب الرفض إذا كان الطلب مرفوضاً 🛡️ */}
+                    {leaveRequest.status === 'rejected' && (
+                        <Alert variant="destructive" className="rounded-2xl border-2 animate-in shake-x bg-red-50 shadow-red-100 p-6">
+                            <AlertCircle className="h-6 w-6 text-red-600" />
+                            <AlertTitle className="text-red-800 font-black text-lg">تم رفض هذا الطلب</AlertTitle>
+                            <AlertDescription className="text-red-700 font-bold mt-2 leading-relaxed">
+                                {leaveRequest.rejectionReason || 'عذراً، تعذر قبول الطلب في هذه الفترة بناءً على متطلبات العمل. يرجى مراجعة الإدارة لمزيد من التفاصيل.'}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
                     <section className="grid grid-cols-2 gap-8 bg-muted/20 p-8 rounded-3xl border">
                         <div className="space-y-4">
                             <InfoRow label="اسم الموظف" value={<span className="font-black text-lg">{leaveRequest.employeeName}</span>} icon={<User className="h-5 w-5 text-primary"/>}/>
