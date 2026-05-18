@@ -48,10 +48,10 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const tenantId = currentUser?.currentCompanyId;
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     
-    // 🏢 جلب الأقسام
+    // 🏢 جلب الأقسام بنظام الاشتراك اللحظي
     const { data: departments, loading: deptsLoading } = useSubscription<Department>(firestore, 'departments', [orderBy('order')]);
     
-    // 👔 إدارة الوظائف المفلترة محلياً لضمان الظهور الفوري
+    // 👔 إدارة الوظائف المفلترة محلياً لجلبها فور اختيار القسم
     const [filteredJobs, setFilteredJobs] = useState<Job[]>([]);
     const [loadingJobs, setLoadingJobs] = useState(false);
 
@@ -82,40 +82,46 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
     const [showTransportAllowance, setShowTransportAllowance] = useState(false);
     const [isCustomHours, setIsCustomHours] = useState(false);
 
-    // ✨ محرك جلب الوظائف عند اختيار القسم (Direct Path Fetching)
+    // ✨ محرك جلب الوظائف عند اختيار القسم (Direct Relationship Engine)
     useEffect(() => {
-        if (!formData.department || !firestore || !tenantId) {
+        if (!formData.department || !firestore || !tenantId || departments.length === 0) {
             setFilteredJobs([]);
             return;
         }
 
         const fetchJobs = async () => {
+            // البحث عن القسم المختار للحصول على الـ ID الخاص به
             const dept = departments.find(d => d.name === formData.department);
-            if (!dept?.id) return;
+            if (!dept?.id) {
+                console.warn(`Department ID not found for: ${formData.department}`);
+                return;
+            }
 
             setLoadingJobs(true);
             try {
-                // 🛡️ التوجه للمسار المباشر للوظائف التابعة للقسم في هذه المنشأة
+                // 🛡️ التوجه للمسار المعزول للوظائف التابعة لهذا القسم تحديداً
                 const jobsPath = `departments/${dept.id}/jobs`;
                 const finalPath = getTenantPath(jobsPath, tenantId);
                 
                 const snap = await getDocs(query(collection(firestore, finalPath), orderBy('order')));
                 const fetchedJobs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Job));
+                
                 setFilteredJobs(fetchedJobs);
 
-                // إذا كانت بيانات أولية، نتأكد من بقاء المسمى المختار
+                // في حال التعديل، نتأكد أن المسمى الوظيفي المختار لا يزال سارياً
                 if (initialData?.jobTitle && !formData.jobTitle) {
                     setFormData(prev => ({ ...prev, jobTitle: initialData.jobTitle }));
                 }
             } catch (err) {
-                console.error("Error fetching filtered jobs:", err);
+                console.error("Error fetching filtered jobs from subcollection:", err);
+                toast({ variant: 'destructive', title: 'خطأ في جلب الوظائف', description: 'تأكد من أن القسم يحتوي على وظائف معرفة.' });
             } finally {
                 setLoadingJobs(false);
             }
         };
 
         fetchJobs();
-    }, [formData.department, departments, firestore, tenantId, initialData?.jobTitle]);
+    }, [formData.department, departments, firestore, tenantId, initialData?.jobTitle, toast]);
 
     useEffect(() => {
         if (initialData) {
@@ -424,4 +430,3 @@ export function EmployeeForm({ onSave, onClose, initialData = null, isSaving = f
         </form>
     );
 }
-

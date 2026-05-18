@@ -57,7 +57,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn, cleanFirestoreData, getTenantPath } from '@/lib/utils';
-import { defaultDepartments, defaultGovernorates } from '@/lib/default-reference-data';
+import { defaultDepartments, defaultGovernorates, defaultJobs, defaultWorkStages, defaultAreas } from '@/lib/default-reference-data';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -309,18 +309,42 @@ export function ReferenceDataManager() {
             const finalPrimaryPath = getTenantPath(primaryCollectionName, tenantId);
             
             if (view === 'departments') {
-                defaultDepartments.forEach((d, idx) => {
-                    const newDocRef = doc(collection(firestore, finalPrimaryPath));
-                    batch.set(newDocRef, { ...d, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
-                });
+                for (const [idx, d] of defaultDepartments.entries()) {
+                    const newDeptRef = doc(collection(firestore, finalPrimaryPath));
+                    batch.set(newDeptRef, { ...d, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
+                    
+                    // 🛡️ استيراد الوظائف التابعة لهذا القسم
+                    const deptJobs = defaultJobs[d.name] || [];
+                    const jobsPath = getTenantPath(`departments/${newDeptRef.id}/jobs`, tenantId);
+                    deptJobs.forEach((job, jIdx) => {
+                        const jobRef = doc(collection(firestore, jobsPath));
+                        batch.set(jobRef, { ...job, order: jIdx, companyId: tenantId, parentId: newDeptRef.id });
+                    });
+
+                    // 🛡️ استيراد مراحل العمل التابعة لهذا القسم
+                    const deptStages = defaultWorkStages[d.name] || [];
+                    const stagesPath = getTenantPath(`departments/${newDeptRef.id}/workStages`, tenantId);
+                    deptStages.forEach((stage, sIdx) => {
+                        const stageRef = doc(collection(firestore, stagesPath));
+                        batch.set(stageRef, { ...stage, order: sIdx, companyId: tenantId, parentId: newDeptRef.id });
+                    });
+                }
             } else if (view === 'locations') {
-                defaultGovernorates.forEach((g, idx) => {
-                    const newDocRef = doc(collection(firestore, finalPrimaryPath));
-                    batch.set(newDocRef, { ...g, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
-                });
+                for (const [idx, g] of defaultGovernorates.entries()) {
+                    const newGovRef = doc(collection(firestore, finalPrimaryPath));
+                    batch.set(newGovRef, { ...g, order: idx, companyId: tenantId, createdAt: serverTimestamp() });
+
+                    // 🛡️ استيراد المناطق التابعة لهذه المحافظة
+                    const govAreas = defaultAreas[g.name] || [];
+                    const areasPath = getTenantPath(`governorates/${newGovRef.id}/areas`, tenantId);
+                    govAreas.forEach((area, aIdx) => {
+                        const areaRef = doc(collection(firestore, areasPath));
+                        batch.set(areaRef, { ...area, order: aIdx, companyId: tenantId, parentId: newGovRef.id });
+                    });
+                }
             }
             await batch.commit();
-            toast({ title: 'تم الاستيراد بنجاح' });
+            toast({ title: 'نجاح الاستيراد الهرمي', description: 'تم استيراد القوائم مع كافة الوظائف والمراحل والمناطق التابعة لها.' });
             setIsImportConfirmOpen(false);
         } catch (e) { toast({ variant: 'destructive', title: 'فشل الاستيراد' }); } finally { setIsImporting(false); }
     };
@@ -398,7 +422,7 @@ export function ReferenceDataManager() {
                         <div className="flex gap-4">
                             {view !== 'transactions' && (
                                 <Button variant="secondary" onClick={() => setIsImportConfirmOpen(true)} className="bg-white/90 hover:bg-white text-primary rounded-2xl font-black h-12 px-8 gap-3 shadow-xl transition-all active:scale-95">
-                                    <DownloadCloud className="h-5 w-5"/> استيراد افتراضي
+                                    <DownloadCloud className="h-5 w-5"/> استيراد القوالب الكاملة
                                 </Button>
                             )}
                             <Button onClick={() => setView('main')} variant="outline" className="text-white border-white/40 hover:bg-white/10 rounded-2xl font-black h-12 px-8 gap-2 backdrop-blur-md">
@@ -554,13 +578,13 @@ export function ReferenceDataManager() {
                 <AlertDialogContent dir="rtl" className="rounded-[3rem] border-none shadow-2xl p-12">
                     <AlertDialogHeader>
                         <div className="p-5 bg-primary/10 text-primary rounded-[1.8rem] w-fit mb-6 shadow-inner"><DownloadCloud className="h-12 w-12"/></div>
-                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب؟</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام والوظائف والمدن الافتراضية آلياً.</AlertDialogDescription>
+                        <AlertDialogTitle className="text-3xl font-black text-[#1e1b4b] tracking-tighter">تأكيد استيراد القوالب الكاملة؟</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg font-bold text-slate-500 leading-relaxed mt-4">سيقوم هذا الإجراء بإضافة الأقسام، الوظائف، مراحل العمل، والمدن مع كافة تفاصيلها الفرعية المعتمدة في النظام.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="mt-10 gap-4">
                         <AlertDialogCancel className="rounded-2xl font-black h-12 px-10 border-2">تراجع</AlertDialogCancel>
                         <AlertDialogAction onClick={handleImportDefaults} disabled={isImporting} className="rounded-2xl font-black h-12 px-16 shadow-2xl shadow-primary/30">
-                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد'}
+                            {isImporting ? <Loader2 className="h-5 w-5 animate-spin"/> : 'نعم، ابدأ الاستيراد العميق'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
