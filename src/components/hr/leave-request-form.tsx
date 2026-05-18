@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, LeaveRequest, Holiday } from '@/lib/types';
-import { Loader2, Save, Info, User, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Loader2, Save, Info, User, AlertCircle, ShieldCheck, Stethoscope } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -19,7 +19,7 @@ import { InlineSearchList } from '../ui/inline-search-list';
 import { toFirestoreDate } from '@/services/date-converter';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getTenantPath } from '@/lib/utils';
-import { startOfDay, endOfDay, isSameDay, isBefore } from 'date-fns';
+import { startOfDay, endOfDay, isSameDay, isBefore, startOfYear, endOfYear } from 'date-fns';
 
 interface LeaveRequestFormProps {
   isOpen: boolean;
@@ -46,6 +46,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
   const [endDate, setEndDate] = useState<Date | undefined>();
   const [notes, setNotes] = useState('');
   const [overlapError, setOverlapError] = useState<string | null>(null);
+  const [sickLeaveBalanceInfo, setSickLeaveBalanceInfo] = useState<{ used: number, max: number } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
   const isEditing = !!leaveRequestToEdit;
@@ -71,6 +72,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
             setNotes('');
         }
         setOverlapError(null);
+        setSickLeaveBalanceInfo(null);
     }
   }, [isOpen, isEditing, leaveRequestToEdit, currentUser, isAdmin]);
 
@@ -95,9 +97,43 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
     fetchRefs();
   }, [isOpen, firestore, toast]);
 
+  // ✨ محرك رصد رصيد الإجازات المرضية المتبقي (15 يوم سنوياً)
+  useEffect(() => {
+    if (!isOpen || !firestore || !selectedEmployeeId || leaveType !== 'Sick' || !tenantId) {
+        setSickLeaveBalanceInfo(null);
+        return;
+    }
+
+    const checkSickBalance = async () => {
+        const start = startOfYear(new Date());
+        const end = endOfYear(new Date());
+        const leavePath = getTenantPath('leaveRequests', tenantId);
+        
+        const q = query(
+            collection(firestore, leavePath),
+            where('employeeId', '==', selectedEmployeeId),
+            where('leaveType', '==', 'Sick'),
+            where('status', 'in', ['approved', 'on-leave', 'returned'])
+        );
+        
+        const snap = await getDocs(q);
+        let used = 0;
+        snap.forEach(doc => {
+            const data = doc.data() as LeaveRequest;
+            const lStart = toFirestoreDate(data.startDate);
+            if (lStart && lStart >= start && lStart <= end) {
+                used += (data.workingDays || 0);
+            }
+        });
+        setSickLeaveBalanceInfo({ used, max: 15 });
+    };
+
+    checkSickBalance();
+  }, [isOpen, selectedEmployeeId, leaveType, firestore, tenantId]);
+
   const leaveDuration = useMemo(() => {
     if (!startDate || !endDate) return { totalDays: 0, workingDays: 0 };
-    return calculateWorkingDays(startDate, endDate, branding?.group_work_hours?.holidays || branding?.work_hours?.holidays || [], publicHolidays);
+    return calculateWorkingDays(startDate, endDate, branding?.work_hours?.holidays || [], publicHolidays);
   }, [startDate, endDate, branding, publicHolidays]);
 
   const employeeOptions = useMemo(() => employees.map(e => ({ value: e.id!, label: e.fullName })), [employees]);
@@ -107,6 +143,17 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
     if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate || !tenantId) {
       toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
       return;
+    }
+
+    // ✨ التحقق من سقف الإجازة المرضية (15 يوم)
+    if (leaveType === 'Sick' && sickLeaveBalanceInfo) {
+        const remaining = sickLeaveBalanceInfo.max - sickLeaveBalanceInfo.used;
+        if (leaveDuration.workingDays > remaining) {
+            const msg = `عذراً، رصيد الإجازات المرضية المتبقي للموظف هو (${remaining}) أيام فقط لهذا العام. لا يمكن تجاوز 15 يوماً مدفوعاً.`;
+            setOverlapError(msg);
+            toast({ variant: 'destructive', title: 'تجاوز رصيد المرضيات', description: msg });
+            return;
+        }
     }
     
     setIsSaving(true);
@@ -118,7 +165,6 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
 
       const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
       
-      // 🛡️ رادار منع التداخل: فحص وجود طلبات أخرى في نفس التوقيت 🛡️
       const overlapQuery = query(
           collection(firestore, leaveCollectionPath),
           where('employeeId', '==', selectedEmployeeId),
@@ -143,7 +189,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
       if (hasOverlap) {
           const errorMsg = "عذراً، يوجد إجازة أخرى مسجلة للموظف في نفس هذا التوقيت، يرجى مراجعة التواريخ المحددة.";
           setOverlapError(errorMsg);
-          toast({ variant: 'destructive', title: 'تداخل في التواريخ', description: errorMsg });
+          toast({ variant: 'destructive', title: 'تنبيه تداخل مواعيد', description: errorMsg });
           setIsSaving(false);
           return;
       }
@@ -162,7 +208,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
       if (isEditing && leaveRequestToEdit?.id) {
         const leaveRef = doc(firestore, 'leaveRequests', leaveRequestToEdit.id);
         await updateDoc(leaveRef, dataToSave);
-        toast({ title: 'نجاح', description: 'تم تعديل طلب الإجازة بنجاح.' });
+        toast({ title: 'نجاح', description: 'تم تحديث طلب الإجازة بنجاح.' });
       } else {
         const newRequest = {
             ...dataToSave,
@@ -208,6 +254,16 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
                 </Alert>
             )}
 
+            {leaveType === 'Sick' && sickLeaveBalanceInfo && (
+                <Alert className="rounded-2xl border-2 border-blue-500 bg-blue-50 shadow-sm py-4">
+                    <Stethoscope className="h-5 w-5 text-blue-600" />
+                    <AlertTitle className="text-sm font-black text-blue-800">رصيد الإجازات المرضية</AlertTitle>
+                    <AlertDescription className="text-xs font-bold text-blue-700 mt-1">
+                        تم استهلاك ({sickLeaveBalanceInfo.used}) أيام من أصل ({sickLeaveBalanceInfo.max}) أيام مدفوعة لهذا العام.
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="grid gap-2">
                 <Label htmlFor="employee" className="font-black text-gray-700 pr-1">الموظف المعني *</Label>
                 {isAdmin ? (
@@ -233,7 +289,7 @@ export function LeaveRequestForm({ isOpen, onClose, onSaveSuccess, leaveRequestT
                     <SelectTrigger id="leaveType" className="h-11 rounded-xl border-2 font-bold"><SelectValue/></SelectTrigger>
                     <SelectContent dir="rtl">
                         <SelectItem value="Annual">سنوية</SelectItem>
-                        <SelectItem value="Sick">مرضية</SelectItem>
+                        <SelectItem value="Sick">مرضية (بحد أقصى 15 يوم/سنة)</SelectItem>
                         <SelectItem value="Emergency">طارئة</SelectItem>
                         <SelectItem value="Unpaid">بدون أجر</SelectItem>
                     </SelectContent>

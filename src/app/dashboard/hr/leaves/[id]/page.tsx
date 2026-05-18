@@ -28,18 +28,20 @@ import {
     AlertCircle,
     Badge as BadgeIcon
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { toFirestoreDate } from '@/services/date-converter';
 import { useBranding } from '@/context/branding-context';
 import { Logo } from '@/components/layout/logo';
 import { Badge } from '@/components/ui/badge';
+import { calculateAnnualLeaveBalance } from '@/services/leave-calculator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DateInput } from '@/components/ui/date-input';
 import { Label } from '@/components/ui/label';
 import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
+import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -111,7 +113,7 @@ export default function LeaveRequestDetailsPage() {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
                 throw e;
             });
-            toast({ title: 'تم تسجيل المغادرة' });
+            toast({ title: 'تم توثيق المغادرة' });
             setIsStartDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
     };
@@ -130,7 +132,7 @@ export default function LeaveRequestDetailsPage() {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: reqPath, operation: 'write' }));
                 throw e;
             });
-            toast({ title: 'تمت المباشرة' });
+            toast({ title: 'تمت المباشرة بنجاح' });
             setIsReturnDialogOpen(false);
         } catch (e) { setIsProcessing(false); }
     };
@@ -145,7 +147,7 @@ export default function LeaveRequestDetailsPage() {
         <div className="space-y-6 max-w-4xl mx-auto pb-20" dir="rtl">
             <div className="no-print flex justify-between items-center bg-white/60 backdrop-blur-md p-4 rounded-[2rem] border-2 border-white/80 shadow-sm mb-4">
                  <Button variant="ghost" onClick={() => router.back()} className="font-bold gap-2 rounded-xl">
-                    <ArrowRight className="h-4 w-4"/> عودة للقائمة
+                    <ArrowRight className="h-4 w-4"/> العودة للقائمة
                 </Button>
                 <div className="flex gap-3">
                     {isAdmin && (

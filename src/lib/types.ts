@@ -41,7 +41,23 @@ export interface LeaveRequest extends BaseEntity {
   approvedAt?: Timestamp | any;
   rejectedAt?: Timestamp | any;
   notes?: string;
+  adminComment?: string;
+  rejectionReason?: string;
   passportReceived?: boolean;
+}
+
+export interface PermissionRequest extends BaseEntity {
+  employeeId: string;
+  employeeName: string;
+  type: 'late_arrival' | 'early_departure';
+  date: Timestamp | any;
+  durationHours: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  adminComment?: string;
+  rejectionReason?: string;
+  approvedBy?: string;
+  approvedAt?: Timestamp | any;
 }
 
 export interface CustodyReconciliation extends BaseEntity {
@@ -375,41 +391,6 @@ export interface MonthlyAttendance extends BaseEntity {
     absentDays: number;
     lateDays: number;
   };
-}
-
-export interface PermissionRequest extends BaseEntity {
-  employeeId: string;
-  employeeName: string;
-  type: 'late_arrival' | 'early_departure';
-  date: Timestamp | any;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-  rejectionReason?: string;
-  approvedBy?: string;
-  approvedAt?: Timestamp | any;
-}
-
-export interface Payslip extends BaseEntity {
-  employeeId: string;
-  employeeName: string;
-  employeeNumber?: string;
-  year: number;
-  month: number;
-  type?: 'Monthly' | 'Leave';
-  earnings: {
-    basicSalary: number;
-    housingAllowance: number;
-    transportAllowance: number;
-    commission: number;
-  };
-  deductions: {
-    absenceDeduction: number;
-    lateDeduction: number;
-    otherDeductions: number;
-  };
-  netSalary: number;
-  status: 'draft' | 'processed' | 'paid';
-  paidAt?: Timestamp | any;
 }
 
 export interface AuditLog extends BaseEntity {

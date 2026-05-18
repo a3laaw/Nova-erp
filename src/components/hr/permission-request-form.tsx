@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { DateInput } from '@/components/ui/date-input';
 import { useToast } from '@/hooks/use-toast';
 import type { Employee, PermissionRequest, LeaveRequest } from '@/lib/types';
-import { Loader2, Save, Info, User, AlertCircle, CalendarRange } from 'lucide-react';
+import { Loader2, Save, Info, User, AlertCircle, CalendarRange, Clock } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
@@ -18,6 +18,7 @@ import { startOfMonth, endOfMonth, isSameDay, startOfDay, endOfDay } from 'date-
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toFirestoreDate } from '@/services/date-converter';
 import { cn, getTenantPath } from '@/lib/utils';
+import { Input } from '../ui/input';
 
 interface PermissionRequestFormProps {
   isOpen: boolean;
@@ -37,9 +38,11 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [permissionType, setPermissionType] = useState<'late_arrival' | 'early_departure'>('late_arrival');
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [durationHours, setDurationHours] = useState('1');
   const [reason, setReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [overlapError, setOverlapError] = useState<string | null>(null);
+  const [monthlyCount, setMonthlyCount] = useState(0);
   
   const isEditing = !!permissionToEdit;
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'HR' || currentUser?.role === 'Developer';
@@ -51,6 +54,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             setPermissionType(permissionToEdit.type);
             setDate(toFirestoreDate(permissionToEdit.date) || undefined);
             setReason(permissionToEdit.reason);
+            setDurationHours(String(permissionToEdit.durationHours || '1'));
         } else {
              if (!isAdmin) {
               setSelectedEmployeeId(currentUser?.employeeId || '');
@@ -60,10 +64,38 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
             setPermissionType('late_arrival');
             setDate(new Date());
             setReason('');
+            setDurationHours('1');
         }
         setOverlapError(null);
     }
   }, [isOpen, isEditing, permissionToEdit, currentUser, isAdmin]);
+
+  // ✨ محرك رصد عدد الاستئذانات الشهري للموظف (بحد أقصى 3)
+  useEffect(() => {
+    if (!isOpen || !firestore || !selectedEmployeeId || !date || !tenantId) {
+        setMonthlyCount(0);
+        return;
+    }
+
+    const checkMonthlyQuota = async () => {
+        const monthStart = startOfMonth(date);
+        const monthEnd = endOfMonth(date);
+        const permissionsPath = getTenantPath('permissionRequests', tenantId);
+        
+        const q = query(
+            collection(firestore, permissionsPath),
+            where('employeeId', '==', selectedEmployeeId),
+            where('date', '>=', monthStart),
+            where('date', '<=', monthEnd),
+            where('status', 'in', ['pending', 'approved'])
+        );
+        
+        const snap = await getDocs(q);
+        setMonthlyCount(snap.size);
+    };
+
+    checkMonthlyQuota();
+  }, [isOpen, selectedEmployeeId, date, firestore, tenantId]);
 
   const activeEmployees = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
   const employeeOptions = useMemo(() => activeEmployees.map(e => ({ value: e.id!, label: e.fullName })), [activeEmployees]);
@@ -73,6 +105,19 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
     if (!firestore || !currentUser || !selectedEmployeeId || !permissionType || !date || !reason.trim() || !tenantId) {
       toast({ variant: 'destructive', title: 'بيانات ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
       return;
+    }
+
+    const duration = parseFloat(durationHours);
+    if (isNaN(duration) || duration <= 0 || duration > 3) {
+        toast({ variant: 'destructive', title: 'تجاوز الوقت المسموح', description: 'مدة الاستئذان يجب أن تكون بين 0 و 3 ساعات بحد أقصى.' });
+        return;
+    }
+
+    if (monthlyCount >= 3 && !isEditing) {
+        const msg = "عذراً، لقد استنفذ الموظف رصيد الاستئذانات المسموح به لهذا الشهر (3 طلبات كحد أقصى).";
+        setOverlapError(msg);
+        toast({ variant: 'destructive', title: 'تجاوز الحد الشهري', description: msg });
+        return;
     }
     
     setIsSaving(true);
@@ -100,7 +145,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
       });
 
       if (hasOverlappingLeave) {
-          const msg = "عذراً، الموظف لديه إجازة معتمدة في هذا التاريخ؛ لا يمكن الجمع بين الإجازة والاستئذان في نفس اليوم لضمان دقة السجلات.";
+          const msg = "عذراً، الموظف لديه إجازة معتمدة في هذا التاريخ؛ لا يمكن طلب استئذان في يوم الإجازة لضمان دقة السجلات.";
           setOverlapError(msg);
           toast({ variant: 'destructive', title: 'تنبيه تداخل مواعيد', description: msg });
           setIsSaving(false);
@@ -113,6 +158,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
         employeeName: (selectedEmployee as any).fullName || (selectedEmployee as any).nameAr,
         type: permissionType,
         date: date,
+        durationHours: duration,
         reason: reason,
         companyId: tenantId
       };
@@ -159,7 +205,7 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                         {isEditing ? 'تعديل طلب استئذان' : 'تقديم طلب استئذان'}
                     </DialogTitle>
                     <DialogDescription className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">
-                        متابعة انضباط الموظف وجدولة ساعات العمل.
+                        إدارة ساعات العمل والانضباط الوظيفي.
                     </DialogDescription>
                 </div>
             </div>
@@ -172,6 +218,16 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                     <AlertTitle className="text-lg font-black text-red-800">تنبيه تداخل مواعيد</AlertTitle>
                     <AlertDescription className="text-sm font-bold text-red-700 mt-2 leading-relaxed">
                         {overlapError}
+                    </AlertDescription>
+                </Alert>
+            )}
+
+            {!overlapError && monthlyCount >= 3 && !isEditing && (
+                 <Alert variant="destructive" className="rounded-2xl border-2 border-orange-500 bg-orange-50 py-4">
+                    <AlertCircle className="h-5 w-5 text-orange-600" />
+                    <AlertTitle className="text-sm font-black text-orange-800">تنبيه استنفاد الرصيد</AlertTitle>
+                    <AlertDescription className="text-xs font-bold text-orange-700 mt-1">
+                        لقد تم تسجيل {monthlyCount} طلبات لهذا الشهر. لا يمكن تقديم المزيد.
                     </AlertDescription>
                 </Alert>
             )}
@@ -212,6 +268,25 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
               </div>
             </div>
 
+            <div className="grid gap-2">
+                <Label htmlFor="duration" className="font-black text-gray-700 pr-1 flex items-center gap-2">
+                    <Clock className="h-3 w-3 text-primary" /> مدة الاستئذان (بالساعات) *
+                </Label>
+                <div className="flex items-center gap-3">
+                    <Input 
+                        id="duration" 
+                        type="number" 
+                        step="0.5" 
+                        min="0.5" 
+                        max="3" 
+                        value={durationHours} 
+                        onChange={(e) => setDurationHours(e.target.value)}
+                        className="h-12 rounded-xl border-2 text-center font-black text-xl text-primary w-24"
+                    />
+                    <span className="text-sm font-bold text-muted-foreground">أقصى مدة مسموحة هي 3 ساعات.</span>
+                </div>
+            </div>
+
              <div className="grid gap-2">
               <Label htmlFor="reason" className="font-bold text-gray-700 pr-1">المبررات / السبب *</Label>
               <Textarea id="reason" value={reason} onChange={(e) => setReason(e.target.value)} required rows={3} className="rounded-2xl border-2 p-4 text-base font-medium focus:ring-primary/20" placeholder="اذكر سبب الطلب بوضوح..." disabled={isSaving} />
@@ -222,14 +297,15 @@ export function PermissionRequestForm({ isOpen, onClose, onSaveSuccess, permissi
                 <AlertTitle className="text-xs font-black text-primary uppercase">توجيه إداري</AlertTitle>
                 <AlertDescription className="text-[10px] font-bold text-slate-600 mt-1 leading-relaxed">
                     • الحد الأقصى هو 3 استئذانات شهرياً. <br/>
-                    • لا يمكن طلب استئذان في أيام الإجازات المعتمدة لضمان دقة سجلات الحضور.
+                    • الحد الأقصى لكل طلب هو 3 ساعات فقط. <br/>
+                    • لا يمكن طلب استئذان في أيام الإجازات لضمان دقة السجلات.
                 </AlertDescription>
             </Alert>
           </div>
 
           <DialogFooter className="p-8 bg-muted/10 border-t flex gap-3">
             <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving} className="rounded-xl font-bold h-12 px-8">إلغاء</Button>
-            <Button type="submit" disabled={isSaving || !!overlapError} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white hover:bg-black transition-all">
+            <Button type="submit" disabled={isSaving || !!overlapError || (monthlyCount >= 3 && !isEditing)} className="rounded-xl font-black px-12 h-12 shadow-xl shadow-primary/30 gap-2 bg-[#7209B7] text-white hover:bg-black transition-all">
               {isSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin"/> : <Save className="ml-2 h-4 w-4" />}
               {isEditing ? 'تحديث الطلب' : 'إرسال للمراجعة'}
             </Button>
