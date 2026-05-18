@@ -32,7 +32,7 @@ import { Separator } from '@/components/ui/separator';
 import { toFirestoreDate } from '@/services/date-converter';
 import { format, formatDistanceToNow, isBefore, startOfDay } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, getTenantPath } from '@/lib/utils';
 
 const leaveTypeTranslations: Record<string, string> = {
     'Annual': 'سنوية',
@@ -47,6 +47,7 @@ export default function NewLeaveRequestPage() {
     const { toast } = useToast();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const tenantId = currentUser?.currentCompanyId;
 
     const { data: employees = [], loading: employeesLoading } = useSubscription<Employee>(firestore, 'employees', [where('status', '==', 'active')]);
     const { data: publicHolidays, loading: holidaysLoading } = useSubscription<Holiday>(firestore, 'holidays');
@@ -71,7 +72,7 @@ export default function NewLeaveRequestPage() {
         if (employeeIdFromUrl) {
             setSelectedEmployeeId(employeeIdFromUrl);
         } else if (currentUser && currentUser.role !== 'Admin' && currentUser.role !== 'HR') {
-            setSelectedEmployeeId(currentUser.employeeId);
+            setSelectedEmployeeId(currentUser.employeeId || '');
         }
     }, [currentUser, searchParams]);
 
@@ -87,7 +88,7 @@ export default function NewLeaveRequestPage() {
     }, [startDate, endDate, toast]);
 
     useEffect(() => {
-        if (!firestore || !selectedEmployeeId) {
+        if (!firestore || !selectedEmployeeId || !tenantId) {
             setLastLeaveInfo(null);
             setHasCheckedContext(false);
             return;
@@ -96,8 +97,9 @@ export default function NewLeaveRequestPage() {
         const fetchLastLeave = async () => {
             setLoadingContext(true);
             try {
+                const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
                 const q = query(
-                    collection(firestore, 'leaveRequests'),
+                    collection(firestore, leaveCollectionPath),
                     where('employeeId', '==', selectedEmployeeId)
                 );
                 const snap = await getDocs(q);
@@ -125,7 +127,7 @@ export default function NewLeaveRequestPage() {
         };
 
         fetchLastLeave();
-    }, [firestore, selectedEmployeeId]);
+    }, [firestore, selectedEmployeeId, tenantId]);
 
     const loading = employeesLoading || holidaysLoading || brandingLoading;
 
@@ -154,7 +156,7 @@ export default function NewLeaveRequestPage() {
         e.preventDefault();
         if (savingRef.current) return;
 
-        if (!firestore || !currentUser || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
+        if (!firestore || !currentUser || !tenantId || !selectedEmployeeId || !leaveType || !startDate || !endDate) {
             toast({ variant: 'destructive', title: 'حقول ناقصة', description: 'الرجاء تعبئة جميع الحقول المطلوبة.' });
             return;
         }
@@ -169,6 +171,7 @@ export default function NewLeaveRequestPage() {
         setIsSaving(true);
 
         try {
+            const leaveCollectionPath = getTenantPath('leaveRequests', tenantId);
             const newRequest = {
                 employeeId: selectedEmployeeId,
                 employeeName: selectedEmployee.fullName,
@@ -182,15 +185,16 @@ export default function NewLeaveRequestPage() {
                 passportReceived: passportReceived,
                 status: 'pending' as const,
                 createdAt: serverTimestamp(),
+                companyId: tenantId
             };
 
-            await addDoc(collection(firestore, 'leaveRequests'), newRequest);
+            await addDoc(collection(firestore, leaveCollectionPath), newRequest);
             toast({ title: 'نجاح', description: 'تم إرسال طلب الإجازة بنجاح.' });
             router.push('/dashboard/hr/leaves');
         } catch (error) {
             savingRef.current = false;
             setIsSaving(false);
-            toast({ variant: 'destructive', title: 'خطأ في الحفظ' });
+            toast({ variant: 'destructive', title: 'عائق صلاحيات', description: 'فشل حفظ الطلب، تأكد من تسجيل الدخول للمنشأة الصحيحة.' });
         }
     };
     
@@ -256,27 +260,17 @@ export default function NewLeaveRequestPage() {
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="grid gap-2">
-                        <Label htmlFor="startDate" className="font-black text-gray-700 pr-1">من تاريخ <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="startDate" className="font-black text-gray-700 pr-1">من تاريخ *</Label>
                         <DateInput value={startDate} onChange={setStartDate} disabled={isSaving} className="h-12 rounded-xl" />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="endDate" className="font-black text-gray-700 pr-1">إلى تاريخ <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="endDate" className="font-black text-gray-700 pr-1">إلى تاريخ *</Label>
                         <DateInput value={endDate} onChange={setEndDate} disabled={isSaving} className="h-12 rounded-xl" />
                       </div>
                     </div>
 
                     {leaveAnalysis.totalDays > 0 && (
                       <div className="space-y-4 animate-in fade-in zoom-in-95 duration-300">
-                        {leaveType === 'Annual' && leaveAnalysis.totalDays < 30 && (
-                            <Alert className="bg-amber-50 border-amber-200 rounded-3xl border-2 animate-in slide-in-from-top-4 shadow-sm">
-                                <AlertCircle className="h-5 w-5 text-amber-600" />
-                                <AlertTitle className="text-amber-800 font-black text-base">تنبيه ودي (HR Guidance)</AlertTitle>
-                                <AlertDescription className="text-sm font-bold text-amber-700 leading-relaxed mt-1">
-                                    الإجازة السنوية عادةً ما تطلب كفترة راحة طويلة (شهر كامل). إذا كانت رغبتك في إجازة قصيرة جداً (أقل من شهر)، ربما تفضل اختيار نوع "طارئة" أو تقديم "طلب استئذان" من الميدان للحفاظ على رصيد إجازتك السنوية المجمعة.
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
                         <div className="text-sm font-bold p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col sm:flex-row justify-around gap-4 text-center">
                             <div className="space-y-1">
                                 <p className="text-[10px] uppercase text-muted-foreground tracking-widest">إجمالي الأيام</p>
@@ -288,24 +282,6 @@ export default function NewLeaveRequestPage() {
                                 <p className="text-2xl font-black text-primary">{leaveAnalysis.workingDays} يوم</p>
                             </div>
                         </div>
-
-                        {leaveType === 'Annual' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="p-4 rounded-2xl bg-green-50 border border-green-100 flex flex-col items-center gap-1">
-                                    <Label className="text-[10px] font-black text-green-700 uppercase">خصم من الرصيد</Label>
-                                    <p className="text-2xl font-black text-green-800 font-mono">{leaveAnalysis.paidDays} <span className="text-sm font-bold">يوم</span></p>
-                                </div>
-                                <div className={cn(
-                                    "p-4 rounded-2xl border flex flex-col items-center gap-1 transition-all",
-                                    leaveAnalysis.unpaidDays > 0 ? "bg-orange-50 border-orange-200 animate-pulse" : "bg-muted/30 border-muted opacity-40"
-                                )}>
-                                    <Label className={cn("text-[10px] font-black uppercase", leaveAnalysis.unpaidDays > 0 ? "text-orange-700" : "text-muted-foreground")}>بدون راتب (عجز رصيد)</Label>
-                                    <p className={cn("text-2xl font-black font-mono", leaveAnalysis.unpaidDays > 0 ? "text-orange-800" : "text-muted-foreground")}>
-                                        {leaveAnalysis.unpaidDays} <span className="text-sm font-bold">يوم</span>
-                                    </p>
-                                </div>
-                            </div>
-                        )}
                       </div>
                     )}
 

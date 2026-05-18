@@ -40,12 +40,16 @@ const statusColors: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   approved: 'bg-green-100 text-green-800 border-green-200',
   rejected: 'bg-red-100 text-red-800 border-red-200',
+  'on-leave': 'bg-blue-100 text-blue-800 border-blue-200',
+  'returned': 'bg-indigo-100 text-indigo-800 border-indigo-200',
 };
 
 const statusTranslations: Record<string, string> = {
   pending: 'معلق',
   approved: 'موافق عليه',
   rejected: 'مرفوض',
+  'on-leave': 'في إجازة',
+  'returned': 'عاد للعمل',
 };
 
 export function LeaveRequestsList() {
@@ -87,7 +91,7 @@ export function LeaveRequestsList() {
             approvedAt: serverTimestamp()
         });
         toast({ title: '✅ تمت الموافقة' });
-    } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الصلاحيات' }); }
+    } catch (e) { toast({ variant: 'destructive', title: 'عائق صلاحيات' }); }
   };
 
   const handleReject = async (req: LeaveRequest) => {
@@ -100,7 +104,7 @@ export function LeaveRequestsList() {
             rejectedAt: serverTimestamp()
         });
         toast({ title: '❌ تم الرفض' });
-    } catch (e) { toast({ variant: 'destructive', title: 'خطأ في الصلاحيات' }); }
+    } catch (e) { toast({ variant: 'destructive', title: 'عائق صلاحيات' }); }
   };
 
   if (loading) return <Skeleton className="h-64 w-full rounded-2xl" />;
@@ -130,7 +134,9 @@ export function LeaveRequestsList() {
             ) : (
               leaveRequests.map(req => (
                 <TableRow key={req.id} className="hover:bg-[#F3E8FF]/20 h-16">
-                  <TableCell className="px-8 font-black text-slate-800">{req.employeeName}</TableCell>
+                  <TableCell className="px-8 font-black text-slate-800">
+                      <Link href={`/dashboard/hr/leaves/${req.id}`} className="hover:underline">{req.employeeName}</Link>
+                  </TableCell>
                   <TableCell><Badge variant="secondary" className="font-bold">{req.leaveType}</Badge></TableCell>
                   <TableCell className="font-mono text-xs opacity-60 font-bold">{formatDate(req.startDate)} - {formatDate(req.endDate)}</TableCell>
                   <TableCell><Badge variant="outline" className={cn("px-3 font-black text-[10px]", statusColors[req.status])}>{statusTranslations[req.status]}</Badge></TableCell>
